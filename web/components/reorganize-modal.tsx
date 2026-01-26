@@ -85,7 +85,7 @@ export function ReorganizeModal({
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-900/95 backdrop-blur-sm">
           <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
-            <Sparkles className="w-6 h-6 text-purple-400" />
+            <Sparkles className="w-6 h-6 text-indigo-400" />
             AI 重組建議 - {proposal.product_name}
           </h2>
           <button
@@ -99,8 +99,8 @@ export function ReorganizeModal({
         {/* Body */}
         <div className="space-y-6 px-6 py-4">
           {/* 1. 分析結果 */}
-          <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-            <h3 className="font-semibold text-purple-300 mb-2 flex items-center gap-2">
+          <div className="p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+            <h3 className="font-semibold text-indigo-300 mb-2 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               分析結果
             </h3>
@@ -117,7 +117,7 @@ export function ReorganizeModal({
               <li>將重新分配所有 Tasks 到新的 Topic 群組</li>
               <li>將更新 {proposal.time_inferences.filter(t => t.suggested_due_date).length} 個 Tasks 的截止日期</li>
               {proposal.task_consolidations && proposal.task_consolidations.length > 0 && (
-                <li className="text-purple-300">
+                <li className="text-indigo-300">
                   將整合 {proposal.task_consolidations.reduce((acc, c) => acc + c.sub_task_ids.length + 1, 0)} 個細碎 Tasks 為 {proposal.task_consolidations.length} 個帶待辦事項的主 Task
                 </li>
               )}
@@ -134,23 +134,23 @@ export function ReorganizeModal({
               </h3>
               <div className="space-y-3">
                 {proposal.task_consolidations.map((consolidation, idx) => (
-                  <div key={idx} className="p-3 rounded-lg bg-gradient-to-br from-purple-900/30 to-indigo-900/30 border border-purple-500/20">
+                  <div key={idx} className="p-3 rounded-lg bg-gradient-to-br from-purple-900/30 to-indigo-900/30 border border-indigo-500/20">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h4 className="font-medium text-purple-200">{consolidation.consolidated_title}</h4>
+                        <h4 className="font-medium text-indigo-200">{consolidation.consolidated_title}</h4>
                         <p className="text-xs text-white/50 mt-1">{consolidation.consolidated_narrative}</p>
                       </div>
-                      <span className="shrink-0 ml-2 px-2 py-0.5 rounded-full text-xs border border-purple-400/30 text-purple-300">
+                      <span className="shrink-0 ml-2 px-2 py-0.5 rounded-full text-xs border border-indigo-400/30 text-indigo-300">
                         信心度 {Math.round(consolidation.confidence * 100)}%
                       </span>
                     </div>
                     <div className="text-xs text-white/40 mb-2">
-                      <span className="text-purple-400">原因：</span>{consolidation.reasoning}
+                      <span className="text-indigo-400">原因：</span>{consolidation.reasoning}
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="text-white/50">{consolidation.sub_task_ids.length + 1} 個細項</span>
-                      <ArrowRight className="w-3 h-3 text-purple-400" />
-                      <span className="text-purple-300">1 個主 Task + {consolidation.sub_task_ids.length} 個待辦事項</span>
+                      <ArrowRight className="w-3 h-3 text-indigo-400" />
+                      <span className="text-indigo-300">1 個主 Task + {consolidation.sub_task_ids.length} 個待辦事項</span>
                     </div>
                   </div>
                 ))}
@@ -196,7 +196,7 @@ export function ReorganizeModal({
                         {inference.urgency_level.toUpperCase()}
                       </span>
                       {inference.inferred_from_milestone_id && (
-                        <div className="flex items-center gap-1 text-xs text-purple-400">
+                        <div className="flex items-center gap-1 text-xs text-indigo-400">
                           <Target className="w-3 h-3" />
                           里程碑
                         </div>
@@ -230,7 +230,7 @@ export function ReorganizeModal({
           <Button
             onClick={onApply}
             disabled={isApplying}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+            className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
           >
             {isApplying ? "應用中..." : "應用重組"}
           </Button>

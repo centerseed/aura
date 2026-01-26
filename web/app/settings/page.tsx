@@ -58,7 +58,7 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
       </div>
     );
   }
@@ -76,7 +76,7 @@ export default function SettingsPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             返回 Dashboard
           </Button>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent">
             帳號設定
           </h1>
           <p className="text-slate-400 mt-2">管理你的帳號資訊與偏好設定</p>
@@ -87,7 +87,7 @@ export default function SettingsPage() {
           <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
               <CardTitle className="flex items-center text-white">
-                <User className="w-5 h-5 mr-2 text-purple-400" />
+                <User className="w-5 h-5 mr-2 text-indigo-400" />
                 個人資訊
               </CardTitle>
               <CardDescription className="text-slate-400">

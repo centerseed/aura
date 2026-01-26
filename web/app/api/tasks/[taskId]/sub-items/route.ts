@@ -28,9 +28,8 @@ export async function POST(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // 獲取現有的 ai_analysis
-    const aiAnalysis = (task.ai_analysis as Record<string, unknown>) || {};
-    const subItems = (aiAnalysis.sub_items as Array<{
+    // ✅ 修復: 從正確欄位讀取 sub_items
+    const subItems = (task.sub_items as Array<{
       id: string;
       content: string;
       completed: boolean;
@@ -56,22 +55,11 @@ export async function POST(
     const completedCount = updatedSubItems.filter((item) => item.completed).length;
     const completionRate = total > 0 ? completedCount / total : 0;
 
-    // 更新 ai_analysis
-    const updatedAiAnalysis = {
-      ...aiAnalysis,
-      sub_items: updatedSubItems,
-      sub_items_meta: {
-        total,
-        completed: completedCount,
-        completion_rate: completionRate,
-      },
-    };
-
-    // 保存到資料庫
+    // ✅ 修復: 保存到資料庫的正確欄位
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        ai_analysis: updatedAiAnalysis,
+        sub_items: updatedSubItems,
         updated_at: new Date(),
       },
     });

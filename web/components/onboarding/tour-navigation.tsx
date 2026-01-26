@@ -58,9 +58,9 @@ export function TourNavigation({
                 }}
                 className={`transition-all duration-300 rounded-full ${
                   i + 1 === currentScene
-                    ? "w-8 h-2 bg-gradient-to-r from-purple-500 to-indigo-500"
+                    ? "w-8 h-2 bg-gradient-to-r from-indigo-500 to-indigo-500"
                     : i + 1 < currentScene
-                    ? "w-2 h-2 bg-purple-500/50"
+                    ? "w-2 h-2 bg-indigo-500/50"
                     : "w-2 h-2 bg-white/20"
                 }`}
                 aria-label={`Scene ${i + 1}`}
@@ -72,7 +72,7 @@ export function TourNavigation({
           <div className="w-32 flex justify-end">
             <Button
               onClick={onNext}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-lg transition-all duration-300 shadow-lg shadow-purple-500/20 hover:shadow-lg hover:shadow-purple-500/40"
+              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white font-medium rounded-lg transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/40"
             >
               <span className="text-sm">
                 {currentScene === totalScenes ? "開始使用" : "下一步"}

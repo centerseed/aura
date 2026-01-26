@@ -18,8 +18,8 @@ const COLUMN_CONFIG: Record<DrawerStatus, { icon: typeof Inbox; gradient: string
   },
   MAINTAIN: {
     icon: RefreshCw,
-    gradient: "from-purple-500/10 to-pink-500/5",
-    border: "border-purple-200 dark:border-purple-800",
+    gradient: "from-indigo-500/10 to-emerald-500/5",
+    border: "border-indigo-200 dark:border-purple-800",
   },
   REFERENCE: {
     icon: BookOpen,
@@ -55,7 +55,7 @@ export function KanbanColumn({ id, title, color, tasks, onToggleSubItem, onSetDu
         flex flex-col rounded-2xl bg-gradient-to-b ${config.gradient}
         border-2 ${config.border}
         min-h-[500px] transition-all duration-200
-        ${isOver ? "ring-2 ring-purple-500 ring-offset-2 scale-[1.02]" : ""}
+        ${isOver ? "ring-2 ring-indigo-500 ring-offset-2 scale-[1.02]" : ""}
       `}
     >
       {/* Column Header */}

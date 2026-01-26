@@ -30,7 +30,7 @@ const PRESET_AREAS = [
     name: "個人",
     scope: "興趣愛好、自我學習、心靈成長、休閒娛樂",
     icon: User,
-    color: "from-purple-500 to-pink-500",
+    color: "from-indigo-500 to-emerald-500",
   },
   {
     name: "人際",
@@ -165,17 +165,17 @@ function OnboardingContent() {
     <main className="min-h-screen bg-slate-950 text-white relative">
       {/* 極簡背景 - 只保留細微裝飾 */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-30">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-violet-600/15 rounded-full blur-[100px]" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-600/15 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative max-w-4xl mx-auto px-6 py-6">
         {/* Header - 緊湊版 */}
         <div className="text-center mb-8 space-y-3">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 backdrop-blur-xl shadow-lg shadow-purple-500/10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-500/10 to-emerald-500/10 border border-indigo-500/20 backdrop-blur-xl shadow-lg shadow-indigo-500/10">
             <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-            <span className="text-sm font-medium bg-gradient-to-r from-purple-200 to-pink-200 bg-clip-text text-transparent">設定你的身份地圖</span>
+            <span className="text-sm font-medium bg-gradient-to-r from-indigo-200 to-emerald-200 bg-clip-text text-transparent">設定你的身份地圖</span>
           </div>
 
           {/* Title */}
@@ -183,7 +183,7 @@ function OnboardingContent() {
             <span className="inline-block bg-gradient-to-br from-white via-white to-white/80 bg-clip-text text-transparent drop-shadow-2xl">
               嗨，
             </span>
-            <span className="inline-block bg-gradient-to-r from-purple-400 via-violet-400 to-pink-400 bg-clip-text text-transparent animate-[gradient_3s_ease_infinite] bg-[length:200%_auto]">
+            <span className="inline-block bg-gradient-to-r from-indigo-400 via-indigo-400 to-emerald-400 bg-clip-text text-transparent animate-[gradient_3s_ease_infinite] bg-[length:200%_auto]">
               {userName}
             </span>
           </h1>
@@ -191,7 +191,7 @@ function OnboardingContent() {
           {/* Description */}
           <div className="max-w-2xl mx-auto space-y-1">
             <p className="text-lg text-white/80 leading-relaxed">
-              在開始之前，讓我們先定義你的<span className="text-purple-300 font-semibold">「身份地圖」</span>
+              在開始之前，讓我們先定義你的<span className="text-indigo-300 font-semibold">「身份地圖」</span>
             </p>
             <p className="text-sm text-white/50">
               系統會根據這些身分來組織你的資訊，讓一切井然有序
@@ -202,7 +202,7 @@ function OnboardingContent() {
         {/* Preset Areas - 緊湊版 */}
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-white/60 uppercase tracking-widest mb-3 flex items-center gap-2">
-            <span className="inline-block w-1 h-4 bg-gradient-to-b from-purple-400 to-pink-400 rounded-full"></span>
+            <span className="inline-block w-1 h-4 bg-gradient-to-b from-indigo-400 to-emerald-400 rounded-full"></span>
             選擇你的身份（可多選）
           </h2>
 
@@ -220,14 +220,14 @@ function OnboardingContent() {
                     transition-all duration-500 ease-out
                     backdrop-blur-xl
                     ${isSelected
-                      ? "border-purple-400/60 bg-gradient-to-br from-purple-500/20 via-violet-500/15 to-pink-500/20 shadow-2xl shadow-purple-500/20 scale-[1.02]"
+                      ? "border-indigo-400/60 bg-gradient-to-br from-indigo-500/20 via-indigo-500/15 to-emerald-500/20 shadow-2xl shadow-indigo-500/20 scale-[1.02]"
                       : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/25 hover:shadow-xl hover:shadow-white/5 hover:scale-[1.01]"
                     }
                   `}
                 >
                   {/* 光暈效果 */}
                   {isSelected && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl blur-xl -z-10"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-emerald-500/20 rounded-2xl blur-xl -z-10"></div>
                   )}
 
                   {/* Selection Indicator */}
@@ -236,7 +236,7 @@ function OnboardingContent() {
                       absolute top-4 right-4 w-6 h-6 rounded-full flex items-center justify-center
                       transition-all duration-300 shadow-lg
                       ${isSelected
-                        ? "bg-gradient-to-br from-purple-500 to-violet-600 scale-110 rotate-12"
+                        ? "bg-gradient-to-br from-indigo-500 to-indigo-600 scale-110 rotate-12"
                         : "bg-white/10 group-hover:bg-white/20 group-hover:scale-105"
                       }
                     `}
@@ -258,7 +258,7 @@ function OnboardingContent() {
 
                     {/* Content */}
                     <div className="flex-1 pt-1">
-                      <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-purple-200 transition-colors">
+                      <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-indigo-200 transition-colors">
                         {area.name}
                       </h3>
                       <p className="text-sm text-white/60 leading-relaxed group-hover:text-white/80 transition-colors">
@@ -277,9 +277,9 @@ function OnboardingContent() {
           {!showCustom ? (
             <button
               onClick={() => setShowCustom(true)}
-              className="group flex items-center gap-2 text-white/50 hover:text-purple-300 transition-all duration-300 hover:gap-3"
+              className="group flex items-center gap-2 text-white/50 hover:text-indigo-300 transition-all duration-300 hover:gap-3"
             >
-              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
                 <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
               </div>
               <span className="font-medium">新增自定義身份</span>
@@ -287,10 +287,10 @@ function OnboardingContent() {
           ) : (
             <div className="relative p-6 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 backdrop-blur-xl shadow-xl">
               {/* 裝飾性光暈 */}
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl blur-lg -z-10"></div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/20 to-emerald-500/20 rounded-2xl blur-lg -z-10"></div>
 
               <h3 className="text-white font-bold mb-5 flex items-center gap-2 text-lg">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center">
                   <Rocket className="w-4 h-4 text-white" />
                 </div>
                 自定義身份
@@ -304,7 +304,7 @@ function OnboardingContent() {
                     value={customArea.name}
                     onChange={(e) => setCustomArea((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="例如：創作者、學生、父母"
-                    className="w-full px-4 py-3.5 rounded-xl bg-white/5 border border-white/20 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
+                    className="w-full px-4 py-3.5 rounded-xl bg-white/5 border border-white/20 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
                   />
                 </div>
 
@@ -315,7 +315,7 @@ function OnboardingContent() {
                     onChange={(e) => setCustomArea((prev) => ({ ...prev, scope: e.target.value }))}
                     placeholder="例如：內容創作、影片製作、社群經營..."
                     rows={3}
-                    className="w-full px-4 py-3.5 rounded-xl bg-white/5 border border-white/20 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none transition-all"
+                    className="w-full px-4 py-3.5 rounded-xl bg-white/5 border border-white/20 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 resize-none transition-all"
                   />
                 </div>
               </div>
@@ -330,7 +330,7 @@ function OnboardingContent() {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
                 <span className="text-white/60">已選擇</span>
-                <span className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2.5 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-400/30 text-purple-200 font-bold text-sm shadow-lg">
+                <span className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2.5 rounded-lg bg-gradient-to-br from-indigo-500/20 to-emerald-500/20 border border-indigo-400/30 text-indigo-200 font-bold text-sm shadow-lg">
                   {totalSelected}
                 </span>
                 <span className="text-white/60">個身份</span>
@@ -346,10 +346,10 @@ function OnboardingContent() {
           <Button
             onClick={handleSubmit}
             disabled={totalSelected === 0 || isSubmitting}
-            className="group relative h-13 px-10 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:via-violet-500 hover:to-indigo-500 text-white font-semibold text-base rounded-xl shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+            className="group relative h-13 px-10 bg-gradient-to-r from-indigo-600 via-indigo-600 to-emerald-600 hover:from-indigo-500 hover:via-indigo-500 hover:to-emerald-500 text-white font-semibold text-base rounded-xl shadow-2xl shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
           >
             {/* 光暈效果 */}
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl blur opacity-50 group-hover:opacity-75 transition duration-300 -z-10"></div>
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-emerald-600 rounded-xl blur opacity-50 group-hover:opacity-75 transition duration-300 -z-10"></div>
 
             {isSubmitting ? (
               <div className="flex items-center gap-2">
@@ -374,7 +374,7 @@ export default function OnboardingPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-slate-900">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         </div>
       }
     >

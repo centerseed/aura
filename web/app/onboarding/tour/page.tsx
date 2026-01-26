@@ -74,7 +74,7 @@ function TourContent() {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
           <p className="text-white/60">準備導覽中...</p>
         </div>
       </main>
@@ -87,8 +87,8 @@ function TourContent() {
     >
       {/* 極簡背景 */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-30">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-violet-600/15 rounded-full blur-[100px]" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-600/15 rounded-full blur-[100px]" />
       </div>
 
       {/* Scene Content */}
@@ -113,7 +113,7 @@ function TourContent() {
 function LoadingFallback() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
     </main>
   );
 }

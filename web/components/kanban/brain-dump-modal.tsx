@@ -35,7 +35,7 @@ export function BrainDumpModal({ isOpen, onClose, onSubmit, isLoading }: BrainDu
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -57,16 +57,16 @@ export function BrainDumpModal({ isOpen, onClose, onSubmit, isLoading }: BrainDu
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="腦袋裡在想什麼？任務、想法、隨機念頭——全部倒出來，AI 會幫你整理..."
-            className="w-full h-48 p-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
+            className="w-full h-48 p-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
             autoFocus
           />
 
           {/* Tips */}
-          <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-500/20">
-            <p className="text-sm text-purple-300">
+          <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-indigo-500/20">
+            <p className="text-sm text-indigo-300">
               <strong>提示：</strong>可以混合多個主題，使用任何語言。AI 會：
             </p>
-            <ul className="mt-2 text-sm text-purple-400 space-y-1">
+            <ul className="mt-2 text-sm text-indigo-400 space-y-1">
               <li>• 從你的意識流中識別出不同的項目</li>
               <li>• 將每個項目分類到正確的 身分 → 產品 → 主題</li>
               <li>• 判斷緊急程度和生命週期階段</li>
@@ -82,7 +82,7 @@ export function BrainDumpModal({ isOpen, onClose, onSubmit, isLoading }: BrainDu
           <Button
             onClick={handleSubmit}
             disabled={!text.trim() || isLoading}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white min-w-[120px]"
+            className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white min-w-[120px]"
           >
             {isLoading ? (
               <>

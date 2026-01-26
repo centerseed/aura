@@ -346,10 +346,18 @@ ${text}
         aiAnalysis.due_date_source = item.due_date_source;
       }
 
-      // 處理 sub_items (待辦事項清單)
+      // 處理 sub_items (待辦事項清單) - 準備寫入 task.sub_items
+      let taskSubItems: Array<{
+        id: string;
+        content: string;
+        completed: boolean;
+        created_at: string;
+        completed_at: string | null;
+        order: number;
+      }> = [];
       if (item.sub_items && item.sub_items.length > 0) {
         const now = new Date().toISOString();
-        aiAnalysis.sub_items = item.sub_items.map((sub, idx) => ({
+        taskSubItems = item.sub_items.map((sub, idx) => ({
           id: crypto.randomUUID(),
           content: sub.content,
           completed: false,
@@ -357,11 +365,6 @@ ${text}
           completed_at: null,
           order: idx,
         }));
-        aiAnalysis.sub_items_meta = {
-          total: item.sub_items.length,
-          completed: 0,
-          completion_rate: 0,
-        };
       }
 
       // 驗證 inferred_from_milestone 是否為有效 UUID
@@ -381,6 +384,7 @@ ${text}
           due_date: item.due_date ? new Date(item.due_date) : null,
           inferred_from_milestone: validMilestoneId,
           time_confidence: item.time_confidence !== undefined ? item.time_confidence : null,
+          sub_items: taskSubItems, // ✅ 修復: 將 sub_items 寫入正確欄位
           ai_analysis: aiAnalysis,
         },
       });

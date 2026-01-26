@@ -84,7 +84,7 @@ export async function PATCH(
 
 // DELETE /api/products/:id - 軟刪除 Product
 export async function DELETE(
-  request: Request,
+  _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
@@ -94,7 +94,10 @@ export async function DELETE(
       where: { id: params.id, deleted_at: null },
       include: {
         tasks: {
-          where: { deleted_at: null },
+          where: {
+            deleted_at: null,
+            status: { not: "ARCHIVE" } // 只檢查未歸檔的 tasks
+          },
         },
       },
     });
@@ -103,12 +106,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // 檢查是否有關聯的 Tasks
+    // 檢查是否有關聯的未完成 Tasks
     if (existing.tasks.length > 0) {
       return NextResponse.json(
         {
-          error: "Cannot delete product with existing tasks",
-          details: `This product has ${existing.tasks.length} task(s). Please delete or move them first.`,
+          error: "Cannot delete product with active tasks",
+          details: `This product has ${existing.tasks.length} active task(s). Please complete, delete, or move them first.`,
         },
         { status: 409 }
       );

@@ -51,9 +51,8 @@ export async function POST(
       return NextResponse.json({ error: "Target task not found" }, { status: 404 });
     }
 
-    // 獲取目標 Task 的 ai_analysis
-    const targetAiAnalysis = (targetTask.ai_analysis as Record<string, unknown>) || {};
-    const existingSubItems = (targetAiAnalysis.sub_items as Array<{
+    // ✅ 修復: 從正確欄位讀取 sub_items
+    const existingSubItems = (targetTask.sub_items as Array<{
       id: string;
       content: string;
       completed: boolean;
@@ -79,17 +78,6 @@ export async function POST(
     const updatedSubItems = [...existingSubItems, newSubItem];
     const completedCount = updatedSubItems.filter((item) => item.completed).length;
     const total = updatedSubItems.length;
-
-    // 更新目標 Task 的 ai_analysis
-    const updatedAiAnalysis = {
-      ...targetAiAnalysis,
-      sub_items: updatedSubItems,
-      sub_items_meta: {
-        total,
-        completed: completedCount,
-        completion_rate: total > 0 ? completedCount / total : 0,
-      },
-    };
 
     // 計算合併後的 start_date（取最早的開始時間）
     const sourceStartDate = sourceTask.start_date;
@@ -133,11 +121,11 @@ export async function POST(
 
     // 使用 transaction 確保原子性
     await prisma.$transaction([
-      // 更新目標 Task
+      // ✅ 修復: 更新目標 Task,將 sub_items 寫入正確欄位
       prisma.task.update({
         where: { id: targetTaskId },
         data: {
-          ai_analysis: updatedAiAnalysis,
+          sub_items: updatedSubItems,
           start_date: mergedStartDate, // 保留最早的開始時間
           references: mergedReferences as any, // 合併後的 references
           updated_at: new Date(),

@@ -105,3 +105,11 @@ Zentropy 專為 **"High-Context Individuals" (高語境個體)** 設計，特別
 *   **Founders**: 同時身兼產品經理、募資者與團隊領袖，需要 L1 Area 來隔離不同身分的焦慮。
 *   **Polymaths**: 在不同專業領域間頻繁切換身分的人。
 *   **PM/Designers**: 需要管理大量非結構化靈感，並轉化為結構化資產的人。
+
+## 9. 商業模式 (The Entropy Series)
+
+Zentropy 採用 **"Governance-as-a-Service"** 模式，依據用戶需要的「秩序量級」收費：
+
+1.  **Atom (原子)** - *Free*: 基礎建設。每月限量 50 則整理，單一身分。
+2.  **Fusion (融合)** - *Paid*: 無限能量。無限整理、多重身分、多模態輸入與 Slack/Calendar 整合。
+3.  **Nexus (樞紐)** - *Premium*: 生態中樞。多人協作、Headless MCP 支援與 API 存取。

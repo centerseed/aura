@@ -42,6 +42,9 @@ import {
   Sparkles,
   X,
   CheckCircle2,
+  ExternalLink,
+  FileText,
+  Trash2,
 } from "lucide-react";
 import type { TaskCard, DrawerStatus } from "@/types";
 import { QuickCapture } from "@/components/quick-capture";
@@ -53,6 +56,7 @@ import { ProductModal } from "@/components/product-modal";
 import { AreaModal } from "@/components/area-modal";
 import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
+import { TaskDetailModal } from "@/components/task-detail-modal";
 
 // 視圖類型
 type ViewMode = "structure" | "timeline" | "gantt";
@@ -61,7 +65,7 @@ type ViewMode = "structure" | "timeline" | "gantt";
 const DRAWER_CONFIG: Record<DrawerStatus, { label: string; icon: typeof Inbox; color: string; dotColor: string }> = {
   INBOX: { label: "收件匣", icon: Inbox, color: "text-amber-500", dotColor: "bg-amber-500" },
   ACTIVE: { label: "進行中", icon: Rocket, color: "text-blue-500", dotColor: "bg-blue-500" },
-  MAINTAIN: { label: "維護中", icon: RefreshCw, color: "text-purple-500", dotColor: "bg-purple-500" },
+  MAINTAIN: { label: "維護中", icon: RefreshCw, color: "text-indigo-500", dotColor: "bg-indigo-500" },
   REFERENCE: { label: "參考資料", icon: BookOpen, color: "text-green-500", dotColor: "bg-green-500" },
   ARCHIVE: { label: "已歸檔", icon: Archive, color: "text-slate-400", dotColor: "bg-slate-400" },
 };
@@ -114,6 +118,8 @@ function DraggableTaskItem({
   onEditTitle,
   onEditSubItem,
   onAddSubItem,
+  onDeleteReference,
+  onOpenDetail,
   isDropTarget = false,
 }: {
   task: TaskCard;
@@ -124,6 +130,8 @@ function DraggableTaskItem({
   onEditTitle?: (taskId: string, newTitle: string) => void;
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
   onAddSubItem?: (taskId: string, content: string) => void;
+  onDeleteReference?: (taskId: string, referenceId: string) => void;
+  onOpenDetail?: () => void;
   isDropTarget?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -147,6 +155,7 @@ function DraggableTaskItem({
   });
 
   const drawerConfig = DRAWER_CONFIG[task.drawer] || DRAWER_CONFIG.INBOX;
+  const isCompleted = task.drawer === "ARCHIVE";
 
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
@@ -158,15 +167,25 @@ function DraggableTaskItem({
     <div
       ref={setDragRef}
       style={style}
-      {...(isEditing ? {} : listeners)}
-      {...(isEditing ? {} : attributes)}
+      {...(isEditing || isCompleted ? {} : listeners)}
+      {...(isEditing || isCompleted ? {} : attributes)}
+      onClick={(e) => {
+        // 已完成的卡片點擊整個區域可以取消標記
+        if (isCompleted && !isEditing) {
+          e.stopPropagation();
+          onComplete?.(task.id);
+        }
+      }}
       className={`
-        group relative bg-white/10 rounded-lg border
-        p-3 ${isEditing ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
-        hover:bg-white/15 hover:border-white/20
+        group relative rounded-lg border p-3
+        ${isEditing ? "cursor-default" : isCompleted ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}
         transition-all duration-150
+        ${isCompleted
+          ? "bg-green-500/20 border-green-500/30 hover:bg-green-500/30 hover:border-green-500/40"
+          : "bg-white/10 border-white/10 hover:bg-white/15 hover:border-white/20"
+        }
         ${isDragging ? "opacity-50 scale-105" : ""}
-        ${isOver ? "" : "border-white/10"}
+        ${isOver ? "" : ""}
       `}
     >
       <div className="flex items-start gap-3">
@@ -196,7 +215,7 @@ function DraggableTaskItem({
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 autoFocus
-                className="flex-1 bg-white/10 border border-white/30 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-purple-400"
+                className="flex-1 bg-white/10 border border-white/30 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-indigo-400"
                 onKeyDown={(e) => {
                   e.stopPropagation();
                   if (e.key === "Escape") {
@@ -240,18 +259,19 @@ function DraggableTaskItem({
             <h4
               ref={setDropRef}
               className={`
-                font-medium text-white text-sm leading-snug cursor-pointer hover:text-purple-300 transition-colors
+                font-medium text-white text-sm leading-snug cursor-pointer hover:text-indigo-300 transition-colors
                 rounded px-2 py-1 -mx-2
-                ${isOver ? "bg-purple-500/30 ring-2 ring-purple-500" : ""}
+                ${isOver ? "bg-indigo-500/30 ring-2 ring-indigo-500" : ""}
               `}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                setEditTitle(task.title);
-                setIsEditing(true);
+                if (!isOver) {
+                  onOpenDetail?.();
+                }
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              title={isOver ? "放開以合併為待辦事項" : "點擊編輯標題"}
+              title={isOver ? "放開以合併為待辦事項" : "點擊查看詳情"}
             >
               {task.title}
             </h4>
@@ -265,45 +285,49 @@ function DraggableTaskItem({
               </span>
             </div>
 
-            {/* Due Date Badge */}
-            {dueInfo ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onSetDueDate?.(task);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors
-                  ${dueInfo.isOverdue
-                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                    : dueInfo.isUrgent
-                      ? "bg-orange-500/20 text-orange-400 hover:bg-orange-500/30"
-                      : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
-                  }`}
-              >
-                {dueInfo.isOverdue && <AlertCircle className="w-3 h-3" />}
-                {!dueInfo.isOverdue && <Calendar className="w-3 h-3" />}
-                {dueInfo.text}
-              </button>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onSetDueDate?.(task);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-white/40 hover:text-white/60 hover:bg-white/10 transition-colors"
-              >
-                <Calendar className="w-3 h-3" />
-                設定日期
-              </button>
+            {/* Due Date Badge - Hidden when completed */}
+            {!isCompleted && (
+              <>
+                {dueInfo ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onSetDueDate?.(task);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors
+                      ${dueInfo.isOverdue
+                        ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                        : dueInfo.isUrgent
+                          ? "bg-orange-500/20 text-orange-400 hover:bg-orange-500/30"
+                          : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+                      }`}
+                  >
+                    {dueInfo.isOverdue && <AlertCircle className="w-3 h-3" />}
+                    {!dueInfo.isOverdue && <Calendar className="w-3 h-3" />}
+                    {dueInfo.text}
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onSetDueDate?.(task);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-white/40 hover:text-white/60 hover:bg-white/10 transition-colors"
+                  >
+                    <Calendar className="w-3 h-3" />
+                    設定日期
+                  </button>
+                )}
+              </>
             )}
           </div>
 
-          {/* Sub-items 簡化顯示 */}
-          {task.sub_items && task.sub_items.length > 0 && (
+          {/* Sub-items 簡化顯示 - Hidden when completed */}
+          {!isCompleted && task.sub_items && task.sub_items.length > 0 && (
             <div className="mt-2 space-y-1">
               {(showAllSubItems ? task.sub_items : task.sub_items.slice(0, 3)).map((subItem) => (
                 <div
@@ -331,7 +355,7 @@ function DraggableTaskItem({
                           value={editSubItemContent}
                           onChange={(e) => setEditSubItemContent(e.target.value)}
                           autoFocus
-                          className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-purple-400"
+                          className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-indigo-400"
                           onKeyDown={(e) => {
                             e.stopPropagation();
                             if (e.key === "Escape") {
@@ -461,7 +485,7 @@ function DraggableTaskItem({
                     onChange={(e) => setNewSubItemContent(e.target.value)}
                     placeholder="新增待辦事項..."
                     autoFocus
-                    className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-purple-400"
+                    className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-indigo-400"
                     onKeyDown={(e) => {
                       e.stopPropagation();
                       if (e.key === "Escape") {
@@ -513,7 +537,7 @@ function DraggableTaskItem({
                 <div className="flex items-center gap-2 mt-1.5">
                   <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all"
+                      className="h-full bg-gradient-to-r from-indigo-500 to-indigo-500 transition-all"
                       style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
                     />
                   </div>
@@ -524,10 +548,78 @@ function DraggableTaskItem({
               )}
             </div>
           )}
+
+          {/* References 區塊 - Hidden when completed */}
+          {!isCompleted && task.references && task.references.length > 0 && (
+            <div className="mt-2">
+              <div className="text-xs text-white/40 mb-1">參考資料</div>
+              <div className="space-y-1">
+                {task.references.map((ref) => (
+                  <div
+                    key={ref.id}
+                    className="group/ref flex items-start gap-1.5 text-xs hover:bg-white/5 rounded px-1 py-0.5 -mx-1"
+                  >
+                    {ref.type === "url" ? (
+                      <>
+                        <ExternalLink className="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
+                        <a
+                          href={ref.content}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 text-blue-400 hover:underline break-all"
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          {ref.title || ref.content}
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-3 h-3 text-white/40 shrink-0 mt-0.5" />
+                        <span className="flex-1 text-white/60 break-all">
+                          {ref.content}
+                        </span>
+                      </>
+                    )}
+                    {onDeleteReference && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          onDeleteReference(task.id, ref.id);
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="opacity-0 group-hover/ref:opacity-100 p-0.5 rounded hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-all shrink-0"
+                        title="刪除"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Complete Button (只在非 ARCHIVE 狀態顯示) */}
-        {task.drawer !== "ARCHIVE" && onComplete && (
+        {/* Completed Badge or Complete Button */}
+        {isCompleted ? (
+          /* Completed Badge - Click to undo */
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onComplete?.(task.id);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/30 hover:bg-green-500/50 transition-all cursor-pointer"
+            title="點擊取消標記為已完成"
+          >
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+          </button>
+        ) : onComplete ? (
+          /* Complete Button */
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -540,7 +632,7 @@ function DraggableTaskItem({
           >
             <CheckCircle2 className="w-4 h-4" />
           </button>
-        )}
+        ) : null}
 
         <GripVertical className="w-4 h-4 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
       </div>
@@ -553,7 +645,7 @@ function DragOverlayTask({ task }: { task: TaskCard }) {
   const drawerConfig = DRAWER_CONFIG[task.drawer] || DRAWER_CONFIG.INBOX;
 
   return (
-    <div className="bg-slate-800 rounded-lg border-2 border-purple-500 p-3 shadow-xl shadow-purple-500/25 rotate-3 scale-105">
+    <div className="bg-slate-800 rounded-lg border-2 border-indigo-500 p-3 shadow-xl shadow-indigo-500/25 rotate-3 scale-105">
       <div className="flex items-start gap-3">
         <div className={`mt-1.5 w-2 h-2 rounded-full ${drawerConfig.dotColor} shrink-0`} />
         <div className="flex-1 min-w-0">
@@ -571,9 +663,9 @@ function DragOverlayTask({ task }: { task: TaskCard }) {
 // 拖曳預覽 - Product
 function DragOverlayProduct({ productName }: { productName: string }) {
   return (
-    <div className="bg-slate-800 rounded-xl border-2 border-purple-500 p-4 shadow-xl shadow-purple-500/25 rotate-3 scale-105 min-w-[200px]">
+    <div className="bg-slate-800 rounded-xl border-2 border-indigo-500 p-4 shadow-xl shadow-indigo-500/25 rotate-3 scale-105 min-w-[200px]">
       <div className="flex items-center gap-2">
-        <Package className="w-4 h-4 text-purple-400" />
+        <Package className="w-4 h-4 text-indigo-400" />
         <span className="font-medium text-white">{productName}</span>
       </div>
     </div>
@@ -599,6 +691,8 @@ function DroppableProduct({
   onDeleteSubItem,
   onEditSubItem,
   onAddSubItem,
+  onDeleteReference,
+  onOpenTaskDetail,
   onRename,
   onEdit,
   onEditTaskTitle,
@@ -621,18 +715,20 @@ function DroppableProduct({
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
   onAddSubItem?: (taskId: string, content: string) => void;
+  onDeleteReference?: (taskId: string, referenceId: string) => void;
+  onOpenTaskDetail?: (task: TaskCard) => void;
   onRename?: (productId: string, newName: string) => void;
   onEdit?: (product: { id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string }) => void;
   onEditTaskTitle?: (taskId: string, newTitle: string) => void;
   isReorganizing?: boolean;
 }) {
-  // 作為放置目標（接收 Task）
+  // 作為放置目標（接收 Task 和其他 Product）
   const { setNodeRef: setDropRef } = useDroppable({
     id: `product-${productId}`,
-    data: { type: 'product', productId }
+    data: { type: 'product', productId, areaId }
   });
 
-  // 作為可拖曳項目（拖曳到 Area）
+  // 作為可拖曳項目（拖曳到 Area 或其他 Product）
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
     id: `draggable-product-${productId}`,
     data: {
@@ -670,7 +766,7 @@ function DroppableProduct({
         rounded-xl border-2 transition-all duration-200
         ${isDragging ? "opacity-50 scale-105" : ""}
         ${isOver
-          ? "border-purple-500 bg-purple-500/20 ring-2 ring-purple-500/50 scale-[1.02]"
+          ? "border-indigo-500 bg-indigo-500/20 ring-2 ring-indigo-500/50 scale-[1.02]"
           : "border-white/10 bg-white/5 backdrop-blur-sm"
         }
       `}
@@ -678,10 +774,11 @@ function DroppableProduct({
       <div className="border-b border-white/10">
         {/* Product Header */}
         <div
-          className="px-4 py-3 group/header cursor-grab active:cursor-grabbing"
+          className="px-4 py-3 group/header cursor-grab active:cursor-grabbing hover:bg-white/5 transition-colors"
           {...listeners}
         >
           <div className="flex items-center gap-2">
+            <GripVertical className="w-4 h-4 text-white/30 group-hover/header:text-white/60 transition-colors" />
             <Package className="w-4 h-4 text-white/50" />
             <span className="font-medium text-white flex-1 truncate">{productName}</span>
 
@@ -713,15 +810,15 @@ function DroppableProduct({
                 disabled={isReorganizing}
                 className={`p-1.5 rounded-md border transition-all ${
                   isReorganizing
-                    ? "bg-purple-500/30 border-purple-400/50 cursor-wait"
-                    : "bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/20 hover:border-purple-400/50"
+                    ? "bg-indigo-500/30 border-indigo-400/50 cursor-wait"
+                    : "bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20 hover:border-indigo-400/50"
                 }`}
                 title={isReorganizing ? "AI 分析中..." : "AI 自動整理 Topics 與時間"}
               >
                 {isReorganizing ? (
-                  <Loader2 className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 )}
               </button>
             )}
@@ -742,10 +839,10 @@ function DroppableProduct({
                 <button
                   key={milestone.id}
                   onClick={() => onEditMilestone(milestone)}
-                  className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
+                  className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors"
                   title={`點擊編輯「${milestone.name}」`}
                 >
-                  <Target className="w-3 h-3 text-purple-400 shrink-0" />
+                  <Target className="w-3 h-3 text-indigo-400 shrink-0" />
                   <span className="text-xs text-white/70 max-w-[120px] truncate">
                     {milestone.name}
                   </span>
@@ -755,7 +852,7 @@ function DroppableProduct({
                         ? "text-red-400"
                         : isUrgent
                         ? "text-orange-400"
-                        : "text-purple-300"
+                        : "text-indigo-300"
                     }`}
                   >
                     {isOverdue
@@ -769,11 +866,11 @@ function DroppableProduct({
             {/* 新增里程碑按鈕 */}
             <button
               onClick={() => onEditMilestone({ entity_type: "PRODUCT", entity_id: productId })}
-              className="flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors group"
+              className="flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/10 transition-colors group"
               title="新增里程碑"
             >
-              <Plus className="w-3 h-3 text-white/40 group-hover:text-purple-400 transition-colors" />
-              <span className="text-xs text-white/40 group-hover:text-purple-300 transition-colors">新增</span>
+              <Plus className="w-3 h-3 text-white/40 group-hover:text-indigo-400 transition-colors" />
+              <span className="text-xs text-white/40 group-hover:text-indigo-300 transition-colors">新增</span>
             </button>
           </div>
         )}
@@ -783,11 +880,11 @@ function DroppableProduct({
           <div className="px-4 pb-2">
             <button
               onClick={() => onEditMilestone({ entity_type: "PRODUCT", entity_id: productId })}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors w-full justify-center group"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/10 transition-colors w-full justify-center group"
               title="設定第一個里程碑"
             >
-              <Target className="w-3 h-3 text-white/30 group-hover:text-purple-400 transition-colors" />
-              <span className="text-xs text-white/40 group-hover:text-purple-300 transition-colors">設定里程碑</span>
+              <Target className="w-3 h-3 text-white/30 group-hover:text-indigo-400 transition-colors" />
+              <span className="text-xs text-white/40 group-hover:text-indigo-300 transition-colors">設定里程碑</span>
             </button>
           </div>
         )}
@@ -808,7 +905,7 @@ function DroppableProduct({
               // 兩個都有 due_date，按日期排序（早的在前）
               return new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime();
             })
-            .map((task) => <DraggableTaskItem key={task.id} task={task} onSetDueDate={onSetDueDate} onComplete={onComplete} onToggleSubItem={onToggleSubItem} onDeleteSubItem={onDeleteSubItem} onEditTitle={onEditTaskTitle} onEditSubItem={onEditSubItem} onAddSubItem={onAddSubItem} />)
+            .map((task) => <DraggableTaskItem key={task.id} task={task} onSetDueDate={onSetDueDate} onComplete={onComplete} onToggleSubItem={onToggleSubItem} onDeleteSubItem={onDeleteSubItem} onEditTitle={onEditTaskTitle} onEditSubItem={onEditSubItem} onAddSubItem={onAddSubItem} onDeleteReference={onDeleteReference} onOpenDetail={() => onOpenTaskDetail?.(task)} />)
         )}
       </div>
     </div>
@@ -841,12 +938,12 @@ function DroppableAreaHeader({
       ref={setNodeRef}
       className={`flex items-center justify-between mb-4 p-4 rounded-xl transition-all ${
         isOver
-          ? "bg-purple-500/10 border-2 border-purple-500 border-dashed"
+          ? "bg-indigo-500/10 border-2 border-indigo-500 border-dashed"
           : "border-2 border-transparent"
       }`}
     >
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
           <FolderOpen className="w-5 h-5 text-white" />
         </div>
         <div>
@@ -894,6 +991,8 @@ function DashboardContent() {
   const [editingArea, setEditingArea] = useState<{ id: string; name: string; scope?: string | null; description?: string | null } | null>(null);
   const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
   const [editingTaskForDueDate, setEditingTaskForDueDate] = useState<TaskCard | null>(null);
+  const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskCard | null>(null);
   const [showProductSuggestionModal, setShowProductSuggestionModal] = useState(false);
   const [productSuggestion, setProductSuggestion] = useState<{
     taskId: string;
@@ -1037,7 +1136,70 @@ function DashboardContent() {
     const activeData = active.data.current;
     const overData = over.data.current;
 
-    // 情況 1: 拖曳 Product 到 Area
+    // 情況 1: 拖曳 Product 到 Product (重新排序)
+    if (activeData?.type === 'product' && overData?.type === 'product') {
+      const activeId = activeData.productId;
+      const overId = overData.productId;
+      const activeAreaId = activeData.areaId;
+      const overAreaId = overData.areaId;
+
+      console.log('Product to Product drag:', { activeId, overId, activeAreaId, overAreaId });
+
+      // 只在同一個 area 內重新排序
+      if (activeId === overId || activeAreaId !== overAreaId) return;
+
+      // 找到該 area 的所有 products
+      const targetArea = areas.find(a => a.id === activeAreaId);
+      if (!targetArea) return;
+
+      const oldIndex = targetArea.products.findIndex(p => p.id === activeId);
+      const newIndex = targetArea.products.findIndex(p => p.id === overId);
+
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      // 重新排列 products
+      const reorderedProducts = [...targetArea.products];
+      const [movedProduct] = reorderedProducts.splice(oldIndex, 1);
+      reorderedProducts.splice(newIndex, 0, movedProduct);
+
+      // 更新 UI
+      setAreas(prevAreas =>
+        prevAreas.map(area =>
+          area.id === activeAreaId
+            ? { ...area, products: reorderedProducts }
+            : area
+        )
+      );
+
+      // 調用 API 更新順序
+      try {
+        const updates = reorderedProducts.map((product, index) => ({
+          id: product.id,
+          display_order: index,
+        }));
+
+        const res = await fetch('/api/products/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates }),
+        });
+
+        if (!res.ok) {
+          throw new Error('更新順序失敗');
+        }
+      } catch (err) {
+        console.error('Failed to reorder products:', err);
+        // 如果失敗，重新載入數據
+        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          setAreas(libraryData);
+        }
+      }
+      return;
+    }
+
+    // 情況 2: 拖曳 Product 到 Area
     if (activeData?.type === 'product' && overData?.type === 'area') {
       const productId = activeData.productId;
       const currentAreaId = activeData.areaId;
@@ -1104,7 +1266,7 @@ function DashboardContent() {
       return;
     }
 
-    // 情況 2: 拖曳 Task 到 Product
+    // 情況 3: 拖曳 Task 到 Product
     if (activeData?.task && overData?.type === 'product') {
       const taskId = active.id as string;
       const newProductId = overData.productId;
@@ -1179,7 +1341,7 @@ function DashboardContent() {
       return;
     }
 
-    // 情況 3: 拖曳 Task 到 Area（需要 AI 推薦專案）
+    // 情況 4: 拖曳 Task 到 Area（需要 AI 推薦專案）
     if (activeData?.task && overData?.type === 'area') {
       const taskId = active.id as string;
       const targetAreaId = overData.areaId;
@@ -1235,7 +1397,7 @@ function DashboardContent() {
       }
     }
 
-    // 情況 4: 拖曳 Task 到另一個 Task（合併為 sub-item）
+    // 情況 5: 拖曳 Task 到另一個 Task（合併為 sub-item）
     if (activeData?.task && overData?.type === 'task') {
       const sourceTaskId = active.id as string;
       const targetTaskId = overData.targetTaskId;
@@ -1387,10 +1549,25 @@ function DashboardContent() {
   // 標記任務為已完成
   const handleCompleteTask = async (taskId: string) => {
     try {
+      // 找到任務的當前狀態
+      let currentDrawer = "ACTIVE"; // 預設值
+      for (const area of areas) {
+        for (const product of area.products) {
+          const task = product.tasks.find((t) => t.id === taskId);
+          if (task) {
+            currentDrawer = task.drawer;
+            break;
+          }
+        }
+      }
+
+      // 如果已完成（ARCHIVE），改為 ACTIVE；否則改為 ARCHIVE
+      const newStatus = currentDrawer === "ARCHIVE" ? "ACTIVE" : "ARCHIVE";
+
       const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId, status: "ARCHIVE" }),
+        body: JSON.stringify({ taskId, status: newStatus }),
       });
 
       if (!res.ok) {
@@ -1449,6 +1626,57 @@ function DashboardContent() {
     }
   };
 
+  // 編輯任務說明
+  const handleEditNarrative = async (taskId: string, newNarrative: string) => {
+    if (!userId) return;
+
+    // Optimistic update
+    setAreas((prevAreas) =>
+      prevAreas.map((area) => ({
+        ...area,
+        products: area.products.map((product) => ({
+          ...product,
+          tasks: product.tasks.map((task) =>
+            task.id === taskId ? { ...task, narrative: newNarrative.trim() || null } : task
+          ),
+        })),
+      }))
+    );
+
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, narrative: newNarrative.trim() }),
+      });
+
+      if (!res.ok) {
+        throw new Error("更新失敗");
+      }
+    } catch (err) {
+      console.error("Failed to edit narrative:", err);
+      alert("更新說明失敗，請稍後再試");
+      // Revert on error
+      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      if (libraryRes.ok) {
+        const data = await libraryRes.json();
+        setAreas(data);
+      }
+    }
+  };
+
+  // 設定開始日期
+  const handleSetStartDate = async (taskId: string) => {
+    // 重用現有的 due date modal，後續可以改成同時設定 start/due date
+    const task = areas
+      .flatMap((a) => a.products.flatMap((p) => p.tasks))
+      .find((t) => t.id === taskId);
+    if (task) {
+      setEditingTaskForDueDate(task);
+      setIsDueDateModalOpen(true);
+    }
+  };
+
   // 切換 sub-item 完成狀態
   const handleToggleSubItem = async (taskId: string, subItemId: string, completed: boolean) => {
     try {
@@ -1467,7 +1695,7 @@ function DashboardContent() {
                 const completedCount = updatedSubItems.filter((item: any) => item.completed).length;
                 const total = updatedSubItems.length;
 
-                return {
+                const updatedTask = {
                   ...task,
                   sub_items: updatedSubItems,
                   sub_items_meta: {
@@ -1476,6 +1704,13 @@ function DashboardContent() {
                     completion_rate: total > 0 ? completedCount / total : 0
                   }
                 };
+
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+
+                return updatedTask;
               }
               return task;
             }) || []
@@ -1677,6 +1912,110 @@ function DashboardContent() {
     }
   };
 
+  // 新增 reference
+  const handleAddReference = async (taskId: string, type: "url" | "note", content: string, title?: string) => {
+    try {
+      // API call
+      const res = await fetch(`/api/tasks/${taskId}/references`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, content, title }),
+      });
+
+      if (!res.ok) {
+        throw new Error("新增參考資料失敗");
+      }
+
+      const result = await res.json();
+      const newReference = result.reference;
+
+      // 更新 UI
+      setAreas(prevAreas => {
+        return prevAreas.map(area => ({
+          ...area,
+          products: area.products?.map(product => ({
+            ...product,
+            tasks: product.tasks?.map((task: any) => {
+              if (task.id === taskId) {
+                const updatedTask = {
+                  ...task,
+                  references: [...(task.references || []), newReference]
+                };
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+                return updatedTask;
+              }
+              return task;
+            }) || []
+          })) || []
+        }));
+      });
+    } catch (err) {
+      console.error("Failed to add reference:", err);
+      alert("新增參考資料失敗，請稍後再試");
+      // 錯誤時重新載入數據
+      if (userId) {
+        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          setAreas(libraryData);
+        }
+      }
+      throw err; // 重新拋出錯誤以便 modal 知道失敗了
+    }
+  };
+
+  // 刪除 reference
+  const handleDeleteReference = async (taskId: string, referenceId: string) => {
+    try {
+      // Optimistic update: 先更新 UI
+      setAreas(prevAreas => {
+        return prevAreas.map(area => ({
+          ...area,
+          products: area.products?.map(product => ({
+            ...product,
+            tasks: product.tasks?.map((task: any) => {
+              if (task.id === taskId) {
+                const updatedTask = {
+                  ...task,
+                  references: (task.references || []).filter((ref: any) => ref.id !== referenceId)
+                };
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+                return updatedTask;
+              }
+              return task;
+            }) || []
+          })) || []
+        }));
+      });
+
+      // API call
+      const res = await fetch(`/api/tasks/${taskId}/references?referenceId=${referenceId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error("刪除參考資料失敗");
+      }
+    } catch (err) {
+      console.error("Failed to delete reference:", err);
+      alert("刪除參考資料失敗，請稍後再試");
+      // 錯誤時重新載入數據
+      if (userId) {
+        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          setAreas(libraryData);
+        }
+      }
+    }
+  };
+
   // 重命名 Product
   const handleRenameProduct = async (productId: string, newName: string) => {
     if (!userId || !newName.trim()) return;
@@ -1777,7 +2116,7 @@ function DashboardContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto mb-4" />
           <p className="text-white/50">載入資料中...</p>
         </div>
       </div>
@@ -1808,7 +2147,7 @@ function DashboardContent() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         {/* Background Effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
         </div>
@@ -1833,7 +2172,7 @@ function DashboardContent() {
                   onClick={() => setViewMode("structure")}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
                     viewMode === "structure"
-                      ? "bg-purple-500/30 text-purple-300"
+                      ? "bg-indigo-500/30 text-indigo-300"
                       : "text-white/60 hover:text-white hover:bg-white/10"
                   }`}
                 >
@@ -1905,7 +2244,7 @@ function DashboardContent() {
                     onClick={() => setSelectedArea(null)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                       selectedArea === null
-                        ? "bg-purple-500/20 text-purple-300"
+                        ? "bg-indigo-500/20 text-indigo-300"
                         : "hover:bg-white/10 text-white/60"
                     }`}
                   >
@@ -1936,7 +2275,7 @@ function DashboardContent() {
                             }}
                             className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                               selectedArea === area.name
-                                ? "bg-purple-500/20 text-purple-300"
+                                ? "bg-indigo-500/20 text-indigo-300"
                                 : "hover:bg-white/10 text-white/60"
                             }`}
                           >
@@ -2127,12 +2466,17 @@ function DashboardContent() {
                               onDeleteSubItem={handleDeleteSubItem}
                               onEditSubItem={handleEditSubItem}
                               onAddSubItem={handleAddSubItem}
+                              onDeleteReference={handleDeleteReference}
                               onRename={handleRenameProduct}
                               onEdit={(product) => {
                                 setEditingProduct(product);
                                 setIsProductModalOpen(true);
                               }}
                               onEditTaskTitle={handleEditTaskTitle}
+                              onOpenTaskDetail={(task) => {
+                                setSelectedTask(task);
+                                setIsTaskDetailModalOpen(true);
+                              }}
                               isReorganizing={reorganizingProductId === product.id}
                             />
                           ))}
@@ -2156,7 +2500,7 @@ function DashboardContent() {
                                 setSelectedAreaForProduct({ id: area.id, name: area.name });
                                 setIsProductModalOpen(true);
                               }}
-                              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+                              className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
                             >
                               <Plus className="w-4 h-4 mr-2" />
                               立即新增
@@ -2314,6 +2658,37 @@ function DashboardContent() {
           isApplying={isReorganizing}
         />
 
+        {/* Task Detail Modal */}
+        {selectedTask && (
+          <TaskDetailModal
+            task={selectedTask}
+            isOpen={isTaskDetailModalOpen}
+            onClose={() => {
+              setIsTaskDetailModalOpen(false);
+              setSelectedTask(null);
+            }}
+            onEditTitle={handleEditTaskTitle}
+            onEditNarrative={handleEditNarrative}
+            onSetDueDate={(taskId) => {
+              const task = areas
+                .flatMap((a) => a.products.flatMap((p) => p.tasks))
+                .find((t) => t.id === taskId);
+              if (task) {
+                setEditingTaskForDueDate(task);
+                setIsDueDateModalOpen(true);
+              }
+            }}
+            onSetStartDate={handleSetStartDate}
+            onToggleSubItem={handleToggleSubItem}
+            onAddSubItem={handleAddSubItem}
+            onDeleteSubItem={handleDeleteSubItem}
+            onEditSubItem={handleEditSubItem}
+            onAddReference={handleAddReference}
+            onDeleteReference={handleDeleteReference}
+            onComplete={handleCompleteTask}
+          />
+        )}
+
         {/* Product Suggestion Modal */}
         {showProductSuggestionModal && productSuggestion && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -2459,9 +2834,9 @@ function DashboardContent() {
             {/* Modal */}
             <Card className="relative w-full max-w-lg mx-4 bg-slate-900 border-white/10 shadow-2xl">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-indigo-900/30 to-indigo-900/30">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
                     <Target className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -2494,8 +2869,8 @@ function DashboardContent() {
 
                 {/* 箭頭 */}
                 <div className="flex justify-center">
-                  <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
-                    <ChevronDown className="w-5 h-5 text-purple-400" />
+                  <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                    <ChevronDown className="w-5 h-5 text-indigo-400" />
                   </div>
                 </div>
 
@@ -2508,7 +2883,7 @@ function DashboardContent() {
                       {pendingMerge.targetTask.tag.area} → {pendingMerge.targetTask.tag.product}
                     </p>
                     {pendingMerge.targetTask.sub_items && pendingMerge.targetTask.sub_items.length > 0 && (
-                      <p className="text-xs text-purple-400 mt-2">
+                      <p className="text-xs text-indigo-400 mt-2">
                         目前有 {pendingMerge.targetTask.sub_items.length} 個待辦事項
                       </p>
                     )}
@@ -2535,7 +2910,7 @@ function DashboardContent() {
                 <Button
                   onClick={handleConfirmMerge}
                   disabled={isMerging}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+                  className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
                 >
                   {isMerging ? (
                     <>
@@ -2580,7 +2955,7 @@ export default function DashboardPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         </div>
       }
     >

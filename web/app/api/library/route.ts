@@ -27,7 +27,10 @@ export async function GET(request: Request) {
               orderBy: { created_at: "desc" },
             },
           },
-          orderBy: { name: "asc" },
+          orderBy: [
+            { display_order: "asc" },
+            { name: "asc" },
+          ],
         },
       },
       orderBy: { name: "asc" },
@@ -46,8 +49,9 @@ export async function GET(request: Request) {
         status: product.status,
         tasks: product.tasks.map((task) => {
           const analysis = task.ai_analysis as Record<string, unknown> | null;
-          // 提取 sub_items 和 sub_items_meta
-          const subItems = (analysis?.sub_items as Array<{
+
+          // 提取 sub_items 和 sub_items_meta（從資料庫直接欄位）
+          const subItems = (task.sub_items as Array<{
             id: string;
             content: string;
             completed: boolean;
@@ -55,11 +59,21 @@ export async function GET(request: Request) {
             completed_at: string | null;
             order: number;
           }>) || [];
-          const subItemsMeta = (analysis?.sub_items_meta as {
-            total: number;
-            completed: number;
-            completion_rate: number;
-          }) || { total: 0, completed: 0, completion_rate: 0 };
+
+          const subItemsMeta = subItems.length > 0 ? {
+            total: subItems.length,
+            completed: subItems.filter(item => item.completed).length,
+            completion_rate: subItems.filter(item => item.completed).length / subItems.length,
+          } : { total: 0, completed: 0, completion_rate: 0 };
+
+          // 提取 references（從資料庫直接欄位）
+          const references = (task.references as Array<{
+            id: string;
+            type: "url" | "note";
+            content: string;
+            title?: string | null;
+            created_at: string;
+          }>) || [];
 
           return {
             id: task.id,
@@ -78,9 +92,10 @@ export async function GET(request: Request) {
             due_date: task.due_date?.toISOString() || null,
             time_confidence: task.time_confidence || null,
             inferred_from_milestone: task.inferred_from_milestone || null,
-            // 新增: Sub-items support
+            // Sub-items 和 References 從資料庫欄位讀取
             sub_items: subItems,
             sub_items_meta: subItemsMeta,
+            references: references,
           };
         }),
       })),

@@ -221,15 +221,10 @@ export async function POST(
             where: { id: consolidation.parent_task_id },
             data: {
               content: consolidation.consolidated_title,
+              sub_items: subItems, // ✅ 修復: 將 sub_items 寫入正確欄位
               ai_analysis: {
                 ...parentAnalysis,
                 narrative: consolidation.consolidated_narrative,
-                sub_items: subItems,
-                sub_items_meta: {
-                  total: subItems.length,
-                  completed: 0,
-                  completion_rate: 0.0,
-                },
                 consolidation_reasoning: consolidation.reasoning,
                 consolidated_at: new Date().toISOString(),
               },

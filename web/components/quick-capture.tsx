@@ -344,7 +344,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
     return (
       <button
         onClick={() => setIsExpanded(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-500/30 flex items-center justify-center transition-all hover:scale-110 group"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/30 flex items-center justify-center transition-all hover:scale-110 group"
       >
         <MessageSquarePlus className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
       </button>
@@ -370,7 +370,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
             {/* 標題 */}
             <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
               <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-purple-400" />
+                <Package className="w-4 h-4 text-indigo-400" />
                 <span className="text-sm font-medium text-white">選擇專案</span>
                 <span className="text-xs text-white/40 ml-auto">↑↓ 選擇 · Enter 確認 · Esc 取消</span>
               </div>
@@ -390,11 +390,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
                       onMouseEnter={() => setSelectedMentionIndex(index)}
                       className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
                         index === selectedMentionIndex
-                          ? "bg-purple-500/30 text-white"
+                          ? "bg-indigo-500/30 text-white"
                           : "hover:bg-white/5 text-white/80"
                       }`}
                     >
-                      <Package className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                      <Package className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                       <span className="text-sm font-medium truncate flex-1">{product.name}</span>
                       <span className="text-xs text-white/50 flex-shrink-0 bg-white/10 px-2 py-1 rounded">{product.areaName}</span>
                     </button>
@@ -591,7 +591,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
                             key={idx}
                             className={`p-3 rounded-xl border ${
                               op.type === "merge"
-                                ? "bg-purple-500/10 border-purple-500/20"
+                                ? "bg-indigo-500/10 border-indigo-500/20"
                                 : "bg-teal-500/10 border-teal-500/20"
                             } ${!selectedOperationIds.has(op.id) ? "opacity-40" : ""}`}
                           >
@@ -609,12 +609,12 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
                                   }
                                   setSelectedOperationIds(newSet);
                                 }}
-                                className="w-4 h-4 rounded border-white/20 bg-white/10 text-purple-600 focus:ring-purple-500 focus:ring-2 cursor-pointer"
+                                className="w-4 h-4 rounded border-white/20 bg-white/10 text-indigo-600 focus:ring-indigo-500 focus:ring-2 cursor-pointer"
                               />
                               {op.type === "merge" ? (
                                 <>
-                                  <Merge className="w-4 h-4 text-purple-400" />
-                                  <span className="text-xs font-medium text-purple-300">合併專案</span>
+                                  <Merge className="w-4 h-4 text-indigo-400" />
+                                  <span className="text-xs font-medium text-indigo-300">合併專案</span>
                                 </>
                               ) : (
                                 <>
@@ -655,14 +655,14 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
                               {/* 箭頭 */}
                               <div className="flex-shrink-0">
                                 <ArrowRight className={`w-5 h-5 ${
-                                  op.type === "merge" ? "text-purple-400" : "text-teal-400"
+                                  op.type === "merge" ? "text-indigo-400" : "text-teal-400"
                                 }`} />
                               </div>
 
                               {/* 目標 */}
                               <div className={`flex-1 p-2 rounded-lg border ${
                                 op.type === "merge"
-                                  ? "bg-purple-500/20 border-purple-500/30"
+                                  ? "bg-indigo-500/20 border-indigo-500/30"
                                   : "bg-teal-500/20 border-teal-500/30"
                               }`}>
                                 <div className="flex items-center gap-1.5">
@@ -690,7 +690,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
                       ) : (
                         // 降級：使用舊的字串格式
                         (pendingOperation.data as ReorganizePreview).preview_operations?.map((op, idx) => (
-                          <div key={idx} className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                          <div key={idx} className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
                             <p className="text-sm text-white/90 whitespace-pre-line">{op}</p>
                           </div>
                         ))
@@ -769,18 +769,18 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
 
       <div className="fixed bottom-6 right-6 z-50 w-96 animate-in slide-in-from-bottom-4 duration-200">
         {/* 主面板 */}
-        <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-purple-500/20 overflow-hidden">
+        <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-indigo-500/20 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-400" />
+            <Sparkles className="w-4 h-4 text-indigo-400" />
             <span className="text-sm font-medium text-white">快速記錄</span>
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowResults(!showResults)}
               className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${
-                (processedItems.length > 0 || adjustmentResult) ? 'text-purple-400' : 'text-white/30'
+                (processedItems.length > 0 || adjustmentResult) ? 'text-indigo-400' : 'text-white/30'
               }`}
               disabled={!processedItems.length && !adjustmentResult}
             >
@@ -837,7 +837,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
                     {/* 標籤路徑 + 時間標籤 */}
                     <div className="flex items-center gap-1.5 text-xs text-white/50 mb-2 flex-wrap">
                       <FolderOpen className="w-3 h-3" />
-                      <span className="text-purple-400">{item.tag.area}</span>
+                      <span className="text-indigo-400">{item.tag.area}</span>
                       <span className="text-white/30">/</span>
                       <Package className="w-3 h-3" />
                       <span className="text-blue-400">{item.tag.product}</span>
@@ -871,7 +871,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
                     {/* AI 思考過程 */}
                     <div className="text-xs text-white/40 bg-white/5 rounded-md p-2 space-y-1">
                       <div>
-                        <span className="text-purple-400/70">分類思路：</span> {item.reasoning}
+                        <span className="text-indigo-400/70">分類思路：</span> {item.reasoning}
                       </div>
                       {item.time_reasoning && (
                         <div className="border-t border-white/10 pt-1 mt-1">
@@ -962,12 +962,12 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
               {/* 變更統計 */}
               {adjustmentResult.changes && (
                 <div className="flex gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-emerald-600 flex items-center justify-center flex-shrink-0">
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    <div className="bg-purple-500/20 border border-purple-500/30 rounded-2xl rounded-tl-sm p-3">
-                      <p className="text-xs text-purple-300 mb-2 font-medium">變更統計</p>
+                    <div className="bg-indigo-500/20 border border-indigo-500/30 rounded-2xl rounded-tl-sm p-3">
+                      <p className="text-xs text-indigo-300 mb-2 font-medium">變更統計</p>
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-white/50">移動任務：</span>
                         <span className="text-white font-bold">{adjustmentResult.changes.moved} 個</span>
@@ -985,8 +985,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
             <div className="p-4 border-b border-white/10 bg-gradient-to-r from-purple-900/20 to-indigo-900/20">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                <div className="absolute inset-0 w-5 h-5 bg-purple-500/20 rounded-full animate-ping" />
+                <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                <div className="absolute inset-0 w-5 h-5 bg-indigo-500/20 rounded-full animate-ping" />
               </div>
               <div>
                 <p className="text-sm text-white">AI 正在歸檔...</p>
@@ -1007,7 +1007,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
               placeholder="輸入任何想法... 用 @ 快速指定專案"
               disabled={isProcessing}
               rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all disabled:opacity-50"
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all disabled:opacity-50"
             />
 
           </div>
@@ -1027,7 +1027,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
               size="sm"
               onClick={handleSubmit}
               disabled={!input.trim() || isProcessing}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+              className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
             >
               {isProcessing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

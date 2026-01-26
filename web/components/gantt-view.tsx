@@ -248,10 +248,10 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                         >
                           <div className="relative">
                             <Flag
-                              className="w-5 h-5 text-purple-400 fill-purple-400 drop-shadow-lg group-hover:scale-125 transition-transform"
+                              className="w-5 h-5 text-indigo-400 fill-purple-400 drop-shadow-lg group-hover:scale-125 transition-transform"
                             />
                             <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-white/20 rounded px-3 py-2 text-xs text-white pointer-events-none z-30 shadow-xl">
-                              <div className="font-semibold text-purple-300">{milestone.name}</div>
+                              <div className="font-semibold text-indigo-300">{milestone.name}</div>
                               <div className="text-white/60 text-xs mt-0.5">
                                 {new Date(milestone.target_date).toLocaleDateString('zh-TW')}
                               </div>

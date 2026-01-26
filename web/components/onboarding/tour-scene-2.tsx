@@ -40,7 +40,7 @@ export function TourScene2({ userAreas }: Props) {
       name: "正式上線",
       date: "2026-04-01",
       daysAway: 67,
-      color: "from-purple-500 to-pink-600",
+      color: "from-indigo-500 to-emerald-600",
       icon: "🚀",
     },
   ];
@@ -68,7 +68,7 @@ export function TourScene2({ userAreas }: Props) {
         <div className="p-8 rounded-3xl bg-slate-900/80 backdrop-blur-xl border-2 border-white/20 shadow-2xl">
           {/* 時間軸 */}
           <div className="relative h-24 mb-8">
-            <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-500/40 via-violet-500/40 to-pink-500/40 rounded-full shadow-lg" />
+            <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500/40 via-indigo-500/40 to-emerald-500/40 rounded-full shadow-lg" />
 
             {sortedMilestones.map((milestone, i) => {
               const position = (milestone.daysAway / 150) * 100;
@@ -79,7 +79,7 @@ export function TourScene2({ userAreas }: Props) {
                   style={{ left: `${Math.min(position, 92)}%` }}
                 >
                   <div className="flex flex-col items-center -translate-x-1/2">
-                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${milestone.color} flex items-center justify-center text-lg shadow-xl shadow-purple-500/50 border-2 border-white/30`}>
+                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${milestone.color} flex items-center justify-center text-lg shadow-xl shadow-indigo-500/50 border-2 border-white/30`}>
                       {milestone.icon}
                     </div>
                     <div className="mt-3 bg-slate-800/90 border border-white/30 rounded-lg px-3 py-2 text-center whitespace-nowrap backdrop-blur-sm shadow-xl">
@@ -96,13 +96,13 @@ export function TourScene2({ userAreas }: Props) {
 
       {/* 核心說明 - 簡化版 */}
       <div
-        className={`p-6 rounded-2xl bg-gradient-to-r from-purple-600/30 to-violet-600/30 border-2 border-purple-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
+        className={`p-6 rounded-2xl bg-gradient-to-r from-indigo-600/30 to-violet-600/30 border-2 border-indigo-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         }`}
         style={{ transitionDelay: "300ms" }}
       >
         <p className="text-white text-center text-lg leading-relaxed font-medium">
-          <span className="text-purple-200 font-bold text-xl">設定 Milestone 後</span>
+          <span className="text-indigo-200 font-bold text-xl">設定 Milestone 後</span>
           <br />
           <span className="text-white/90">AI 會根據時間點自動推斷任務完成日期</span>
         </p>

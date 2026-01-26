@@ -19,10 +19,10 @@ model User {
   settings             Json?                @db.Json
   areas                Area[]
   governance_proposals GovernanceProposal[]
+  milestones           Milestone[]
   products             Product[]
   tasks                Task[]
   topics               Topic[]
-  milestones           Milestone[]
 
   @@map("users")
 }
@@ -45,21 +45,22 @@ model Area {
 }
 
 model Product {
-  id          String                 @id @default(uuid()) @db.Uuid
-  created_at  DateTime               @default(now()) @db.Timestamp(6)
-  updated_at  DateTime               @updatedAt @db.Timestamp(6)
-  deleted_at  DateTime?              @db.Timestamp(6)
-  user_id     String                 @db.Uuid
-  area_id     String                 @db.Uuid
-  name        String                 @db.VarChar
-  description String?                @db.VarChar
-  status      Status
-  lifecycle   Lifecycle
-  embedding   Unsupported("vector")?
-  area        Area                   @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  user        User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tasks       Task[]
-  topics      Topic[]
+  id            String                 @id @default(uuid()) @db.Uuid
+  created_at    DateTime               @default(now()) @db.Timestamp(6)
+  updated_at    DateTime               @updatedAt @db.Timestamp(6)
+  deleted_at    DateTime?              @db.Timestamp(6)
+  user_id       String                 @db.Uuid
+  area_id       String                 @db.Uuid
+  name          String                 @db.VarChar
+  description   String?                @db.VarChar
+  status        Status
+  lifecycle     Lifecycle
+  embedding     Unsupported("vector")?
+  display_order Int                    @default(0)
+  area          Area                   @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user          User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tasks         Task[]
+  topics        Topic[]
 
   @@map("products")
 }
@@ -93,6 +94,7 @@ model Task {
   embedding               Unsupported("vector")?
   ai_analysis             Json?                  @db.Json
   references              Json                   @default("[]") @db.Json
+  sub_items               Json                   @default("[]") @db.Json
   start_date              DateTime?              @db.Timestamp(6)
   due_date                DateTime?              @db.Timestamp(6)
   inferred_from_milestone String?                @db.Uuid

@@ -38,7 +38,7 @@ export function TourScene1({ userAreas }: Props) {
           {/* Area 層 */}
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/50">
                 <FolderOpen className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
@@ -50,7 +50,7 @@ export function TourScene1({ userAreas }: Props) {
               {userAreas.slice(0, 3).map((area, i) => (
                 <div
                   key={i}
-                  className="px-4 py-2 rounded-lg bg-purple-500/20 border border-purple-400/50 text-white font-medium shadow-lg"
+                  className="px-4 py-2 rounded-lg bg-indigo-500/20 border border-indigo-400/50 text-white font-medium shadow-lg"
                 >
                   {area}
                 </div>
@@ -105,13 +105,13 @@ export function TourScene1({ userAreas }: Props) {
 
       {/* 核心說明 - 高對比 */}
       <div
-        className={`p-5 rounded-2xl bg-gradient-to-r from-purple-600/30 to-indigo-600/30 border-2 border-purple-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
+        className={`p-5 rounded-2xl bg-gradient-to-r from-indigo-600/30 to-indigo-600/30 border-2 border-indigo-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         }`}
         style={{ transitionDelay: "300ms" }}
       >
         <p className="text-white text-center text-base leading-relaxed font-medium">
-          <span className="text-purple-200 font-bold text-lg">AI 會自動將你的想法分類</span>
+          <span className="text-indigo-200 font-bold text-lg">AI 會自動將你的想法分類</span>
           <br />
           <span className="text-white/90">到對應的身份、資產和工作性質</span>
         </p>

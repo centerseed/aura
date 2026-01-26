@@ -92,7 +92,7 @@ export function MilestoneList({ milestones, onEdit, onDelete }: MilestoneListPro
                     )}
                     {/* 如果有關聯的 Area,顯示領域標籤 */}
                     {milestone.area && !milestone.product && (
-                      <span className="text-purple-400 font-normal mr-1.5">
+                      <span className="text-indigo-400 font-normal mr-1.5">
                         [{milestone.area.name}]
                       </span>
                     )}

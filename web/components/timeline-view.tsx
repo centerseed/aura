@@ -178,7 +178,7 @@ function TaskItem({
             {/* Milestone 關聯提示 */}
             {relatedMilestone && (
               <div
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-500/20 text-purple-400"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-400"
                 title={`關聯里程碑：${relatedMilestone.name}`}
               >
                 <Target className="w-3 h-3" />
@@ -324,7 +324,7 @@ export function TimelineView({ tasks, drawerConfig, milestones, onSetDueDate }: 
         drawerConfig={drawerConfig}
         milestones={milestones}
         onSetDueDate={onSetDueDate}
-        color="text-purple-400"
+        color="text-indigo-400"
       />
 
       {/* 無截止日期 */}

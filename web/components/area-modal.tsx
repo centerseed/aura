@@ -171,7 +171,7 @@ export function AreaModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-slate-900 z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
               <FolderOpen className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -214,7 +214,7 @@ export function AreaModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：事業、個人、創作者..."
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               autoFocus
             />
           </div>
@@ -229,7 +229,7 @@ export function AreaModal({
               onChange={(e) => setScope(e.target.value)}
               placeholder="例如：職涯發展、創業經營、技能提升..."
               rows={3}
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
             />
           </div>
 
@@ -244,9 +244,9 @@ export function AreaModal({
                   <button
                     key={suggestion.name}
                     onClick={() => applySuggestion(suggestion)}
-                    className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-purple-500/50 text-left transition-all group"
+                    className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-indigo-500/50 text-left transition-all group"
                   >
-                    <div className="font-medium text-white text-sm mb-1 group-hover:text-purple-300">
+                    <div className="font-medium text-white text-sm mb-1 group-hover:text-indigo-300">
                       {suggestion.name}
                     </div>
                     <div className="text-xs text-white/40 line-clamp-2">
@@ -295,7 +295,7 @@ export function AreaModal({
             <Button
               onClick={handleSubmit}
               disabled={!name.trim() || isSubmitting || isDeleting}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+              className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
             >
               {isSubmitting ? (
                 <>

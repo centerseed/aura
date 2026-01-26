@@ -64,15 +64,29 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { taskId, status, productId, start_date, due_date, content } = body;
+    const { taskId, status, productId, start_date, due_date, content, narrative } = body;
 
     if (!taskId) {
       return NextResponse.json({ error: "taskId is required" }, { status: 400 });
     }
 
-    const hasUpdate = status || productId || start_date !== undefined || due_date !== undefined || content;
+    const hasUpdate = status || productId || start_date !== undefined || due_date !== undefined || content || narrative !== undefined;
     if (!hasUpdate) {
       return NextResponse.json({ error: "No update data provided" }, { status: 400 });
+    }
+
+    // 如果需要更新 narrative，先取得現有的 ai_analysis
+    let aiAnalysisUpdate = undefined;
+    if (narrative !== undefined) {
+      const existingTask = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { ai_analysis: true },
+      });
+      const currentAnalysis = (existingTask?.ai_analysis as Record<string, unknown>) || {};
+      aiAnalysisUpdate = {
+        ...currentAnalysis,
+        narrative: narrative || null,
+      };
     }
 
     // 使用 Prisma 原生類型
@@ -88,6 +102,7 @@ export async function PATCH(request: Request) {
           due_date: due_date ? new Date(due_date) : null
         }),
         ...(content && { content: content.trim() }),
+        ...(aiAnalysisUpdate && { ai_analysis: aiAnalysisUpdate as any }),
       },
       include: {
         product: {

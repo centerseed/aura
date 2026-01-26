@@ -48,19 +48,19 @@ export function TourScene3() {
           {/* AI 分析 */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-lg">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-lg">
                 2
               </div>
               <h3 className="text-white font-bold">AI 分析</h3>
             </div>
             <div className="ml-8 space-y-2 text-sm">
-              <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-400/30 text-white/90">
+              <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-400/30 text-white/90">
                 🎯 識別 Milestone: MVP Release (2026-03-01)
               </div>
-              <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-400/30 text-white/90">
+              <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-400/30 text-white/90">
                 ⚙️ 評估複雜度: 中等，預留 5 天
               </div>
-              <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-400/30 text-white/90">
+              <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-400/30 text-white/90">
                 📅 計算時間: 2026-02-24 (提前緩衝)
               </div>
             </div>
@@ -94,13 +94,13 @@ export function TourScene3() {
 
       {/* 核心說明 - 簡化版 */}
       <div
-        className={`p-6 rounded-2xl bg-gradient-to-r from-purple-600/30 to-violet-600/30 border-2 border-purple-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
+        className={`p-6 rounded-2xl bg-gradient-to-r from-indigo-600/30 to-violet-600/30 border-2 border-indigo-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         }`}
         style={{ transitionDelay: "300ms" }}
       >
         <p className="text-white text-center text-lg leading-relaxed font-medium">
-          <span className="text-purple-200 font-bold text-xl">不用手動排程</span>
+          <span className="text-indigo-200 font-bold text-xl">不用手動排程</span>
           <br />
           <span className="text-white/90">AI 會根據 Milestone 自動推斷最適合的完成時間</span>
         </p>
