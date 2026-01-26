@@ -1,4 +1,4 @@
-# Aura Business OS - SDD Hub (Spec-Driven Development)
+# Zentropy Business OS - SDD Hub (Spec-Driven Development)
 
 本目錄遵循 **Spec-Driven Development (SDD)** 流程。開發不再是「憑感覺編碼」，而是依序通過各個「規格閘門 (Spec Gates)」。
 
@@ -25,7 +25,7 @@
 *Architecture Decision Records. 紀錄技術選型的動機。*
 
 ### [05_Refinery](./05_Refinery) - 方法論精煉 (The Soul)
-*定義 SAM 方法論、雙軸穩定模型等核心思考。*
+*定義 Zentropy 方法論、雙軸穩定模型等核心思考。*
 *   `001_SAM_Methodology_Logic.md`: 核心邏輯機制。
 *   `002_SDD_Workflow_Guide.md`: SDD 開發工作流指南。
 

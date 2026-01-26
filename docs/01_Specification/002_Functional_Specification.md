@@ -1,6 +1,6 @@
-# Aura Functional Specification (功能規格與系統邏輯)
+# Zentropy Functional Specification (功能規格與系統邏輯)
 
-本文件詳述了 Aura 系統的運行邏輯、核心管理模型以及虛擬幕僚 (Agents) 的協作流程。
+本文件詳述了 Zentropy 系統的運行邏輯、核心管理模型以及虛擬幕僚 (Agents) 的協作流程。
 
 ## 1. 核心管理模型：雙軸維度 (Dual-Axis Matrix)
 
@@ -31,7 +31,7 @@
 | 層級 (Level) | 定義 (Definition) | 用戶期待 (User Expectation) | AI 治理邊界 (Governance Rule) | 範例 (Examples) |
 | :--- | :--- | :--- | :--- | :--- |
 | **L1: Area (領域)** | **The Workspace**: 人生的不同舞台或協作空間。對應不同的 Context 與參與人員。 | 「這是我的辦公室/客廳。」<br>我可以邀請合夥人進入特定的 Area 共同工作。 | **Extensible (可擴充)**。<br>預設提供四大象限，但允許新增 Custom Area (如 `05_NewStartup`) 作為獨立協作空間。 | `02_Work`, `05_Startup_X`<br>(Shared) |
-| **L2: Product (主體)** | **The Shareable Asset**: 具備產出價值的實體資產。可單獨授權給外部協作者。 | 「這是我的專案資料夾。」<br>我可以只把這個專案分享給外包人員，而不暴露整個 Area。 | **Proposable (需核准)**。<br>AI 可識別新實體並提議，但建立新 Product 通常需 User/Coach 確認。 | `Backend_System` (Shared),<br>`Personal_Blog` |
+| **L2: Product (主體)** | **The Shareable Asset**: 具備產出價值的實體資產。可單獨授權給外部協作者。<br>**Lifecycle Types**:<br>- **Finite (有限)**: 有明確交付與結束日 (e.g., `App_v1`).<br>- **Perpetual (永續)**: 需持續維運 (e.g., `Health`, `Finance`). | 「這是我的專案資料夾。」<br>我可以只把這個專案分享給外包人員，而不暴露整個 Area。 | **Proposable (需核准)**。<br>AI 可識別新實體並提議，但建立/歸檔(Archive)高層級 Product 需 User/Coach 確認。 | `Backend_System` (Shared),<br>`Personal_Blog` |
 | **L3: Topic (細項)** | **The Nature**: 在該主體下執行的工作性質或子模組。 | 「這是我的工作性質。」<br>用於分析時間分配與工作類型。 | **Flexible (自動化)**。<br>AI 依據內容自動聚類，但受 MDL (最小描述長度) 限制。 | `Feature`, `Deisgn`,<br>`Meeting` |
 
 ### 2.0.1 AI 分類判斷法則 (Taxonomy Heuristics)
@@ -68,12 +68,133 @@
 *   **輸出**: 結構化 JSON 數據。
 
 ### 2.2 圖書管理員 (The Librarian) - 檔案專家
-*   **歸檔邏輯**: 根據 Entity 與 Naming Convention 自動存入 `Aura_Vault/`。
+*   **歸檔邏輯**: 根據 Entity 與 Naming Convention 自動存入。
 *   **上下文鏈接**: 在使用者處理任務時，自動檢索並彈出相關 Reference 備忘。
+*   **AI 功能** (已在 Web POC 實現):
+    *   **Brain Dump**: 將自然語言輸入結構化為任務 (`/api/brain-dump`)
+    *   **Adjust Tags**: 解析自然語言指令調整任務分類 (`/api/adjust-tags`)
+    *   **Suggest Product**: AI 推薦專案名稱 (`/api/suggest-product`)
+    *   **Reorganize**: AI 分析並建議重組結構 (`/api/reorganize`)
+    *   **Time Inference**: AI 推斷任務截止日期 (三階段策略)
 
 ### 2.3 營運教練 (The Coach) - 全局監控與問答
 *   **衝突偵測**: 掃描 WBS 與日曆，提前預警任務重疊。
 *   **心理閉環**: 晚報與晨報的對話主持，確保使用者達成「晚睡前心理卸載」。
+
+### 2.4 快速紀錄 Input Pipeline (Information Fidelity Protocol)
+
+用戶透過「快速紀錄」輸入的內容，必須經過嚴格的保真度處理流程。**核心原則：減熵是漸進的，不是第一步就發生。**
+
+#### 2.4.1 處理階段 (Processing Stages)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Stage 1: Raw Input (原始輸入)                           │
+│  用戶輸入（可能零散、有錯字、條列式、口語化）                │
+└─────────────────────┬───────────────────────────────────┘
+                      ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 2: Normalized Task (正規化任務)                   │
+│  ─────────────────────────────────────                  │
+│  ✓ 修正明顯錯字 (typo correction)                       │
+│  ✓ 補齊省略內容 (標記為「推斷」)                          │
+│  ✓ 格式整理 (條列 → 結構化 sub_items)                    │
+│  ✗ 刪減內容 (用戶說 A,B,C,D,E 必須全部保留)               │
+│                                                         │
+│  【保真度原則】：資訊量 ≥ Raw Input (只增不減)             │
+└─────────────────────┬───────────────────────────────────┘
+                      ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 3: Enriched Task (增強任務)                       │
+│  ─────────────────────────────────────                  │
+│  • AI 貼標籤：L1 (Area) / L2 (Product) / L3 (Topic)     │
+│  • AI 設定時間：start_date / due_date                   │
+│  • 【關鍵】：區分「用戶明示」vs「AI 推斷」                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 2.4.2 資訊來源標記 (Source Attribution)
+
+每個被 AI 填入的欄位，必須標記其**來源類型 (source_type)**：
+
+| source_type | 定義 | 優先級 | 可被覆蓋 |
+|-------------|------|--------|----------|
+| `explicit` | 用戶明確說出 | 最高 | ✗ 不可 |
+| `inferred_from_context` | 從用戶輸入的上下文推斷 | 中 | ✓ 需用戶確認 |
+| `inferred_from_system` | 從系統資料推斷（如 Milestone） | 低 | ✓ 自動或用戶修正 |
+
+**關鍵規則：Explicit > Inferred**
+
+```
+用戶說：「今天要買牛奶」
+────────────────────────
+due_date = 今天
+date_source = "explicit"  ← 明示，不可被 milestone 覆蓋
+
+用戶說：「處理 A 專案的 X 事項」（沒提日期）
+────────────────────────
+due_date = A 專案的 milestone?
+date_source = "inferred_from_system"  ← 推斷，可被用戶修正
+```
+
+#### 2.4.3 時間推斷優先級 (Time Inference Priority)
+
+當 AI 推斷任務時間時，必須遵守以下優先級：
+
+1. **Level 1 (最高)**: 用戶明確指定的時間詞彙
+   - 「今天」「明天」「下週一」「1/30」「月底前」
+   - `date_source = "explicit"`，信心度 = 1.0
+   - **絕對不可被其他推斷覆蓋**
+
+2. **Level 2**: 用戶輸入中的相對時間暗示
+   - 「等開完會後」「收到報價後」「A 完成後」
+   - `date_source = "inferred_from_context"`，信心度 = 0.7-0.9
+
+3. **Level 3 (最低)**: 系統根據 Milestone / 關聯任務推斷
+   - 與某 Product 的 Milestone 關聯
+   - `date_source = "inferred_from_system"`，信心度 = 0.3-0.7
+   - **僅在 Level 1, 2 都不存在時才適用**
+
+#### 2.4.4 原始輸入保留 (Raw Input Preservation)
+
+為了審計與回溯，每個 Task 必須保留用戶的原始輸入：
+
+```json
+{
+  "id": "uuid",
+  "content": "處理 A 專案進度",          // Normalized title
+  "raw_input": "今天要處理 A 專案進度，還有 B 問題要確認，C 等下週",  // 原始輸入
+  "ai_analysis": {
+    "narrative": "...",
+    "sub_items": [...],                   // 若有多項，展開為 sub_items
+    "source_attribution": {
+      "due_date": {
+        "value": "2026-01-26",
+        "source_type": "explicit",
+        "confidence": 1.0,
+        "reasoning": "用戶明確說「今天」"
+      },
+      "area": {
+        "value": "Work",
+        "source_type": "inferred_from_context",
+        "confidence": 0.85,
+        "reasoning": "A 專案屬於 Work Area"
+      }
+    }
+  }
+}
+```
+
+#### 2.4.5 禁止行為 (Prohibited Actions)
+
+在 Stage 2 (Normalized Task) 階段，**嚴禁**以下行為：
+
+| 禁止行為 | 錯誤範例 | 正確做法 |
+|---------|---------|---------|
+| 刪減用戶提到的事項 | 用戶說 A,B,C,D,E → 只記錄 A,B,C | 全部保留為 sub_items |
+| 用系統推斷覆蓋明示 | 用戶說「今天」→ 因 milestone 改成「三天後」 | 維持「今天」 |
+| 過度摘要 | 「跟小明談 A,B,C」→「與小明討論」 | 保留 A,B,C 細節 |
+| 忽略條件/前提 | 「等報價後再決定」→「決定 X」 | 保留「等報價後」的條件 |
 
 ---
 
@@ -106,9 +227,9 @@ Librarian Agent 不以單一筆記為判斷基礎，而是維護一個**語義�
 
 | 條件類別 | 指標 (Metrics) | 達成閾值與意圖 |
 | :--- | :--- | :--- |
-| **群聚成熟度** | 子群聚密度 (Sub-cluster Density) | 當子群聚內部關聯度比主標籤高出 2.5 倍，且資料量 > 8 筆時，觸發 **「分形演化 (Fractal Split)」**。 |
-| **語義模糊度** | 跨標籤重疊率 (Tag Overlap) | 當兩個不同標籤（如：`AI` 與 `Automation`）的資訊向量相似度 > 85% 時，觸發 **「語義歸一 (Normalization)」**。 |
-| **視覺熵值** | 碎片化指數 (Fragmentation Index) | 當無結構的「碎料筆記」在單一主題佔比超過 60% 時，觸發 **「原子坍縮 (Collapse)」**。 |
+| **群聚成熟度** | 子群聚相對密度 (Relative Sub-cluster Density) | 當子群聚內部關聯度顯著高於母體背景值 (Top 10% Density)，且成長趨勢 (Trend) 為正向時，觸發 **Suggestion:「分形演化」**。 |
+| **語義模糊度** | 語義重疊趨勢 (Semantic Overlap Trend) | 當兩個標籤的相似度隨時間逐漸上升並突破動態閾值 (Dynamic Threshold) 時，觸發 **Suggestion:「語義歸一」**。 |
+| **視覺熵值** | 碎片化增長率 (Fragmentation Growth Rate) | 當單一主題內的無結構碎料增長率顯著高於整理速率 (Entropy > Cleaning Velocity) 時，觸發 **Auto-Action:「原子坍縮」**。 |
 
 #### 3.4.2.1 關聯度量化定義 (Metrics for Associativity)
 「內部關聯度」係指透過以下複合指標計算之結果，用以判定知識群聚的「重力」：
@@ -135,7 +256,15 @@ Librarian Agent 不以單一筆記為判斷基礎，而是維護一個**語義�
         *   **狀態抽屜 (Drawer)**：依據內容最新的成熟度分配（如：開發完成轉為 Maintain）。
         *   **實體標籤 (Tag)**：依據演化後的語義重心，自動補全或修正層級標籤。
 
-#### 3.4.4 知識治理的第一性原理 (First Principles of Governance)
+#### 3.4.4 治理執行模型 (Governance Execution Model)
+系統根據「決策風險」與「可逆性」將治理行為分為兩類：
+
+| 行為類別 (Category) | 定義 (Definition) | 包含項目 (Items) | 執行方式 (Execution) |
+| :--- | :--- | :--- | :--- |
+| **Suggestion (建議)** | 高風險、結構性改變，涉及 L1/L2 層級變動或不可逆的刪除。 | - Create/Archive L2 Product<br>- Rename Area/Product<br>- Global Merge (語義歸一) | 系統生成 Proposal，列入 `Coach` 的晨會待辦，需用戶 **Approve**。 |
+| **Auto-Action (自動)** | 低風險、優化性調整，僅涉及 L3 層級或內容聚合。 | - Create/Merge L3 Topic<br>- Status Update (Active <-> Maintain)<br>- Narrative Evolution (原子坍縮) | Librarian 直接執行，但在 `Log` 中標記，用戶可於 Review 時 **Revert**。 |
+
+#### 3.4.5 知識治理的第一性原理 (First Principles of Governance)
 本系統採用基於 **資訊熵 (Information Entropy)** 與 **語義拓撲 (Semantic Topology)** 的治理架構，參考了 OpenReview (2024) 關於 LLM 知識熵衰減的研究成果：
 
 1.  **熵衰減與可塑性平衡 (Entropy Decay & Plasticity)**:
@@ -152,7 +281,7 @@ Librarian Agent 不以單一筆記為判斷基礎，而是維護一個**語義�
     *   **核心**：狀態（抽屜）反映資訊的「做功速率」。
     *   **行動**：只要該項目的資訊仍處於高頻變動（無論是 Feature 還是 Bug fix），其狀態即為 **Active (高動能)**。只有當變動率趨於零，才向靜態抽屜遷移。
 
-#### 3.4.4.1 Prompt 決策鏈：新標籤的產出協議 (Trigger Protocols)
+#### 3.4.5.1 Prompt 決策鏈：新標籤的產出協議 (Trigger Protocols)
 基於 EM-INF (推理期熵最小化) 原則，新實體標籤 (Topic) 的產出必須通過以下「重重過濾」：
 
 1.  **語義損失補償 (Semantic Loss Compensation)**: 若碎料與既有標籤的語義重疊度 < 80%（即語義損失 > 20%），且無法被既有引力中心「吞噬」時，始得提議建立新標籤。

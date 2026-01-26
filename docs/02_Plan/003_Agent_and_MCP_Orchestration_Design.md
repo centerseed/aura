@@ -1,13 +1,13 @@
 # Agent & MCP Orchestration Design (幕僚與協議協作設計)
 
-本文件定義了 Aura 系統中各 Agent 的通訊機制，以及如何透過 MCP (Model Context Protocol) 存取外部能力（日曆、檔案、NLU 規則）。
+本文件定義了 Zentropy 系統中各 Agent 的通訊機制，以及如何透過 MCP (Model Context Protocol) 存取外部能力（日曆、檔案、NLU 規則）。
 
 ## 1. 協作模式設計 (The Hybrid Framework)
 
 AAE 框架支援雙軌協作模式，以平衡「業務穩定性」與「未來靈活性」。
 
 ### 1.1 靜態流水線 (Static Pipeline - 優先實作)
-*   **定義**: 針對確定性的業務邏輯（如 Aura 的輸入解析流）。
+*   **定義**: 針對確定性的業務邏輯（如 Zentropy 的輸入解析流）。
 *   **機制**: 使用 `Orchestrator` 強制定義 `Gatekeeper -> Librarian -> Coach` 的執行順序與合約。
 *   **優點**: 極度穩定、部署成本低、測試邊界清晰。
 
@@ -16,7 +16,7 @@ AAE 框架支援雙軌協作模式，以平衡「業務穩定性」與「未來�
 *   **機制**: 利用 Pydantic AI 的 `Agent Delegation` 機制。
 *   **優點**: 可應對複雜的邊界問題，支援隨心所欲的 Agent 調度。
 
-### 1.3 共享上下文 (The AuraDeps)
+### 1.3 共享上下文 (The ZentropyDeps)
 不論是何種模式，均透過 Pydantic AI 的 `Deps` 機制共享以下狀態：
 *   **User Session**: 當前用戶權限與會話歷史。
 *   **MCP Support**: 集中的 MCP 伺服器連接管理。
@@ -26,15 +26,15 @@ AAE 框架支援雙軌協作模式，以平衡「業務穩定性」與「未來�
 
 ## 2. MCP (Model Context Protocol) 架構整合
 
-MCP 是 Aura Agent 執行具體動作的「手」。
+MCP 是 Zentropy Agent 執行具體動作的「手」。
 
 ### 2.1 Backend 作為 MCP Client
-Aura 後端將實作 MCP Client 邏輯，與以下伺服器溝通：
+Zentropy 後端將實作 MCP Client 邏輯，與以下伺服器溝通：
 
 | Agent | 所需 MCP Server | 主要 Tool 功能 |
 | :--- | :--- | :--- |
 | **Gatekeeper** | `NLU_Enforcer_Server` | 執行屬性識別、強制 Schema 對齊。 |
-| **Librarian** | `File_Management_Server` | 自動檢索 `Aura_Vault`、建立索引、自動歸檔。 |
+| **Librarian** | `File_Management_Server` | 自動檢索 `Zentropy_Vault`、建立索引、自動歸檔。 |
 | **Coach** | `Productivity_Connect_Server` | 掃描 WBS (Markdown)、讀取 Google Calendar、衝突偵測。 |
 
 ### 2.2 接口實作概念 (Clean Architecture)
@@ -55,7 +55,7 @@ Aura 後端將實作 MCP Client 邏輯，與以下伺服器溝通：
 
 ### 4.1 身份感知 (Identity Awareness)
 *   **Session Key**: 每個會話由 `user_id` + `session_id` 組成。
-*   **Context Isolation**: `AuraContext` 不再是全域共享，而是由 `SessionStore` 根據請求實體動態加載。
+*   **Context Isolation**: `ZentropyContext` 不再是全域共享，而是由 `SessionStore` 根據請求實體動態加載。
 
 ### 4.2 持久化會話 (Session Persistence)
 *   由於使用 Cloud Run (Serverless)，記憶體狀態不可靠。

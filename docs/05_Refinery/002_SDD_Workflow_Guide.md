@@ -1,6 +1,6 @@
-# SDD (Spec-Driven Development) 指南：亞拉系統開發工作流
+# SDD (Spec-Driven Development) 指南：Zentropy 系統開發工作流
 
-本文件詳細定義了 Aura 專案所採用的 **規格驅動開發 (SDD)** 方法論。這是一套旨在將 AI 的生成能力與工程的嚴謹性相結合的實作框架。
+本文件詳細定義了 Zentropy 專案所採用的 **規格驅動開發 (SDD)** 方法論。這是一套旨在將 AI 的生成能力與工程的嚴謹性相結合的實作框架。
 
 ---
 
@@ -57,7 +57,7 @@
 
 ## 四、 AI 與創辦人的協作模型
 
-| 節點 | 創辦人 (Human) | AI (Aura/Antigravity) |
+| 節點 | 創辦人 (Human) | AI (Zentropy/Antigravity) |
 | :--- | :--- | :--- |
 | **Specify** | 定義願景與痛點 | 撰寫結構化的 PRD/FRD |
 | **Gate 1** | **簽核確認** | - |

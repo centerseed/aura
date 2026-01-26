@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 專案概述
 
-**SAM System (Stability-first Attention Management)** - 為創業者設計的「不失控」營運管理系統,採用雙軸管理模型 (Status × Entity) 與三個協作 AI Agents。
+**Zentropy - 讓一切井然有序** - 為創業者設計的「不失控」營運管理系統,採用雙軸管理模型 (Status × Entity) 與三個協作 AI Agents。
 
 ## 開發命令
 
@@ -26,8 +26,8 @@ pytest tests/integration/test_firestore_connection.py
 pytest --cov=app tests/
 
 # Docker 建置與運行
-docker build -t aura-backend .
-docker run -p 8080:8080 aura-backend
+docker build -t zentropy-backend .
+docker run -p 8080:8080 zentropy-backend
 ```
 
 ### 環境設定
@@ -111,7 +111,7 @@ interface/        # 🟡 接口轉換層
    - 輸出結構化 JSON
 
 2. **The Librarian (圖書管理員)** - 檔案專家
-   - 根據 Entity 與 Naming Convention 自動歸檔至 `Aura_Vault/`
+   - 根據 Entity 與 Naming Convention 自動歸檔至 `Zentropy_Vault/`
    - 上下文鏈接: 自動檢索並推薦相關 Reference
 
 3. **The Coach (營運教練)** - 全局監控
@@ -119,7 +119,7 @@ interface/        # 🟡 接口轉換層
    - 心理閉環: 主持晨報 (08:30) 與晚報 (21:00)
 
 ### Aura_Vault 歸檔邏輯
-`Aura_Vault/` 存放業務文件,按 Entity 組織:
+`Zentropy_Vault/` 存放業務文件,按 Entity 組織:
 - `00_Core/`: 核心架構與策略
 - `01_Compliance/`: 法律合規
 - `02_Treasury/`: 財務稅務
@@ -178,7 +178,7 @@ interface/        # 🟡 接口轉換層
 - Dockerfile 與本地測試
 
 **Milestone 2**: Agent Orchestration & MCP Integration (進行中)
-- Aura Agent Framework 實作
+- Zentropy Agent Framework 實作
 - MCP Client 接口實作
 - Tool Access Layer (File_Tool, Calendar_Tool, NLU_Tool)
 - 跨 Agent 的 Session_State 管理

@@ -1,14 +1,14 @@
 
-# Aura Backend Implementation Plan (Phase 2 & 3)
+# Zentropy Backend Implementation Plan (Phase 2 & 3)
 
-本計畫定義了 Naruvia Backend 從 POC 驗證過渡到正式生產環境的具體開發路徑。核心專注於實作經過驗證的 **Entropy Reduction Governance (熵減治理)** 與 **Rolling Structured Memory (滾動結構化記憶)**。
+本計畫定義了 Zentropy Backend 從 POC 驗證過渡到正式生產環境的具體開發路徑。核心專注於實作經過驗證的 **Entropy Reduction Governance (熵減治理)** 與 **Rolling Structured Memory (滾動結構化記憶)**。
 
 ---
 
 ## Technical Architecture Overview
 *   **Language**: Python 3.10+
 *   **Framework**: FastAPI
-*   **LLM**: Gemini 1.5 Pro (Governance) / Flash (Routine Tasks)
+*   **LLM**: Gemini 2.5 Flash Lite (Governance) / Flash (Routine Tasks)
 *   **Persistence**: PostgreSQL 16+ with `pgvector`
 *   **ORM**: SQLAlchemy 2.0+ (Async)
 *   **Memory**: Area-based Rolling Summary (Stored in Postgres JSONB)

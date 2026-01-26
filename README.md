@@ -1,4 +1,4 @@
-# SAM System (Stability-first Attention Management)
+# Zentropy - 讓一切井然有序
 
 這是一個專為創業者設計的「不失控」營運管理系統。
 

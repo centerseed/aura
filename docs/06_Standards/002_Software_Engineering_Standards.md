@@ -1,7 +1,7 @@
-# Aura Software Engineering Standards
-# Aura 軟體工程開發標準
+# Zentropy Software Engineering Standards
+# Zentropy 軟體工程開發標準
 
-本文件定義了 Aura 系統跨平台的開發標準，確保程式碼的一致性、可測試性與長期維護性。所有實作計畫 (Plan) 必須符合本標準。
+本文件定義了 Zentropy 系統跨平台的開發標準，確保程式碼的一致性、可測試性與長期維護性。所有實作計畫 (Plan) 必須符合本標準。
 
 ---
 

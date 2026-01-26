@@ -1,7 +1,7 @@
-# SAM System Naming Convention & Taxonomy
-# SAM 系統命名規範與術語統一表
+# Zentropy System Naming Convention & Taxonomy
+# Zentropy 系統命名規範與術語統一表
 
-為了確保 LLM、開發者與使用者（創辦人）在理解上高度對齊，本文件定義了 SAM 系統內所有核心名詞與檔案命名規範。
+為了確保 LLM、開發者與使用者（創辦人）在理解上高度對齊，本文件定義了 Zentropy 系統內所有核心名詞與檔案命名規範。
 
 ---
 
@@ -33,7 +33,7 @@
 `XXX_主題描述_版本.md`
 *   **XXX (編號)**: 3 位數零補齊的數字（如 `001`, `002`），代表在該資料夾內的邏輯與建立順序。
 *   **主題描述**: 建議使用底線 `_` 分隔，不使用空格。
-*   **範例**：`001_Aura_Technical_Blueprint_v1.md`
+*   **範例**：`001_Zentropy_Technical_Blueprint_v1.md`
 
 ### 2. 不同類別的特殊命名
 *   **會議記錄 (Meetings)**：`YYYYMMDD_MTG_參與者簡稱_主題.md`

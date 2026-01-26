@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String               @id @default(uuid()) @db.Uuid
+  created_at           DateTime             @default(now()) @db.Timestamp(6)
+  updated_at           DateTime             @updatedAt @db.Timestamp(6)
+  deleted_at           DateTime?            @db.Timestamp(6)
+  email                String?              @unique(map: "ix_users_email") @db.VarChar
+  name                 String?              @db.VarChar
+  auth_provider        AuthProvider         @default(EMAIL)
+  auth_provider_id     String?              @db.VarChar
+  settings             Json?                @db.Json
+  areas                Area[]
+  governance_proposals GovernanceProposal[]
+  products             Product[]
+  tasks                Task[]
+  topics               Topic[]
+  milestones           Milestone[]
+
+  @@map("users")
+}
+
+model Area {
+  id              String    @id @default(uuid()) @db.Uuid
+  created_at      DateTime  @default(now()) @db.Timestamp(6)
+  updated_at      DateTime  @updatedAt @db.Timestamp(6)
+  deleted_at      DateTime? @db.Timestamp(6)
+  user_id         String    @db.Uuid
+  name            String    @db.VarChar
+  description     String?   @db.VarChar
+  is_custom       Boolean
+  rolling_summary Json?     @db.Json
+  scope           String?   @db.VarChar
+  user            User      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products        Product[]
+
+  @@map("areas")
+}
+
+model Product {
+  id          String                 @id @default(uuid()) @db.Uuid
+  created_at  DateTime               @default(now()) @db.Timestamp(6)
+  updated_at  DateTime               @updatedAt @db.Timestamp(6)
+  deleted_at  DateTime?              @db.Timestamp(6)
+  user_id     String                 @db.Uuid
+  area_id     String                 @db.Uuid
+  name        String                 @db.VarChar
+  description String?                @db.VarChar
+  status      Status
+  lifecycle   Lifecycle
+  embedding   Unsupported("vector")?
+  area        Area                   @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user        User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tasks       Task[]
+  topics      Topic[]
+
+  @@map("products")
+}
+
+model Topic {
+  id              String                 @id @default(uuid()) @db.Uuid
+  created_at      DateTime               @default(now()) @db.Timestamp(6)
+  updated_at      DateTime               @updatedAt @db.Timestamp(6)
+  deleted_at      DateTime?              @db.Timestamp(6)
+  user_id         String                 @db.Uuid
+  product_id      String                 @db.Uuid
+  name            String                 @db.VarChar
+  semantic_center Unsupported("vector")?
+  tasks           Task[]
+  product         Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user            User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("topics")
+}
+
+model Task {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  created_at              DateTime               @default(now()) @db.Timestamp(6)
+  updated_at              DateTime               @updatedAt @db.Timestamp(6)
+  deleted_at              DateTime?              @db.Timestamp(6)
+  user_id                 String                 @db.Uuid
+  product_id              String                 @db.Uuid
+  topic_id                String?                @db.Uuid
+  content                 String                 @db.VarChar
+  status                  Status
+  embedding               Unsupported("vector")?
+  ai_analysis             Json?                  @db.Json
+  references              Json                   @default("[]") @db.Json
+  start_date              DateTime?              @db.Timestamp(6)
+  due_date                DateTime?              @db.Timestamp(6)
+  inferred_from_milestone String?                @db.Uuid
+  time_confidence         Float?
+  product                 Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  topic                   Topic?                 @relation(fields: [topic_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("tasks")
+}
+
+model GovernanceProposal {
+  id         String         @id @default(uuid()) @db.Uuid
+  created_at DateTime       @default(now()) @db.Timestamp(6)
+  updated_at DateTime       @updatedAt @db.Timestamp(6)
+  deleted_at DateTime?      @db.Timestamp(6)
+  user_id    String         @db.Uuid
+  type       String         @db.VarChar
+  target_id  String?        @db.Uuid
+  payload    Json?          @db.Json
+  status     ProposalStatus
+  users      User           @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("governance_proposals")
+}
+
+model alembic_version {
+  version_num String @id(map: "alembic_version_pkc") @db.VarChar(32)
+}
+
+model Milestone {
+  id          String    @id @default(uuid()) @db.Uuid
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  updated_at  DateTime  @updatedAt @db.Timestamp(6)
+  deleted_at  DateTime? @db.Timestamp(6)
+  user_id     String    @db.Uuid
+  name        String    @db.VarChar
+  target_date DateTime  @db.Timestamp(6)
+  status      String    @default("planned") @db.VarChar
+  entity_type String    @db.VarChar
+  entity_id   String    @db.Uuid
+  priority    Int       @default(5)
+  description String?   @db.VarChar
+  user        User      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("milestones")
+}
+
+enum Status {
+  INBOX     @map("INBOX")
+  ACTIVE    @map("ACTIVE")
+  MAINTAIN  @map("MAINTAIN")
+  REFERENCE @map("REFERENCE")
+  ARCHIVE   @map("ARCHIVE")
+
+  @@map("statusenum")
+}
+
+enum Lifecycle {
+  FINITE    @map("FINITE")
+  PERPETUAL @map("PERPETUAL")
+
+  @@map("lifecycleenum")
+}
+
+enum ProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("proposalstatusenum")
+}
+
+enum MilestoneStatus {
+  planned
+  in_progress
+  completed
+  delayed
+  cancelled
+
+  @@map("milestonestatusenum")
+}
+
+enum EntityType {
+  AREA
+  PRODUCT
+  TOPIC
+
+  @@map("entitytypeenum")
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  ANONYMOUS
+
+  @@map("authproviderenum")
+}

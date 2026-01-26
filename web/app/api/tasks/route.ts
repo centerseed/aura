@@ -1,0 +1,105 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { Status } from "@prisma/client";
+
+// GET /api/tasks?userId=xxx
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get("userId");
+
+  if (!userId) {
+    return NextResponse.json({ error: "userId is required" }, { status: 400 });
+  }
+
+  try {
+    const tasks = await prisma.task.findMany({
+      where: {
+        user_id: userId,
+        deleted_at: null,
+      },
+      include: {
+        product: {
+          include: {
+            area: true,
+          },
+        },
+        topic: true,
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+    });
+
+    // 轉換為前端格式
+    const formattedTasks = tasks.map((task) => {
+      const analysis = task.ai_analysis as Record<string, unknown> | null;
+      return {
+        id: task.id,
+        title: task.content,
+        narrative: (analysis?.narrative as string) || null,
+        drawer: task.status,
+        lifecycle: (analysis?.lifecycle as string) || "embryo",
+        tag: {
+          area: task.product.area.name,
+          product: task.product.name,
+          topic: task.topic?.name || "未分類",
+        },
+        strategy_used: (analysis?.strategy_used as string) || null,
+        reasoning: (analysis?.reasoning as string) || null,
+        start_date: task.start_date?.toISOString() || null,
+        due_date: task.due_date?.toISOString() || null,
+        time_confidence: task.time_confidence || null,
+        inferred_from_milestone: task.inferred_from_milestone || null,
+      };
+    });
+
+    return NextResponse.json(formattedTasks);
+  } catch (error) {
+    console.error("Failed to fetch tasks:", error);
+    return NextResponse.json({ error: "Failed to fetch tasks" }, { status: 500 });
+  }
+}
+
+// PATCH /api/tasks - 更新任務狀態、移動到其他 Product、設定日期、或修改內容
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { taskId, status, productId, start_date, due_date, content } = body;
+
+    if (!taskId) {
+      return NextResponse.json({ error: "taskId is required" }, { status: 400 });
+    }
+
+    const hasUpdate = status || productId || start_date !== undefined || due_date !== undefined || content;
+    if (!hasUpdate) {
+      return NextResponse.json({ error: "No update data provided" }, { status: 400 });
+    }
+
+    // 使用 Prisma 原生類型
+    const task = await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        ...(status && { status: Status[status as keyof typeof Status] }),
+        ...(productId && { product_id: productId }),
+        ...(start_date !== undefined && {
+          start_date: start_date ? new Date(start_date) : null
+        }),
+        ...(due_date !== undefined && {
+          due_date: due_date ? new Date(due_date) : null
+        }),
+        ...(content && { content: content.trim() }),
+      },
+      include: {
+        product: {
+          include: { area: true },
+        },
+        topic: true,
+      },
+    });
+
+    return NextResponse.json({ success: true, task });
+  } catch (error) {
+    console.error("Failed to update task:", error);
+    return NextResponse.json({ error: "Failed to update task" }, { status: 500 });
+  }
+}

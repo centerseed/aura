@@ -7,7 +7,7 @@
 *   **狀態**: 已完成 (Completed) ✅
 
 ## 任務描述 (Description)
-建立 Aura 後端 (FastAPI) 的基礎運行環境，並串線 Firebase 與 Cloud Run 部署流程。本任務遵循 TDD 流程。
+建立 Zentropy 後端 (FastAPI) 的基礎運行環境，並串線 Firebase 與 Cloud Run 部署流程。本任務遵循 TDD 流程。
 
 ## 查核清單 (Checklist)
 

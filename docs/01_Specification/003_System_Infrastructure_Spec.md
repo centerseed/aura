@@ -1,15 +1,16 @@
-# Aura Technical Blueprint (全域技術藍圖)
+# Zentropy Technical Blueprint (全域技術藍圖)
 
-本文件定義了 Aura 系統跨平台的實作架構、技術棧與測試策略。
+本文件定義了 Zentropy 系統跨平台的實作架構、技術棧與測試策略。
 
 ## 1. 技術棧 (Tech Stack)
 *   **Backend**: Python 3.10+ & FastAPI (異步、高性能)。
 *   **Persistence**: PostgreSQL 16+ (Relational Data, JSONB).
 *   **Vector Search**: pgvector Extension (L0 Funnel & Semantic Search).
 *   **ORM**: SQLAlchemy 2.0+ (Async).
-*   **Web**: Next.js / React.
+*   **Web POC**: Next.js 14+ (App Router), React 18+, Tailwind CSS, Prisma ORM
 *   **Mobile App**: Flutter (REST API Client).
-*   **LLM**: Gemini 1.5 Pro (核心 NLU 引擎).
+*   **LLM**: Gemini 2.5 Flash Lite (核心 NLU 引擎，透過 @ai-sdk/google 整合).
+*   **AI SDK**: Vercel AI SDK (`ai` package) + Zod Schema 驗證.
 
 ## 2. 目錄結構 (Directory Structure) - Clean Arch 實踐
 

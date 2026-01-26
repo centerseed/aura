@@ -1,4 +1,4 @@
-# Aura Firebase Automation Workflow
+# Zentropy Firebase Automation Workflow
 
 本文件定義了如何自動化建立 Firebase 專案、下載金鑰並完成後端配置的標準流程。
 
@@ -16,7 +16,7 @@
 
 ```bash
 # 1. 建立 GCP/Firebase 專案
-gcloud projects create [PROJECT_ID] --name="Aura Business OS"
+gcloud projects create [PROJECT_ID] --name="Zentropy Business OS"
 
 # 2. 啟用核心服務
 gcloud services enable firestore.googleapis.com \
@@ -28,16 +28,16 @@ gcloud services enable firestore.googleapis.com \
 gcloud alpha firestore databases create --location=asia-east1 --project=[PROJECT_ID]
 
 # 4. 建立 Service Account 並下載金鑰
-gcloud iam service-accounts create aura-backend-sa --display-name="Aura Backend Service Account" --project=[PROJECT_ID]
+gcloud iam service-accounts create zentropy-backend-sa --display-name="Zentropy Backend Service Account" --project=[PROJECT_ID]
 
 # 5. 授權 Firestore 存取權限
 gcloud projects add-iam-policy-binding [PROJECT_ID] \
-    --member="serviceAccount:aura-backend-sa@[PROJECT_ID].iam.gserviceaccount.com" \
+    --member="serviceAccount:zentropy-backend-sa@[PROJECT_ID].iam.gserviceaccount.com" \
     --role="roles/datastore.user"
 
 # 6. 生成並下載密鑰到 backend 目錄
 gcloud iam service-accounts keys create backend/service-account.json \
-    --iam-account=aura-backend-sa@[PROJECT_ID].iam.gserviceaccount.com \
+    --iam-account=zentropy-backend-sa@[PROJECT_ID].iam.gserviceaccount.com \
     --project=[PROJECT_ID]
 ```
 
