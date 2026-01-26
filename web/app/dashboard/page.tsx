@@ -1007,7 +1007,11 @@ function DashboardContent() {
   const [isReorganizeModalOpen, setIsReorganizeModalOpen] = useState(false);
   const [reorganizeProposal, setReorganizeProposal] = useState<any | null>(null);
   const [isReorganizing, setIsReorganizing] = useState(false);
+  const [isApplying, setIsApplying] = useState(false); // 新增: applying 狀態
   const [reorganizingProductId, setReorganizingProductId] = useState<string | null>(null);
+  const proposalCacheRef = useRef<Map<string, any>>(new Map()); // 快取 proposal by productId
+  const [isRestoring, setIsRestoring] = useState(false); // 還原中狀態
+  const [lastReorganizedProductId, setLastReorganizedProductId] = useState<string | null>(null); // 記錄最後重組的 product
 
   // Task 合併相關 state
   const [showMergeConfirmModal, setShowMergeConfirmModal] = useState(false);
@@ -2059,6 +2063,15 @@ function DashboardContent() {
   const handleReorganize = async (productId: string, productName: string) => {
     if (!userId) return;
 
+    // ✅ 檢查是否已有快取的 proposal（重試時使用相同的 proposal）
+    const cachedProposal = proposalCacheRef.current.get(productId);
+    if (cachedProposal) {
+      console.log("✅ 使用快取的 AI proposal（避免重複生成）");
+      setReorganizeProposal(cachedProposal);
+      setIsReorganizeModalOpen(true);
+      return;
+    }
+
     setIsReorganizing(true);
     setReorganizingProductId(productId);
     try {
@@ -2069,7 +2082,12 @@ function DashboardContent() {
       if (!res.ok) throw new Error("重組分析失敗");
 
       const proposal = await res.json();
-      setReorganizeProposal({ ...proposal, productId, productName });
+      const fullProposal = { ...proposal, productId, productName };
+
+      // ✅ 快取 proposal（只在成功時快取）
+      proposalCacheRef.current.set(productId, fullProposal);
+
+      setReorganizeProposal(fullProposal);
       setIsReorganizeModalOpen(true);
     } catch (err) {
       console.error("Failed to reorganize:", err);
@@ -2084,6 +2102,7 @@ function DashboardContent() {
   const handleApplyReorganization = async () => {
     if (!reorganizeProposal || !userId) return;
 
+    setIsApplying(true); // ✅ 開始 applying loading
     try {
       const res = await fetch(`/api/products/${reorganizeProposal.productId}/apply-reorganization?user_id=${userId}`, {
         method: "POST",
@@ -2091,7 +2110,16 @@ function DashboardContent() {
         body: JSON.stringify(reorganizeProposal),
       });
 
-      if (!res.ok) throw new Error("應用重組失敗");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.details || "應用重組失敗");
+      }
+
+      // 成功後清除該 product 的 proposal 快取
+      proposalCacheRef.current.delete(reorganizeProposal.productId);
+
+      // ✅ 記錄最後重組的 product ID（用於還原功能）
+      setLastReorganizedProductId(reorganizeProposal.productId);
 
       // 重新載入數據
       const libraryRes = await fetch(`/api/library?userId=${userId}`);
@@ -2104,7 +2132,54 @@ function DashboardContent() {
       setReorganizeProposal(null);
     } catch (err) {
       console.error("Failed to apply reorganization:", err);
-      alert("應用失敗，請稍後再試");
+      alert(`應用失敗：${err instanceof Error ? err.message : "請稍後再試"}`);
+      // ✅ 失敗時不清除 proposal，用戶可以重試
+    } finally {
+      setIsApplying(false); // ✅ 結束 applying loading
+    }
+  };
+
+  // 還原上次重組
+  const handleRestoreReorganization = async () => {
+    if (!lastReorganizedProductId || !userId) return;
+
+    const confirmed = window.confirm(
+      "確定要還原上次的重組操作嗎？\n\n這將恢復最近 30 分鐘內被刪除的 Tasks（包含 references）。"
+    );
+
+    if (!confirmed) return;
+
+    setIsRestoring(true);
+    try {
+      const res = await fetch(
+        `/api/products/${lastReorganizedProductId}/restore-recent-tasks?userId=${userId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ minutes: 30 }),
+        }
+      );
+
+      if (!res.ok) throw new Error("還原失敗");
+
+      const data = await res.json();
+
+      // 重新載入數據
+      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      if (libraryRes.ok) {
+        const libraryData = await libraryRes.json();
+        setAreas(libraryData);
+      }
+
+      // 清除記錄
+      setLastReorganizedProductId(null);
+
+      alert(`✅ 成功還原 ${data.restored_count} 個 Tasks`);
+    } catch (err) {
+      console.error("Failed to restore:", err);
+      alert("還原失敗，請稍後再試");
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -2166,6 +2241,25 @@ function DashboardContent() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* 還原上次重組按鈕 */}
+              {lastReorganizedProductId && (
+                <button
+                  onClick={handleRestoreReorganization}
+                  disabled={isRestoring}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 hover:bg-yellow-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="還原最近一次重組操作"
+                >
+                  {isRestoring ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {isRestoring ? "還原中..." : "還原上次重組"}
+                  </span>
+                </button>
+              )}
+
               {/* 視圖切換按鈕 */}
               <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
                 <button
@@ -2651,11 +2745,12 @@ function DashboardContent() {
           isOpen={isReorganizeModalOpen}
           onClose={() => {
             setIsReorganizeModalOpen(false);
-            setReorganizeProposal(null);
+            // ✅ 不清除 proposal，保留快取以便重試
+            // setReorganizeProposal(null);
           }}
           onApply={handleApplyReorganization}
           proposal={reorganizeProposal}
-          isApplying={isReorganizing}
+          isApplying={isApplying}
         />
 
         {/* Task Detail Modal */}

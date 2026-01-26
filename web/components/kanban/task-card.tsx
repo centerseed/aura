@@ -31,9 +31,10 @@ interface TaskCardProps {
   onOpenDetail?: () => void;
   onSetDueDate?: (taskId: string) => void;
   onComplete?: (taskId: string) => void;
+  onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void;
 }
 
-export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate, onComplete }: TaskCardProps) {
+export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate, onComplete, onToggleSubItem }: TaskCardProps) {
   const {
     attributes,
     listeners,

@@ -29,7 +29,7 @@ export async function PATCH(
     }
 
     // 獲取現有的 references
-    const existingReferences = (task.references as Reference[]) || [];
+    const existingReferences = (task.references as unknown as Reference[]) || [];
 
     // 找到要更新的 reference
     const referenceIndex = existingReferences.findIndex(

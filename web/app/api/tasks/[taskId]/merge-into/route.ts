@@ -94,8 +94,8 @@ export async function POST(
     // 如果只有目標有值或兩者都沒有，保持 targetStartDate（可能為 null）
 
     // 合併 references（自動去重）
-    const sourceReferences = (sourceTask.references as Reference[]) || [];
-    const targetReferences = (targetTask.references as Reference[]) || [];
+    const sourceReferences = (sourceTask.references as unknown as Reference[]) || [];
+    const targetReferences = (targetTask.references as unknown as Reference[]) || [];
 
     // 建立去重的邏輯：URL 型態用 content 去重，note 型態保留所有（因為內容可能相同但語境不同）
     const mergedReferences = [...targetReferences];

@@ -44,7 +44,7 @@ export async function POST(
     }
 
     // 獲取現有的 references
-    const existingReferences = (task.references as Reference[]) || [];
+    const existingReferences = (task.references as unknown as Reference[]) || [];
 
     // 創建新的 reference
     const now = new Date().toISOString();
@@ -112,7 +112,7 @@ export async function DELETE(
     }
 
     // 獲取現有的 references
-    const existingReferences = (task.references as Reference[]) || [];
+    const existingReferences = (task.references as unknown as Reference[]) || [];
 
     // 過濾掉要刪除的 reference
     const updatedReferences = existingReferences.filter(

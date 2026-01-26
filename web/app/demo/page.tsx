@@ -688,50 +688,44 @@ export default function HomeDemo() {
               <div className="grid md:grid-cols-3 gap-8">
                 {[
                   {
-                    name: "免費版",
-                    price: "¥0",
+                    name: "Atom",
+                    price: "免費",
                     period: "永久",
                     highlight: false,
                     features: [
-                      "無限 Brain Dump 記錄",
-                      "AI 自動分類與標籤",
-                      "優先級識別",
-                      "基本搜尋",
-                      "個人使用"
+                      "每月 50 次 AI 自動分類",
+                      "每月 10 次零碎整理、智能重組",
+                      "一個用戶地圖",
+                      "無限使用"
                     ],
                     cta: "立即開始"
                   },
                   {
-                    name: "專業版",
-                    price: "¥99",
+                    name: "Fusion",
+                    price: "NT$ 240",
                     period: "月",
                     highlight: true,
+                    isActive: true,
                     features: [
-                      "所有免費版功能",
-                      "AI 長期記憶系統",
-                      "歷史演進追蹤",
-                      "高級語意搜尋 (RAG)",
-                      "智能摘要生成",
-                      "MCP 整合 (Cursor/Claude)",
-                      "優先支持"
+                      "Atom 版所有功能，無限制",
+                      "無限輸入和整理",
+                      "語音/圖片輸入（開發中）",
+                      "Google 日曆串接（開發中）"
                     ],
-                    cta: "升級到專業版"
+                    cta: "限時免費"
                   },
                   {
-                    name: "團隊版",
-                    price: "¥299",
-                    period: "月",
+                    name: "Cosmos",
+                    price: "近期登場",
+                    period: "",
                     highlight: false,
                     features: [
-                      "所有專業版功能",
-                      "多人協作 (Project 層級)",
-                      "協作者管理與權限",
-                      "團隊活動日誌",
-                      "API 存取",
-                      "自訂工作流",
-                      "專屬支持"
+                      "Fusion 所有功能",
+                      "MCP 支援",
+                      "多人協作模式",
+                      "智慧行程管理"
                     ],
-                    cta: "聯絡我們"
+                    cta: "敬請期待"
                   }
                 ].map((plan, i) => (
                   <div
@@ -753,7 +747,14 @@ export default function HomeDemo() {
                     <div className="space-y-6">
                       {/* 價格 */}
                       <div>
-                        <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>{plan.name}</h3>
+                        <div className="flex items-center gap-2 mb-3">
+                          <h3 className={`text-2xl font-bold ${theme.text}`}>{plan.name}</h3>
+                          {(plan as any).isActive && (
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"}`}>
+                              目前使用中
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-baseline gap-2">
                           <span className={`text-5xl font-bold ${isDark ? "text-indigo-400" : "text-indigo-600"}`}>{plan.price}</span>
                           <span className={theme.textMutedDarker}>/ {plan.period}</span>

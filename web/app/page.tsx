@@ -1,57 +1,99 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Loader2, LogIn, Zap, RefreshCw, BookOpen, Sparkles, Check, ListTodo, Wand2 } from "lucide-react";
 import { auth, googleProvider, signInWithPopup, signInAnonymously } from "@/lib/firebase";
 
 export default function HomeDemo() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [isEntering, setIsEntering] = useState(false);
   const [authMethod, setAuthMethod] = useState<"select" | "name">("select");
   const [showAuthPanel, setShowAuthPanel] = useState(false);
   const [isDark] = useState(true);
   const [activeDemoTab, setActiveDemoTab] = useState(0);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [currentUser, setCurrentUser] = useState<{ uid: string; email?: string; name?: string } | null>(null);
+  const [hasLibraryData, setHasLibraryData] = useState(false);
+
+  // 檢查使用者是否已登入
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // 使用者已登入，先從 /api/me 取得使用者資料庫 ID
+        try {
+          const meRes = await fetch(`/api/me?firebaseUid=${user.uid}`);
+          if (meRes.ok) {
+            const userData = await meRes.json();
+            setCurrentUser({
+              uid: user.uid,
+              email: user.email || undefined,
+              name: user.displayName || undefined,
+            });
+            setHasLibraryData(userData.hasAreas || false);
+          } else {
+            // 用戶在資料庫中不存在，未完成註冊
+            setCurrentUser(null);
+            setHasLibraryData(false);
+          }
+        } catch (error) {
+          console.error("檢查使用者狀態失敗:", error);
+          setCurrentUser(null);
+          setHasLibraryData(false);
+        }
+      } else {
+        // 使用者未登入
+        setCurrentUser(null);
+        setHasLibraryData(false);
+      }
+      setIsCheckingAuth(false);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   // 主題配色
   const theme = isDark
     ? {
-        bg: "bg-slate-900",
-        text: "text-white",
-        textMuted: "text-white/60",
-        textMutedDarker: "text-white/50",
-        textMutedLighter: "text-white/70",
-        textMutedAlt: "text-white/80",
-        border: "border-white/20",
-        borderLight: "border-white/10",
-        borderHover: "border-emerald-400/50",
-        card: "bg-white/5",
-        cardHover: "bg-white/8",
-        cardBg: "bg-slate-900/98",
-        accent: "text-emerald-400",
-        accentBg: "bg-emerald-500/15",
-        accentBorder: "border-emerald-500/60",
-        shadow: "shadow-emerald-500/20",
-      }
+      bg: "bg-slate-900",
+      text: "text-white",
+      textMuted: "text-white/60",
+      textMutedDarker: "text-white/50",
+      textMutedLighter: "text-white/70",
+      textMutedAlt: "text-white/80",
+      border: "border-white/20",
+      borderLight: "border-white/10",
+      borderHover: "border-emerald-400/50",
+      card: "bg-white/5",
+      cardHover: "bg-white/8",
+      cardBg: "bg-slate-900/98",
+      accent: "text-emerald-400",
+      accentBg: "bg-emerald-500/15",
+      accentBorder: "border-emerald-500/60",
+      shadow: "shadow-emerald-500/20",
+    }
     : {
-        bg: "bg-white",
-        text: "text-slate-900",
-        textMuted: "text-slate-600",
-        textMutedDarker: "text-slate-500",
-        textMutedLighter: "text-slate-700",
-        textMutedAlt: "text-slate-800",
-        border: "border-indigo-200/50",
-        borderLight: "border-indigo-100/50",
-        borderHover: "border-emerald-400/60",
-        card: "bg-indigo-50/40",
-        cardHover: "bg-indigo-100/50",
-        cardBg: "bg-white",
-        accent: "text-emerald-600",
-        accentBg: "bg-emerald-100/60",
-        accentBorder: "border-emerald-400/60",
-        shadow: "shadow-emerald-300/30",
-      };
+      bg: "bg-white",
+      text: "text-slate-900",
+      textMuted: "text-slate-600",
+      textMutedDarker: "text-slate-500",
+      textMutedLighter: "text-slate-700",
+      textMutedAlt: "text-slate-800",
+      border: "border-indigo-200/50",
+      borderLight: "border-indigo-100/50",
+      borderHover: "border-emerald-400/60",
+      card: "bg-indigo-50/40",
+      cardHover: "bg-indigo-100/50",
+      cardBg: "bg-white",
+      accent: "text-emerald-600",
+      accentBg: "bg-emerald-100/60",
+      accentBorder: "border-emerald-400/60",
+      shadow: "shadow-emerald-300/30",
+    };
 
   // 演示場景組 - 三個不同功能的演示（每個只保留一個場景）
   const demoTabs = [
@@ -118,13 +160,16 @@ export default function HomeDemo() {
           name: user.displayName,
         }),
       });
-      if (!response.ok) throw new Error("登入失敗");
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`登入 API 失敗: ${response.status} - ${error}`);
+      }
       const userData = await response.json();
       await redirectUser(userData);
     } catch (error) {
       console.error("Google 登入失敗:", error);
       setIsEntering(false);
-      alert("登入失敗，請稍後再試");
+      alert(`登入失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
     }
   };
 
@@ -143,13 +188,16 @@ export default function HomeDemo() {
           name: "訪客",
         }),
       });
-      if (!response.ok) throw new Error("登入失敗");
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`登入 API 失敗: ${response.status} - ${error}`);
+      }
       const userData = await response.json();
       await redirectUser(userData);
     } catch (error) {
       console.error("匿名登入失敗:", error);
       setIsEntering(false);
-      alert("登入失敗,請稍後再試");
+      alert(`登入失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
     }
   };
 
@@ -167,30 +215,50 @@ export default function HomeDemo() {
           name: name,
         }),
       });
-      if (!response.ok) throw new Error("登入失敗");
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`登入 API 失敗: ${response.status} - ${error}`);
+      }
       const userData = await response.json();
       await redirectUser(userData);
     } catch (error) {
       console.error("名稱登入失敗:", error);
       setIsEntering(false);
-      alert("登入失敗，請稍後再試");
+      alert(`登入失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
     }
   };
 
   const redirectUser = async (userData: { id: string; email?: string | null; name?: string | null }) => {
     try {
       const libraryRes = await fetch(`/api/library?userId=${userData.id}`);
+      if (!libraryRes.ok) {
+        throw new Error(`Library fetch failed: ${libraryRes.status}`);
+      }
       const libraryData = await libraryRes.json();
+
+      // 短暫延遲確保路由過度順暢
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       if (!libraryData || libraryData.length === 0) {
-        window.location.href = `/onboarding`;
+        router.push(`/onboarding`);
       } else {
-        window.location.href = `/dashboard`;
+        router.push(`/dashboard`);
       }
     } catch (error) {
       console.error("檢查使用者狀態失敗:", error);
-      window.location.href = `/onboarding`;
+      setIsEntering(false);
+      alert("無法檢查使用者狀態，請稍後再試");
     }
   };
+
+  // 如果正在檢查認證狀態，顯示加載畫面
+  if (isCheckingAuth) {
+    return (
+      <main className={`min-h-screen ${isDark ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-50"} flex items-center justify-center`}>
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+      </main>
+    );
+  }
 
   return (
     <main className={`min-h-screen ${isDark ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-50"} ${theme.text} overflow-hidden transition-colors duration-300`}>
@@ -204,14 +272,26 @@ export default function HomeDemo() {
       {/* 右上角操作按鈕 */}
       <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
         <button
-          onClick={() => setShowAuthPanel(!showAuthPanel)}
+          onClick={() => {
+            if (currentUser) {
+              // 已登入，直接進入儀表板
+              if (hasLibraryData) {
+                router.push("/dashboard");
+              } else {
+                router.push("/onboarding");
+              }
+            } else {
+              // 未登入，開啟登入面板
+              setShowAuthPanel(!showAuthPanel);
+            }
+          }}
           className="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl
             bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
             text-white font-medium text-sm transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/30
             border border-emerald-400/40 hover:border-emerald-400/80"
         >
           <LogIn className="w-4 h-4" />
-          登入
+          {currentUser ? "進入儀表板" : "登入"}
         </button>
       </div>
 
@@ -270,15 +350,14 @@ export default function HomeDemo() {
                       <button
                         key={tab.id}
                         onClick={() => setActiveDemoTab(tab.id)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
-                          activeDemoTab === tab.id
-                            ? isDark
-                              ? "bg-indigo-500/20 border-2 border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20"
-                              : "bg-indigo-100 border-2 border-indigo-400 text-indigo-900 shadow-lg shadow-indigo-300/20"
-                            : isDark
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${activeDemoTab === tab.id
+                          ? isDark
+                            ? "bg-indigo-500/20 border-2 border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20"
+                            : "bg-indigo-100 border-2 border-indigo-400 text-indigo-900 shadow-lg shadow-indigo-300/20"
+                          : isDark
                             ? "bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80"
                             : "bg-white border border-indigo-200/50 text-slate-600 hover:bg-indigo-50 hover:text-slate-900"
-                        }`}
+                          }`}
                       >
                         <TabIcon className="w-4 h-4" />
                         {tab.name}
@@ -404,7 +483,7 @@ export default function HomeDemo() {
                               <ActiveIcon className={`w-5 h-5 ${colors.iconText}`} />
                               <span className={`text-sm font-bold ${colors.text}`}>AI 智能拆解</span>
                             </div>
-                            {scenario.outputItems.map((item: any, i: number) => (
+                            {scenario.outputItems?.map((item: any, i: number) => (
                               <div
                                 key={i}
                                 className={`flex items-start gap-3 p-3 rounded-lg ${isDark ? "bg-white/5" : "bg-white"} border ${theme.borderLight} hover:scale-105 transition-transform`}
@@ -422,11 +501,10 @@ export default function HomeDemo() {
                                       </span>
                                     )}
                                     {item.priority && (
-                                      <span className={`px-2 py-0.5 rounded ${
-                                        item.priority === "高"
-                                          ? isDark ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-700"
-                                          : isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"
-                                      }`}>
+                                      <span className={`px-2 py-0.5 rounded ${item.priority === "高"
+                                        ? isDark ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-700"
+                                        : isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"
+                                        }`}>
                                         {item.priority}
                                       </span>
                                     )}
@@ -582,13 +660,12 @@ export default function HomeDemo() {
                                     {item.text}
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className={`text-xs px-2 py-0.5 rounded ${
-                                      item.category === "Active"
-                                        ? isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700"
-                                        : item.category === "Maintain"
+                                    <span className={`text-xs px-2 py-0.5 rounded ${item.category === "Active"
+                                      ? isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700"
+                                      : item.category === "Maintain"
                                         ? isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"
                                         : isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"
-                                    }`}>
+                                      }`}>
                                       {item.category}
                                     </span>
                                     <span className={`text-xs ${theme.textMutedDarker}`}>
@@ -711,41 +788,37 @@ export default function HomeDemo() {
                   return (
                     <div
                       key={i}
-                      className={`group relative p-8 border-2 ${item.borderColor} bg-gradient-to-br ${item.bgGradient} rounded-2xl transition-all hover:scale-105 hover:shadow-2xl ${
-                        item.color === "amber"
-                          ? isDark ? "hover:shadow-amber-500/20" : "hover:shadow-amber-300/20"
-                          : item.color === "blue"
+                      className={`group relative p-8 border-2 ${item.borderColor} bg-gradient-to-br ${item.bgGradient} rounded-2xl transition-all hover:scale-105 hover:shadow-2xl ${item.color === "amber"
+                        ? isDark ? "hover:shadow-amber-500/20" : "hover:shadow-amber-300/20"
+                        : item.color === "blue"
                           ? isDark ? "hover:shadow-blue-500/20" : "hover:shadow-blue-300/20"
                           : isDark ? "hover:shadow-emerald-500/20" : "hover:shadow-emerald-300/20"
-                      }`}
+                        }`}
                     >
                       {/* Icon */}
-                      <div className={`w-16 h-16 rounded-2xl ${
-                        item.color === "amber"
-                          ? isDark ? "bg-amber-500/20" : "bg-amber-100"
-                          : item.color === "blue"
+                      <div className={`w-16 h-16 rounded-2xl ${item.color === "amber"
+                        ? isDark ? "bg-amber-500/20" : "bg-amber-100"
+                        : item.color === "blue"
                           ? isDark ? "bg-blue-500/20" : "bg-blue-100"
                           : isDark ? "bg-emerald-500/20" : "bg-emerald-100"
-                      } flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-                        <Icon className={`w-8 h-8 ${
-                          item.color === "amber"
-                            ? isDark ? "text-amber-400" : "text-amber-600"
-                            : item.color === "blue"
+                        } flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
+                        <Icon className={`w-8 h-8 ${item.color === "amber"
+                          ? isDark ? "text-amber-400" : "text-amber-600"
+                          : item.color === "blue"
                             ? isDark ? "text-blue-400" : "text-blue-600"
                             : isDark ? "text-emerald-400" : "text-emerald-600"
-                        }`} />
+                          }`} />
                       </div>
 
                       {/* 標題 */}
                       <div className="space-y-2 mb-4">
                         <h3 className={`text-xl font-bold ${theme.text}`}>{item.title}</h3>
-                        <p className={`text-sm ${
-                          item.color === "amber"
-                            ? isDark ? "text-amber-400/80" : "text-amber-700"
-                            : item.color === "blue"
+                        <p className={`text-sm ${item.color === "amber"
+                          ? isDark ? "text-amber-400/80" : "text-amber-700"
+                          : item.color === "blue"
                             ? isDark ? "text-blue-400/80" : "text-blue-700"
                             : isDark ? "text-emerald-400/80" : "text-emerald-700"
-                        } font-medium`}>{item.subtitle}</p>
+                          } font-medium`}>{item.subtitle}</p>
                       </div>
 
                       {/* 描述 */}
@@ -758,13 +831,12 @@ export default function HomeDemo() {
                         </div>
                         {item.examples.map((example, j) => (
                           <div key={j} className={`flex items-start gap-2 text-sm ${theme.textMutedLighter}`}>
-                            <span className={`${
-                              item.color === "amber"
-                                ? isDark ? "text-amber-400" : "text-amber-600"
-                                : item.color === "blue"
+                            <span className={`${item.color === "amber"
+                              ? isDark ? "text-amber-400" : "text-amber-600"
+                              : item.color === "blue"
                                 ? isDark ? "text-blue-400" : "text-blue-600"
                                 : isDark ? "text-emerald-400" : "text-emerald-600"
-                            }`}>•</span>
+                              }`}>•</span>
                             <span>{example}</span>
                           </div>
                         ))}
@@ -789,61 +861,54 @@ export default function HomeDemo() {
               <div className="grid md:grid-cols-3 gap-8">
                 {[
                   {
-                    name: "免費版",
-                    price: "¥0",
+                    name: "Atom",
+                    price: "免費",
                     period: "永久",
                     highlight: false,
                     features: [
-                      "無限 Brain Dump 記錄",
-                      "AI 自動分類與標籤",
-                      "優先級識別",
-                      "基本搜尋",
-                      "個人使用"
+                      "每月 50 次 AI 自動分類",
+                      "每月 10 次零碎整理、智能重組",
+                      "一個用戶地圖",
+                      "無限使用"
                     ],
                     cta: "立即開始"
                   },
                   {
-                    name: "專業版",
-                    price: "¥99",
+                    name: "Fusion",
+                    price: "NT$ 240",
                     period: "月",
                     highlight: true,
+                    isActive: true,
                     features: [
-                      "所有免費版功能",
-                      "AI 長期記憶系統",
-                      "歷史演進追蹤",
-                      "高級語意搜尋 (RAG)",
-                      "智能摘要生成",
-                      "MCP 整合 (Cursor/Claude)",
-                      "優先支持"
+                      "Atom 版所有功能，無限制",
+                      "無限輸入和整理",
+                      "語音/圖片輸入（開發中）",
+                      "Google 日曆串接（開發中）"
                     ],
-                    cta: "升級到專業版"
+                    cta: "限時免費"
                   },
                   {
-                    name: "團隊版",
-                    price: "¥299",
-                    period: "月",
+                    name: "Cosmos",
+                    price: "近期登場",
+                    period: "",
                     highlight: false,
                     features: [
-                      "所有專業版功能",
-                      "多人協作 (Project 層級)",
-                      "協作者管理與權限",
-                      "團隊活動日誌",
-                      "API 存取",
-                      "自訂工作流",
-                      "專屬支持"
+                      "Fusion 所有功能",
+                      "MCP 支援",
+                      "多人協作模式",
+                      "智慧行程管理"
                     ],
-                    cta: "聯絡我們"
+                    cta: "敬請期待"
                   }
                 ].map((plan, i) => (
                   <div
                     key={i}
-                    className={`relative p-8 rounded-2xl border-2 transition-all hover:scale-105 ${
-                      plan.highlight
-                        ? isDark
-                          ? "border-indigo-500/60 bg-gradient-to-br from-indigo-500/20 to-transparent shadow-2xl shadow-indigo-500/30"
-                          : "border-emerald-500 bg-gradient-to-br from-indigo-50 to-white shadow-2xl shadow-emerald-400/30"
-                        : `${theme.border} ${theme.card} hover:shadow-xl ${isDark ? "hover:shadow-emerald-500/20" : "hover:shadow-emerald-300/20"}`
-                    }`}
+                    className={`relative p-8 rounded-2xl border-2 transition-all hover:scale-105 ${plan.highlight
+                      ? isDark
+                        ? "border-indigo-500/60 bg-gradient-to-br from-indigo-500/20 to-transparent shadow-2xl shadow-indigo-500/30"
+                        : "border-emerald-500 bg-gradient-to-br from-indigo-50 to-white shadow-2xl shadow-emerald-400/30"
+                      : `${theme.border} ${theme.card} hover:shadow-xl ${isDark ? "hover:shadow-emerald-500/20" : "hover:shadow-emerald-300/20"}`
+                      }`}
                   >
                     {plan.highlight && (
                       <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-full text-xs font-bold text-white shadow-lg">
@@ -854,7 +919,14 @@ export default function HomeDemo() {
                     <div className="space-y-6">
                       {/* 價格 */}
                       <div>
-                        <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>{plan.name}</h3>
+                        <div className="flex items-center gap-2 mb-3">
+                          <h3 className={`text-2xl font-bold ${theme.text}`}>{plan.name}</h3>
+                          {(plan as any).isActive && (
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"}`}>
+                              目前使用中
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-baseline gap-2">
                           <span className={`text-5xl font-bold ${isDark ? "text-indigo-400" : "text-indigo-600"}`}>{plan.price}</span>
                           <span className={theme.textMutedDarker}>/ {plan.period}</span>
@@ -875,13 +947,12 @@ export default function HomeDemo() {
 
                       {/* CTA */}
                       <button
-                        className={`w-full py-3.5 rounded-xl font-semibold transition-all hover:scale-105 ${
-                          plan.highlight
-                            ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-lg"
-                            : isDark
+                        className={`w-full py-3.5 rounded-xl font-semibold transition-all hover:scale-105 ${plan.highlight
+                          ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-lg"
+                          : isDark
                             ? "border-2 border-white/20 text-white hover:border-emerald-400/50 hover:bg-white/5"
                             : "border-2 border-slate-300 text-slate-900 hover:border-emerald-500 hover:bg-indigo-50"
-                        }`}
+                          }`}
                       >
                         {plan.cta}
                       </button>
@@ -929,10 +1000,10 @@ export default function HomeDemo() {
                   ) : (
                     <>
                       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                       </svg>
                       使用 Google 帳號
                     </>

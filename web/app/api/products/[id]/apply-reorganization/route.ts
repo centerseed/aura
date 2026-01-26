@@ -62,7 +62,7 @@ export async function POST(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // 使用 Transaction 確保原子性
+    // 使用 Transaction 確保原子性 (設定 30 秒超時以處理大量 tasks)
     const result = await prisma.$transaction(async (tx) => {
       // 1. 根據 proposed_clusters 創建或查找 Topics
       const topicMapping: Map<string, string> = new Map(); // cluster.topic_name -> topic.id
@@ -85,7 +85,7 @@ export async function POST(
               user_id: userId,
               product_id: productId,
               name: cluster.topic_name,
-            },
+            } as any, // TypeScript 類型斷言,created_at 由 Prisma 自動處理
           });
         }
 
@@ -184,14 +184,14 @@ export async function POST(
             continue;
           }
 
-          // 獲取 parent task
+          // 獲取 parent task (包含所有欄位)
           const parentTask = await tx.task.findUnique({
             where: { id: consolidation.parent_task_id },
           });
 
           if (!parentTask || parentTask.deleted_at) continue;
 
-          // 獲取所有 sub tasks (用於建立 sub_items)
+          // 獲取所有 sub tasks (用於建立 sub_items，包含所有欄位)
           const subTasks = await tx.task.findMany({
             where: {
               id: { in: validSubTaskIds },
@@ -203,17 +203,52 @@ export async function POST(
           });
 
           // 構建 sub_items 陣列
-          const subItems = subTasks.map((subTask, idx) => {
-            const subAnalysis = (subTask.ai_analysis as Record<string, unknown>) || {};
-            return {
-              id: subTask.id, // 使用原 Task ID 作為 sub-item ID
-              content: subTask.content,
-              completed: false,
-              created_at: new Date().toISOString(),
-              completed_at: null,
-              order: idx,
-            };
-          });
+          const subItems = subTasks.map((subTask, idx) => ({
+            id: subTask.id, // 使用原 Task ID 作為 sub-item ID
+            content: subTask.content,
+            completed: false,
+            created_at: new Date().toISOString(),
+            completed_at: null,
+            order: idx,
+          }));
+
+          // ✅ 合併所有 sub tasks 的 references 到 parent task
+          const parentReferences = (parentTask.references as Array<{
+            id: string;
+            type: string;
+            content: string;
+            title?: string;
+          }>) || [];
+
+          const mergedReferences = [...parentReferences];
+          const existingUrls = new Set(
+            parentReferences
+              .filter(ref => ref.type === "url")
+              .map(ref => ref.content.toLowerCase().trim())
+          );
+
+          // 合併所有 sub tasks 的 references
+          for (const subTask of subTasks) {
+            const subReferences = (subTask.references as Array<{
+              id: string;
+              type: string;
+              content: string;
+              title?: string;
+            }>) || [];
+
+            for (const ref of subReferences) {
+              if (ref.type === "url") {
+                const normalizedUrl = ref.content.toLowerCase().trim();
+                if (!existingUrls.has(normalizedUrl)) {
+                  mergedReferences.push(ref);
+                  existingUrls.add(normalizedUrl);
+                }
+              } else {
+                // note 型態：直接加入
+                mergedReferences.push(ref);
+              }
+            }
+          }
 
           // 更新 parent task
           const parentAnalysis = (parentTask.ai_analysis as Record<string, unknown>) || {};
@@ -221,7 +256,8 @@ export async function POST(
             where: { id: consolidation.parent_task_id },
             data: {
               content: consolidation.consolidated_title,
-              sub_items: subItems, // ✅ 修復: 將 sub_items 寫入正確欄位
+              sub_items: subItems as any, // ✅ 修復: 將 sub_items 寫入正確欄位
+              references: mergedReferences as any, // ✅ 修復: 合併所有 references
               ai_analysis: {
                 ...parentAnalysis,
                 narrative: consolidation.consolidated_narrative,
@@ -250,6 +286,9 @@ export async function POST(
         updated_tasks: proposal.time_inferences.length,
         consolidated_tasks: consolidatedCount,
       };
+    }, {
+      maxWait: 30000, // 最多等待 30 秒獲取交易鎖
+      timeout: 30000,  // 交易執行超時 30 秒
     });
 
     return NextResponse.json({
