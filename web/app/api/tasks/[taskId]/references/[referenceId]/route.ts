@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 interface Reference {
   id: string;
@@ -11,20 +12,22 @@ interface Reference {
 
 // PATCH /api/tasks/[taskId]/references/[referenceId] - 更新 reference
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ taskId: string; referenceId: string }> }
 ) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const { taskId, referenceId } = await params;
     const body = await request.json();
     const { content, title } = body;
 
-    // 查詢 Task
+    // 查詢 Task 並驗證屬於當前用戶
     const task = await prisma.task.findUnique({
       where: { id: taskId, deleted_at: null },
+      include: { product: true },
     });
 
-    if (!task) {
+    if (!task || task.product.user_id !== userId) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 

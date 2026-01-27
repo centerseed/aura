@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // Validation schema for update
 const UpdateMilestoneSchema = z.object({
@@ -15,17 +16,18 @@ const UpdateMilestoneSchema = z.object({
 
 // PUT /api/milestones/:id
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
     const validated = UpdateMilestoneSchema.parse(body);
 
-    // 檢查 milestone 是否存在
+    // 檢查 milestone 是否存在且屬於當前用戶
     const existing = await prisma.milestone.findFirst({
-      where: { id: params.id, deleted_at: null },
+      where: { id: params.id, user_id: userId, deleted_at: null },
     });
 
     if (!existing) {
@@ -59,14 +61,16 @@ export async function PUT(
 
 // DELETE /api/milestones/:id (軟刪除)
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
   try {
-    // 檢查 milestone 是否存在
+    const userId = await authenticateRequest(request, prisma);
+
+    // 檢查 milestone 是否存在且屬於當前用戶
     const existing = await prisma.milestone.findFirst({
-      where: { id: params.id, deleted_at: null },
+      where: { id: params.id, user_id: userId, deleted_at: null },
     });
 
     if (!existing) {

@@ -19,6 +19,7 @@ interface TaskDetailModalProps {
   onAddReference?: (taskId: string, type: "url" | "note", content: string, title?: string) => Promise<void>;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onComplete?: (taskId: string) => void;
+  onDelete?: (taskId: string) => void;
 }
 
 export function TaskDetailModal({
@@ -36,6 +37,7 @@ export function TaskDetailModal({
   onAddReference,
   onDeleteReference,
   onComplete,
+  onDelete,
 }: TaskDetailModalProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -50,6 +52,7 @@ export function TaskDetailModal({
   const [newRefType, setNewRefType] = useState<"url" | "note">("url");
   const [newRefContent, setNewRefContent] = useState("");
   const [newRefTitle, setNewRefTitle] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // 同步 task prop 的變化
   useEffect(() => {
@@ -494,6 +497,35 @@ export function TaskDetailModal({
               >
                 {task.drawer === "ARCHIVE" ? "取消標記完成" : "標記為完成"}
               </button>
+            )}
+            {onDelete && !showDeleteConfirm && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 hover:border-red-500/50 transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                刪除任務
+              </button>
+            )}
+            {showDeleteConfirm && onDelete && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white/80">確定要刪除此任務?</span>
+                <button
+                  onClick={() => {
+                    onDelete?.(task.id);
+                    onClose();
+                  }}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+                >
+                  確定刪除
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
             )}
           </div>
           <button

@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // POST /api/products/reorder - 更新多個 products 的 display_order
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    await authenticateRequest(request, prisma);
     const body = await request.json();
     const { updates } = body;
 
@@ -37,8 +39,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to reorder products:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json(
-      { error: "Failed to reorder products" },
+      { error: "Failed to reorder products", details: errorMessage },
       { status: 500 }
     );
   }

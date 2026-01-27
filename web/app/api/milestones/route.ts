@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // Validation schema
 const CreateMilestoneSchema = z.object({
-  userId: z.string().uuid(),
   name: z.string().min(1).max(200),
   target_date: z.string().datetime({ offset: true }), // ISO 8601 date string (允許時區偏移)
   entity_type: z.enum(["AREA", "PRODUCT", "TOPIC"]),
@@ -14,15 +14,10 @@ const CreateMilestoneSchema = z.object({
   status: z.enum(["planned", "in_progress", "completed", "delayed", "cancelled"]).default("planned"),
 });
 
-// GET /api/milestones?userId=xxx
-export async function GET(request: Request) {
+// GET /api/milestones
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-    }
+    const userId = await authenticateRequest(request, prisma);
 
     const milestones = await prisma.milestone.findMany({
       where: {
@@ -95,6 +90,9 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Failed to fetch milestones:", error);
     console.error("Error details:", error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.message.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     // 如果 Milestone 表不存在，返回空陣列而不是錯誤
     if (error instanceof Error && error.message.includes('milestone')) {
       console.warn("Milestone table may not exist yet. Returning empty array.");
@@ -105,8 +103,9 @@ export async function GET(request: Request) {
 }
 
 // POST /api/milestones
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
     console.log("Received milestone creation request:", JSON.stringify(body, null, 2));
 
@@ -115,7 +114,7 @@ export async function POST(request: Request) {
 
     const milestone = await prisma.milestone.create({
       data: {
-        user_id: validated.userId,
+        user_id: userId,
         name: validated.name,
         target_date: new Date(validated.target_date),
         entity_type: validated.entity_type,
@@ -131,6 +130,9 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) {
       console.error("Validation error:", error.errors);
       return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 });
+    }
+    if (error instanceof Error && error.message.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error("Failed to create milestone:", error);
     console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");

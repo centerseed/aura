@@ -1,17 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Status } from "@prisma/client";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
-// GET /api/tasks?userId=xxx
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-
-  if (!userId) {
-    return NextResponse.json({ error: "userId is required" }, { status: 400 });
-  }
-
+// GET /api/tasks
+export async function GET(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
+
     const tasks = await prisma.task.findMany({
       where: {
         user_id: userId,
@@ -56,13 +52,17 @@ export async function GET(request: Request) {
     return NextResponse.json(formattedTasks);
   } catch (error) {
     console.error("Failed to fetch tasks:", error);
+    if (error instanceof Error && error.message.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json({ error: "Failed to fetch tasks" }, { status: 500 });
   }
 }
 
 // PATCH /api/tasks - 更新任務狀態、移動到其他 Product、設定日期、或修改內容
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
+    await authenticateRequest(request, prisma);
     const body = await request.json();
     const { taskId, status, productId, start_date, due_date, content, narrative } = body;
 
@@ -115,6 +115,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true, task });
   } catch (error) {
     console.error("Failed to update task:", error);
-    return NextResponse.json({ error: "Failed to update task" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    return NextResponse.json({ error: "Failed to update task", details: errorMessage }, { status: 500 });
   }
 }

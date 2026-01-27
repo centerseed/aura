@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // POST /api/tasks/[taskId]/sub-items - 新增 sub-item
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const { taskId } = await params;
     const body = await request.json();
     const { content } = body;
@@ -19,12 +21,13 @@ export async function POST(
       );
     }
 
-    // 查詢 Task
+    // 查詢 Task 並驗證屬於當前用戶
     const task = await prisma.task.findUnique({
       where: { id: taskId, deleted_at: null },
+      include: { product: true },
     });
 
-    if (!task) {
+    if (!task || task.product.user_id !== userId) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 

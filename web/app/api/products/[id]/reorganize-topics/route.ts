@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // Zod Schema for AI structured output
 const ReorganizeProposalSchema = z.object({
@@ -42,21 +43,16 @@ const ReorganizeProposalSchema = z.object({
 
 // POST /api/products/[id]/reorganize-topics
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId") || searchParams.get("user_id");
+    const userId = await authenticateRequest(request, prisma);
     const { id: productId } = await params;
 
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-    }
-
-    // 1. 查詢 Product 資訊
+    // 1. 查詢 Product 資訊並驗證屬於當前用戶
     const product = await prisma.product.findUnique({
-      where: { id: productId, deleted_at: null },
+      where: { id: productId, user_id: userId, deleted_at: null },
       include: {
         area: true,
       },
@@ -67,11 +63,15 @@ export async function POST(
     }
 
     // 2. 查詢該 Product 下的所有 Tasks
+    // ✅ 過濾已刪除和已完成的 task,節省 AI 處理成本
     const tasks = await prisma.task.findMany({
       where: {
         user_id: userId,
         product_id: productId,
         deleted_at: null,
+        status: {
+          not: "ARCHIVE", // 已完成的任務不需要重組
+        },
       },
       include: {
         topic: true,
@@ -150,15 +150,58 @@ export async function POST(
       prompt,
     });
 
-    // 6. 返回完整的 ReorganizeProposal
+    // 6. 構建 tasks_context (給前端顯示用)
+    const tasksContext = tasks.map((t) => ({
+      id: t.id,
+      title: t.content.length > 50 ? t.content.slice(0, 47) + "..." : t.content,
+      current_topic: t.topic?.name || "未分類",
+      current_due_date: t.due_date?.toISOString() || null,
+    }));
+
+    // 7. 過濾 time_inferences：只保留原本沒有 due_date 的 task
+    const tasksWithDueDate = new Set(
+      tasks.filter(t => t.due_date !== null).map(t => t.id)
+    );
+    const filteredTimeInferences = result.time_inferences.filter(
+      inf => !tasksWithDueDate.has(inf.task_id)
+    );
+
+    // 8. 創建評估 Log (PENDING 狀態)
+    const evaluationLog = await prisma.systemEvaluationLog.create({
+      data: {
+        user_id: userId,
+        type: "REORGANIZE",
+        input_content: {
+          product_id: productId,
+          product_name: product.name,
+          tasks_count: tasks.length,
+        },
+        output_content: {
+          proposed_clusters: result.proposed_clusters,
+          time_inferences: filteredTimeInferences,
+          task_consolidations: result.task_consolidations || [],
+          reasoning: result.reasoning,
+        },
+        user_action: "PENDING",
+        metadata: {
+          current_topic_count: currentTopics.length,
+          proposed_topic_count: result.proposed_clusters.length,
+        },
+      },
+    });
+
+    // 9. 返回完整的 ReorganizeProposal
     return NextResponse.json({
       product_id: productId,
       product_name: product.name,
       current_topics: currentTopics,
+      current_topic_count: currentTopics.length,
       proposed_clusters: result.proposed_clusters,
-      time_inferences: result.time_inferences,
+      time_inferences: filteredTimeInferences,
       task_consolidations: result.task_consolidations || [],
+      tasks_context: tasksContext,
       reasoning: result.reasoning,
+      logId: evaluationLog.id,
     });
   } catch (error) {
     console.error("Reorganize topics failed:", error);
@@ -217,7 +260,10 @@ ${milestonesCompact}
 
 ## 任務:
 1. **Topic 分群**: 按功能模組分群 (如: Onboarding, AI Engine, Payment)，避免活動類型 (如: Dev, QA)
-2. **時間推斷**: 每個 Task 給 due_date + urgency (critical/high/medium/low)
+2. **時間推斷**:
+   - ⚠️ **保守原則**: 只對「沒有 due_date」的 Task 建議時間
+   - 已有 due_date 的 Task，suggested_due_date 設為 null（保持原樣）
+   - urgency_level 仍需為所有 Task 設定
 3. **整合細碎 Tasks**: ⚠️ 極度保守，只整合非常明確的檢查項 (checklist-style tasks)
 
 ## 整合條件 (必須同時滿足 ALL，否則絕不整合):
@@ -235,7 +281,7 @@ ${milestonesCompact}
 - 任何有疑慮的情況 (寧可不整合)
 
 ## 輸出規則:
-- 繁體中文
+- ⚠️ **必須使用繁體中文**：所有 topic_name、description、reasoning、consolidated_title 都必須是繁體中文，禁止英文
 - description/reasoning 限 1 句話
 - inferred_from_milestone_id 必須是有效 Milestone ID 或 null
 - 所有 task_id 必須來自上方列表`;

@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import type { Milestone, MilestoneStatus, EntityType } from "@/types";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/firebase";
 
 interface MilestoneModalProps {
   isOpen: boolean;
@@ -120,8 +121,14 @@ export function MilestoneModal({
     setIsSubmitting(true);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       const payload = {
-        userId,
         name,
         target_date: targetDate.toISOString(),
         status: "planned" as MilestoneStatus,
@@ -138,7 +145,10 @@ export function MilestoneModal({
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -164,8 +174,18 @@ export function MilestoneModal({
     setError(null);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       const res = await fetch(`/api/milestones/${editingMilestone.id}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
 
       if (!res.ok) {
@@ -261,7 +281,7 @@ export function MilestoneModal({
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-0 z-[70]" align="start">
                 <CalendarComponent
                   mode="single"
                   selected={targetDate}

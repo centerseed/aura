@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // AI 推薦專案名稱的結構
 const ProductSuggestionSchema = z.object({
@@ -12,14 +13,15 @@ const ProductSuggestionSchema = z.object({
 });
 
 // POST /api/suggest-product
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
-    const { taskContent, taskNarrative, areaId, areaName, areaScope, userId } = body;
+    const { taskContent, taskNarrative, areaId, areaName, areaScope } = body;
 
-    if (!taskContent || !areaId || !userId) {
+    if (!taskContent || !areaId) {
       return NextResponse.json(
-        { error: "taskContent, areaId, and userId are required" },
+        { error: "taskContent and areaId are required" },
         { status: 400 }
       );
     }
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
     const { object: suggestion } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: ProductSuggestionSchema,
-      prompt: `你是 Naruvia 的專案命名助手。用戶想要將一個任務移到「${areaName}」身分下，但該身分下還沒有合適的專案。
+      prompt: `你是 Zentropy 的專案命名助手。用戶想要將一個任務移到「${areaName}」身分下，但該身分下還沒有合適的專案。
 
 ## 任務資訊:
 - 任務內容：${taskContent}
@@ -79,10 +81,23 @@ ${existingProductNames.length > 0 ? existingProductNames.map(name => `- ${name}`
     });
   } catch (error) {
     console.error("Product suggestion failed:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (
+      errorMessage.includes("token") ||
+      errorMessage.includes("User not found")
+    ) {
+      return NextResponse.json({
+        error: "Unauthorized",
+        details: "Authentication failed. Please provide a valid Firebase ID token.",
+      }, { status: 401 });
+    }
+
     return NextResponse.json(
       {
         error: "Failed to suggest product name",
-        details: error instanceof Error ? error.message : String(error),
+        details: errorMessage,
       },
       { status: 500 }
     );

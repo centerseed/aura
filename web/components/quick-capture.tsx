@@ -21,6 +21,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/firebase";
 
 interface ProcessedItem {
   id: string;
@@ -100,10 +101,11 @@ interface QuickCaptureProps {
   userId: string | null;
   onItemsCreated: () => void;
   areas?: AreaWithProducts[];
+  welcomeMode?: boolean;
 }
 
-export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptureProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode = false }: QuickCaptureProps) {
+  const [isExpanded, setIsExpanded] = useState(welcomeMode);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
@@ -148,6 +150,13 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
       inputRef.current.focus();
     }
   }, [isExpanded]);
+
+  // welcomeMode 時自動聚焦
+  useEffect(() => {
+    if (welcomeMode && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [welcomeMode]);
 
   // 當下拉選單選項變化時，重置選中索引
   useEffect(() => {
@@ -258,11 +267,21 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
     setAdjustmentResult(null);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       // 純歸檔模式：直接創建新 Task，不做調整判斷
       // 調整標籤功能已移至「整理標籤」按鈕和 Product 層級的重組功能
       const res = await fetch("/api/brain-dump", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({ text: input, userId }),
       });
 
@@ -299,11 +318,21 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
     setShowResults(true);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       if (pendingOperation.type === "adjust") {
         // 執行調整操作
         const res = await fetch("/api/adjust-tags", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
           body: JSON.stringify({
             text: pendingOperation.originalInput,
             userId,
@@ -339,8 +368,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
     setSelectedOperationIds(new Set());
   };
 
-  // 收起時的浮動按鈕
-  if (!isExpanded) {
+  // 收起時的浮動按鈕（welcomeMode 時不顯示）
+  if (!isExpanded && !welcomeMode) {
     return (
       <button
         onClick={() => setIsExpanded(true)}
@@ -348,6 +377,168 @@ export function QuickCapture({ userId, onItemsCreated, areas = [] }: QuickCaptur
       >
         <MessageSquarePlus className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
       </button>
+    );
+  }
+
+  // welcomeMode：置中放大的輸入區域
+  if (welcomeMode) {
+    return (
+      <>
+        {/* @ Mention 選擇器 */}
+        {showMentionDropdown && (
+          <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh]">
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setShowMentionDropdown(false)}
+            />
+            <div
+              ref={dropdownRef}
+              className="relative w-full max-w-md mx-4 bg-slate-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden"
+            >
+              <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-indigo-400" />
+                  <span className="text-sm font-medium text-white">選擇專案</span>
+                  <span className="text-xs text-white/40 ml-auto">↑↓ 選擇 · Enter 確認 · Esc 取消</span>
+                </div>
+                {mentionQuery && (
+                  <p className="text-xs text-white/50 mt-1">搜尋：{mentionQuery}</p>
+                )}
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto">
+                {filteredProducts.length > 0 ? (
+                  <div className="py-1">
+                    {filteredProducts.map((product, index) => (
+                      <button
+                        key={product.id}
+                        onClick={() => handleSelectProduct(product)}
+                        onMouseEnter={() => setSelectedMentionIndex(index)}
+                        className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
+                          index === selectedMentionIndex
+                            ? "bg-indigo-500/30 text-white"
+                            : "hover:bg-white/5 text-white/80"
+                        }`}
+                      >
+                        <Package className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                        <span className="text-sm font-medium truncate flex-1">{product.name}</span>
+                        <span className="text-xs text-white/50 flex-shrink-0 bg-white/10 px-2 py-1 rounded">{product.areaName}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-8 text-center">
+                    <p className="text-sm text-white/50">找不到符合「{mentionQuery}」的專案</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 置中的輸入面板 */}
+        <div className="w-full max-w-xl mx-auto">
+          <div className="bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl shadow-indigo-500/20 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-indigo-400" />
+                <span className="text-base font-medium text-white">快速記錄</span>
+              </div>
+            </div>
+
+            {/* 處理結果顯示 */}
+            {showResults && processedItems.length > 0 && (
+              <div className="max-h-64 overflow-y-auto border-b border-white/10">
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-green-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>AI 已整理 {processedItems.length} 個項目</span>
+                  </div>
+                  {processedItems.map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      className="p-3 rounded-lg bg-white/5 border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <h4 className="font-medium text-white text-sm mb-1">{item.title}</h4>
+                      <div className="flex items-center gap-1.5 text-xs text-white/50">
+                        <FolderOpen className="w-3 h-3" />
+                        <span className="text-indigo-400">{item.tag.area}</span>
+                        <span className="text-white/30">/</span>
+                        <Package className="w-3 h-3" />
+                        <span className="text-blue-400">{item.tag.product}</span>
+                        <span className="text-white/30">/</span>
+                        <Tag className="w-3 h-3" />
+                        <span className="text-green-400">{item.tag.topic}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 處理中動畫 */}
+            {isProcessing && (
+              <div className="p-5 border-b border-white/10 bg-gradient-to-r from-purple-900/20 to-indigo-900/20">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+                    <div className="absolute inset-0 w-6 h-6 bg-indigo-500/20 rounded-full animate-ping" />
+                  </div>
+                  <div>
+                    <p className="text-base text-white">AI 正在歸檔...</p>
+                    <p className="text-sm text-white/50">分析內容、歸類標籤、推斷時間</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 輸入區域 */}
+            <div className="p-5">
+              <div className="relative">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="輸入任何想法..."
+                  disabled={isProcessing}
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white text-base placeholder:text-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all disabled:opacity-50"
+                />
+              </div>
+
+              {/* 提示 */}
+              <div className="mt-3 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-sm text-blue-300/90 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>
+                    使用 <code className="px-1.5 py-0.5 rounded bg-white/10">1)</code> 或 <code className="px-1.5 py-0.5 rounded bg-white/10">-</code> 可自動拆分為待辦事項
+                  </span>
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end mt-4">
+                <Button
+                  size="lg"
+                  onClick={handleSubmit}
+                  disabled={!input.trim() || isProcessing}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-6"
+                >
+                  {isProcessing ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5 mr-2" />
+                      送出
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 

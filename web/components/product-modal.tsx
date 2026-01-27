@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, Package, AlertCircle, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { auth } from "@/lib/firebase";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -21,17 +22,6 @@ interface ProductModalProps {
   } | null;
 }
 
-const LIFECYCLE_OPTIONS = [
-  { value: "FINITE", label: "有限期專案", description: "有明確結束日期的專案" },
-  { value: "PERPETUAL", label: "永續維運", description: "持續維護的長期項目" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "ACTIVE", label: "進行中", color: "text-blue-400" },
-  { value: "MAINTAIN", label: "維護中", color: "text-indigo-400" },
-  { value: "INBOX", label: "收件匣", color: "text-amber-400" },
-  { value: "REFERENCE", label: "參考資料", color: "text-green-400" },
-];
 
 export function ProductModal({
   isOpen,
@@ -44,8 +34,6 @@ export function ProductModal({
 }: ProductModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [lifecycle, setLifecycle] = useState<"FINITE" | "PERPETUAL">("FINITE");
-  const [status, setStatus] = useState("ACTIVE");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +44,9 @@ export function ProductModal({
       if (editingProduct) {
         setName(editingProduct.name);
         setDescription(editingProduct.description || "");
-        setLifecycle(editingProduct.lifecycle);
-        setStatus(editingProduct.status);
       } else {
         setName("");
         setDescription("");
-        setLifecycle("FINITE");
-        setStatus("ACTIVE");
       }
       setError(null);
     }
@@ -78,16 +62,26 @@ export function ProductModal({
     setError(null);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       if (editingProduct) {
         // 更新現有 Product
         const res = await fetch(`/api/products/${editingProduct.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
           body: JSON.stringify({
             name: name.trim(),
             description: description.trim() || undefined,
-            lifecycle,
-            status,
+            lifecycle: editingProduct.lifecycle,
+            status: editingProduct.status,
           }),
         });
 
@@ -104,14 +98,16 @@ export function ProductModal({
 
         const res = await fetch("/api/products", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
           body: JSON.stringify({
-            userId,
             areaId,
             name: name.trim(),
             description: description.trim() || undefined,
-            lifecycle,
-            status,
+            lifecycle: "FINITE",
+            status: "ACTIVE",
           }),
         });
 
@@ -142,8 +138,18 @@ export function ProductModal({
     setError(null);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       const res = await fetch(`/api/products/${editingProduct.id}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
 
       const data = await res.json();
@@ -185,7 +191,7 @@ export function ProductModal({
               </h2>
               <p className="text-sm text-white/50">
                 {editingProduct
-                  ? "修改專案的名稱、類型與狀態"
+                  ? "修改專案的名稱與描述"
                   : `在「${areaName}」下創建新項目`}
               </p>
             </div>
@@ -240,54 +246,6 @@ export function ProductModal({
             />
           </div>
 
-          {/* Lifecycle */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-3">
-              生命週期類型
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {LIFECYCLE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setLifecycle(option.value as "FINITE" | "PERPETUAL")}
-                  className={`
-                    p-4 rounded-lg border-2 text-left transition-all
-                    ${lifecycle === option.value
-                      ? "border-indigo-500 bg-indigo-500/10"
-                      : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
-                    }
-                  `}
-                >
-                  <div className="font-medium text-white mb-1">{option.label}</div>
-                  <div className="text-xs text-white/50">{option.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-3">
-              初始狀態
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {STATUS_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setStatus(option.value)}
-                  className={`
-                    px-4 py-2.5 rounded-lg border transition-all text-sm font-medium
-                    ${status === option.value
-                      ? "border-indigo-500 bg-indigo-500/20 text-white"
-                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:border-white/20"
-                    }
-                  `}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

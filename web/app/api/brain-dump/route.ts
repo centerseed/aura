@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { authenticateRequest } from "@/lib/auth-middleware";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -47,26 +48,36 @@ const StructureResultSchema = z.object({
 });
 
 // POST /api/brain-dump
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
-    const { text, userId } = body;
+    const { text } = body;
 
-    if (!text || !userId) {
-      return NextResponse.json({ error: "text and userId are required" }, { status: 400 });
+    if (!text) {
+      return NextResponse.json({ error: "text is required" }, { status: 400 });
     }
 
-    // 獲取用戶現有結構作為上下文（包含所有任務）
+    // ✅ 獲取用戶現有結構作為上下文（包含每個 Product 的最近任務，用於語意關聯）
+    // 使用單一 query 避免 N+1 問題
     const existingAreas = await prisma.area.findMany({
       where: { user_id: userId, deleted_at: null },
       include: {
         products: {
           where: { deleted_at: null },
           include: {
-            topics: { where: { deleted_at: null } },
-            tasks: {
+            topics: {
               where: { deleted_at: null },
-              orderBy: { created_at: "desc" },
+              select: { id: true, name: true }  // 只選擇必要欄位
+            },
+            tasks: {
+              where: {
+                deleted_at: null,
+                status: { not: 'ARCHIVE' }, // 只載入未完成的任務
+              },
+              select: { id: true, content: true, created_at: true },
+              orderBy: { created_at: 'desc' },
+              take: 10, // 每個 Product 最多取 10 個最近任務，提供語意線索
             },
           },
         },
@@ -98,25 +109,28 @@ export async function POST(request: Request) {
       console.warn("Failed to load milestones, continuing without them:", milestoneError);
     }
 
-    // 構建完整的上下文摘要（與 reorganize API 一致）
+    // 構建完整的上下文摘要（包含任務內容，用於語意匹配）
     let contextSummary = "";
     if (existingAreas.length > 0) {
-      contextSummary = "\n### 用戶現有結構（請優先使用這些分類）:\n";
+      contextSummary = "\n### 用戶現有結構（請根據任務內容判斷語意匹配）:\n";
       for (const area of existingAreas) {
         contextSummary += `\n**Area: ${area.name}** (範圍: ${area.scope || "未定義"})\n`;
         for (const product of area.products) {
           contextSummary += `  📦 Product: ${product.name}\n`;
+
           // 顯示 Topics
           if (product.topics.length > 0) {
             contextSummary += `     Topics: ${product.topics.map(t => t.name).join(", ")}\n`;
           }
-          // 顯示現有任務（讓 AI 了解這個 Product 包含什麼類型的內容）
-          if (product.tasks.length > 0) {
-            contextSummary += `     現有任務:\n`;
+
+          // 顯示最近任務（提供語意線索）
+          if (product.tasks && product.tasks.length > 0) {
+            contextSummary += `     最近任務:\n`;
             for (const task of product.tasks) {
-              const aiAnalysis = task.ai_analysis as { narrative?: string } || {};
-              contextSummary += `       - ${task.content}${aiAnalysis.narrative ? ` (${aiAnalysis.narrative})` : ""}\n`;
+              contextSummary += `       - ${task.content}\n`;
             }
+          } else {
+            contextSummary += `     最近任務: (無，這是新專案)\n`;
           }
         }
       }
@@ -126,7 +140,7 @@ export async function POST(request: Request) {
     // 添加 Milestone 資訊到上下文
     if (milestones.length > 0) {
       contextSummary += "\n### 用戶設定的里程碑（未來 90 天）:\n";
-      contextSummary += `今天日期：${now.toLocaleDateString("zh-TW")}\n\n`;
+      contextSummary += `今天日期：${now.toLocaleDateString("zh-TW")} (星期${['日', '一', '二', '三', '四', '五', '六'][now.getDay()]})\n\n`;
 
       for (const milestone of milestones) {
         const targetDate = new Date(milestone.target_date);
@@ -184,26 +198,26 @@ export async function POST(request: Request) {
 - 只有單一事項：「明天開會」→ 不拆
 - 內容是描述而非任務：「這個功能的優點是快速和穩定」→ 不拆
 
-## 歸檔原則:
+## Product 選擇原則（核心）
 
-1. **語意引力**：根據「用戶現有結構」中的任務內容，判斷新輸入應該歸屬哪個 Product。
-   - 如果新輸入與某個現有 Product 下的任務語意相似，就歸入那個 Product
+你會看到用戶現有的結構：Area > Product > 最近任務列表。
 
-2. **邊界遵守**：嚴格使用用戶已定義的 Area。除非用戶明確提到新身分，否則不要創建新 Area。
+**選擇方法**：
+1. 看每個 Product 下的「最近任務」列表
+2. 根據這些任務的內容，理解這個 Product 是在處理什麼類型的事務
+3. 判斷新輸入與哪個 Product 的任務屬於同類型的事務
+4. 選擇最匹配的 Product
 
-3. **避免重複**：如果已存在語意相似的 Product，選擇最匹配的那個，不要創建新的。
+**優先使用現有結構**：只有當所有現有 Product 都與新輸入的事務類型無關時，才創建新的 Product 或 Area。
 
-4. **Topic 填寫規則**：
-   - Topic 是 Product 下的細分類別（例如：Design、Development、Meeting）
-   - 如果用戶現有結構中該 Product 已有 Topics，優先使用現有的
-   - 如果無法確定 Topic，請填寫空字串 ""
+**Topic**：優先使用該 Product 已有的 Topics，若無法確定則填空字串 ""
 
-5. **Drawer 狀態**:
-   - INBOX: 未處理，需要關注
-   - ACTIVE: 正在進行中
-   - MAINTAIN: 穩定維護中
-   - REFERENCE: 參考資料
-   - ARCHIVE: 已完成或棄用
+**Drawer 狀態**：
+- INBOX: 未處理，需要關注
+- ACTIVE: 正在進行中
+- MAINTAIN: 穩定維護中
+- REFERENCE: 參考資料
+- ARCHIVE: 已完成或棄用
 
 ${contextSummary}
 
@@ -212,7 +226,7 @@ ${text}
 
 ## ⏰ 時間推斷指示（Explicit > Inferred 原則）
 
-今天日期是 **${now.toLocaleDateString("zh-TW")}**。
+今天日期是 **${now.toLocaleDateString("zh-TW")} (星期${['日', '一', '二', '三', '四', '五', '六'][now.getDay()]})**。
 
 ### 【最高優先級】用戶明確指定的時間 (source_type = "explicit")
 
@@ -220,6 +234,7 @@ ${text}
 - 「今天」「今日」→ 今天的日期
 - 「明天」「明日」→ 明天的日期
 - 「後天」→ 後天的日期
+- 「週X」「禮拜X」「星期X」→ 本週的星期X（如果該日期已過則指下週）
 - 「下週X」「下禮拜X」→ 下週的星期X
 - 「X號」「X日」「X/X」→ 指定日期
 - 「月底」「月底前」→ 當月最後一天
@@ -262,70 +277,95 @@ ${text}
 
 ## 歸檔步驟：
 
-1. **完整理解輸入**：識別用戶提到的所有事項、時間詞彙、條件
-2. **保真度檢查**：確保沒有遺漏任何用戶提到的內容
-3. **時間優先級判定**：先檢查用戶是否明確說了時間，再考慮系統推斷
-4. **尋找歸屬**：查看「用戶現有結構」中是否有語意匹配的 Product
-5. **創建 Task**：確保 narrative 和 sub_items 完整記錄所有細節
+1. **理解用戶意圖**：用戶這次想做什麼事？
+2. **分析現有 Product**：看每個 Product 的「最近任務」列表，這個 Product 是在處理什麼類型的事務？
+3. **選擇匹配的 Product**：選擇與用戶意圖屬於同類型事務的 Product
+4. **處理時間**：用戶明確說的時間優先，其次從上下文推斷，最後從 Milestone 推斷
+5. **完整記錄**：確保 narrative 和 sub_items 保留用戶提到的所有內容
 
-**輸出格式要求**：
-- tag.topic 欄位必須是字串，如果沒有適合的 Topic，填寫 "" （空字串）
-- due_date 必須是 ISO 8601 格式（例如：2026-01-30T00:00:00+08:00）
-- due_date_source 必須填寫，標記時間來源是 explicit/inferred_from_context/inferred_from_system
-- time_reasoning 必須用繁體中文說明時間推斷的理由
-- reasoning 欄位請用繁體中文說明為什麼選擇這個分類
-- **sub_items**：如果輸入包含多個事項，務必全部拆分填入 sub_items 陣列，不可遺漏
-
-**最終提醒**：你的職責是「完整歸檔」。用戶說了 5 件事，你就要記錄 5 件事。用戶說「今天」，就是今天，不管 milestone 是什麼時候。`,
+**輸出格式**：
+- tag.topic：字串，無法確定則填 ""
+- due_date：ISO 8601 格式（例如：2026-01-30T00:00:00+08:00）
+- due_date_source：標記時間來源 explicit/inferred_from_context/inferred_from_system
+- time_reasoning：繁體中文說明時間推斷理由
+- reasoning：繁體中文說明選擇這個 Product 的理由（看了哪些 Product 的任務，為何選擇這個）
+- sub_items：多個事項時全部拆分，完整記錄`,
     });
 
-    // 持久化到資料庫
+    // 持久化到資料庫（優化：使用記憶體快取減少重複查詢）
+
+    // 建立快取 Map，避免重複查詢同樣的 Area/Product/Topic
+    const areaCache = new Map<string, { id: string }>();
+    const productCache = new Map<string, { id: string }>();
+    const topicCache = new Map<string, { id: string }>();
+
+    // 預先填充快取（使用已載入的 existingAreas）
+    for (const area of existingAreas) {
+      areaCache.set(area.name, { id: area.id });
+      for (const product of area.products) {
+        productCache.set(`${area.name}::${product.name}`, { id: product.id });
+        for (const topic of product.topics) {
+          topicCache.set(`${product.id}::${topic.name}`, { id: topic.id });
+        }
+      }
+    }
+
     const createdTasks = [];
     for (const item of result.items) {
-      // 1. 確保 Area 存在
-      let area = await prisma.area.findFirst({
-        where: { user_id: userId, name: item.tag.area, deleted_at: null },
-      });
-      if (!area) {
-        area = await prisma.area.create({
+      // 1. 確保 Area 存在（優先使用快取，避免重複查詢）
+      let areaId: string;
+      const cachedArea = areaCache.get(item.tag.area);
+      if (cachedArea) {
+        areaId = cachedArea.id;
+      } else {
+        const area = await prisma.area.create({
           data: {
             user_id: userId,
             name: item.tag.area,
             is_custom: true,
           },
         });
+        areaId = area.id;
+        areaCache.set(area.name, { id: area.id });
       }
 
-      // 2. 確保 Product 存在
-      let product = await prisma.product.findFirst({
-        where: { user_id: userId, area_id: area.id, name: item.tag.product, deleted_at: null },
-      });
-      if (!product) {
-        product = await prisma.product.create({
+      // 2. 確保 Product 存在（優先使用快取，避免重複查詢）
+      let productId: string;
+      const productKey = `${item.tag.area}::${item.tag.product}`;
+      const cachedProduct = productCache.get(productKey);
+      if (cachedProduct) {
+        productId = cachedProduct.id;
+      } else {
+        const product = await prisma.product.create({
           data: {
             user_id: userId,
-            area_id: area.id,
+            area_id: areaId,
             name: item.tag.product,
             status: item.drawer as any,
             lifecycle: item.lifecycle as any,
           },
         });
+        productId = product.id;
+        productCache.set(productKey, { id: product.id });
       }
 
-      // 3. 確保 Topic 存在（只在有名稱時創建）
-      let topic = null;
+      // 3. 確保 Topic 存在（優先使用快取，只在有名稱時創建）
+      let topicId: string | null = null;
       if (item.tag.topic && item.tag.topic.trim() !== "") {
-        topic = await prisma.topic.findFirst({
-          where: { user_id: userId, product_id: product.id, name: item.tag.topic, deleted_at: null },
-        });
-        if (!topic) {
-          topic = await prisma.topic.create({
+        const topicKey = `${productId}::${item.tag.topic}`;
+        const cachedTopic = topicCache.get(topicKey);
+        if (cachedTopic) {
+          topicId = cachedTopic.id;
+        } else {
+          const topic = await prisma.topic.create({
             data: {
               user_id: userId,
-              product_id: product.id,
+              product_id: productId,
               name: item.tag.topic,
             },
           });
+          topicId = topic.id;
+          topicCache.set(topicKey, { id: topic.id });
         }
       }
 
@@ -376,15 +416,14 @@ ${text}
       const task = await prisma.task.create({
         data: {
           user_id: userId,
-          product_id: product.id,
-          topic_id: topic?.id ?? null,
+          product_id: productId,
+          topic_id: topicId,
           content: item.title,
           status: item.drawer as any,
-          start_date: new Date(), // 開始時間預設為創建當下
           due_date: item.due_date ? new Date(item.due_date) : null,
           inferred_from_milestone: validMilestoneId,
           time_confidence: item.time_confidence !== undefined ? item.time_confidence : null,
-          sub_items: taskSubItems, // ✅ 修復: 將 sub_items 寫入正確欄位
+          sub_items: taskSubItems as any, // Json 類型需要 type assertion
           ai_analysis: aiAnalysis,
         },
       });
@@ -406,17 +445,44 @@ ${text}
       });
     }
 
+    // 記錄評估 Log
+    await prisma.systemEvaluationLog.create({
+      data: {
+        user_id: userId,
+        type: "BRAIN_DUMP",
+        input_content: { text },
+        output_content: { items: result.items },
+        user_action: "APPLIED",
+        metadata: {
+          created_tasks_count: createdTasks.length,
+        },
+      },
+    });
+
     return NextResponse.json({
       success: true,
       items: createdTasks,
     });
   } catch (error) {
     console.error("Brain dump failed:", error);
-    console.error("Error details:", error instanceof Error ? error.message : String(error));
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error details:", errorMessage);
     console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+
+    // Check for authentication errors
+    if (
+      errorMessage.includes("token") ||
+      errorMessage.includes("User not found")
+    ) {
+      return NextResponse.json({
+        error: "Unauthorized",
+        details: "Authentication failed. Please provide a valid Firebase ID token.",
+      }, { status: 401 });
+    }
+
     return NextResponse.json({
       error: "Brain dump processing failed",
-      details: error instanceof Error ? error.message : String(error)
+      details: errorMessage
     }, { status: 500 });
   }
 }

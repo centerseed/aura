@@ -66,7 +66,12 @@ function OnboardingContent() {
       }
 
       try {
-        const userRes = await fetch(`/api/me?firebaseUid=${firebaseUser.uid}`);
+        const token = await firebaseUser.getIdToken();
+        const userRes = await fetch("/api/me", {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (userRes.ok) {
           const userData = await userRes.json();
           setUserId(userData.id);
@@ -127,13 +132,21 @@ function OnboardingContent() {
 
       // 創建 Areas
       console.log("正在創建 Areas...");
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("No authenticated user");
+      }
+      const token = await user.getIdToken();
+
       for (const area of areasToCreate) {
         console.log("創建 Area:", area.name);
         const areaRes = await fetch("/api/areas", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
           body: JSON.stringify({
-            userId: userId,
             name: area.name,
             scope: area.scope,
           }),

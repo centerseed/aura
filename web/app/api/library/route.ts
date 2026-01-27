@@ -1,16 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
-// GET /api/library?userId=xxx - 獲取用戶的完整層級結構
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-
-  if (!userId) {
-    return NextResponse.json({ error: "userId is required" }, { status: 400 });
-  }
-
+// GET /api/library - 獲取用戶的完整層級結構
+export async function GET(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
+
     // 獲取用戶的所有 Areas，包含 Products 和 Tasks
     const areas = await prisma.area.findMany({
       where: {
@@ -104,6 +100,22 @@ export async function GET(request: Request) {
     return NextResponse.json(formattedAreas);
   } catch (error) {
     console.error("Failed to fetch library:", error);
-    return NextResponse.json({ error: "Failed to fetch library" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (
+      errorMessage.includes("token") ||
+      errorMessage.includes("User not found")
+    ) {
+      return NextResponse.json({
+        error: "Unauthorized",
+        details: "Authentication failed. Please provide a valid Firebase ID token.",
+      }, { status: 401 });
+    }
+
+    return NextResponse.json({
+      error: "Failed to fetch library",
+      details: errorMessage
+    }, { status: 500 });
   }
 }

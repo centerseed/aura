@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, FolderOpen, AlertCircle, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { auth } from "@/lib/firebase";
 
 interface AreaModalProps {
   isOpen: boolean;
@@ -75,11 +76,21 @@ export function AreaModal({
     setError(null);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       if (editingArea) {
         // 更新現有 Area
         const res = await fetch(`/api/areas/${editingArea.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
           body: JSON.stringify({
             name: name.trim(),
             scope: scope.trim() || undefined,
@@ -96,7 +107,10 @@ export function AreaModal({
         // 創建新 Area
         const res = await fetch("/api/areas", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
           body: JSON.stringify({
             userId,
             name: name.trim(),
@@ -132,8 +146,18 @@ export function AreaModal({
     setError(null);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       const res = await fetch(`/api/areas/${editingArea.id}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
 
       const data = await res.json();

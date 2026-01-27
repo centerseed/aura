@@ -34,14 +34,17 @@ function TourContent() {
       }
 
       try {
-        const userRes = await fetch(`/api/me?firebaseUid=${firebaseUser.uid}`);
+        const token = await firebaseUser.getIdToken();
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        const userRes = await fetch("/api/me", { headers });
         if (!userRes.ok) {
           throw new Error("無法獲取用戶資料");
         }
         const userData = await userRes.json();
         setUserId(userData.id);
 
-        const areasRes = await fetch(`/api/areas?userId=${userData.id}`);
+        const areasRes = await fetch("/api/areas", { headers });
         const areasData = await areasRes.json();
         setUserAreas(areasData.map((area: any) => area.name));
       } catch (error) {

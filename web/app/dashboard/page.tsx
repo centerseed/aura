@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/firebase";
+
+// Helper function to get auth headers
+async function getAuthHeaders() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No authenticated user");
+  const token = await user.getIdToken();
+  return { 'Authorization': `Bearer ${token}` };
+}
 import {
   DndContext,
   DragOverlay,
@@ -552,35 +560,29 @@ function DraggableTaskItem({
           {/* References 區塊 - Hidden when completed */}
           {!isCompleted && task.references && task.references.length > 0 && (
             <div className="mt-2">
-              <div className="text-xs text-white/40 mb-1">參考資料</div>
+              <div className="flex items-center gap-1.5 text-xs text-white/40 mb-1">
+                <span>參考資料</span>
+                {task.references.some(ref => ref.type === "note") && (
+                  <FileText className="w-3 h-3" />
+                )}
+              </div>
               <div className="space-y-1">
-                {task.references.map((ref) => (
+                {task.references.filter(ref => ref.type === "url").map((ref) => (
                   <div
                     key={ref.id}
                     className="group/ref flex items-start gap-1.5 text-xs hover:bg-white/5 rounded px-1 py-0.5 -mx-1"
                   >
-                    {ref.type === "url" ? (
-                      <>
-                        <ExternalLink className="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
-                        <a
-                          href={ref.content}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 text-blue-400 hover:underline break-all"
-                          onClick={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
-                        >
-                          {ref.title || ref.content}
-                        </a>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="w-3 h-3 text-white/40 shrink-0 mt-0.5" />
-                        <span className="flex-1 text-white/60 break-all">
-                          {ref.content}
-                        </span>
-                      </>
-                    )}
+                    <ExternalLink className="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
+                    <a
+                      href={ref.content}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-blue-400 hover:underline break-all"
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      {ref.title || ref.content}
+                    </a>
                     {onDeleteReference && (
                       <button
                         type="button"
@@ -745,10 +747,17 @@ function DroppableProduct({
     setDragRef(element);
   };
 
-  // 篩選此 Product 的所有里程碑（支援多個）
+  // 篩選此 Product 的所有里程碑（支援多個，排除已過期）
   const productMilestones = milestones
     .filter((m) => m.entity_type === "PRODUCT" && m.entity_id === productId)
     .filter((m) => m.status !== "COMPLETED" && m.status !== "CANCELLED")
+    .filter((m) => {
+      // 排除已過期的 milestone
+      const daysRemaining = Math.ceil(
+        (new Date(m.target_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return daysRemaining >= 0;
+    })
     .sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime());
 
   const hasMilestone = productMilestones.length > 0;
@@ -1043,8 +1052,12 @@ function DashboardContent() {
           }
 
           try {
+            // 獲取 Firebase ID Token
+            const token = await firebaseUser.getIdToken();
+            const headers = { 'Authorization': `Bearer ${token}` };
+
             // 2. 根據 Firebase UID 獲取用戶資料
-            const userRes = await fetch(`/api/me?firebaseUid=${firebaseUser.uid}`);
+            const userRes = await fetch('/api/me', { headers });
             if (!userRes.ok) {
               throw new Error("無法獲取用戶資料");
             }
@@ -1054,13 +1067,13 @@ function DashboardContent() {
             setUserName(userData.displayName || userData.name || userData.email || "User");
 
             // 3. 獲取用戶的 Library (Areas → Products → Tasks)
-            const libraryRes = await fetch(`/api/library?userId=${userData.id}`);
+            const libraryRes = await fetch('/api/library', { headers });
             if (!libraryRes.ok) throw new Error("無法獲取資料庫內容");
             const libraryData = await libraryRes.json();
             setAreas(libraryData);
 
             // 4. 獲取用戶的 Milestones
-            const milestonesRes = await fetch(`/api/milestones?userId=${userData.id}`);
+            const milestonesRes = await fetch('/api/milestones', { headers });
             if (milestonesRes.ok) {
               const milestonesData = await milestonesRes.json();
               setMilestones(milestonesData);
@@ -1182,9 +1195,13 @@ function DashboardContent() {
           display_order: index,
         }));
 
+        const authHeaders = await getAuthHeaders();
         const res = await fetch('/api/products/reorder', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders
+          },
           body: JSON.stringify({ updates }),
         });
 
@@ -1194,7 +1211,7 @@ function DashboardContent() {
       } catch (err) {
         console.error('Failed to reorder products:', err);
         // 如果失敗，重新載入數據
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1249,9 +1266,13 @@ function DashboardContent() {
 
       // 調用 API 更新
       try {
+        const authHeaders = await getAuthHeaders();
         const res = await fetch(`/api/products/${productId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders
+          },
           body: JSON.stringify({ area_id: newAreaId }),
         });
 
@@ -1261,7 +1282,7 @@ function DashboardContent() {
       } catch (err) {
         console.error("Failed to move product:", err);
         // 如果失敗，重新載入數據
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1324,9 +1345,13 @@ function DashboardContent() {
 
       // 調用 API 更新
       try {
+        const authHeaders = await getAuthHeaders();
         const res = await fetch("/api/tasks", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders
+          },
           body: JSON.stringify({ taskId, productId: newProductId }),
         });
 
@@ -1336,7 +1361,7 @@ function DashboardContent() {
       } catch (err) {
         console.error("Failed to move task:", err);
         // 如果失敗，重新載入數據
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1370,9 +1395,13 @@ function DashboardContent() {
 
       // 調用 AI 推薦專案名稱
       try {
+        const authHeaders = await getAuthHeaders();
         const res = await fetch("/api/suggest-product", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders
+          },
           body: JSON.stringify({
             taskContent: currentTask.title,
             taskNarrative: currentTask.narrative,
@@ -1442,9 +1471,13 @@ function DashboardContent() {
     setShowMergeConfirmModal(false);
 
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/tasks/${pendingMerge.sourceTask.id}/merge-into`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ targetTaskId: pendingMerge.targetTask.id }),
       });
 
@@ -1453,7 +1486,7 @@ function DashboardContent() {
       }
 
       // 重新載入數據
-      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
         setAreas(libraryData);
@@ -1479,12 +1512,16 @@ function DashboardContent() {
     setShowProductSuggestionModal(false);
 
     try {
+      const authHeaders = await getAuthHeaders();
+
       // 1. 創建新專案
       const createRes = await fetch("/api/products", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({
-          userId,
           areaId: productSuggestion.areaId,
           name: productName,
           status: "ACTIVE",
@@ -1507,7 +1544,10 @@ function DashboardContent() {
       // 2. 移動任務到新專案
       const moveRes = await fetch("/api/tasks", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({
           taskId: productSuggestion.taskId,
           productId: createdProduct.id,
@@ -1519,7 +1559,7 @@ function DashboardContent() {
       }
 
       // 3. 重新載入數據
-      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
         setAreas(libraryData);
@@ -1540,7 +1580,7 @@ function DashboardContent() {
   const reloadMilestones = async () => {
     if (!userId) return;
     try {
-      const milestonesRes = await fetch(`/api/milestones?userId=${userId}`);
+      const milestonesRes = await fetch("/api/milestones", { headers: await getAuthHeaders() });
       if (milestonesRes.ok) {
         const milestonesData = await milestonesRes.json();
         setMilestones(milestonesData);
@@ -1568,9 +1608,13 @@ function DashboardContent() {
       // 如果已完成（ARCHIVE），改為 ACTIVE；否則改為 ARCHIVE
       const newStatus = currentDrawer === "ARCHIVE" ? "ACTIVE" : "ARCHIVE";
 
+      const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/tasks", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ taskId, status: newStatus }),
       });
 
@@ -1580,7 +1624,7 @@ function DashboardContent() {
 
       // 重新載入數據
       if (userId) {
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1588,6 +1632,45 @@ function DashboardContent() {
       }
     } catch (err) {
       console.error("Failed to complete task:", err);
+    }
+  };
+
+  // 刪除任務
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      // Optimistic update: 先從 UI 移除任務
+      setAreas(prevAreas => {
+        return prevAreas.map(area => ({
+          ...area,
+          products: area.products?.map(product => ({
+            ...product,
+            tasks: product.tasks?.filter((task: any) => task.id !== taskId) || []
+          })) || []
+        }));
+      });
+
+      // 關閉 Task Detail Modal
+      setIsTaskDetailModalOpen(false);
+      setSelectedTask(null);
+
+      // API call
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: await getAuthHeaders(),
+      });
+
+      if (!res.ok) {
+        throw new Error("刪除任務失敗");
+      }
+    } catch (err) {
+      console.error("Failed to delete task:", err);
+      alert("刪除任務失敗，請稍後再試");
+      // 錯誤時重新載入數據
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
+      if (libraryRes.ok) {
+        const libraryData = await libraryRes.json();
+        setAreas(libraryData);
+      }
     }
   };
 
@@ -1609,9 +1692,13 @@ function DashboardContent() {
     );
 
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/tasks", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ taskId, content: newTitle.trim() }),
       });
 
@@ -1622,7 +1709,7 @@ function DashboardContent() {
       console.error("Failed to edit task title:", err);
       alert("更新失敗，請稍後再試");
       // Revert on error
-      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const data = await libraryRes.json();
         setAreas(data);
@@ -1648,9 +1735,13 @@ function DashboardContent() {
     );
 
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/tasks", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ taskId, narrative: newNarrative.trim() }),
       });
 
@@ -1661,7 +1752,7 @@ function DashboardContent() {
       console.error("Failed to edit narrative:", err);
       alert("更新說明失敗，請稍後再試");
       // Revert on error
-      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const data = await libraryRes.json();
         setAreas(data);
@@ -1723,9 +1814,13 @@ function DashboardContent() {
       });
 
       // API call
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/tasks/${taskId}/sub-items/${subItemId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ task_id: taskId, sub_item_id: subItemId, completed }),
       });
 
@@ -1738,7 +1833,7 @@ function DashboardContent() {
       if (result.task_completed) {
         // Task 已自動歸檔,重新載入數據
         if (userId) {
-          const libraryRes = await fetch(`/api/library?userId=${userId}`);
+          const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
           if (libraryRes.ok) {
             const libraryData = await libraryRes.json();
             setAreas(libraryData);
@@ -1749,7 +1844,7 @@ function DashboardContent() {
       console.error("Failed to toggle sub-item:", err);
       // 錯誤時重新載入數據
       if (userId) {
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1790,8 +1885,10 @@ function DashboardContent() {
       });
 
       // API call
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/tasks/${taskId}/sub-items/${subItemId}`, {
         method: "DELETE",
+        headers: authHeaders
       });
 
       if (!res.ok) {
@@ -1801,7 +1898,7 @@ function DashboardContent() {
       console.error("Failed to delete sub-item:", err);
       // 錯誤時重新載入數據
       if (userId) {
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1837,9 +1934,13 @@ function DashboardContent() {
       });
 
       // API call
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/tasks/${taskId}/sub-items/${subItemId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ content: newContent }),
       });
 
@@ -1850,7 +1951,7 @@ function DashboardContent() {
       console.error("Failed to edit sub-item:", err);
       // 錯誤時重新載入數據
       if (userId) {
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1863,9 +1964,13 @@ function DashboardContent() {
   const handleAddSubItem = async (taskId: string, content: string) => {
     try {
       // API call 先執行（因為需要生成 ID）
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/tasks/${taskId}/sub-items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ content }),
       });
 
@@ -1907,7 +2012,7 @@ function DashboardContent() {
       console.error("Failed to add sub-item:", err);
       // 錯誤時重新載入數據
       if (userId) {
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1920,9 +2025,13 @@ function DashboardContent() {
   const handleAddReference = async (taskId: string, type: "url" | "note", content: string, title?: string) => {
     try {
       // API call
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/tasks/${taskId}/references`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ type, content, title }),
       });
 
@@ -1961,7 +2070,7 @@ function DashboardContent() {
       alert("新增參考資料失敗，請稍後再試");
       // 錯誤時重新載入數據
       if (userId) {
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -1999,8 +2108,10 @@ function DashboardContent() {
       });
 
       // API call
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/tasks/${taskId}/references?referenceId=${referenceId}`, {
         method: "DELETE",
+        headers: authHeaders
       });
 
       if (!res.ok) {
@@ -2011,7 +2122,7 @@ function DashboardContent() {
       alert("刪除參考資料失敗，請稍後再試");
       // 錯誤時重新載入數據
       if (userId) {
-        const libraryRes = await fetch(`/api/library?userId=${userId}`);
+        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
           setAreas(libraryData);
@@ -2037,9 +2148,13 @@ function DashboardContent() {
     );
 
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`/api/products/${productId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ name: newName.trim() }),
       });
 
@@ -2051,7 +2166,7 @@ function DashboardContent() {
       console.error("Failed to rename product:", err);
       alert(err instanceof Error ? err.message : "重命名失敗，請稍後再試");
       // Revert on error
-      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const data = await libraryRes.json();
         setAreas(data);
@@ -2075,8 +2190,9 @@ function DashboardContent() {
     setIsReorganizing(true);
     setReorganizingProductId(productId);
     try {
-      const res = await fetch(`/api/products/${productId}/reorganize-topics?user_id=${userId}`, {
+      const res = await fetch(`/api/products/${productId}/reorganize-topics`, {
         method: "POST",
+        headers: await getAuthHeaders(),
       });
 
       if (!res.ok) throw new Error("重組分析失敗");
@@ -2104,9 +2220,12 @@ function DashboardContent() {
 
     setIsApplying(true); // ✅ 開始 applying loading
     try {
-      const res = await fetch(`/api/products/${reorganizeProposal.productId}/apply-reorganization?user_id=${userId}`, {
+      const res = await fetch(`/api/products/${reorganizeProposal.productId}/apply-reorganization`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getAuthHeaders())
+        },
         body: JSON.stringify(reorganizeProposal),
       });
 
@@ -2122,7 +2241,7 @@ function DashboardContent() {
       setLastReorganizedProductId(reorganizeProposal.productId);
 
       // 重新載入數據
-      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
         setAreas(libraryData);
@@ -2151,11 +2270,15 @@ function DashboardContent() {
 
     setIsRestoring(true);
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(
-        `/api/products/${lastReorganizedProductId}/restore-recent-tasks?userId=${userId}`,
+        `/api/products/${lastReorganizedProductId}/restore-recent-tasks`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders
+          },
           body: JSON.stringify({ minutes: 30 }),
         }
       );
@@ -2165,7 +2288,7 @@ function DashboardContent() {
       const data = await res.json();
 
       // 重新載入數據
-      const libraryRes = await fetch(`/api/library?userId=${userId}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
         setAreas(libraryData);
@@ -2482,8 +2605,10 @@ function DashboardContent() {
                   }}
                   onDelete={async (milestoneId) => {
                     try {
+                      const authHeaders = await getAuthHeaders();
                       const res = await fetch(`/api/milestones/${milestoneId}`, {
                         method: "DELETE",
+                        headers: authHeaders
                       });
                       if (res.ok) {
                         await reloadMilestones();
@@ -2681,7 +2806,7 @@ function DashboardContent() {
           onSuccess={async () => {
             // 重新載入數據
             if (userId) {
-              const libraryRes = await fetch(`/api/library?userId=${userId}`);
+              const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
               if (libraryRes.ok) {
                 const libraryData = await libraryRes.json();
                 setAreas(libraryData);
@@ -2704,7 +2829,7 @@ function DashboardContent() {
           onSuccess={async () => {
             // 重新載入數據
             if (userId) {
-              const libraryRes = await fetch(`/api/library?userId=${userId}`);
+              const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
               if (libraryRes.ok) {
                 const libraryData = await libraryRes.json();
                 setAreas(libraryData);
@@ -2727,7 +2852,7 @@ function DashboardContent() {
             onSuccess={async () => {
               // 重新載入數據
               if (userId) {
-                const libraryRes = await fetch(`/api/library?userId=${userId}`);
+                const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
                 if (libraryRes.ok) {
                   const libraryData = await libraryRes.json();
                   setAreas(libraryData);
@@ -2781,6 +2906,7 @@ function DashboardContent() {
             onAddReference={handleAddReference}
             onDeleteReference={handleDeleteReference}
             onComplete={handleCompleteTask}
+            onDelete={handleDeleteTask}
           />
         )}
 
@@ -3031,7 +3157,7 @@ function DashboardContent() {
           onItemsCreated={async () => {
             // 重新載入數據
             if (userId) {
-              const libraryRes = await fetch(`/api/library?userId=${userId}`);
+              const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
               if (libraryRes.ok) {
                 const libraryData = await libraryRes.json();
                 setAreas(libraryData);

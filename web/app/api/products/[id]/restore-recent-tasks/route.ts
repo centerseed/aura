@@ -1,22 +1,27 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // POST /api/products/[id]/restore-recent-tasks - 恢復最近被刪除的 Tasks
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId") || searchParams.get("user_id");
+    const userId = await authenticateRequest(request, prisma);
     const { id: productId } = await params;
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-    }
 
     const body = await request.json();
     const { minutes = 10 } = body; // 預設恢復最近 10 分鐘內被刪除的 tasks
+
+    // 驗證 Product 屬於當前用戶
+    const product = await prisma.product.findUnique({
+      where: { id: productId, user_id: userId, deleted_at: null },
+    });
+
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
 
     // 查找最近 N 分鐘內被軟刪除的 tasks
     const cutoffTime = new Date(Date.now() - minutes * 60 * 1000);
@@ -112,18 +117,14 @@ export async function POST(
 
 // GET /api/products/[id]/restore-recent-tasks - 預覽最近被刪除的 Tasks
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId") || searchParams.get("user_id");
     const { id: productId } = await params;
     const minutes = parseInt(searchParams.get("minutes") || "10");
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-    }
 
     // 查找最近 N 分鐘內被軟刪除的 tasks
     const cutoffTime = new Date(Date.now() - minutes * 60 * 1000);
@@ -152,6 +153,9 @@ export async function GET(
     });
   } catch (error) {
     console.error("Get deleted tasks failed:", error);
+    if (error instanceof Error && error.message.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       {
         error: "Failed to get deleted tasks",

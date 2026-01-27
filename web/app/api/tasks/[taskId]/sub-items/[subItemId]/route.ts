@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // PATCH /api/tasks/[taskId]/sub-items/[subItemId] - 更新 sub-item 狀態或內容
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ taskId: string; subItemId: string }> }
 ) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const { taskId, subItemId } = await params;
     const body = await request.json();
     const { completed, content } = body;
@@ -41,12 +43,13 @@ export async function PATCH(
       );
     }
 
-    // 查詢 Task
+    // 查詢 Task 並驗證屬於當前用戶
     const task = await prisma.task.findUnique({
       where: { id: taskId, deleted_at: null },
+      include: { product: true },
     });
 
-    if (!task) {
+    if (!task || task.product.user_id !== userId) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
@@ -135,18 +138,20 @@ export async function PATCH(
 
 // DELETE /api/tasks/[taskId]/sub-items/[subItemId] - 刪除 sub-item
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ taskId: string; subItemId: string }> }
 ) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const { taskId, subItemId } = await params;
 
-    // 查詢 Task
+    // 查詢 Task 並驗證屬於當前用戶
     const task = await prisma.task.findUnique({
       where: { id: taskId, deleted_at: null },
+      include: { product: true },
     });
 
-    if (!task) {
+    if (!task || task.product.user_id !== userId) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 

@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 import { Status, Lifecycle } from "@prisma/client";
 
 // AI 解析自然語言調整指令的結構（繁體中文）
@@ -25,13 +26,14 @@ const AdjustmentIntentSchema = z.object({
 });
 
 // POST /api/adjust-tags
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
-    const { text, userId, preview = false, confirmed = false } = body;
+    const { text, preview = false, confirmed = false, logId = null } = body;
 
-    if (!text || !userId) {
-      return NextResponse.json({ error: "text and userId are required" }, { status: 400 });
+    if (!text) {
+      return NextResponse.json({ error: "text is required" }, { status: 400 });
     }
 
     // 獲取用戶現有結構
@@ -203,9 +205,24 @@ ${text}
         }
       }
 
+      // 創建評估 Log (PENDING 狀態)
+      const evaluationLog = await prisma.systemEvaluationLog.create({
+        data: {
+          user_id: userId,
+          type: "ADJUST_TAGS",
+          input_content: { text },
+          output_content: {
+            intent,
+            structured_operations: structuredOperations,
+          },
+          user_action: "PENDING",
+        },
+      });
+
       return NextResponse.json({
         success: true,
         preview: true,
+        logId: evaluationLog.id,
         intent_type: intent.intent_type,
         reasoning: intent.reasoning,
         structured_operations: structuredOperations,
@@ -351,6 +368,20 @@ ${text}
       }
     }
 
+    // 更新評估 Log 狀態為 APPLIED (如果有提供 logId)
+    if (logId) {
+      await prisma.systemEvaluationLog.update({
+        where: { id: logId },
+        data: {
+          user_action: "APPLIED",
+          metadata: {
+            operations: operationLog,
+            moved_count: movedCount,
+          },
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       intent_type: intent.intent_type,
@@ -363,10 +394,23 @@ ${text}
     });
   } catch (error) {
     console.error("Adjust tags failed:", error);
-    console.error("Error details:", error instanceof Error ? error.message : String(error));
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error details:", errorMessage);
+
+    // Check for authentication errors
+    if (
+      errorMessage.includes("token") ||
+      errorMessage.includes("User not found")
+    ) {
+      return NextResponse.json({
+        error: "Unauthorized",
+        details: "Authentication failed. Please provide a valid Firebase ID token.",
+      }, { status: 401 });
+    }
+
     return NextResponse.json({
       error: "Tag adjustment failed",
-      details: error instanceof Error ? error.message : String(error)
+      details: errorMessage
     }, { status: 500 });
   }
 }

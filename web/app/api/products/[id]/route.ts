@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 // Validation schema for update
 const UpdateProductSchema = z.object({
@@ -13,17 +14,18 @@ const UpdateProductSchema = z.object({
 
 // PATCH /api/products/:id - 更新 Product（包括移動到新 Area）
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
     const validated = UpdateProductSchema.parse(body);
 
-    // 檢查 product 是否存在
+    // 檢查 product 是否存在且屬於當前用戶
     const existing = await prisma.product.findFirst({
-      where: { id: params.id, deleted_at: null },
+      where: { id: params.id, user_id: userId, deleted_at: null },
     });
 
     if (!existing) {
@@ -84,14 +86,16 @@ export async function PATCH(
 
 // DELETE /api/products/:id - 軟刪除 Product
 export async function DELETE(
-  _request: Request,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
   try {
-    // 檢查 product 是否存在
+    const userId = await authenticateRequest(request, prisma);
+
+    // 檢查 product 是否存在且屬於當前用戶
     const existing = await prisma.product.findFirst({
-      where: { id: params.id, deleted_at: null },
+      where: { id: params.id, user_id: userId, deleted_at: null },
       include: {
         tasks: {
           where: {

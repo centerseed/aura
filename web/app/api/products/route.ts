@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 import { z } from "zod";
 import { Status, Lifecycle } from "@prisma/client";
 
 // Validation schema
 const CreateProductSchema = z.object({
-  userId: z.string().uuid(),
   areaId: z.string().uuid(),
   name: z.string().min(1).max(200),
   description: z.string().optional(),
@@ -14,14 +14,15 @@ const CreateProductSchema = z.object({
 });
 
 // POST /api/products - 創建新的 Product
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
     const validated = CreateProductSchema.parse(body);
 
     // 檢查 Area 是否存在
     const area = await prisma.area.findFirst({
-      where: { id: validated.areaId, user_id: validated.userId, deleted_at: null },
+      where: { id: validated.areaId, user_id: userId, deleted_at: null },
     });
 
     if (!area) {
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     // 檢查是否已存在同名 Product
     const existing = await prisma.product.findFirst({
       where: {
-        user_id: validated.userId,
+        user_id: userId,
         area_id: validated.areaId,
         name: validated.name,
         deleted_at: null,
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     // 創建新 Product
     const product = await prisma.product.create({
       data: {
-        user_id: validated.userId,
+        user_id: userId,
         area_id: validated.areaId,
         name: validated.name,
         description: validated.description,
@@ -61,9 +62,16 @@ export async function POST(request: Request) {
     }
 
     console.error("Failed to create product:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json({
       error: "Failed to create product",
-      details: error instanceof Error ? error.message : String(error)
+      details: errorMessage
     }, { status: 500 });
   }
 }

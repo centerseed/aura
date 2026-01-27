@@ -26,7 +26,13 @@ export default function HomeDemo() {
       if (user) {
         // 使用者已登入，先從 /api/me 取得使用者資料庫 ID
         try {
-          const meRes = await fetch(`/api/me?firebaseUid=${user.uid}`);
+          // 獲取 Firebase ID Token
+          const token = await user.getIdToken();
+          const meRes = await fetch('/api/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
           if (meRes.ok) {
             const userData = await meRes.json();
             setCurrentUser({
@@ -228,9 +234,20 @@ export default function HomeDemo() {
     }
   };
 
-  const redirectUser = async (userData: { id: string; email?: string | null; name?: string | null }) => {
+  const redirectUser = async (_userData: { id: string; email?: string | null; name?: string | null }) => {
     try {
-      const libraryRes = await fetch(`/api/library?userId=${userData.id}`);
+      // 獲取當前 Firebase 用戶的 ID Token
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("No authenticated user found");
+      }
+      const token = await currentUser.getIdToken();
+
+      const libraryRes = await fetch('/api/library', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (!libraryRes.ok) {
         throw new Error(`Library fetch failed: ${libraryRes.status}`);
       }

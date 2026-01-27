@@ -209,11 +209,30 @@ export interface TaskTimeInference {
   reasoning: string;
 }
 
+export interface TaskConsolidation {
+  parent_task_id: string;
+  sub_task_ids: string[];
+  consolidated_title: string;
+  consolidated_narrative: string;
+  reasoning: string;
+  confidence: number;
+}
+
+export interface TaskContext {
+  id: string;
+  title: string;
+  current_topic: string;
+  current_due_date: string | null;
+}
+
 export interface ReorganizeProposal {
   product_id: string;
   product_name: string;
   current_topics: string[];
+  current_topic_count?: number;
   proposed_clusters: TopicCluster[];
   time_inferences: TaskTimeInference[];
+  task_consolidations?: TaskConsolidation[];
+  tasks_context?: TaskContext[];
   reasoning: string;
 }

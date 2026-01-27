@@ -9,6 +9,7 @@ import { X, Calendar, Loader2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/firebase";
 
 interface TaskDueDateModalProps {
   isOpen: boolean;
@@ -46,9 +47,19 @@ export function TaskDueDateModal({
     setIsSubmitting(true);
 
     try {
+      // 獲取 Firebase token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("未登入");
+      }
+      const token = await user.getIdToken();
+
       const res = await fetch("/api/tasks", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({
           taskId,
           due_date: newDueDate?.toISOString() || null,
@@ -84,7 +95,7 @@ export function TaskDueDateModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"

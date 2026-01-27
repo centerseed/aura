@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth-middleware";
 import { Status, Lifecycle } from "@prisma/client";
 
 // AI 重新分類結果結構（繁體中文）
@@ -31,14 +32,11 @@ const ReorganizeResultSchema = z.object({
 });
 
 // POST /api/reorganize
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
-    const { userId, preview = false, confirmed = false, selected_operation_ids = null } = body;
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-    }
+    const { preview = false, confirmed = false, selected_operation_ids = null } = body;
 
     // 獲取用戶所有現有結構
     const existingAreas = await prisma.area.findMany({
@@ -460,6 +458,22 @@ ${structureSummary}
     });
   } catch (error) {
     console.error("Reorganize failed:", error);
-    return NextResponse.json({ error: "Reorganize failed" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (
+      errorMessage.includes("token") ||
+      errorMessage.includes("User not found")
+    ) {
+      return NextResponse.json({
+        error: "Unauthorized",
+        details: "Authentication failed. Please provide a valid Firebase ID token.",
+      }, { status: 401 });
+    }
+
+    return NextResponse.json({
+      error: "Reorganize failed",
+      details: errorMessage
+    }, { status: 500 });
   }
 }

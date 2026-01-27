@@ -1,17 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getAuth } from "@/lib/firebase-admin";
 
-// GET /api/me - 根據 Firebase Auth UID 獲取當前用戶資訊
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const firebaseUid = searchParams.get("firebaseUid");
-
-  if (!firebaseUid) {
-    return NextResponse.json({ error: "firebaseUid is required" }, { status: 400 });
-  }
-
+// GET /api/me - 獲取當前登入用戶的資訊
+export async function GET(request: NextRequest) {
   try {
-    // 根據 Firebase UID 查詢用戶（auth_provider_id）
+    // 驗證 Firebase ID Token
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const auth = getAuth();
+    const decodedToken = await auth.verifyIdToken(token);
+    const firebaseUid = decodedToken.uid;
+
+    // 根據 Firebase UID 查詢用戶
     const user = await prisma.user.findFirst({
       where: {
         auth_provider_id: firebaseUid,
@@ -36,6 +41,9 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Failed to get current user:", error);
+    if (error instanceof Error && error.message.includes("verification")) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
     return NextResponse.json({ error: "Failed to get current user" }, { status: 500 });
   }
 }

@@ -6,6 +6,14 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, Loader2, LogIn } from "lucide-react";
 import { auth, googleProvider, signInWithPopup, signInAnonymously } from "@/lib/firebase";
 
+// Helper function to get auth headers
+async function getAuthHeaders() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No authenticated user");
+  const token = await user.getIdToken();
+  return { 'Authorization': `Bearer ${token}` };
+}
+
 export default function HomeDemo() {
   const [name, setName] = useState("");
   const [isEntering, setIsEntering] = useState(false);
@@ -88,7 +96,7 @@ export default function HomeDemo() {
 
   const redirectUser = async (userData: { id: string; email?: string | null; name?: string | null }) => {
     try {
-      const libraryRes = await fetch(`/api/library?userId=${userData.id}`);
+      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
       const libraryData = await libraryRes.json();
       if (!libraryData || libraryData.length === 0) {
         window.location.href = `/onboarding`;

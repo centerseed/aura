@@ -28,7 +28,12 @@ export default function SettingsPage() {
       }
 
       try {
-        const userRes = await fetch(`/api/me?firebaseUid=${firebaseUser.uid}`);
+        const token = await firebaseUser.getIdToken();
+        const userRes = await fetch("/api/me", {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (userRes.ok) {
           const data = await userRes.json();
           setUserData(data);

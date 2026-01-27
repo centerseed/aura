@@ -36,9 +36,18 @@ function getDaysRemaining(targetDate: string): number {
 }
 
 export function MilestoneList({ milestones, onEdit, onDelete }: MilestoneListProps) {
-  // 過濾並排序：只顯示未完成和未取消的，按日期排序
+  // 過濾並排序：只顯示未完成、未取消、且未過期的，按日期排序
   const activeMilestones = milestones
-    .filter((m) => m.status !== "completed" && m.status !== "cancelled")
+    .filter((m) => {
+      // 排除已完成和已取消的
+      if (m.status === "completed" || m.status === "cancelled") return false;
+
+      // 排除已過期的
+      const daysRemaining = getDaysRemaining(m.target_date);
+      if (daysRemaining < 0) return false;
+
+      return true;
+    })
     .sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime());
 
   if (activeMilestones.length === 0) {
