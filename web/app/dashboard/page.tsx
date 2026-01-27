@@ -1711,6 +1711,11 @@ function DashboardContent() {
       }))
     );
 
+    // 同時更新 selectedTask
+    if (selectedTask?.id === taskId) {
+      setSelectedTask({ ...selectedTask, title: newTitle.trim() });
+    }
+
     try {
       const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/tasks", {
@@ -1733,6 +1738,15 @@ function DashboardContent() {
       if (libraryRes.ok) {
         const data = await libraryRes.json();
         setAreas(data);
+        // 同時 revert selectedTask
+        if (selectedTask?.id === taskId) {
+          const task = data
+            .flatMap((a: ApiArea) => a.products.flatMap((p: ApiProduct) => p.tasks))
+            .find((t: TaskCard) => t.id === taskId);
+          if (task) {
+            setSelectedTask(task);
+          }
+        }
       }
     }
   };
@@ -1753,6 +1767,11 @@ function DashboardContent() {
         })),
       }))
     );
+
+    // 同時更新 selectedTask
+    if (selectedTask?.id === taskId) {
+      setSelectedTask({ ...selectedTask, narrative: newNarrative.trim() || null });
+    }
 
     try {
       const authHeaders = await getAuthHeaders();
@@ -1776,6 +1795,15 @@ function DashboardContent() {
       if (libraryRes.ok) {
         const data = await libraryRes.json();
         setAreas(data);
+        // 同時 revert selectedTask
+        if (selectedTask?.id === taskId) {
+          const task = data
+            .flatMap((a: ApiArea) => a.products.flatMap((p: ApiProduct) => p.tasks))
+            .find((t: TaskCard) => t.id === taskId);
+          if (task) {
+            setSelectedTask(task);
+          }
+        }
       }
     }
   };

@@ -30,8 +30,19 @@ vi.mock('next/server', () => ({
   },
 }))
 
-// Mock environment variables
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test'
-process.env.FIREBASE_ADMIN_PROJECT_ID = 'test-project'
-process.env.FIREBASE_ADMIN_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----'
-process.env.FIREBASE_ADMIN_CLIENT_EMAIL = 'test@test.iam.gserviceaccount.com'
+// Mock Firebase environment variables for unit tests
+// Note: Integration tests will use real DATABASE_URL from .env.local
+if (!process.env.DATABASE_URL) {
+  // Only set mock DATABASE_URL if not already set (for unit tests)
+  process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test'
+}
+
+if (!process.env.FIREBASE_ADMIN_PROJECT_ID) {
+  process.env.FIREBASE_ADMIN_PROJECT_ID = 'test-project'
+}
+if (!process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
+  process.env.FIREBASE_ADMIN_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----'
+}
+if (!process.env.FIREBASE_ADMIN_CLIENT_EMAIL) {
+  process.env.FIREBASE_ADMIN_CLIENT_EMAIL = 'test@test.iam.gserviceaccount.com'
+}

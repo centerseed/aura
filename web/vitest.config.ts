@@ -1,12 +1,24 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { loadEnv } from 'vite'
+import dotenv from 'dotenv'
 
-export default defineConfig({
+// 🚨 測試環境：優先載入 .env.test（如果存在）
+dotenv.config({ path: '.env.test' })
+
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   test: {
     // Test environment
     environment: 'happy-dom',
+
+    // Load environment variables
+    env: {
+      ...loadEnv(mode, process.cwd(), ''),
+      // 確保 NODE_ENV 設為 test
+      NODE_ENV: 'test',
+    },
 
     // Global setup
     globals: true,
@@ -49,6 +61,7 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
     isolate: true,
+    fileParallelism: false, // 避免資料庫連線池耗盡
 
     // Watch mode
     watch: false,
@@ -61,4 +74,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './'),
     },
   },
-})
+}))

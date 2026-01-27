@@ -40,6 +40,13 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Failed to delete task:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json(
       { error: "Failed to delete task" },
       { status: 500 }
@@ -104,6 +111,13 @@ export async function GET(
     return NextResponse.json(formattedTask);
   } catch (error) {
     console.error("Failed to fetch task:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json(
       { error: "Failed to fetch task" },
       { status: 500 }

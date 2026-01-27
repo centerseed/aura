@@ -78,10 +78,17 @@ export async function POST(
     });
   } catch (error) {
     console.error("Add reference failed:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json(
       {
         error: "Failed to add reference",
-        details: error instanceof Error ? error.message : String(error),
+        details: errorMessage,
       },
       { status: 500 }
     );
@@ -146,10 +153,17 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Delete reference failed:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json(
       {
         error: "Failed to delete reference",
-        details: error instanceof Error ? error.message : String(error),
+        details: errorMessage,
       },
       { status: 500 }
     );

@@ -30,7 +30,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --max-instances 10 \
   --timeout 300 \
   --port 8080 \
-  --update-secrets DATABASE_URL=database-url:latest,GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest \
+  --update-secrets DATABASE_URL=database-url:latest,GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest,FIREBASE_ADMIN_KEY=firebase-admin-key:latest \
   --set-env-vars NODE_ENV=production,NEXT_PUBLIC_FIREBASE_API_KEY=REDACTED_FIREBASE_API_KEY,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=zentropy-4f7a5.firebasestorage.app,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=894512935237,NEXT_PUBLIC_FIREBASE_APP_ID=1:894512935237:web:2533f9a2e7d09321f88e2c \
   --project ${PROJECT_ID}
 

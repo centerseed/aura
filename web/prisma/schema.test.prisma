@@ -1,0 +1,150 @@
+// 測試環境專用 Schema - 使用 SQLite 方便測試
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client-test"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./test.db"
+}
+
+model User {
+  id                   String                 @id @default(uuid())
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+  email                String?                @unique
+  name                 String?
+  auth_provider        String                 @default("EMAIL")
+  auth_provider_id     String?
+  settings             Json?
+  areas                Area[]
+  governance_proposals GovernanceProposal[]
+  milestones           Milestone[]
+  products             Product[]
+  tasks                Task[]
+  topics               Topic[]
+  evaluation_logs      SystemEvaluationLog[]
+}
+
+model Area {
+  id              String    @id @default(uuid())
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+  user_id         String
+  name            String
+  description     String?
+  is_custom       Boolean
+  rolling_summary Json?
+  scope           String?
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  products        Product[]
+}
+
+model Product {
+  id            String      @id @default(uuid())
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+  deleted_at    DateTime?
+  user_id       String
+  area_id       String
+  name          String
+  description   String?
+  status        String
+  lifecycle     String
+  display_order Int         @default(0)
+  area          Area        @relation(fields: [area_id], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  topics        Topic[]
+}
+
+model Topic {
+  id              String    @id @default(uuid())
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+  user_id         String
+  product_id      String
+  name            String
+  tasks           Task[]
+  product         Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id                      String           @id @default(uuid())
+  created_at              DateTime         @default(now())
+  updated_at              DateTime         @updatedAt
+  deleted_at              DateTime?
+  user_id                 String
+  product_id              String
+  topic_id                String?
+  content                 String
+  status                  String
+  ai_analysis             Json?
+  references              Json             @default("[]")
+  sub_items               Json             @default("[]")
+  start_date              DateTime?
+  due_date                DateTime?
+  inferred_from_milestone String?
+  time_confidence         Float?
+  product                 Product          @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  topic                   Topic?           @relation(fields: [topic_id], references: [id], onDelete: SetNull)
+  user                    User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  ai_metadata             TaskAIMetadata?
+}
+
+model TaskAIMetadata {
+  id                       String    @id @default(uuid())
+  task_id                  String    @unique
+  time_inference_reasoning String?
+  urgency_level            String?
+  reorganized_at           DateTime?
+  created_at               DateTime  @default(now())
+  updated_at               DateTime  @updatedAt
+  task                     Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+}
+
+model GovernanceProposal {
+  id         String    @id @default(uuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+  user_id    String
+  type       String
+  target_id  String?
+  payload    Json?
+  status     String
+  users      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Milestone {
+  id          String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+  user_id     String
+  name        String
+  target_date DateTime
+  status      String    @default("planned")
+  entity_type String
+  entity_id   String
+  priority    Int       @default(5)
+  description String?
+  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model SystemEvaluationLog {
+  id             String   @id @default(uuid())
+  user_id        String
+  type           String
+  input_content  Json
+  output_content Json
+  user_action    String
+  metadata       Json?
+  created_at     DateTime @default(now())
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}

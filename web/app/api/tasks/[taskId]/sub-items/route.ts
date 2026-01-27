@@ -78,10 +78,17 @@ export async function POST(
     });
   } catch (error) {
     console.error("Add sub-item failed:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for authentication errors
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json(
       {
         error: "Failed to add sub-item",
-        details: error instanceof Error ? error.message : String(error),
+        details: errorMessage,
       },
       { status: 500 }
     );
