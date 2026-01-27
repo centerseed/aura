@@ -336,6 +336,21 @@ function DraggableTaskItem({
             )}
           </div>
 
+          {/* 進度指示 - Moved to top */}
+          {!isCompleted && task.sub_items_meta && task.sub_items_meta.total > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all"
+                  style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs text-white/50 font-medium">
+                {task.sub_items_meta.completed}/{task.sub_items_meta.total}
+              </span>
+            </div>
+          )}
+
           {/* Sub-items 簡化顯示 - Hidden when completed */}
           {!isCompleted && task.sub_items && task.sub_items.length > 0 && (
             <div className="mt-2 space-y-1">
@@ -540,21 +555,6 @@ function DraggableTaskItem({
                   <Plus className="w-3 h-3" />
                   新增待辦事項
                 </button>
-              )}
-
-              {/* 進度指示 */}
-              {task.sub_items_meta && task.sub_items_meta.total > 0 && (
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-indigo-500 transition-all"
-                      style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-white/40">
-                    {task.sub_items_meta.completed}/{task.sub_items_meta.total}
-                  </span>
-                </div>
               )}
             </div>
           )}
@@ -1002,6 +1002,7 @@ function DashboardContent() {
   const [editingArea, setEditingArea] = useState<{ id: string; name: string; scope?: string | null; description?: string | null } | null>(null);
   const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
   const [editingTaskForDueDate, setEditingTaskForDueDate] = useState<TaskCard | null>(null);
+  const [dateModalType, setDateModalType] = useState<"due" | "start">("due");
   const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskCard | null>(null);
   const [showProductSuggestionModal, setShowProductSuggestionModal] = useState(false);
@@ -1810,12 +1811,12 @@ function DashboardContent() {
 
   // 設定開始日期
   const handleSetStartDate = async (taskId: string) => {
-    // 重用現有的 due date modal，後續可以改成同時設定 start/due date
     const task = areas
       .flatMap((a) => a.products.flatMap((p) => p.tasks))
       .find((t) => t.id === taskId);
     if (task) {
       setEditingTaskForDueDate(task);
+      setDateModalType("start");
       setIsDueDateModalOpen(true);
     }
   };
@@ -3014,6 +3015,7 @@ function DashboardContent() {
             onClose={() => {
               setIsDueDateModalOpen(false);
               setEditingTaskForDueDate(null);
+              setDateModalType("due");
             }}
             onSuccess={async () => {
               // 重新載入數據
@@ -3022,12 +3024,24 @@ function DashboardContent() {
                 if (libraryRes.ok) {
                   const libraryData = await libraryRes.json();
                   setAreas(libraryData);
+
+                  // 同步更新 selectedTask（如果打開了詳情 modal）
+                  if (selectedTask) {
+                    const updatedTask = libraryData
+                      .flatMap((a: any) => a.products.flatMap((p: any) => p.tasks))
+                      .find((t: any) => t.id === selectedTask.id);
+                    if (updatedTask) {
+                      setSelectedTask(updatedTask);
+                    }
+                  }
                 }
               }
             }}
             taskId={editingTaskForDueDate.id}
             taskTitle={editingTaskForDueDate.title}
+            dateType={dateModalType}
             currentDueDate={editingTaskForDueDate.due_date}
+            currentStartDate={editingTaskForDueDate.start_date}
           />
         )}
 
@@ -3061,6 +3075,7 @@ function DashboardContent() {
                 .find((t) => t.id === taskId);
               if (task) {
                 setEditingTaskForDueDate(task);
+                setDateModalType("due");
                 setIsDueDateModalOpen(true);
               }
             }}

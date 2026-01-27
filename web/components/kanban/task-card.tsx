@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, MoreHorizontal, ArrowRight, Calendar, AlertCircle, CheckCircle2, CheckCircle, Link } from "lucide-react";
+import { GripVertical, MoreHorizontal, ArrowRight, Calendar, AlertCircle, CheckCircle2, Link } from "lucide-react";
 import type { TaskCard } from "@/types";
 
 // 計算相對時間描述
@@ -98,6 +98,21 @@ export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate
           <span className="text-slate-400 dark:text-slate-500">{task.tag.topic}</span>
         </div>
 
+        {/* Progress Indicator - Moved to top */}
+        {hasSubItems && (
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all"
+                style={{ width: `${(task.sub_items_meta?.completed || 0) / (task.sub_items_meta?.total || 1) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              {task.sub_items_meta?.completed}/{task.sub_items_meta?.total}
+            </span>
+          </div>
+        )}
+
         {/* Narrative Preview */}
         {task.narrative && (
           <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">
@@ -105,21 +120,13 @@ export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate
           </p>
         )}
 
-        {/* Summary badges */}
-        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-3">
-          {hasSubItems && (
-            <div className="flex items-center gap-1">
-              <CheckCircle className="w-3.5 h-3.5" />
-              <span>{task.sub_items_meta?.completed}/{task.sub_items_meta?.total}</span>
-            </div>
-          )}
-          {hasReferences && (
-            <div className="flex items-center gap-1">
-              <Link className="w-3.5 h-3.5" />
-              <span>{task.references!.length}</span>
-            </div>
-          )}
-        </div>
+        {/* Summary badges - References count */}
+        {hasReferences && (
+          <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-3">
+            <Link className="w-3.5 h-3.5" />
+            <span>{task.references!.length} 個參考資料</span>
+          </div>
+        )}
 
         {/* Badges Row */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">

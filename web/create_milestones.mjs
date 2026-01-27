@@ -17,7 +17,7 @@ async function createMilestones() {
   // 2. 找到對應的 Product ID
   const zentropy = products.find(p => p.name === 'Zentropy')
   const paceriz = products.find(p => p.name === 'Paceriz')
-  const fintasy = products.find(p => p.name === 'Fintasy')
+  const fintasy = products.find(p => p.name === 'Fintasy v1')
 
   if (!zentropy || !paceriz || !fintasy) {
     console.error('❌ 找不到必要的 Product')

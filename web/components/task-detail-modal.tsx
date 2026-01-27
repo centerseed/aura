@@ -58,7 +58,7 @@ export function TaskDetailModal({
   useEffect(() => {
     setTitle(task.title);
     setNarrative(task.narrative || "");
-  }, [task.title, task.narrative]);
+  }, [task.title, task.narrative, task.start_date, task.due_date, task.id]);
 
   if (!isOpen) return null;
 
@@ -221,6 +221,23 @@ export function TaskDetailModal({
             {/* Sub-items */}
             <div>
               <h3 className="text-sm font-medium text-white/80 mb-3">待辦事項</h3>
+
+              {/* Progress - Moved to top */}
+              {task.sub_items_meta && task.sub_items_meta.total > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-sm text-white/70 mb-2">
+                    <span>進度</span>
+                    <span>{task.sub_items_meta.completed} / {task.sub_items_meta.total}</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-300"
+                      style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 {task.sub_items && task.sub_items.length > 0 ? (
                   task.sub_items.map((item) => (
@@ -321,22 +338,6 @@ export function TaskDetailModal({
                     <Plus className="w-4 h-4" />
                     新增待辦事項
                   </button>
-                )}
-
-                {/* Progress */}
-                {task.sub_items_meta && task.sub_items_meta.total > 0 && (
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <div className="flex items-center justify-between text-sm text-white/70 mb-2">
-                      <span>進度</span>
-                      <span>{task.sub_items_meta.completed} / {task.sub_items_meta.total}</span>
-                    </div>
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-300"
-                        style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
-                      />
-                    </div>
-                  </div>
                 )}
               </div>
             </div>

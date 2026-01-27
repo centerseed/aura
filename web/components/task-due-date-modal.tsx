@@ -18,6 +18,8 @@ interface TaskDueDateModalProps {
   taskId: string;
   taskTitle: string;
   currentDueDate?: string | null;
+  dateType?: "due" | "start";
+  currentStartDate?: string | null;
 }
 
 export function TaskDueDateModal({
@@ -27,22 +29,25 @@ export function TaskDueDateModal({
   taskId,
   taskTitle,
   currentDueDate,
+  dateType = "due",
+  currentStartDate,
 }: TaskDueDateModalProps) {
-  const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 初始化日期
   useEffect(() => {
-    if (currentDueDate) {
-      setDueDate(new Date(currentDueDate));
+    const currentDate = dateType === "due" ? currentDueDate : currentStartDate;
+    if (currentDate) {
+      setSelectedDate(new Date(currentDate));
     } else {
-      setDueDate(undefined);
+      setSelectedDate(undefined);
     }
     setError(null);
-  }, [currentDueDate, isOpen]);
+  }, [currentDueDate, currentStartDate, dateType, isOpen]);
 
-  const handleSubmit = async (newDueDate: Date | null) => {
+  const handleSubmit = async (newDate: Date | null) => {
     setError(null);
     setIsSubmitting(true);
 
@@ -54,6 +59,7 @@ export function TaskDueDateModal({
       }
       const token = await user.getIdToken();
 
+      const fieldName = dateType === "due" ? "due_date" : "start_date";
       const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: {
@@ -62,7 +68,7 @@ export function TaskDueDateModal({
         },
         body: JSON.stringify({
           taskId,
-          due_date: newDueDate?.toISOString() || null,
+          [fieldName]: newDate?.toISOString() || null,
         }),
       });
 
@@ -81,14 +87,14 @@ export function TaskDueDateModal({
   };
 
   const handleDateSelect = (date: Date | undefined) => {
-    setDueDate(date);
+    setSelectedDate(date);
     if (date) {
       handleSubmit(date);
     }
   };
 
   const handleClearDate = () => {
-    setDueDate(undefined);
+    setSelectedDate(undefined);
     handleSubmit(null);
   };
 
@@ -111,7 +117,9 @@ export function TaskDueDateModal({
               <Calendar className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-white">設定截止日期</h2>
+              <h2 className="text-sm font-semibold text-white">
+                {dateType === "due" ? "設定截止日期" : "設定開始日期"}
+              </h2>
               <p className="text-xs text-white/50 truncate max-w-[200px]">{taskTitle}</p>
             </div>
           </div>
@@ -177,17 +185,17 @@ export function TaskDueDateModal({
               <div className="border border-white/10 rounded-lg overflow-hidden">
                 <CalendarComponent
                   mode="single"
-                  selected={dueDate}
+                  selected={selectedDate}
                   onSelect={handleDateSelect}
                   locale={zhTW}
                 />
               </div>
 
               {/* 當前日期顯示 & 清除按鈕 */}
-              {dueDate && (
+              {selectedDate && (
                 <div className="mt-4 flex items-center justify-between">
                   <span className="text-sm text-white/70">
-                    已選擇：{format(dueDate, "yyyy/MM/dd (EEEE)", { locale: zhTW })}
+                    已選擇：{format(selectedDate, "yyyy/MM/dd (EEEE)", { locale: zhTW })}
                   </span>
                   <Button
                     variant="ghost"
