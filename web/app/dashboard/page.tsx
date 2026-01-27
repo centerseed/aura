@@ -56,6 +56,8 @@ import {
 } from "lucide-react";
 import type { TaskCard, DrawerStatus } from "@/types";
 import { QuickCapture } from "@/components/quick-capture";
+import { AIButtonTip } from "@/components/ai-button-tip";
+import { QuickInputGuide } from "@/components/quick-input-guide";
 import { TimelineView } from "@/components/timeline-view";
 import { GanttView } from "@/components/gantt-view";
 import { MilestoneModal } from "@/components/milestone-modal";
@@ -1030,6 +1032,11 @@ function DashboardContent() {
   } | null>(null);
   const [isMerging, setIsMerging] = useState(false);
 
+  // 歡迎模式（新用戶空白狀態）
+  const [isWelcomeMode, setIsWelcomeMode] = useState(true);
+  const [showQuickInputGuide, setShowQuickInputGuide] = useState(false);
+  const [showAIButtonTip, setShowAIButtonTip] = useState(false);
+
   // DnD Sensors
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1098,6 +1105,19 @@ function DashboardContent() {
 
     loadData();
   }, [router]);
+
+  // 判斷是否需要顯示歡迎模式（新用戶沒有任何任務）
+  const hasTasks = areas.some(a =>
+    a.products.some(p =>
+      p.tasks.filter(t => t.drawer !== 'ARCHIVE').length > 0
+    )
+  );
+
+  useEffect(() => {
+    if (!isLoading && userId) {
+      setIsWelcomeMode(!hasTasks);
+    }
+  }, [isLoading, userId, hasTasks]);
 
   // 統計
   const stats = {
@@ -2334,6 +2354,103 @@ function DashboardContent() {
     );
   }
 
+  // 歡迎模式：新用戶沒有任務時顯示
+  if (isWelcomeMode && !isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        {/* Background Effects */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
+        </div>
+
+        {/* Minimal Header */}
+        <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
+          <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent">
+              Zentropy
+            </h1>
+            <button
+              onClick={() => router.push("/settings")}
+              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all"
+              title="設定"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Centered Welcome Content */}
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] px-4">
+          <div className="w-full max-w-xl text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Welcome Message */}
+            <div className="space-y-4">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <Sparkles className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-white">
+                嗨 {userName}！想到什麼就記下來
+              </h2>
+              <p className="text-lg text-white/60">
+                AI 會自動幫你分類、整理、安排時間
+              </p>
+            </div>
+
+            {/* Enlarged Input Area */}
+            <QuickCapture
+              userId={userId}
+              areas={areas}
+              welcomeMode={true}
+              onItemsCreated={async () => {
+                if (userId) {
+                  const authHeaders = await getAuthHeaders();
+                  const libraryRes = await fetch("/api/library", { headers: authHeaders });
+                  if (libraryRes.ok) {
+                    const libraryData = await libraryRes.json();
+                    setAreas(libraryData);
+                    setExpandedAreas(new Set(libraryData.map((a: ApiArea) => a.name)));
+                    // 離開歡迎模式，先顯示快速輸入引導
+                    setIsWelcomeMode(false);
+                    const guideShown = localStorage.getItem('quickInputGuideShown');
+                    if (!guideShown) {
+                      setTimeout(() => setShowQuickInputGuide(true), 500);
+                    } else {
+                      // 如果快速輸入引導已顯示過，直接顯示 AI 按鈕提示
+                      const tipShown = localStorage.getItem('aiButtonTipShown');
+                      if (!tipShown) {
+                        setTimeout(() => setShowAIButtonTip(true), 1500);
+                      }
+                    }
+                  }
+                }
+              }}
+            />
+
+            {/* Example Suggestions */}
+            <div className="space-y-3">
+              <p className="text-sm text-white/40">試試看：</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {[
+                  "下週要交報告",
+                  "買咖啡豆、洗衣精",
+                  "跟老闆討論專案進度",
+                ].map((example, i) => (
+                  <span
+                    key={i}
+                    className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-white/50"
+                  >
+                    「{example}」
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -2349,6 +2466,27 @@ function DashboardContent() {
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
         </div>
+
+        {/* Quick Input Guide - 優先顯示 */}
+        {showQuickInputGuide && (
+          <QuickInputGuide
+            onClose={() => {
+              setShowQuickInputGuide(false);
+              localStorage.setItem('quickInputGuideShown', 'true');
+              // 關閉快速輸入引導後，顯示 AI 按鈕提示
+              const tipShown = localStorage.getItem('aiButtonTipShown');
+              if (!tipShown) {
+                setTimeout(() => setShowAIButtonTip(true), 1000);
+              }
+            }}
+          />
+        )}
+
+        {/* AI Button Tip Toast */}
+        <AIButtonTip
+          show={showAIButtonTip}
+          onClose={() => setShowAIButtonTip(false)}
+        />
 
         {/* Header */}
         <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">

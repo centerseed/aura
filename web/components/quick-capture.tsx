@@ -126,6 +126,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   const [mentionStartPos, setMentionStartPos] = useState<number | null>(null);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // 追蹤輸入法組合狀態（注音選字等）
+  const [isComposing, setIsComposing] = useState(false);
 
   // 從 areas 提取所有 products（帶有 area 資訊）
   const allProducts = areas.flatMap(area =>
@@ -239,7 +241,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         );
         return;
       }
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey && !isComposing) {
         e.preventDefault();
         handleSelectProduct(filteredProducts[selectedMentionIndex]);
         return;
@@ -251,8 +253,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }
     }
 
-    // 一般的 Enter 送出
-    if (e.key === "Enter" && !e.shiftKey) {
+    // 一般的 Enter 送出（必須不在輸入法組合中）
+    if (e.key === "Enter" && !e.shiftKey && !isComposing) {
       e.preventDefault();
       handleSubmit();
     }
@@ -501,6 +503,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                   value={input}
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
+                  onCompositionStart={() => setIsComposing(true)}
+                  onCompositionEnd={() => {
+                    // 延遲設置以確保 keydown 事件先處理完
+                    setTimeout(() => setIsComposing(false), 0);
+                  }}
                   placeholder="輸入任何想法..."
                   disabled={isProcessing}
                   rows={4}
@@ -1195,6 +1202,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => {
+                // 延遲設置以確保 keydown 事件先處理完
+                setTimeout(() => setIsComposing(false), 0);
+              }}
               placeholder="輸入任何想法... 用 @ 快速指定專案"
               disabled={isProcessing}
               rows={3}
