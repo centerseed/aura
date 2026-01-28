@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { isValidUUID } from "@/domain/constants/validation";
+import type { Reference } from "@/domain/entities/task.entity";
+import { mergeReferences } from "@/application/use-cases/merge-references";
 
 interface ReorganizeProposal {
   product_id: string;
@@ -61,8 +64,7 @@ export async function POST(
 
     // 使用 Transaction 確保原子性 (設定 30 秒超時以處理大量 tasks)
     const result = await prisma.$transaction(async (tx) => {
-      // UUID 驗證正則表達式（統一定義）
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      // UUID 驗證（使用統一函數）
 
       // 1. 根據 proposed_clusters 創建或查找 Topics
       const topicMapping: Map<string, string> = new Map(); // cluster.topic_name -> topic.id
@@ -94,7 +96,7 @@ export async function POST(
         // 2. 批次更新該 cluster 中的所有 Tasks 的 topic_id
         // 過濾出有效的 task IDs
         const validTaskIds = cluster.task_ids.filter(taskId => {
-          if (!uuidRegex.test(taskId)) {
+          if (!isValidUUID(taskId)) {
             console.warn(`Invalid task_id in cluster: ${taskId}, skipping...`);
             return false;
           }
@@ -120,7 +122,7 @@ export async function POST(
       // 3. 根據 time_inferences 更新 Tasks 的時間相關欄位
       // ✅ Phase 2 優化：使用批次操作 + 獨立的 AI metadata 表
       const validInferenceTaskIds = proposal.time_inferences
-        .filter(inf => uuidRegex.test(inf.task_id))
+        .filter(inf => isValidUUID(inf.task_id))
         .map(inf => inf.task_id);
 
       if (validInferenceTaskIds.length > 0) {
@@ -139,7 +141,7 @@ export async function POST(
         // 3.2 批次更新時間欄位（每個 inference 單獨更新，因為值不同）
         // 但不再更新 ai_analysis JSON（改用獨立表）
         for (const inference of proposal.time_inferences) {
-          if (!uuidRegex.test(inference.task_id)) {
+          if (!isValidUUID(inference.task_id)) {
             console.warn(`Invalid task_id format: ${inference.task_id}, skipping...`);
             continue;
           }
@@ -159,7 +161,7 @@ export async function POST(
             updateData.due_date = new Date(inference.suggested_due_date);
           }
 
-          if (inference.inferred_from_milestone_id && uuidRegex.test(inference.inferred_from_milestone_id)) {
+          if (inference.inferred_from_milestone_id && isValidUUID(inference.inferred_from_milestone_id)) {
             updateData.inferred_from_milestone = inference.inferred_from_milestone_id;
           } else {
             updateData.inferred_from_milestone = null;
@@ -185,7 +187,7 @@ export async function POST(
         // 使用原生 SQL 的 ON CONFLICT 實現真正的批次操作
         const now = new Date();
         const metadataValues = proposal.time_inferences
-          .filter(inf => uuidRegex.test(inf.task_id) && taskMap.has(inf.task_id))
+          .filter(inf => isValidUUID(inf.task_id) && taskMap.has(inf.task_id))
           .map(inf => {
             return `(
               gen_random_uuid(),
@@ -217,14 +219,14 @@ export async function POST(
       if (proposal.task_consolidations && proposal.task_consolidations.length > 0) {
         for (const consolidation of proposal.task_consolidations) {
           // 驗證 parent_task_id 格式
-          if (!uuidRegex.test(consolidation.parent_task_id)) {
+          if (!isValidUUID(consolidation.parent_task_id)) {
             console.warn(`Invalid parent_task_id: ${consolidation.parent_task_id}, skipping consolidation...`);
             continue;
           }
 
           // 過濾並驗證 sub_task_ids
           const validSubTaskIds = consolidation.sub_task_ids.filter(id => {
-            if (!uuidRegex.test(id)) {
+            if (!isValidUUID(id)) {
               console.warn(`Invalid sub_task_id: ${id}, skipping...`);
               return false;
             }
@@ -264,43 +266,18 @@ export async function POST(
             order: idx,
           }));
 
-          // ✅ 合併所有 sub tasks 的 references 到 parent task
-          const parentReferences = ((parentTask as any).references as Array<{
-            id: string;
-            type: string;
-            content: string;
-            title?: string;
-          }>) || [];
+          // ✅ 合併所有 sub tasks 的 references 到 parent task（使用統一去重函數）
+          const parentReferences = ((parentTask as any).references as Reference[]) || [];
 
-          const mergedReferences = [...parentReferences];
-          const existingUrls = new Set(
-            parentReferences
-              .filter(ref => ref.type === "url")
-              .map(ref => ref.content.toLowerCase().trim())
-          );
-
-          // 合併所有 sub tasks 的 references
+          // 收集所有 sub tasks 的 references
+          const allSubReferences: Reference[] = [];
           for (const subTask of subTasks) {
-            const subReferences = ((subTask as any).references as Array<{
-              id: string;
-              type: string;
-              content: string;
-              title?: string;
-            }>) || [];
-
-            for (const ref of subReferences) {
-              if (ref.type === "url") {
-                const normalizedUrl = ref.content.toLowerCase().trim();
-                if (!existingUrls.has(normalizedUrl)) {
-                  mergedReferences.push(ref);
-                  existingUrls.add(normalizedUrl);
-                }
-              } else {
-                // note 型態：直接加入
-                mergedReferences.push(ref);
-              }
-            }
+            const subReferences = ((subTask as any).references as Reference[]) || [];
+            allSubReferences.push(...subReferences);
           }
+
+          // 使用統一的 mergeReferences 函數進行去重合併
+          const mergedReferences = mergeReferences(parentReferences, allSubReferences);
 
           // 計算所有 tasks 中最晚的 due_date (保守策略)
           const allDueDates = [parentTask.due_date, ...subTasks.map(t => t.due_date)]

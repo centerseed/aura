@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
-interface Reference {
-  id: string;
-  type: "url" | "note";
-  content: string;
-  title?: string | null;
-  created_at: string;
-}
+import type { Reference } from "@/domain/entities/task.entity";
+import { mergeReferences } from "@/application/use-cases/merge-references";
 
 // POST /api/tasks/[taskId]/merge-into - 將此 Task 合併為另一個 Task 的 sub-item
 export async function POST(
@@ -93,31 +87,10 @@ export async function POST(
     }
     // 如果只有目標有值或兩者都沒有，保持 targetStartDate（可能為 null）
 
-    // 合併 references（自動去重）
+    // 合併 references（使用統一去重函數）
     const sourceReferences = (sourceTask.references as unknown as Reference[]) || [];
     const targetReferences = (targetTask.references as unknown as Reference[]) || [];
-
-    // 建立去重的邏輯：URL 型態用 content 去重，note 型態保留所有（因為內容可能相同但語境不同）
-    const mergedReferences = [...targetReferences];
-    const existingUrls = new Set(
-      targetReferences
-        .filter(ref => ref.type === "url")
-        .map(ref => ref.content.toLowerCase().trim())
-    );
-
-    for (const ref of sourceReferences) {
-      if (ref.type === "url") {
-        // URL 型態：檢查是否重複
-        const normalizedUrl = ref.content.toLowerCase().trim();
-        if (!existingUrls.has(normalizedUrl)) {
-          mergedReferences.push(ref);
-          existingUrls.add(normalizedUrl);
-        }
-      } else {
-        // note 型態：直接加入（保留所有備註）
-        mergedReferences.push(ref);
-      }
-    }
+    const mergedReferences = mergeReferences(targetReferences, sourceReferences);
 
     // 使用 transaction 確保原子性
     await prisma.$transaction([

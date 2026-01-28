@@ -4,6 +4,7 @@ import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { isValidUUID } from "@/domain/constants/validation";
 
 // Sub-item 結構
 const SubItemSchema = z.object({
@@ -161,135 +162,72 @@ export async function POST(request: NextRequest) {
     const { object: result } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: StructureResultSchema,
-      prompt: `你是 Zentropy 的圖書管理員 AI，負責將用戶的輸入「歸檔」成結構化的 Task 卡片。
+      prompt: `你是任務記錄專家。將用戶輸入轉成結構化的 Task。
 
-## ⚠️ 最重要原則：資訊保真度 (Information Fidelity)
+# 核心原則
 
-**你的核心職責是「完整記錄」，不是「簡化」或「執行」。**
+## 1. 完整記錄
+問自己：**「把輸出念給用戶聽，用戶會說『你漏了 X』嗎？」**
+- 會 → 你漏了東西，補上
+- 不會 → OK
 
-### 絕對禁止的行為：
-1. ❌ **刪減用戶提到的事項** - 用戶說 A,B,C,D,E，你必須全部記錄，不可只留 A,B,C
-2. ❌ **用系統推斷覆蓋用戶明示** - 用戶說「今天」，絕不可因為 milestone 改成「三天後」
-3. ❌ **過度摘要** - 「跟小明談 A,B,C」不可變成「與小明討論」
-4. ❌ **忽略條件/前提** - 「等報價後再決定」不可變成「決定 X」
+所有細節都要保留：
+- 用戶提到的每個事項 → 放入 sub_items 或 narrative
+- 用戶提到的條件/前提 → 放入 narrative
+- 用戶提到的人名/專案名 → 保留原文
 
-### 正確做法：
-- 用戶提到的每個事項都要保留（可用 sub_items 展開）
-- 用戶明確說的時間詞彙優先於系統推斷
-- narrative 要保留用戶提到的所有細節和上下文
+## 2. Sub-items 拆分
+問自己：**「用戶說的這些事，可以分別勾掉嗎？」**
+- 可以分別勾掉 → 拆成 sub_items
+- 不能分別勾掉 → 放在 narrative
 
-## Sub-items 拆分規則（非常重要）:
+## 3. Product 選擇
+問自己：**「這個新任務和哪個 Product 的現有任務最像？」**
+- 看每個 Product 下的「最近任務」
+- 選擇任務類型最相似的 Product
+- 只有完全無關時才創建新 Product
 
-當用戶輸入包含**多個可獨立完成的步驟或項目**時，應拆成 sub_items。**這是保證資訊不丟失的關鍵機制。**
+Topic：優先使用該 Product 已有的 Topics，無法確定則填 ""
 
-**觸發條件（滿足任一即可）**：
-- 有列舉標記：1) 2) 3)、一二三、• - [ ] 等
-- 有並列結構：「A、B、C」「A 和 B 和 C」「A 跟 B 跟 C」
-- 有動詞序列：「要做 A、做 B、做 C」
-- 有順序暗示：「先...然後...最後...」「首先...接著...」
-- 語意上是「多件可分別勾掉的事」
+## 4. 時間推斷
+問自己：**「用戶有明確說時間嗎？」**
 
-**範例**：
-- 「準備報告要蒐集數據分析結果寫摘要」→ title=「準備報告」, sub_items=[蒐集數據, 分析結果, 寫摘要]
-- 「今天要開會寫文件回郵件」→ title=「今日待辦」, sub_items=[開會, 寫文件, 回郵件]
-- 「跟小明談 A 專案進度，他說 delay 因為 B 問題，另外 C 也卡住，D 要先確認，E 下週再說」→ title=「A 專案進度討論」, sub_items=[B 問題導致 delay, C 卡住, D 需先確認, E 下週處理], narrative 保留完整對話脈絡
+| 優先級 | 情況 | source_type | confidence |
+|--------|------|-------------|------------|
+| 最高 | 用戶說「今天」「明天」「週五」「1/30」 | explicit | 1.0 |
+| 次高 | 用戶說「盡快」「有空時」 | inferred_from_context | 0.7-0.9 |
+| 最低 | 從 Milestone 推斷 | inferred_from_system | 0.3-0.7 |
 
-**不拆分的情況**：
-- 只有單一事項：「明天開會」→ 不拆
-- 內容是描述而非任務：「這個功能的優點是快速和穩定」→ 不拆
+用戶明確說的時間，絕對優先於系統推斷。
 
-## Product 選擇原則（核心）
-
-你會看到用戶現有的結構：Area > Product > 最近任務列表。
-
-**選擇方法**：
-1. 看每個 Product 下的「最近任務」列表
-2. 根據這些任務的內容，理解這個 Product 是在處理什麼類型的事務
-3. 判斷新輸入與哪個 Product 的任務屬於同類型的事務
-4. 選擇最匹配的 Product
-
-**優先使用現有結構**：只有當所有現有 Product 都與新輸入的事務類型無關時，才創建新的 Product 或 Area。
-
-**Topic**：優先使用該 Product 已有的 Topics，若無法確定則填空字串 ""
-
-**Drawer 狀態**：
+## 5. Drawer 狀態
 - INBOX: 未處理，需要關注
 - ACTIVE: 正在進行中
 - MAINTAIN: 穩定維護中
 - REFERENCE: 參考資料
-- ARCHIVE: 已完成或棄用
+- ARCHIVE: 已完成
+
+---
+
+# 背景資訊
+
+今天：${now.toLocaleDateString("zh-TW")} (星期${['日', '一', '二', '三', '四', '五', '六'][now.getDay()]})
 
 ${contextSummary}
 
-## 用戶輸入（請將此內容歸檔為 Task）:
+---
+
+# 用戶輸入
+
 ${text}
 
-## ⏰ 時間推斷指示（Explicit > Inferred 原則）
+---
 
-今天日期是 **${now.toLocaleDateString("zh-TW")} (星期${['日', '一', '二', '三', '四', '五', '六'][now.getDay()]})**。
-
-### 【最高優先級】用戶明確指定的時間 (source_type = "explicit")
-
-如果用戶輸入包含以下時間詞彙，**必須使用該時間，不可被其他推斷覆蓋**：
-- 「今天」「今日」→ 今天的日期
-- 「明天」「明日」→ 明天的日期
-- 「後天」→ 後天的日期
-- 「週X」「禮拜X」「星期X」→ 本週的星期X（如果該日期已過則指下週）
-- 「下週X」「下禮拜X」→ 下週的星期X
-- 「X號」「X日」「X/X」→ 指定日期
-- 「月底」「月底前」→ 當月最後一天
-- 「這週」「本週」→ 本週五
-
-設定：
-- due_date_source.source_type = "explicit"
-- due_date_source.confidence = 1.0
-- due_date_source.reasoning = "用戶明確指定「XXX」"
-
-### 【次要優先級】從輸入上下文推斷 (source_type = "inferred_from_context")
-
-如果用戶提到相對時間暗示但沒有明確日期：
-- 「等開完會後」「收到報價後」「A 完成後」
-- 「盡快」「儘早」→ 3 天內
-- 「有空時」「之後」→ 7 天內
-
-設定：
-- due_date_source.source_type = "inferred_from_context"
-- due_date_source.confidence = 0.7-0.9
-- due_date_source.reasoning = 說明推斷邏輯
-
-### 【最低優先級】從系統 Milestone 推斷 (source_type = "inferred_from_system")
-
-**只有在用戶沒有提到任何時間詞彙時**，才從 Milestone 推斷：
-- 設定 due_date 為 Milestone target_date 前 3-7 天
-- 設定 inferred_from_milestone 為該 Milestone 的 ID
-- due_date_source.source_type = "inferred_from_system"
-- due_date_source.confidence = 0.3-0.7
-- due_date_source.reasoning = "從 Milestone「XXX」推斷"
-
-### 無關聯情況
-如果沒有任何時間線索，也沒有相關 Milestone：
-- ACTIVE drawer → 7 天內
-- INBOX drawer → 14 天內
-- MAINTAIN drawer → 30 天內
-- REFERENCE drawer → 不設定 due_date
-- due_date_source.source_type = "inferred_from_system"
-- due_date_source.confidence = 0.2-0.4
-
-## 歸檔步驟：
-
-1. **理解用戶意圖**：用戶這次想做什麼事？
-2. **分析現有 Product**：看每個 Product 的「最近任務」列表，這個 Product 是在處理什麼類型的事務？
-3. **選擇匹配的 Product**：選擇與用戶意圖屬於同類型事務的 Product
-4. **處理時間**：用戶明確說的時間優先，其次從上下文推斷，最後從 Milestone 推斷
-5. **完整記錄**：確保 narrative 和 sub_items 保留用戶提到的所有內容
-
-**輸出格式**：
-- tag.topic：字串，無法確定則填 ""
+# 輸出格式
+- 使用繁體中文
 - due_date：ISO 8601 格式（例如：2026-01-30T00:00:00+08:00）
-- due_date_source：標記時間來源 explicit/inferred_from_context/inferred_from_system
-- time_reasoning：繁體中文說明時間推斷理由
-- reasoning：繁體中文說明選擇這個 Product 的理由（看了哪些 Product 的任務，為何選擇這個）
-- sub_items：多個事項時全部拆分，完整記錄`,
+- tag.topic：字串，無法確定則填 ""
+- reasoning：說明選擇這個 Product 的理由`,
     });
 
     // 持久化到資料庫（優化：使用記憶體快取減少重複查詢）
@@ -408,8 +346,7 @@ ${text}
       }
 
       // 驗證 inferred_from_milestone 是否為有效 UUID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const validMilestoneId = item.inferred_from_milestone && uuidRegex.test(item.inferred_from_milestone)
+      const validMilestoneId = item.inferred_from_milestone && isValidUUID(item.inferred_from_milestone)
         ? item.inferred_from_milestone
         : null;
 

@@ -1,7 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2 } from "lucide-react";
+import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { TaskCard, SubItem, Reference } from "@/types";
 
 interface TaskDetailModalProps {
@@ -16,10 +35,107 @@ interface TaskDetailModalProps {
   onAddSubItem?: (taskId: string, content: string) => void;
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
+  onReorderSubItems?: (taskId: string, subItemIds: string[]) => Promise<void>;
   onAddReference?: (taskId: string, type: "url" | "note", content: string, title?: string) => Promise<void>;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onComplete?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
+}
+
+// 可拖拽的子項目組件
+function SortableSubItem({
+  item,
+  onToggle,
+  onEdit,
+  onDelete,
+  isEditing,
+  onStartEdit,
+}: {
+  item: SubItem;
+  onToggle: (id: string, completed: boolean) => void;
+  onEdit: (id: string, content: string) => void;
+  onDelete: (id: string) => void;
+  isEditing: boolean;
+  onStartEdit: (id: string, content: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const [editContent, setEditContent] = useState(item.content);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group flex items-center gap-2 ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-1"
+      >
+        <GripVertical className="w-4 h-4 text-white/20 group-hover:text-white/40" />
+      </div>
+
+      {isEditing ? (
+        <input
+          type="text"
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          onBlur={() => onEdit(item.id, editContent)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onEdit(item.id, editContent);
+            if (e.key === "Escape") setEditContent(item.content);
+          }}
+          autoFocus
+          className="flex-1 px-3 py-2 text-sm rounded-lg border border-indigo-400/50 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
+        />
+      ) : (
+        <>
+          <button
+            onClick={() => onToggle(item.id, !item.completed)}
+            className="flex items-center gap-3 flex-1 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left"
+          >
+            {item.completed ? (
+              <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
+            ) : (
+              <Circle className="w-5 h-5 text-white/30 shrink-0" />
+            )}
+            <span
+              className={`text-sm ${
+                item.completed
+                  ? "line-through text-white/40"
+                  : "text-white/80"
+              }`}
+            >
+              {item.content}
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              onStartEdit(item.id, item.content);
+            }}
+            className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-white/10 text-white/60 hover:text-indigo-300 transition-all"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onDelete(item.id)}
+            className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function TaskDetailModal({
@@ -34,6 +150,7 @@ export function TaskDetailModal({
   onAddSubItem,
   onDeleteSubItem,
   onEditSubItem,
+  onReorderSubItems,
   onAddReference,
   onDeleteReference,
   onComplete,
@@ -53,12 +170,23 @@ export function TaskDetailModal({
   const [newRefContent, setNewRefContent] = useState("");
   const [newRefTitle, setNewRefTitle] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [subItems, setSubItems] = useState<SubItem[]>(task.sub_items || []);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // 拖拽設置
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // 同步 task prop 的變化
   useEffect(() => {
     setTitle(task.title);
     setNarrative(task.narrative || "");
-  }, [task.title, task.narrative, task.start_date, task.due_date, task.id]);
+    setSubItems(task.sub_items || []);
+  }, [task.title, task.narrative, task.start_date, task.due_date, task.id, task.sub_items]);
 
   if (!isOpen) return null;
 
@@ -105,6 +233,35 @@ export function TaskDetailModal({
       console.error("Failed to add reference:", error);
     } finally {
       setIsSubmittingReference(false);
+    }
+  };
+
+  // 拖拽事件處理
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = subItems.findIndex((item) => item.id === active.id);
+      const newIndex = subItems.findIndex((item) => item.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newSubItems = arrayMove(subItems, oldIndex, newIndex);
+        setSubItems(newSubItems);
+
+        // 調用回調函數以保存新順序
+        try {
+          await onReorderSubItems?.(task.id, newSubItems.map((item) => item.id));
+        } catch (error) {
+          console.error("Failed to reorder sub-items:", error);
+          // 恢復原始順序
+          setSubItems(task.sub_items || []);
+        }
+      }
     }
   };
 
@@ -238,111 +395,88 @@ export function TaskDetailModal({
                 </div>
               )}
 
-              <div className="space-y-2">
-                {task.sub_items && task.sub_items.length > 0 ? (
-                  task.sub_items.map((item) => (
-                    <div key={item.id} className="group flex items-center gap-2">
-                      {editingSubItemId === item.id ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={subItems.map((item) => item.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {subItems && subItems.length > 0 ? (
+                      subItems.map((item) => (
+                        <SortableSubItem
+                          key={item.id}
+                          item={item}
+                          onToggle={(id, completed) => onToggleSubItem?.(task.id, id, completed)}
+                          onEdit={(id, content) => {
+                            onEditSubItem?.(task.id, id, content);
+                            setEditingSubItemId(null);
+                            setEditSubItemContent("");
+                          }}
+                          onDelete={(id) => onDeleteSubItem?.(task.id, id)}
+                          onStartEdit={(id, content) => {
+                            setEditingSubItemId(id);
+                            setEditSubItemContent(content);
+                          }}
+                          isEditing={editingSubItemId === item.id}
+                        />
+                      ))
+                    ) : (
+                      <p className="text-sm text-white/40 italic px-3 py-2">尚無待辦事項</p>
+                    )}
+
+                    {/* Add Sub-item */}
+                    {isAddingSubItem ? (
+                      <div className="flex items-center gap-2 pt-2">
                         <input
                           type="text"
-                          value={editSubItemContent}
-                          onChange={(e) => setEditSubItemContent(e.target.value)}
-                          onBlur={() => handleEditSubItem(item.id)}
+                          value={newSubItemContent}
+                          onChange={(e) => setNewSubItemContent(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") handleEditSubItem(item.id);
+                            if (e.key === "Enter") handleAddSubItem();
                             if (e.key === "Escape") {
-                              setEditingSubItemId(null);
-                              setEditSubItemContent("");
+                              setIsAddingSubItem(false);
+                              setNewSubItemContent("");
                             }
                           }}
+                          placeholder="輸入待辦事項..."
                           autoFocus
-                          className="flex-1 px-3 py-2 text-sm rounded-lg border border-indigo-400/50 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
+                          className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50"
                         />
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => onToggleSubItem?.(task.id, item.id, !item.completed)}
-                            className="flex items-center gap-3 flex-1 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left"
-                          >
-                            {item.completed ? (
-                              <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
-                            ) : (
-                              <Circle className="w-5 h-5 text-white/30 shrink-0" />
-                            )}
-                            <span className={`text-sm ${item.completed ? "line-through text-white/40" : "text-white/80"}`}>
-                              {item.content}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingSubItemId(item.id);
-                              setEditSubItemContent(item.content);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-white/10 text-white/60 hover:text-indigo-300 transition-all"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteSubItem?.(task.id, item.id)}
-                            className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-white/40 italic px-3 py-2">尚無待辦事項</p>
-                )}
-
-                {/* Add Sub-item */}
-                {isAddingSubItem ? (
-                  <div className="flex items-center gap-2 pt-2">
-                    <input
-                      type="text"
-                      value={newSubItemContent}
-                      onChange={(e) => setNewSubItemContent(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddSubItem();
-                        if (e.key === "Escape") {
-                          setIsAddingSubItem(false);
-                          setNewSubItemContent("");
-                        }
-                      }}
-                      placeholder="輸入待辦事項..."
-                      autoFocus
-                      className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50"
-                    />
-                    <button
-                      onClick={handleAddSubItem}
-                      className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors"
-                    >
-                      新增
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsAddingSubItem(false);
-                        setNewSubItemContent("");
-                      }}
-                      className="px-4 py-2 text-sm font-medium rounded-lg bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
-                    >
-                      取消
-                    </button>
+                        <button
+                          onClick={handleAddSubItem}
+                          className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors"
+                        >
+                          新增
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsAddingSubItem(false);
+                            setNewSubItemContent("");
+                          }}
+                          className="px-4 py-2 text-sm font-medium rounded-lg bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setIsAddingSubItem(true)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-white/20 text-white/60 hover:border-indigo-400/50 hover:text-white/80 hover:bg-white/5 transition-all mt-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        新增待辦事項
+                      </button>
+                    )}
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setIsAddingSubItem(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-white/20 text-white/60 hover:border-indigo-400/50 hover:text-white/80 hover:bg-white/5 transition-all mt-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    新增待辦事項
-                  </button>
-                )}
-              </div>
+                </SortableContext>
+              </DndContext>
             </div>
           </div>
-
 
           {/* Right Column - References */}
           <div className="w-96 border-l border-white/10 overflow-y-auto p-6 bg-white/5">

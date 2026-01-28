@@ -1,238 +1,51 @@
-// ===== Domain Types =====
+/**
+ * Type Re-exports - 類型重新導出
+ *
+ * 此文件將 domain 層的類型重新導出，保持向下兼容
+ * 所有新代碼應該直接從 domain 層導入，但舊代碼仍可從 @/types 導入
+ *
+ * 遷移路徑：
+ * 舊代碼: import { Task } from '@/types'
+ * 新代碼: import { Task } from '@/domain/entities/task.entity'
+ */
 
-export type DrawerStatus =
-  | "INBOX"
-  | "ACTIVE"
-  | "MAINTAIN"
-  | "REFERENCE"
-  | "ARCHIVE";
+// ===== Value Objects =====
+export type { DrawerStatus } from '../domain/value-objects/drawer-status'
+export type { LifecycleStatus } from '../domain/value-objects/lifecycle'
 
-export type LifecycleStatus =
-  | "embryo"
-  | "active"
-  | "mature"
-  | "dormant";
+// ===== Entities =====
 
-// L1: Area (身分)
-export interface Area {
-  id: string;
-  user_id: string;
-  name: string;
-  scope: string | null;
-  description: string | null;
-  is_custom: boolean;
-  created_at: string;
-}
+// Task 相關實體
+export type {
+  Task,
+  SubItem,
+  SubItemsMeta,
+  Reference,
+  Topic,
+  TaskTag,
+  TaskCard,
+  KanbanColumn,
+  StructuredOutput,
+} from '../domain/entities/task.entity'
 
-// L2: Product (資產)
-export interface Product {
-  id: string;
-  user_id: string;
-  area_id: string;
-  name: string;
-  description: string | null;
-  created_at: string;
-  // Relations
-  area?: Area;
-}
+// Product 相關實體
+export type {
+  Area,
+  Product,
+  TopicCluster,
+  TaskTimeInference,
+  TaskConsolidation,
+  TaskContext,
+  ReorganizeProposal,
+  GovernanceAction,
+} from '../domain/entities/product.entity'
 
-// L3: Topic (主題模組)
-export interface Topic {
-  id: string;
-  user_id: string;
-  product_id: string;
-  name: string;
-  created_at: string;
-  // Relations
-  product?: Product;
-}
+// Milestone 相關實體
+export type {
+  Milestone,
+  MilestoneStatus,
+  EntityType,
+} from '../domain/entities/milestone.entity'
 
-// Sub-item (待辦清單項目)
-export interface SubItem {
-  id: string;
-  content: string;
-  completed: boolean;
-  created_at: string;
-  completed_at: string | null;
-  order: number;
-}
-
-export interface SubItemsMeta {
-  total: number;
-  completed: number;
-  completion_rate: number;  // 0.0-1.0
-}
-
-// Reference (參考資料)
-export interface Reference {
-  id: string;
-  type: "url" | "note";
-  content: string;
-  title?: string | null;
-  created_at: string;
-}
-
-// Task (任務)
-export interface Task {
-  id: string;
-  user_id: string;
-  product_id: string;
-  topic_id: string | null;
-  content: string;
-  status: DrawerStatus;
-  lifecycle: LifecycleStatus;
-  ai_analysis: {
-    narrative?: string;
-    strategy_used?: string;
-    reasoning?: string;
-    merged_items?: string[];
-    sub_items?: SubItem[];  // 新增
-    sub_items_meta?: SubItemsMeta;  // 新增
-  };
-  references: Reference[];  // 新增: 參考資料
-  created_at: string;
-  updated_at: string;
-  // Relations
-  product?: Product;
-  topic?: Topic;
-}
-
-// ===== UI Types =====
-
-export type MilestoneStatus =
-  | "planned"
-  | "in_progress"
-  | "completed"
-  | "delayed"
-  | "cancelled";
-
-export type EntityType = "AREA" | "PRODUCT" | "TOPIC";
-
-export interface Milestone {
-  id: string;
-  user_id: string;
-  name: string;
-  target_date: string;
-  status: MilestoneStatus;
-  entity_type: EntityType;
-  entity_id: string;
-  priority: number;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-  // 關聯實體 (根據 entity_type 其中一個會有值)
-  product?: { id: string; name: string } | null;
-  area?: { id: string; name: string } | null;
-  topic?: { id: string; name: string } | null;
-}
-
-export interface TaskTag {
-  area: string;
-  product: string;
-  topic: string;
-}
-
-export interface TaskCard {
-  id: string;
-  title: string;
-  narrative: string | null;
-  drawer: DrawerStatus;
-  lifecycle: LifecycleStatus;
-  tag: TaskTag;
-  strategy_used: string | null;
-  reasoning: string | null;
-  start_date?: string | null;
-  due_date?: string | null;
-  time_confidence?: number | null;
-  inferred_from_milestone?: string | null;
-  // 新增: Sub-items support
-  sub_items?: SubItem[];
-  sub_items_meta?: SubItemsMeta;
-  // 新增: References support
-  references?: Reference[];
-  // ai_analysis 完整結構
-  ai_analysis?: {
-    narrative?: string;
-    strategy_used?: string;
-    reasoning?: string;
-    merged_items?: string[];
-    sub_items?: SubItem[];
-    sub_items_meta?: SubItemsMeta;
-  };
-}
-
-// Kanban Column 結構
-export interface KanbanColumn {
-  id: string;
-  title: string;
-  tasks: TaskCard[];
-}
-
-// ===== AI Types =====
-
-export interface StructuredOutput {
-  items: Array<{
-    title: string;
-    narrative: string;
-    drawer: DrawerStatus;
-    lifecycle: LifecycleStatus;
-    tag: TaskTag;
-    strategy_used: string;
-    reasoning: string;
-  }>;
-}
-
-export interface GovernanceAction {
-  action_type: string;
-  target_id?: string;
-  old_name?: string;
-  new_name?: string;
-  target_area?: string;
-  context?: string;
-}
-
-// ===== Product Reorganization Types =====
-
-export interface TopicCluster {
-  topic_name: string;
-  description: string;
-  task_ids: string[];
-  confidence: number;
-}
-
-export interface TaskTimeInference {
-  task_id: string;
-  suggested_due_date: string | null;
-  inferred_from_milestone_id: string | null;
-  time_confidence: number;
-  urgency_level: "critical" | "high" | "medium" | "low";
-  reasoning: string;
-}
-
-export interface TaskConsolidation {
-  parent_task_id: string;
-  sub_task_ids: string[];
-  consolidated_title: string;
-  consolidated_narrative: string;
-  reasoning: string;
-  confidence: number;
-}
-
-export interface TaskContext {
-  id: string;
-  title: string;
-  current_topic: string;
-  current_due_date: string | null;
-}
-
-export interface ReorganizeProposal {
-  product_id: string;
-  product_name: string;
-  current_topics: string[];
-  current_topic_count?: number;
-  proposed_clusters: TopicCluster[];
-  time_inferences: TaskTimeInference[];
-  task_consolidations?: TaskConsolidation[];
-  tasks_context?: TaskContext[];
-  reasoning: string;
-}
+// ===== Validation =====
+export { UUID_PATTERN, isValidUUID, validateUUID } from '../domain/constants/validation'

@@ -54,7 +54,15 @@ import {
   FileText,
   Trash2,
 } from "lucide-react";
-import type { TaskCard, DrawerStatus } from "@/types";
+import type {
+  TaskCard,
+  DrawerStatus,
+  Milestone,
+  SubItem,
+  Reference,
+  ReorganizeProposal,
+  EntityType,
+} from "@/types";
 import { QuickCapture } from "@/components/quick-capture";
 import { AIButtonTip } from "@/components/ai-button-tip";
 import { QuickInputGuide } from "@/components/quick-input-guide";
@@ -709,8 +717,8 @@ function DroppableProduct({
   productStatus: string;
   tasks: TaskCard[];
   isOver: boolean;
-  milestones: any[];
-  onEditMilestone: (milestone?: any) => void;
+  milestones: Milestone[];
+  onEditMilestone: (milestone?: Milestone | Partial<Milestone>) => void;
   areaId: string;
   onSetDueDate?: (task: TaskCard) => void;
   onComplete?: (taskId: string) => void;
@@ -752,7 +760,7 @@ function DroppableProduct({
   // 篩選此 Product 的所有里程碑（支援多個，排除已過期）
   const productMilestones = milestones
     .filter((m) => m.entity_type === "PRODUCT" && m.entity_id === productId)
-    .filter((m) => m.status !== "COMPLETED" && m.status !== "CANCELLED")
+    .filter((m) => m.status !== "completed" && m.status !== "cancelled")
     .filter((m) => {
       // 排除已過期的 milestone
       const daysRemaining = Math.ceil(
@@ -985,7 +993,7 @@ function DashboardContent() {
   const [areas, setAreas] = useState<ApiArea[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("User");
-  const [milestones, setMilestones] = useState<any[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -994,7 +1002,7 @@ function DashboardContent() {
   const [activeProduct, setActiveProduct] = useState<{ id: string; name: string } | null>(null);
   const [overDropId, setOverDropId] = useState<string | null>(null);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
-  const [editingMilestone, setEditingMilestone] = useState<any | null>(null);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedAreaForProduct, setSelectedAreaForProduct] = useState<{ id: string; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<{ id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string } | null>(null);
@@ -1017,11 +1025,11 @@ function DashboardContent() {
   } | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [isReorganizeModalOpen, setIsReorganizeModalOpen] = useState(false);
-  const [reorganizeProposal, setReorganizeProposal] = useState<any | null>(null);
+  const [reorganizeProposal, setReorganizeProposal] = useState<ReorganizeProposal | null>(null);
   const [isReorganizing, setIsReorganizing] = useState(false);
   const [isApplying, setIsApplying] = useState(false); // 新增: applying 狀態
   const [reorganizingProductId, setReorganizingProductId] = useState<string | null>(null);
-  const proposalCacheRef = useRef<Map<string, any>>(new Map()); // 快取 proposal by productId
+  const proposalCacheRef = useRef<Map<string, ReorganizeProposal>>(new Map()); // 快取 proposal by productId
   const [isRestoring, setIsRestoring] = useState(false); // 還原中狀態
   const [lastReorganizedProductId, setLastReorganizedProductId] = useState<string | null>(null); // 記錄最後重組的 product
 
@@ -1665,7 +1673,7 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.filter((task: any) => task.id !== taskId) || []
+            tasks: product.tasks?.filter((task: TaskCard) => task.id !== taskId) || []
           })) || []
         }));
       });
@@ -1831,12 +1839,12 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: any) => {
+            tasks: product.tasks?.map((task: TaskCard) => {
               if (task.id === taskId && task.sub_items) {
-                const updatedSubItems = task.sub_items.map((item: any) =>
+                const updatedSubItems = task.sub_items.map((item: SubItem) =>
                   item.id === subItemId ? { ...item, completed } : item
                 );
-                const completedCount = updatedSubItems.filter((item: any) => item.completed).length;
+                const completedCount = updatedSubItems.filter((item: SubItem) => item.completed).length;
                 const total = updatedSubItems.length;
 
                 const updatedTask = {
@@ -1911,13 +1919,13 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: any) => {
+            tasks: product.tasks?.map((task: TaskCard) => {
               if (task.id === taskId && task.sub_items) {
-                const updatedSubItems = task.sub_items.filter((item: any) => item.id !== subItemId);
-                const completedCount = updatedSubItems.filter((item: any) => item.completed).length;
+                const updatedSubItems = task.sub_items.filter((item: SubItem) => item.id !== subItemId);
+                const completedCount = updatedSubItems.filter((item: SubItem) => item.completed).length;
                 const total = updatedSubItems.length;
 
-                return {
+                const updatedTask = {
                   ...task,
                   sub_items: updatedSubItems,
                   sub_items_meta: {
@@ -1926,6 +1934,13 @@ function DashboardContent() {
                     completion_rate: total > 0 ? completedCount / total : 0
                   }
                 };
+
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+
+                return updatedTask;
               }
               return task;
             }) || []
@@ -1965,16 +1980,23 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: any) => {
+            tasks: product.tasks?.map((task: TaskCard) => {
               if (task.id === taskId && task.sub_items) {
-                const updatedSubItems = task.sub_items.map((item: any) =>
+                const updatedSubItems = task.sub_items.map((item: SubItem) =>
                   item.id === subItemId ? { ...item, content: newContent } : item
                 );
 
-                return {
+                const updatedTask = {
                   ...task,
                   sub_items: updatedSubItems,
                 };
+
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+
+                return updatedTask;
               }
               return task;
             }) || []
@@ -2036,13 +2058,13 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: any) => {
+            tasks: product.tasks?.map((task: TaskCard) => {
               if (task.id === taskId) {
                 const updatedSubItems = [...(task.sub_items || []), newSubItem];
-                const completedCount = updatedSubItems.filter((item: any) => item.completed).length;
+                const completedCount = updatedSubItems.filter((item: SubItem) => item.completed).length;
                 const total = updatedSubItems.length;
 
-                return {
+                const updatedTask = {
                   ...task,
                   sub_items: updatedSubItems,
                   sub_items_meta: {
@@ -2051,6 +2073,13 @@ function DashboardContent() {
                     completion_rate: total > 0 ? completedCount / total : 0
                   }
                 };
+
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+
+                return updatedTask;
               }
               return task;
             }) || []
@@ -2067,6 +2096,57 @@ function DashboardContent() {
           setAreas(libraryData);
         }
       }
+    }
+  };
+
+  // 重新排序 sub-items
+  const handleReorderSubItems = async (taskId: string, subItemIds: string[]) => {
+    try {
+      // API call
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/tasks/${taskId}/sub-items`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ sub_item_ids: subItemIds }),
+      });
+
+      if (!res.ok) {
+        throw new Error("重新排序失敗");
+      }
+
+      const result = await res.json();
+
+      // 更新 UI
+      setAreas(prevAreas => {
+        return prevAreas.map(area => ({
+          ...area,
+          products: area.products?.map(product => ({
+            ...product,
+            tasks: product.tasks?.map((task: TaskCard) => {
+              if (task.id === taskId) {
+                const updatedTask = {
+                  ...task,
+                  sub_items: result.sub_items,
+                  sub_items_meta: result.sub_items_meta,
+                };
+
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+
+                return updatedTask;
+              }
+              return task;
+            }) || []
+          })) || []
+        }));
+      });
+    } catch (err) {
+      console.error("Failed to reorder sub-items:", err);
     }
   };
 
@@ -2097,7 +2177,7 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: any) => {
+            tasks: product.tasks?.map((task: TaskCard) => {
               if (task.id === taskId) {
                 const updatedTask = {
                   ...task,
@@ -2138,11 +2218,11 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: any) => {
+            tasks: product.tasks?.map((task: TaskCard) => {
               if (task.id === taskId) {
                 const updatedTask = {
                   ...task,
-                  references: (task.references || []).filter((ref: any) => ref.id !== referenceId)
+                  references: (task.references || []).filter((ref: Reference) => ref.id !== referenceId)
                 };
                 // 同時更新 selectedTask
                 if (selectedTask?.id === taskId) {
@@ -2269,7 +2349,7 @@ function DashboardContent() {
 
     setIsApplying(true); // ✅ 開始 applying loading
     try {
-      const res = await fetch(`/api/products/${reorganizeProposal.productId}/apply-reorganization`, {
+      const res = await fetch(`/api/products/${reorganizeProposal.product_id}/apply-reorganization`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2284,10 +2364,10 @@ function DashboardContent() {
       }
 
       // 成功後清除該 product 的 proposal 快取
-      proposalCacheRef.current.delete(reorganizeProposal.productId);
+      proposalCacheRef.current.delete(reorganizeProposal.product_id);
 
       // ✅ 記錄最後重組的 product ID（用於還原功能）
-      setLastReorganizedProductId(reorganizeProposal.productId);
+      setLastReorganizedProductId(reorganizeProposal.product_id);
 
       // 重新載入數據
       const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
@@ -2827,15 +2907,15 @@ function DashboardContent() {
                               milestones={milestones}
                               areaId={area.id}
                               onEditMilestone={(milestone) => {
-                                if (milestone?.id) {
-                                  // 編輯現有里程碑
-                                  setEditingMilestone(milestone);
+                                if (milestone && 'id' in milestone && milestone.id) {
+                                  // 編輯現有里程碑（完整的 Milestone）
+                                  setEditingMilestone(milestone as Milestone);
                                 } else if (milestone?.entity_id) {
                                   // 新增里程碑（預填 entity 信息）
                                   setEditingMilestone({
                                     entity_type: milestone.entity_type,
                                     entity_id: milestone.entity_id,
-                                  });
+                                  } as Milestone);
                                 } else {
                                   // 新增空白里程碑
                                   setEditingMilestone(null);
@@ -3028,8 +3108,8 @@ function DashboardContent() {
                   // 同步更新 selectedTask（如果打開了詳情 modal）
                   if (selectedTask) {
                     const updatedTask = libraryData
-                      .flatMap((a: any) => a.products.flatMap((p: any) => p.tasks))
-                      .find((t: any) => t.id === selectedTask.id);
+                      .flatMap((a: ApiArea) => a.products.flatMap((p: ApiProduct) => p.tasks))
+                      .find((t: TaskCard) => t.id === selectedTask.id);
                     if (updatedTask) {
                       setSelectedTask(updatedTask);
                     }
@@ -3084,6 +3164,7 @@ function DashboardContent() {
             onAddSubItem={handleAddSubItem}
             onDeleteSubItem={handleDeleteSubItem}
             onEditSubItem={handleEditSubItem}
+            onReorderSubItems={handleReorderSubItems}
             onAddReference={handleAddReference}
             onDeleteReference={handleDeleteReference}
             onComplete={handleCompleteTask}

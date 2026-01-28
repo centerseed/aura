@@ -254,13 +254,60 @@ export function ReorganizeModal({
 
           {/* 整合提示 */}
           {hasConsolidations && (
-            <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/20">
-              <div className="flex items-center gap-2 text-sm text-indigo-200">
-                <Layers className="w-4 h-4" />
-                <span>
-                  {proposal.task_consolidations!.length} 組任務將整合為待辦清單
-                </span>
-              </div>
+            <div className="space-y-3">
+              {proposal.task_consolidations!.map((consolidation, idx) => {
+                // 取得主任務和子任務的標題
+                const parentTask = taskContextMap.get(consolidation.parent_task_id);
+                const subTasks = consolidation.sub_task_ids.map(id => taskContextMap.get(id)).filter(Boolean);
+
+                return (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/20"
+                  >
+                    {/* 整合標題 */}
+                    <div className="flex items-start gap-2 mb-2">
+                      <Layers className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-indigo-200">
+                          {consolidation.consolidated_title}
+                        </div>
+                        <div className="text-xs text-white/40 mt-0.5">
+                          {consolidation.sub_task_ids.length + 1} 個任務整合為待辦清單
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 整合的任務列表 */}
+                    <div className="ml-6 space-y-1 mb-2">
+                      {/* 主任務 */}
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-indigo-300">●</span>
+                        <span className="text-white/70 truncate">
+                          {parentTask?.title || consolidation.parent_task_id}
+                        </span>
+                        <span className="text-indigo-400/60 text-[10px]">主任務</span>
+                      </div>
+                      {/* 子任務 */}
+                      {subTasks.map((task, subIdx) => (
+                        <div key={subIdx} className="flex items-center gap-2 text-xs">
+                          <span className="text-white/30">○</span>
+                          <span className="text-white/50 truncate">
+                            {task?.title || consolidation.sub_task_ids[subIdx]}
+                          </span>
+                          <span className="text-white/30 text-[10px]">→ 子項目</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 整合理由 */}
+                    <div className="ml-6 text-xs text-white/40 border-t border-white/5 pt-2">
+                      <span className="text-white/50">理由：</span>
+                      {consolidation.reasoning}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 

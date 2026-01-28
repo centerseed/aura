@@ -3,15 +3,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight, ChevronDown, Calendar, Flag, Star } from "lucide-react";
-import type { TaskCard, DrawerStatus } from "@/types";
-
-interface Milestone {
-  id: string;
-  name: string;
-  target_date: Date;
-  entity_type: string;
-  entity_id: string;
-}
+import type { TaskCard, DrawerStatus, Milestone } from "@/types";
 
 interface GanttViewProps {
   areas: Array<{

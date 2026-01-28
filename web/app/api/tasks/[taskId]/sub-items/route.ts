@@ -2,6 +2,94 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
 
+// PUT /api/tasks/[taskId]/sub-items - 重新排序 sub-items
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ taskId: string }> }
+) {
+  try {
+    const userId = await authenticateRequest(request, prisma);
+    const { taskId } = await params;
+    const body = await request.json();
+    const { sub_item_ids } = body;
+
+    // 驗證 sub_item_ids
+    if (!Array.isArray(sub_item_ids)) {
+      return NextResponse.json(
+        { error: "'sub_item_ids' must be an array" },
+        { status: 400 }
+      );
+    }
+
+    // 查詢 Task 並驗證屬於當前用戶
+    const task = await prisma.task.findUnique({
+      where: { id: taskId, deleted_at: null },
+      include: { product: true },
+    });
+
+    if (!task || task.product.user_id !== userId) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // 獲取當前的 sub_items
+    const subItems = (task.sub_items as Array<{
+      id: string;
+      content: string;
+      completed: boolean;
+      created_at: string;
+      completed_at: string | null;
+      order: number;
+    }>) || [];
+
+    // 根據新順序重新排列 sub_items
+    const orderedSubItems = sub_item_ids
+      .map((id) => subItems.find((item) => item.id === id))
+      .filter(Boolean)
+      .map((item, index) => ({
+        ...item!,
+        order: index,
+      }));
+
+    // 更新 sub_items
+    const completedCount = orderedSubItems.filter((item) => item.completed).length;
+    const total = orderedSubItems.length;
+    const completionRate = total > 0 ? completedCount / total : 0;
+
+    await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        sub_items: orderedSubItems,
+        updated_at: new Date(),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      sub_items: orderedSubItems,
+      sub_items_meta: {
+        total,
+        completed: completedCount,
+        completion_rate: completionRate,
+      },
+    });
+  } catch (error) {
+    console.error("Reorder sub-items failed:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    return NextResponse.json(
+      {
+        error: "Failed to reorder sub-items",
+        details: errorMessage,
+      },
+      { status: 500 }
+    );
+  }
+}
+
 // POST /api/tasks/[taskId]/sub-items - 新增 sub-item
 export async function POST(
   request: NextRequest,

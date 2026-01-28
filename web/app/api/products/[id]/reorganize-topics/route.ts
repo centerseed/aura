@@ -250,39 +250,59 @@ function buildReorganizePrompt(context: {
     ? context.milestones.map((m) => `[${m.id}] ${m.name} (${m.target_date.split('T')[0]}, P${m.priority})`).join("\n")
     : "無";
 
-  return `Product "${context.product_name}" (Area: ${context.area_name}) 重組分析。今天: ${context.today.split('T')[0]}
+  return `你是任務組織專家。請分析以下任務並提出重組建議。
 
-## Tasks (共 ${context.tasks.length} 個，ID 必須從此列表選取):
+# 背景
+Product: "${context.product_name}" (Area: ${context.area_name})
+今天: ${context.today.split('T')[0]}
+
+## Tasks (共 ${context.tasks.length} 個):
 ${tasksCompact}
 
 ## Milestones:
 ${milestonesCompact}
 
-## 任務:
-1. **Topic 分群**: 按功能模組分群 (如: Onboarding, AI Engine, Payment)，避免活動類型 (如: Dev, QA)
-2. **時間推斷**:
-   - ⚠️ **保守原則**: 只對「沒有 due_date」的 Task 建議時間
-   - 已有 due_date 的 Task，suggested_due_date 設為 null（保持原樣）
-   - urgency_level 仍需為所有 Task 設定
-3. **整合細碎 Tasks**: ⚠️ 極度保守，只整合非常明確的檢查項 (checklist-style tasks)
+---
 
-## 整合條件 (必須同時滿足 ALL，否則絕不整合):
-- ✅ **明確的檢查項特徵**: Tasks 都是「購買X」、「確認Y」、「完成Z」這種簡單動作
-- ✅ **完全相同的目標**: 所有 tasks 必須圍繞同一個具體成果 (如: 同一個會議的準備工作)
-- ✅ **時間完全一致**: 同一天或同一個 Milestone
-- ✅ **極小顆粒度**: 每個 task < 30 分鐘可完成的簡單動作
-- ✅ **數量限制**: 2-5 個 (太多表示不夠細碎)
-- ✅ **信心度 > 0.85**: 必須非常確定才整合
+# Topic 分群
 
-## ⛔ 絕不整合的情況:
-- 不同類型的任務 (即使相關)
-- 需要不同技能或工具的任務
-- 有獨立敘述或上下文的任務
-- 任何有疑慮的情況 (寧可不整合)
+## 分群的核心問題
+對於任意兩個任務 A 和 B，問：**「做 A 的時候，需要知道 B 嗎？」**
+- 如果需要 → 放同一個 Topic
+- 如果不需要 → 可以放不同 Topic
 
-## 輸出規則:
-- ⚠️ **必須使用繁體中文**：所有 topic_name、description、reasoning、consolidated_title 都必須是繁體中文，禁止英文
-- description/reasoning 限 1 句話
-- inferred_from_milestone_id 必須是有效 Milestone ID 或 null
-- 所有 task_id 必須來自上方列表`;
+## 「需要知道」的三種情況
+1. **目標相同** — A 和 B 都是為了達成同一個成果
+2. **上下文相依** — 完成 A 需要參考 B 的資訊
+3. **語義相近** — A 和 B 描述的是同一件事的不同面向
+
+## Topic 命名
+用「名詞片語」描述這群任務的共同主題，例如：「用戶認證」「支付系統」「測試基礎建設」「資料遷移」
+
+---
+
+# 時間推斷
+
+- 只對「沒有 due_date」的 Task 建議時間，已有 due_date 的設為 null
+- 所有 Task 都要設定 urgency_level
+- 優先參考 Milestone 時間
+
+---
+
+# 任務整合
+
+## 整合的核心問題
+問：**「這些任務是同一件事的 checklist 嗎？」**
+
+整合條件：
+1. 它們共同完成「一個」明確成果
+2. 單獨看每個任務沒有獨立意義
+3. 可以用 checkbox 逐一勾掉
+
+---
+
+# 輸出規則
+- 使用繁體中文
+- 所有 task_id 必須來自上方列表
+- inferred_from_milestone_id 必須是有效 Milestone ID 或 null`;
 }
