@@ -38,12 +38,24 @@ export async function GET(request: NextRequest) {
       name: area.name,
       description: area.description,
       scope: area.scope,
-      products: area.products.map((product) => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        status: product.status,
-        tasks: product.tasks.map((task) => {
+      products: area.products.map((product) => {
+        // 計算 product 層級的 references 數量
+        const productRefs = (product.references as Array<unknown>) || [];
+        // 計算所有 task 層級的 references 數量
+        const taskRefsCount = product.tasks.reduce((sum, task) => {
+          const taskRefs = (task.references as Array<unknown>) || [];
+          return sum + taskRefs.length;
+        }, 0);
+        const totalReferenceCount = productRefs.length + taskRefsCount;
+
+        return {
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          status: product.status,
+          lifecycle: product.lifecycle,
+          referenceCount: totalReferenceCount,
+          tasks: product.tasks.map((task) => {
           const analysis = task.ai_analysis as Record<string, unknown> | null;
 
           // 提取 sub_items 和 sub_items_meta（從資料庫直接欄位）
@@ -94,7 +106,8 @@ export async function GET(request: NextRequest) {
             references: references,
           };
         }),
-      })),
+        };
+      }),
     }));
 
     return NextResponse.json(formattedAreas);

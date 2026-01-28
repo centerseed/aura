@@ -40,6 +40,13 @@ export async function GET(request: NextRequest) {
           product: task.product.name,
           topic: task.topic?.name || "未分類",
         },
+        // Raw fields for Mobile App / Sync
+        product_id: task.product_id,
+        topic_id: task.topic_id,
+        user_id: task.user_id,
+        content: task.content,
+        status: task.status,
+        sub_items: task.sub_items,
         strategy_used: (analysis?.strategy_used as string) || null,
         reasoning: (analysis?.reasoning as string) || null,
         start_date: task.start_date?.toISOString() || null,

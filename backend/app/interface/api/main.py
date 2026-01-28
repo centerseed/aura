@@ -20,6 +20,14 @@ from sqlmodel import select
 
 app = FastAPI(title="Aura Business OS API - Naruvia")
 
+# ===== Auth Models =====
+class SignInRequest(BaseModel):
+    auth_method: str
+    email: str
+    firebase_uid: str
+    display_name: Optional[str] = None
+    photo_url: Optional[str] = None
+
 class RawInputRequest(BaseModel):
     text: str
 
@@ -30,6 +38,53 @@ async def health_check():
 @app.get("/")
 def read_root():
     return {"message": "Aura Business OS API is running."}
+
+# ===== Authentication Endpoints =====
+
+@app.post("/api/auth/signin")
+async def signin(request: SignInRequest):
+    """
+    使用者登入端點。
+    驗證認證方式並與資料庫同步使用者資訊。
+    """
+    # 驗證認證方式
+    if not request.auth_method:
+        raise HTTPException(
+            status_code=400,
+            detail="需要提供認證方式"
+        )
+
+    # 驗證是否支援此認證方式
+    supported_methods = ["google", "email", "firebase"]
+    if request.auth_method not in supported_methods:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支援的認證方式: {request.auth_method}。支援的方式: {', '.join(supported_methods)}"
+        )
+
+    # 驗證必要欄位
+    if not request.email:
+        raise HTTPException(
+            status_code=400,
+            detail="需要提供電子郵件"
+        )
+
+    if not request.firebase_uid:
+        raise HTTPException(
+            status_code=400,
+            detail="需要提供 Firebase UID"
+        )
+
+    # 返回成功響應（未來可以與資料庫同步或創建使用者）
+    return {
+        "success": True,
+        "auth_method": request.auth_method,
+        "email": request.email,
+        "firebase_uid": request.firebase_uid,
+        "display_name": request.display_name,
+        "photo_url": request.photo_url,
+        "message": f"使用者 {request.email} 已透過 {request.auth_method} 認證"
+    }
 
 @app.post("/ingest")
 async def ingest_input(request: RawInputRequest):

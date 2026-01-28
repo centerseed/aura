@@ -71,6 +71,7 @@ import { GanttView } from "@/components/gantt-view";
 import { MilestoneModal } from "@/components/milestone-modal";
 import { MilestoneList } from "@/components/milestone-list";
 import { ProductModal } from "@/components/product-modal";
+import { ProductDetailModal } from "@/components/product-detail-modal";
 import { AreaModal } from "@/components/area-modal";
 import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
@@ -103,6 +104,7 @@ interface ApiProduct {
   description: string | null;
   status: string;
   lifecycle: "FINITE" | "PERPETUAL";
+  referenceCount: number;
   tasks: TaskCard[];
 }
 
@@ -691,6 +693,7 @@ function DroppableProduct({
   productDescription,
   productLifecycle,
   productStatus,
+  referenceCount = 0,
   tasks,
   isOver,
   milestones,
@@ -707,6 +710,7 @@ function DroppableProduct({
   onOpenTaskDetail,
   onRename,
   onEdit,
+  onShowReferences,
   onEditTaskTitle,
   isReorganizing = false,
 }: {
@@ -715,6 +719,7 @@ function DroppableProduct({
   productDescription?: string | null;
   productLifecycle: "FINITE" | "PERPETUAL";
   productStatus: string;
+  referenceCount?: number;
   tasks: TaskCard[];
   isOver: boolean;
   milestones: Milestone[];
@@ -731,6 +736,7 @@ function DroppableProduct({
   onOpenTaskDetail?: (task: TaskCard) => void;
   onRename?: (productId: string, newName: string) => void;
   onEdit?: (product: { id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string }) => void;
+  onShowReferences?: (product: { id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string }) => void;
   onEditTaskTitle?: (taskId: string, newTitle: string) => void;
   isReorganizing?: boolean;
 }) {
@@ -799,9 +805,6 @@ function DroppableProduct({
           <div className="flex items-center gap-2">
             <GripVertical className="w-4 h-4 text-white/30 group-hover/header:text-white/60 transition-colors" />
             <Package className="w-4 h-4 text-white/50" />
-            <span className="font-medium text-white flex-1 truncate">{productName}</span>
-
-            {/* 編輯按鈕 */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -813,11 +816,31 @@ function DroppableProduct({
                   status: productStatus,
                 });
               }}
-              className="p-1.5 rounded-md hover:bg-white/10 transition-all"
-              title="編輯專案"
+              className="font-medium text-white flex-1 truncate text-left hover:text-indigo-300 transition-colors"
+              title="點擊查看專案詳情"
             >
-              <Edit2 className="w-3.5 h-3.5 text-white/40 hover:text-white/80" />
+              {productName}
             </button>
+
+            {/* References 按鈕 - 只在有 references 時顯示 */}
+            {referenceCount > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowReferences?.({
+                    id: productId,
+                    name: productName,
+                    description: productDescription,
+                    lifecycle: productLifecycle,
+                    status: productStatus,
+                  });
+                }}
+                className="p-1.5 rounded-md border bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400/50 transition-all"
+                title={`查看相關資料 (${referenceCount})`}
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-400" />
+              </button>
+            )}
 
             {/* AI Reorganize 按鈕 */}
             {onReorganize && (
@@ -1004,6 +1027,8 @@ function DashboardContent() {
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
+  const [productDetailInitialTab, setProductDetailInitialTab] = useState<"edit" | "references">("edit");
   const [selectedAreaForProduct, setSelectedAreaForProduct] = useState<{ id: string; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<{ id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string } | null>(null);
   const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
@@ -1041,8 +1066,8 @@ function DashboardContent() {
   } | null>(null);
   const [isMerging, setIsMerging] = useState(false);
 
-  // 歡迎模式（新用戶空白狀態）
-  const [isWelcomeMode, setIsWelcomeMode] = useState(true);
+  // 歡迎模式（新用戶空白狀態）- 初始為 false，避免載入時閃爍
+  const [isWelcomeMode, setIsWelcomeMode] = useState(false);
   const [showQuickInputGuide, setShowQuickInputGuide] = useState(false);
   const [showAIButtonTip, setShowAIButtonTip] = useState(false);
 
@@ -2902,6 +2927,7 @@ function DashboardContent() {
                               productDescription={product.description}
                               productLifecycle={product.lifecycle}
                               productStatus={product.status}
+                              referenceCount={product.referenceCount}
                               tasks={showArchive ? product.tasks : product.tasks.filter((t) => t.drawer !== "ARCHIVE")}
                               isOver={overDropId === `product-${product.id}`}
                               milestones={milestones}
@@ -2936,7 +2962,13 @@ function DashboardContent() {
                               onRename={handleRenameProduct}
                               onEdit={(product) => {
                                 setEditingProduct(product);
-                                setIsProductModalOpen(true);
+                                setProductDetailInitialTab("edit");
+                                setIsProductDetailModalOpen(true);
+                              }}
+                              onShowReferences={(product) => {
+                                setEditingProduct(product);
+                                setProductDetailInitialTab("references");
+                                setIsProductDetailModalOpen(true);
                               }}
                               onEditTaskTitle={handleEditTaskTitle}
                               onOpenTaskDetail={(task) => {
@@ -3064,6 +3096,29 @@ function DashboardContent() {
           areaId={selectedAreaForProduct?.id}
           areaName={selectedAreaForProduct?.name}
           editingProduct={editingProduct}
+        />
+
+        {/* Product Detail Modal (點擊標題開啟) */}
+        <ProductDetailModal
+          isOpen={isProductDetailModalOpen}
+          onClose={() => {
+            setIsProductDetailModalOpen(false);
+            setEditingProduct(null);
+            setProductDetailInitialTab("edit"); // 重置為預設 tab
+          }}
+          onSuccess={async () => {
+            // 重新載入數據
+            if (userId) {
+              const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
+              if (libraryRes.ok) {
+                const libraryData = await libraryRes.json();
+                setAreas(libraryData);
+              }
+            }
+          }}
+          userId={userId || ""}
+          product={editingProduct}
+          initialTab={productDetailInitialTab}
         />
 
         {/* Area Modal */}

@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
 
+interface Reference {
+  id: string;
+  type: "url" | "note";
+  content: string;
+  title?: string | null;
+  created_at: string;
+  // 當 reference 從已刪除的 task 移動過來時，保留原始 task 資訊
+  originalTaskId?: string;
+  originalTaskContent?: string;
+}
+
 // DELETE /api/tasks/[taskId] - 軟刪除任務
 export async function DELETE(
   request: NextRequest,
@@ -25,6 +36,30 @@ export async function DELETE(
       return NextResponse.json({ error: "Task not found or unauthorized" }, { status: 404 });
     }
 
+    // 如果 task 有 references，把它們移到 product 層級
+    const taskReferences = (task.references as unknown as Reference[]) || [];
+    if (taskReferences.length > 0) {
+      const productReferences = (task.product.references as unknown as Reference[]) || [];
+
+      // 為每個 reference 添加原始 task 資訊
+      const migratedReferences = taskReferences.map((ref) => ({
+        ...ref,
+        originalTaskId: task.id,
+        originalTaskContent: task.content,
+      }));
+
+      // 合併到 product 的 references
+      const updatedProductReferences = [...productReferences, ...migratedReferences];
+
+      // 更新 product 的 references
+      await prisma.product.update({
+        where: { id: task.product_id },
+        data: {
+          references: updatedProductReferences as any,
+        },
+      });
+    }
+
     // 執行軟刪除 (設定 deleted_at)
     const updatedTask = await prisma.task.update({
       where: { id: taskId },
@@ -36,7 +71,8 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
       message: "Task deleted successfully",
-      taskId: updatedTask.id
+      taskId: updatedTask.id,
+      referencesMigrated: taskReferences.length,
     });
   } catch (error) {
     console.error("Failed to delete task:", error);
