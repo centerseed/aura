@@ -118,6 +118,11 @@ export interface TaskCard {
   due_date?: string | null
   time_confidence?: number | null
   inferred_from_milestone?: string | null
+  // Raw fields for matching
+  product_id?: string
+  // Timestamps
+  created_at?: string | null
+  updated_at?: string | null
   // Sub-items support
   sub_items?: SubItem[]
   sub_items_meta?: SubItemsMeta

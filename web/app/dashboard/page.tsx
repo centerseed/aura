@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useState, useEffect, Suspense, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1071,6 +1071,61 @@ function DashboardContent() {
   const [showQuickInputGuide, setShowQuickInputGuide] = useState(false);
   const [showAIButtonTip, setShowAIButtonTip] = useState(false);
 
+  // 今日完成任務追蹤（從 API 獲取）
+  const [completedTodayTasks, setCompletedTodayTasks] = useState<TaskCard[]>([]);
+  const [showCompletedSheet, setShowCompletedSheet] = useState(false);
+  const [completionFeedback, setCompletionFeedback] = useState<string | null>(null);
+
+  // 最近兩週已歸檔任務（用於「顯示已完成」功能）
+  const [recentArchivedTasks, setRecentArchivedTasks] = useState<TaskCard[]>([]);
+  const [isLoadingArchived, setIsLoadingArchived] = useState(false);
+  const [archivedLoaded, setArchivedLoaded] = useState(false);
+
+  // 載入今日完成的任務
+  const loadCompletedToday = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tasks?completed_today=true", {
+        headers: await getAuthHeaders(),
+      });
+      if (res.ok) {
+        const tasks = await res.json();
+        setCompletedTodayTasks(tasks);
+      }
+    } catch (err) {
+      console.error("Failed to load completed today tasks:", err);
+    }
+  }, []);
+
+  // 載入最近兩週的已歸檔任務
+  const loadRecentArchived = useCallback(async () => {
+    if (archivedLoaded || isLoadingArchived) return;
+    setIsLoadingArchived(true);
+    try {
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      const fromDate = twoWeeksAgo.toISOString();
+      const res = await fetch(`/api/tasks?status=ARCHIVE&from=${fromDate}`, {
+        headers: await getAuthHeaders(),
+      });
+      if (res.ok) {
+        const tasks = await res.json();
+        setRecentArchivedTasks(tasks);
+        setArchivedLoaded(true);
+      }
+    } catch (err) {
+      console.error("Failed to load recent archived tasks:", err);
+    } finally {
+      setIsLoadingArchived(false);
+    }
+  }, [archivedLoaded, isLoadingArchived]);
+
+  // 初始載入今日完成任務（在用戶登入後）
+  useEffect(() => {
+    if (userId) {
+      loadCompletedToday();
+    }
+  }, [userId, loadCompletedToday]);
+
   // DnD Sensors
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1153,9 +1208,29 @@ function DashboardContent() {
     }
   }, [isLoading, userId, hasTasks]);
 
+  // 獲取今天的日期範圍
+  const getTodayDateRange = () => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    return { todayStart, todayEnd };
+  };
+
   // 統計
   const stats = {
-    total: areas.reduce((sum, area) => sum + area.products.reduce((ps, p) => ps + p.tasks.filter((t) => t.drawer !== "ARCHIVE").length, 0), 0),
+    total: (() => {
+      const { todayStart, todayEnd } = getTodayDateRange();
+      return areas.reduce((sum, area) =>
+        sum + area.products.reduce((ps, p) =>
+          ps + p.tasks.filter((t) => {
+            // 未完成的任務
+            if (t.drawer === "ARCHIVE") return false;
+            // 必須有 due_date 且在今天
+            if (!t.due_date) return false;
+            const dueDate = new Date(t.due_date);
+            return dueDate >= todayStart && dueDate < todayEnd;
+          }).length, 0), 0);
+    })(),
     active: areas.reduce(
       (sum, area) =>
         sum + area.products.reduce((ps, p) => ps + p.tasks.filter((t) => t.drawer === "ACTIVE").length, 0),
@@ -1647,20 +1722,37 @@ function DashboardContent() {
   // 標記任務為已完成
   const handleCompleteTask = async (taskId: string) => {
     try {
-      // 找到任務的當前狀態
-      let currentDrawer = "ACTIVE"; // 預設值
-      for (const area of areas) {
-        for (const product of area.products) {
-          const task = product.tasks.find((t) => t.id === taskId);
-          if (task) {
-            currentDrawer = task.drawer;
-            break;
-          }
-        }
+      // 找到任務的當前狀態（從所有可能的來源）
+      let task = areas
+        .flatMap((area) => area.products)
+        .flatMap((product) => product.tasks)
+        .find((t) => t.id === taskId);
+
+      // 如果在 areas 中找不到，嘗試從已歸檔任務中尋找
+      if (!task) {
+        task = recentArchivedTasks.find((t) => t.id === taskId);
       }
 
+      // 如果還是找不到，嘗試從今日完成任務中尋找
+      if (!task) {
+        task = completedTodayTasks.find((t) => t.id === taskId);
+      }
+
+      if (!task) {
+        console.error("Task not found:", taskId);
+        return;
+      }
+
+      console.log("🔍 Task current state:", {
+        id: taskId,
+        drawer: task.drawer
+      });
+
       // 如果已完成（ARCHIVE），改為 ACTIVE；否則改為 ARCHIVE
-      const newStatus = currentDrawer === "ARCHIVE" ? "ACTIVE" : "ARCHIVE";
+      const newStatus = task.drawer === "ARCHIVE" ? "ACTIVE" : "ARCHIVE";
+      const isCompleting = newStatus === "ARCHIVE";
+
+      console.log("🎯 Updating to:", newStatus, "isCompleting:", isCompleting);
 
       const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/tasks", {
@@ -1676,13 +1768,60 @@ function DashboardContent() {
         throw new Error("更新失敗");
       }
 
-      // 重新載入數據
-      if (userId) {
-        const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
-        if (libraryRes.ok) {
-          const libraryData = await libraryRes.json();
-          setAreas(libraryData);
+      const { task: updatedTask } = await res.json();
+
+      // 直接使用返回的完整任務資料更新 state（不重新查詢所有卡片）
+      setAreas(prevAreas => {
+        const taskExistsInAreas = prevAreas.some(area =>
+          area.products.some(product => product.tasks.some(t => t.id === taskId))
+        );
+
+        if (taskExistsInAreas) {
+          // 任務已在 areas 中，直接更新
+          return prevAreas.map(area => ({
+            ...area,
+            products: area.products.map(product => ({
+              ...product,
+              tasks: product.tasks.map(task =>
+                task.id === taskId ? updatedTask : task
+              ),
+            })),
+          }));
+        } else if (!isCompleting) {
+          // 任務不在 areas 中，且正在取消完成 → 加入對應的 product
+          return prevAreas.map(area => ({
+            ...area,
+            products: area.products.map(product => {
+              if (product.id === updatedTask.product_id) {
+                return {
+                  ...product,
+                  tasks: [...product.tasks, updatedTask],
+                };
+              }
+              return product;
+            }),
+          }));
         }
+        return prevAreas;
+      });
+
+      // 更新 completedTodayTasks
+      if (isCompleting) {
+        setCompletedTodayTasks(prev => [...prev, updatedTask]);
+        const newCount = completedTodayTasks.length + 1;
+        setCompletionFeedback(`完成！今天已完成 ${newCount} 項`);
+        setTimeout(() => setCompletionFeedback(null), 3000);
+      } else {
+        setCompletedTodayTasks(prev => prev.filter(t => t.id !== taskId));
+      }
+
+      // 更新 recentArchivedTasks
+      if (isCompleting) {
+        // 完成任務時，加入已歸檔列表
+        setRecentArchivedTasks(prev => [...prev, updatedTask]);
+      } else {
+        // 取消完成時，從已歸檔列表移除
+        setRecentArchivedTasks(prev => prev.filter(t => t.id !== taskId));
       }
     } catch (err) {
       console.error("Failed to complete task:", err);
@@ -2460,8 +2599,39 @@ function DashboardContent() {
     }
   };
 
-  // 篩選顯示的 Areas
-  const displayAreas = selectedArea ? areas.filter((a) => a.name === selectedArea) : areas;
+  // 篩選顯示的 Areas，並在 showArchive 時合併近兩週完成的任務
+  const displayAreas = useMemo(() => {
+    const baseAreas = selectedArea ? areas.filter((a) => a.name === selectedArea) : areas;
+
+    if (!showArchive || recentArchivedTasks.length === 0) {
+      return baseAreas;
+    }
+
+    // 建立 product_id -> archived tasks 的映射
+    const archivedByProduct = new Map<string, TaskCard[]>();
+    for (const task of recentArchivedTasks) {
+      const productId = task.product_id;
+      if (productId) {
+        if (!archivedByProduct.has(productId)) {
+          archivedByProduct.set(productId, []);
+        }
+        archivedByProduct.get(productId)!.push(task);
+      }
+    }
+
+    // 合併到對應的 Product
+    return baseAreas.map(area => ({
+      ...area,
+      products: area.products.map(product => {
+        const archivedTasks = archivedByProduct.get(product.id) || [];
+        if (archivedTasks.length === 0) return product;
+        return {
+          ...product,
+          tasks: [...product.tasks, ...archivedTasks],
+        };
+      }),
+    }));
+  }, [selectedArea, areas, showArchive, recentArchivedTasks]);
 
   // 載入中
   if (isLoading && areas.length === 0) {
@@ -2654,6 +2824,18 @@ function DashboardContent() {
                   </span>
                 </button>
               )}
+
+              {/* 今日完成指標 */}
+              <button
+                onClick={() => setShowCompletedSheet(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-all"
+                title="查看今日完成的任務"
+              >
+                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                <span className="text-sm text-green-400">
+                  今天已完成 ({completedTodayTasks.length}/{stats.total + completedTodayTasks.length})
+                </span>
+              </button>
 
               {/* 視圖切換按鈕 */}
               <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
@@ -2849,19 +3031,25 @@ function DashboardContent() {
 
                   {/* Show Archive Toggle */}
                   <button
-                    onClick={() => setShowArchive(!showArchive)}
+                    onClick={() => {
+                      const newState = !showArchive;
+                      setShowArchive(newState);
+                      if (newState && !archivedLoaded) {
+                        loadRecentArchived();
+                      }
+                    }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
                       showArchive
-                        ? "bg-slate-500/20 text-slate-300"
+                        ? "bg-green-500/20 text-green-300"
                         : "bg-white/5 text-white/50 hover:bg-white/10"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <Archive className="w-3.5 h-3.5" />
-                      <span className="text-xs font-medium">顯示已完成</span>
+                      <span className="text-xs font-medium">近兩週完成</span>
                     </div>
                     <span className="text-xs bg-white/10 px-1.5 py-0.5 rounded-full">
-                      {stats.archived}
+                      {isLoadingArchived ? "..." : (archivedLoaded ? recentArchivedTasks.length : "?")}
                     </span>
                   </button>
                 </div>
@@ -3464,6 +3652,80 @@ function DashboardContent() {
                 </Button>
               </div>
             </Card>
+          </div>
+        )}
+
+        {/* 完成回饋 Toast */}
+        {completionFeedback && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-500/90 text-white shadow-lg backdrop-blur-sm">
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="font-medium">{completionFeedback}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 今日完成清單 Sheet */}
+        {showCompletedSheet && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowCompletedSheet(false)}
+            />
+            {/* Sheet */}
+            <div className="relative w-full max-w-md mx-4 bg-slate-800 rounded-xl border border-white/10 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-400" />
+                  <h3 className="text-lg font-semibold text-white">今日完成</h3>
+                  <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold">
+                    {completedTodayTasks.length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowCompletedSheet(false)}
+                  className="p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* Content */}
+              <div className="max-h-[60vh] overflow-y-auto">
+                {completedTodayTasks.length === 0 ? (
+                  <div className="py-12 text-center text-white/50">
+                    <p>今天還沒有完成任何任務</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-white/5">
+                    {completedTodayTasks.map((task) => (
+                      <li key={task.id} className="px-5 py-3 hover:bg-white/5 transition-colors">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-400 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-white/70 line-through">
+                              {task.title}
+                            </p>
+                            {task.tag && (
+                              <p className="text-xs text-white/40 mt-0.5">
+                                {task.tag.area} &gt; {task.tag.product}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-white/10 bg-white/5">
+                <p className="text-xs text-white/40 text-center">
+                  每日成就會在午夜重置
+                </p>
+              </div>
+            </div>
           </div>
         )}
 

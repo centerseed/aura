@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Status } from "@prisma/client";
 import { authenticateRequest } from "@/lib/auth-middleware";
 
 // GET /api/library - 獲取用戶的完整層級結構
+// Query params:
+//   - include_archived: true 時包含 ARCHIVE 狀態的任務（預設排除）
 export async function GET(request: NextRequest) {
   try {
     const userId = await authenticateRequest(request, prisma);
+    const { searchParams } = new URL(request.url);
+    const includeArchived = searchParams.get("include_archived") === "true";
+
+    // 建立 task 查詢條件（預設排除 ARCHIVE）
+    const taskWhereClause: { deleted_at: null; status?: { not: Status } } = {
+      deleted_at: null,
+    };
+    if (!includeArchived) {
+      taskWhereClause.status = { not: Status.ARCHIVE };
+    }
 
     // 獲取用戶的所有 Areas，包含 Products 和 Tasks
     const areas = await prisma.area.findMany({
@@ -18,7 +31,7 @@ export async function GET(request: NextRequest) {
           where: { deleted_at: null },
           include: {
             tasks: {
-              where: { deleted_at: null },
+              where: taskWhereClause,
               include: { topic: true },
               orderBy: { created_at: "desc" },
             },

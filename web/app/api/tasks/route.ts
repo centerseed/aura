@@ -4,15 +4,56 @@ import { Status } from "@prisma/client";
 import { authenticateRequest } from "@/lib/auth-middleware";
 
 // GET /api/tasks
+// Query params:
+//   - status: 篩選特定狀態 (INBOX, ACTIVE, MAINTAIN, REFERENCE, ARCHIVE)
+//   - completed_today: true 時只返回今日完成的任務
+//   - from: ISO 日期字串，篩選 updated_at >= from
+//   - to: ISO 日期字串，篩選 updated_at < to
 export async function GET(request: NextRequest) {
   try {
     const userId = await authenticateRequest(request, prisma);
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
+    const completedToday = searchParams.get("completed_today") === "true";
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
+
+    // 建立查詢條件
+    const whereClause: {
+      user_id: string;
+      deleted_at: null;
+      status?: Status;
+      updated_at?: { gte?: Date; lt?: Date };
+    } = {
+      user_id: userId,
+      deleted_at: null,
+    };
+
+    // 篩選狀態
+    if (status && Status[status as keyof typeof Status]) {
+      whereClause.status = Status[status as keyof typeof Status];
+    }
+
+    // 篩選今日完成（status=ARCHIVE 且 updated_at 是今天）
+    if (completedToday) {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+      whereClause.status = Status.ARCHIVE;
+      whereClause.updated_at = { gte: todayStart, lt: todayEnd };
+    } else if (fromParam || toParam) {
+      // 時間範圍篩選
+      whereClause.updated_at = {};
+      if (fromParam) {
+        whereClause.updated_at.gte = new Date(fromParam);
+      }
+      if (toParam) {
+        whereClause.updated_at.lt = new Date(toParam);
+      }
+    }
 
     const tasks = await prisma.task.findMany({
-      where: {
-        user_id: userId,
-        deleted_at: null,
-      },
+      where: whereClause,
       include: {
         product: {
           include: {
@@ -22,7 +63,7 @@ export async function GET(request: NextRequest) {
         topic: true,
       },
       orderBy: {
-        created_at: "desc",
+        updated_at: "desc",
       },
     });
 
@@ -53,6 +94,9 @@ export async function GET(request: NextRequest) {
         due_date: task.due_date?.toISOString() || null,
         time_confidence: task.time_confidence || null,
         inferred_from_milestone: task.inferred_from_milestone || null,
+        // 新增：updated_at 用於今日完成篩選
+        updated_at: task.updated_at?.toISOString() || null,
+        created_at: task.created_at?.toISOString() || null,
       };
     });
 
@@ -119,7 +163,60 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, task });
+    // 格式化回應與前端一致
+    const taskAny = task as any;
+    const analysis = taskAny.ai_analysis as Record<string, unknown> | null;
+    const subItems = (taskAny.sub_items as Array<{
+      id: string;
+      content: string;
+      completed: boolean;
+      created_at: string;
+      completed_at: string | null;
+      order: number;
+    }>) || [];
+    const subItemsMeta = subItems.length > 0 ? {
+      total: subItems.length,
+      completed: subItems.filter(item => item.completed).length,
+      completion_rate: subItems.filter(item => item.completed).length / subItems.length,
+    } : { total: 0, completed: 0, completion_rate: 0 };
+    const references = (taskAny.references as Array<{
+      id: string;
+      type: "url" | "note";
+      content: string;
+      title?: string | null;
+      created_at: string;
+    }>) || [];
+
+    const formattedTask = {
+      id: task.id,
+      title: task.content,
+      narrative: (analysis?.narrative as string) || null,
+      drawer: task.status,
+      lifecycle: (analysis?.lifecycle as string) || "embryo",
+      tag: {
+        area: task.product.area.name,
+        product: task.product.name,
+        topic: task.topic?.name || "未分類",
+      },
+      product_id: task.product_id,
+      topic_id: task.topic_id,
+      user_id: task.user_id,
+      content: task.content,
+      status: task.status,
+      sub_items: subItems,
+      sub_items_meta: subItemsMeta,
+      strategy_used: (analysis?.strategy_used as string) || null,
+      reasoning: (analysis?.reasoning as string) || null,
+      start_date: taskAny.start_date?.toISOString() || null,
+      due_date: taskAny.due_date?.toISOString() || null,
+      time_confidence: taskAny.time_confidence || null,
+      inferred_from_milestone: taskAny.inferred_from_milestone || null,
+      updated_at: taskAny.updated_at?.toISOString() || null,
+      created_at: taskAny.created_at?.toISOString() || null,
+      references: references,
+    };
+
+    return NextResponse.json({ success: true, task: formattedTask });
   } catch (error) {
     console.error("Failed to update task:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
