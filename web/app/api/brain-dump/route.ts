@@ -51,6 +51,9 @@ const StructureResultSchema = z.object({
 // POST /api/brain-dump
 export async function POST(request: NextRequest) {
   try {
+    const timings: Record<string, number> = {};
+    const startTotal = Date.now();
+
     const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
     const { text } = body;
@@ -61,6 +64,7 @@ export async function POST(request: NextRequest) {
 
     // ✅ 獲取用戶現有結構作為上下文（包含每個 Product 的最近任務，用於語意關聯）
     // 使用單一 query 避免 N+1 問題
+    const startDbStructure = Date.now();
     const existingAreas = await prisma.area.findMany({
       where: { user_id: userId, deleted_at: null },
       include: {
@@ -84,8 +88,10 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+    timings["db_structure"] = Date.now() - startDbStructure;
 
     // 載入用戶的 Milestones（未來 90 天內）
+    const startDbMilestones = Date.now();
     const now = new Date();
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 90);
@@ -109,6 +115,7 @@ export async function POST(request: NextRequest) {
     } catch (milestoneError) {
       console.warn("Failed to load milestones, continuing without them:", milestoneError);
     }
+    timings["db_milestones"] = Date.now() - startDbMilestones;
 
     // 構建完整的上下文摘要（包含任務內容，用於語意匹配）
     let contextSummary = "";
@@ -159,6 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 調用 AI 進行結構化
+    const startAI = Date.now();
     const { object: result } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: StructureResultSchema,
@@ -229,8 +237,10 @@ ${text}
 - tag.topic：字串，無法確定則填 ""
 - reasoning：說明選擇這個 Product 的理由`,
     });
+    timings["ai_generateObject"] = Date.now() - startAI;
 
     // 持久化到資料庫（優化：使用記憶體快取減少重複查詢）
+    const startDbPersist = Date.now();
 
     // 建立快取 Map，避免重複查詢同樣的 Area/Product/Topic
     const areaCache = new Map<string, { id: string }>();
@@ -395,6 +405,9 @@ ${text}
         },
       },
     });
+    timings["db_persist"] = Date.now() - startDbPersist;
+    timings["total"] = Date.now() - startTotal;
+    console.log("⏱️ [brain-dump] Timings:", JSON.stringify(timings, null, 2));
 
     return NextResponse.json({
       success: true,

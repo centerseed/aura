@@ -75,3 +75,36 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// GET /api/products - 獲取用戶的所有 Products (非刪除)
+export async function GET(request: NextRequest) {
+  try {
+    const userId = await authenticateRequest(request, prisma);
+
+    // 獲取所有未軟刪除的 Product，並做排序
+    const products = await prisma.product.findMany({
+      where: {
+        user_id: userId,
+        deleted_at: null,
+      },
+      orderBy: [
+        { display_order: 'asc' },
+        { created_at: 'desc' },
+      ],
+    });
+
+    return NextResponse.json(products);
+  } catch (error) {
+    console.error("Failed to fetch products:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes("token")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    return NextResponse.json({
+      error: "Failed to fetch products",
+      details: errorMessage
+    }, { status: 500 });
+  }
+}

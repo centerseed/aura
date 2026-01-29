@@ -5,40 +5,30 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
 
-// Zod Schema for AI structured output
+// Zod Schema for AI structured output (精簡版 - 減少輸出量)
 const ReorganizeProposalSchema = z.object({
   proposed_clusters: z.array(
     z.object({
-      topic_name: z.string().describe("建議的 Topic 名稱"),
-      description: z.string().describe("該 Topic 的語義描述"),
-      task_ids: z.array(z.string()).describe("屬於該 Topic 的 Task IDs"),
-      confidence: z.number().min(0).max(1).describe("AI 的信心度"),
+      topic_name: z.string(),
+      task_ids: z.array(z.string()),
     })
-  ).describe("新的 Topic 分群"),
+  ),
 
   time_inferences: z.array(
     z.object({
       task_id: z.string(),
-      suggested_due_date: z.string().nullable().describe("建議的截止日期 (ISO 8601)"),
-      inferred_from_milestone_id: z.string().nullable().describe("從哪個 Milestone 推斷"),
-      time_confidence: z.number().min(0).max(1).describe("時間推斷的信心度"),
-      urgency_level: z.enum(["critical", "high", "medium", "low"]).describe("緊急程度"),
-      reasoning: z.string().describe("時間推斷的理由"),
+      suggested_due_date: z.string().nullable(),
+      urgency_level: z.enum(["critical", "high", "medium", "low"]),
     })
-  ).describe("所有 Tasks 的時間推斷"),
+  ),
 
   task_consolidations: z.array(
     z.object({
-      parent_task_id: z.string().describe("作為主 Task 的 ID (從 task_ids 中選一個最具代表性的)"),
-      sub_task_ids: z.array(z.string()).describe("將被整合為 sub-items 的 Task IDs"),
-      consolidated_title: z.string().describe("整合後的主 Task 標題"),
-      consolidated_narrative: z.string().describe("整合後的敘述"),
-      reasoning: z.string().describe("為何要整合這些 Tasks"),
-      confidence: z.number().min(0).max(1).describe("整合建議的信心度"),
+      parent_task_id: z.string(),
+      sub_task_ids: z.array(z.string()),
+      consolidated_title: z.string(),
     })
-  ).optional().describe("建議整合成 todo-list 的 Task 群組"),
-
-  reasoning: z.string().describe("整體重組的理由與邏輯"),
+  ).optional(),
 });
 
 // POST /api/products/[id]/reorganize-topics
@@ -47,10 +37,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const timings: Record<string, number> = {};
+    const startTotal = Date.now();
+
     const userId = await authenticateRequest(request, prisma);
     const { id: productId } = await params;
 
     // 1. 查詢 Product 資訊並驗證屬於當前用戶
+    const startDb1 = Date.now();
     const product = await prisma.product.findUnique({
       where: { id: productId, user_id: userId, deleted_at: null },
       include: {
@@ -58,12 +52,15 @@ export async function POST(
       },
     });
 
+    timings["db_product"] = Date.now() - startDb1;
+
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     // 2. 查詢該 Product 下的所有 Tasks
     // ✅ 過濾已刪除和已完成的 task,節省 AI 處理成本
+    const startDb2 = Date.now();
     const tasks = await prisma.task.findMany({
       where: {
         user_id: userId,
@@ -81,6 +78,8 @@ export async function POST(
       },
     });
 
+    timings["db_tasks"] = Date.now() - startDb2;
+
     if (tasks.length === 0) {
       return NextResponse.json({
         product_id: productId,
@@ -94,6 +93,7 @@ export async function POST(
 
     // 3. 查詢相關的 Milestones (entity_type = 'PRODUCT', entity_id = productId)
     // 注意: 資料庫中 entity_type 是 varchar,不是 enum
+    const startDb3 = Date.now();
     const milestones = await prisma.milestone.findMany({
       where: {
         user_id: userId,
@@ -105,6 +105,7 @@ export async function POST(
         target_date: "asc",
       },
     });
+    timings["db_milestones"] = Date.now() - startDb3;
 
     // 4. 構建上下文資訊
     const currentTopics = [...new Set(tasks.map((t) => t.topic?.name).filter((name): name is string => Boolean(name)))];
@@ -144,11 +145,13 @@ export async function POST(
       today,
     });
 
+    const startAI = Date.now();
     const { object: result } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: ReorganizeProposalSchema,
       prompt,
     });
+    timings["ai_generateObject"] = Date.now() - startAI;
 
     // 6. 構建 tasks_context (給前端顯示用)
     const tasksContext = tasks.map((t) => ({
@@ -167,6 +170,7 @@ export async function POST(
     );
 
     // 8. 創建評估 Log (PENDING 狀態)
+    const startDb4 = Date.now();
     const evaluationLog = await prisma.systemEvaluationLog.create({
       data: {
         user_id: userId,
@@ -180,7 +184,6 @@ export async function POST(
           proposed_clusters: result.proposed_clusters,
           time_inferences: filteredTimeInferences,
           task_consolidations: result.task_consolidations || [],
-          reasoning: result.reasoning,
         },
         user_action: "PENDING",
         metadata: {
@@ -189,6 +192,12 @@ export async function POST(
         },
       },
     });
+
+    timings["db_evaluationLog"] = Date.now() - startDb4;
+    timings["total"] = Date.now() - startTotal;
+
+    // 輸出計時結果
+    console.log("⏱️ [reorganize-topics] Timings:", JSON.stringify(timings, null, 2));
 
     // 9. 返回完整的 ReorganizeProposal
     return NextResponse.json({
@@ -200,7 +209,6 @@ export async function POST(
       time_inferences: filteredTimeInferences,
       task_consolidations: result.task_consolidations || [],
       tasks_context: tasksContext,
-      reasoning: result.reasoning,
       logId: evaluationLog.id,
     });
   } catch (error) {
@@ -303,6 +311,5 @@ ${milestonesCompact}
 
 # 輸出規則
 - 使用繁體中文
-- 所有 task_id 必須來自上方列表
-- inferred_from_milestone_id 必須是有效 Milestone ID 或 null`;
+- 所有 task_id 必須來自上方列表`;
 }

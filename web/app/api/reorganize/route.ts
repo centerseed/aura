@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { preview = false, confirmed = false, selected_operation_ids = null } = body;
 
-    // 獲取用戶所有現有結構
+    // 獲取用戶所有現有結構（只查詢未完成的任務）
     const existingAreas = await prisma.area.findMany({
       where: { user_id: userId, deleted_at: null },
       include: {
@@ -47,7 +47,10 @@ export async function POST(request: NextRequest) {
           include: {
             topics: { where: { deleted_at: null } },
             tasks: {
-              where: { deleted_at: null },
+              where: {
+                deleted_at: null,
+                status: { not: Status.ARCHIVE },  // ✅ 排除已完成任務
+              },
               orderBy: { created_at: "desc" },
             },
           },
@@ -63,13 +66,37 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // ✅ 優化：建立完整的快取結構，避免後續重複查詢
+    const areaCache = new Map<string, { id: string; name: string }>();
+    const productCache = new Map<string, { id: string; name: string; areaId: string; areaName: string; taskCount: number }>();
+    const productByNameCache = new Map<string, Array<{ id: string; areaName: string; taskCount: number }>>();
+    const taskMap: Record<string, { areaName: string; productName: string; content: string; aiAnalysis: object | null }> = {};
+
     // 構建完整的結構摘要給 AI
     let structureSummary = "### Current Structure:\n\n";
-    const taskMap: Record<string, { areaName: string; productName: string; content: string }> = {};
 
     for (const area of existingAreas) {
+      // 快取 Area
+      areaCache.set(area.name, { id: area.id, name: area.name });
+
       structureSummary += `**Area: ${area.name}** (scope: ${area.scope || "undefined"})\n`;
       for (const product of area.products) {
+        const taskCount = product.tasks.length;
+
+        // 快取 Product (by ID)
+        productCache.set(product.id, {
+          id: product.id,
+          name: product.name,
+          areaId: area.id,
+          areaName: area.name,
+          taskCount,
+        });
+
+        // 快取 Product (by name，可能有多個同名 product)
+        const existingByName = productByNameCache.get(product.name) || [];
+        existingByName.push({ id: product.id, areaName: area.name, taskCount });
+        productByNameCache.set(product.name, existingByName);
+
         structureSummary += `  - Product: ${product.name}\n`;
         for (const task of product.tasks) {
           const aiAnalysis = task.ai_analysis as { narrative?: string } || {};
@@ -78,6 +105,7 @@ export async function POST(request: NextRequest) {
             areaName: area.name,
             productName: product.name,
             content: task.content,
+            aiAnalysis: task.ai_analysis as object | null,
           };
         }
       }
@@ -135,50 +163,36 @@ ${structureSummary}
       }> = [];
       let operationIdCounter = 0;
 
-      // 預覽合併操作
+      // ✅ 優化：預覽合併操作 - 使用快取，不需要查詢資料庫
       for (const merge of result.merges) {
         for (const sourceProductName of merge.source_products) {
-          const sourceProducts = await prisma.product.findMany({
-            where: {
-              user_id: userId,
-              name: sourceProductName,
-              deleted_at: null,
-            },
-            include: {
-              area: { select: { name: true } },
-            },
-          });
+          // 從快取獲取同名 Products
+          const sourceProducts = productByNameCache.get(sourceProductName) || [];
 
           for (const sourceProduct of sourceProducts) {
-            const taskCount = await prisma.task.count({
-              where: { product_id: sourceProduct.id, deleted_at: null },
-            });
-
             structuredOperations.push({
               id: `merge-${operationIdCounter++}`,
               type: "merge",
               reason: merge.reason,
               from: {
-                area: sourceProduct.area?.name,
+                area: sourceProduct.areaName,
                 product: sourceProductName,
               },
               to: {
                 area: merge.target_area,
                 product: merge.target_product,
               },
-              taskCount,
+              taskCount: sourceProduct.taskCount,
             });
           }
         }
       }
 
-      // 預覽重新分類操作
+      // ✅ 優化：預覽重新分類操作 - 使用 taskMap，不需要查詢資料庫
       for (const reclass of result.reclassifications) {
-        const task = await prisma.task.findUnique({
-          where: { id: reclass.task_id },
-        });
+        const taskInfo = taskMap[reclass.task_id];
 
-        if (task && !task.deleted_at) {
+        if (taskInfo) {
           structuredOperations.push({
             id: `reclass-${operationIdCounter++}`,
             type: "reclassify",
@@ -186,7 +200,7 @@ ${structureSummary}
             from: {
               area: reclass.current_area,
               product: reclass.current_product,
-              taskTitle: reclass.task_title || task.content,
+              taskTitle: reclass.task_title || taskInfo.content,
             },
             to: {
               area: reclass.new_area,
@@ -225,59 +239,74 @@ ${structureSummary}
     // 操作日誌（用於顯示給用戶）
     const operationLog: string[] = [];
 
+    // ✅ 優化：建立執行時的動態快取（記錄新創建的 area/product）
+    const execAreaCache = new Map<string, string>(); // areaName -> areaId
+    const execProductCache = new Map<string, string>(); // areaId::productName -> productId
+
+    // 預填充執行快取
+    areaCache.forEach((info, name) => {
+      execAreaCache.set(name, info.id);
+    });
+    productCache.forEach((info, id) => {
+      execProductCache.set(`${info.areaId}::${info.name}`, id);
+    });
+
+    // 輔助函數：獲取或創建 Area
+    const getOrCreateArea = async (areaName: string): Promise<string> => {
+      const cached = execAreaCache.get(areaName);
+      if (cached) return cached;
+
+      const newArea = await prisma.area.create({
+        data: {
+          user_id: userId,
+          name: areaName,
+          is_custom: true,
+          created_at: new Date(),
+        },
+      });
+      execAreaCache.set(areaName, newArea.id);
+      operationLog.push(`  ➕ 創建新 Area：${areaName}`);
+      return newArea.id;
+    };
+
+    // 輔助函數：獲取或創建 Product
+    const getOrCreateProduct = async (areaId: string, areaName: string, productName: string): Promise<string> => {
+      const cacheKey = `${areaId}::${productName}`;
+      const cached = execProductCache.get(cacheKey);
+      if (cached) return cached;
+
+      const newProduct = await prisma.product.create({
+        data: {
+          user_id: userId,
+          area_id: areaId,
+          name: productName,
+          status: Status.ACTIVE,
+          lifecycle: Lifecycle.FINITE,
+          created_at: new Date(),
+        },
+      });
+      execProductCache.set(cacheKey, newProduct.id);
+      operationLog.push(`  ➕ 創建新 Product：${areaName} / ${productName}`);
+      return newProduct.id;
+    };
+
     // 執行合併操作
     let mergeCount = 0;
-    let opIdCounter = 0; // 用於生成操作 ID 以匹配預覽時的 ID
+    let opIdCounter = 0;
+    const productsToDelete: string[] = [];
 
     for (const merge of result.merges) {
       operationLog.push(`🔀 合併操作：${merge.reason}`);
 
-      // 找到目標 Area
-      let targetArea = await prisma.area.findFirst({
-        where: { user_id: userId, name: merge.target_area, deleted_at: null },
-      });
+      // ✅ 優化：使用快取獲取或創建目標 Area
+      const targetAreaId = await getOrCreateArea(merge.target_area);
 
-      if (!targetArea) {
-        // 如果目標 Area 不存在，創建它
-        targetArea = await prisma.area.create({
-          data: {
-            user_id: userId,
-            name: merge.target_area,
-            is_custom: true,
-          },
-        });
-        operationLog.push(`  ➕ 創建新 Area：${merge.target_area}`);
-      }
+      // ✅ 優化：使用快取獲取或創建目標 Product
+      const targetProductId = await getOrCreateProduct(targetAreaId, merge.target_area, merge.target_product);
 
-      // 找到或創建目標 Product
-      let targetProduct = await prisma.product.findFirst({
-        where: { user_id: userId, area_id: targetArea.id, name: merge.target_product, deleted_at: null },
-      });
-
-      if (!targetProduct) {
-        targetProduct = await prisma.product.create({
-          data: {
-            user_id: userId,
-            area_id: targetArea.id,
-            name: merge.target_product,
-            status: Status.ACTIVE,
-            lifecycle: Lifecycle.FINITE,
-          },
-        });
-        operationLog.push(`  ➕ 創建新 Product：${merge.target_area} / ${merge.target_product}`);
-      }
-
-      // 合併來源 Products 的 Tasks 到目標 Product
+      // ✅ 優化：使用快取獲取來源 Products
       for (const sourceProductName of merge.source_products) {
-        // 找到所有匹配的來源 Products（可能在不同 Areas）
-        const sourceProducts = await prisma.product.findMany({
-          where: {
-            user_id: userId,
-            name: sourceProductName,
-            deleted_at: null,
-            id: { not: targetProduct.id }, // 排除目標自己
-          },
-        });
+        const sourceProducts = productByNameCache.get(sourceProductName) || [];
 
         for (const sourceProduct of sourceProducts) {
           // 生成操作 ID（需與預覽時一致）
@@ -288,51 +317,39 @@ ${structureSummary}
             continue;
           }
 
-          // 計算任務數量
-          const taskCount = await prisma.task.count({
-            where: { product_id: sourceProduct.id, deleted_at: null },
-          });
+          // 排除目標自己
+          if (sourceProduct.id === targetProductId) continue;
+
+          // ✅ 優化：使用快取中的 taskCount，不需要查詢
+          const taskCount = sourceProduct.taskCount;
 
           // 移動所有 Tasks 到目標 Product
           await prisma.task.updateMany({
             where: { product_id: sourceProduct.id, deleted_at: null },
-            data: { product_id: targetProduct.id },
+            data: { product_id: targetProductId },
           });
 
           // 移動所有 Topics 到目標 Product
           await prisma.topic.updateMany({
             where: { product_id: sourceProduct.id, deleted_at: null },
-            data: { product_id: targetProduct.id },
+            data: { product_id: targetProductId },
           });
 
           operationLog.push(`  📦 合併「${sourceProductName}」→「${merge.target_product}」（${taskCount} 個任務）`);
 
-          // 軟刪除來源 Product
-          await prisma.product.update({
-            where: { id: sourceProduct.id },
-            data: { deleted_at: new Date() },
-          });
-
+          // 收集要刪除的 Product ID（稍後批量更新）
+          productsToDelete.push(sourceProduct.id);
           mergeCount++;
         }
       }
+    }
 
-      // 軟刪除來源 Areas（如果它們現在是空的）
-      for (const sourceAreaName of merge.source_areas) {
-        if (sourceAreaName === merge.target_area) continue;
-
-        const sourceArea = await prisma.area.findFirst({
-          where: { user_id: userId, name: sourceAreaName, deleted_at: null },
-          include: { products: { where: { deleted_at: null } } },
-        });
-
-        if (sourceArea && sourceArea.products.length === 0) {
-          await prisma.area.update({
-            where: { id: sourceArea.id },
-            data: { deleted_at: new Date() },
-          });
-        }
-      }
+    // ✅ 優化：批量軟刪除來源 Products
+    if (productsToDelete.length > 0) {
+      await prisma.product.updateMany({
+        where: { id: { in: productsToDelete } },
+        data: { deleted_at: new Date() },
+      });
     }
 
     // 執行重新分類操作
@@ -346,57 +363,26 @@ ${structureSummary}
         continue;
       }
 
-      // 找到任務
-      const task = await prisma.task.findUnique({
-        where: { id: reclass.task_id },
-      });
+      // ✅ 優化：使用 taskMap，不需要查詢資料庫
+      const taskInfo = taskMap[reclass.task_id];
+      if (!taskInfo) continue;
 
-      if (!task || task.deleted_at) continue;
-
-      operationLog.push(`🏷️  重新分類：「${task.content}」`);
+      operationLog.push(`🏷️  重新分類：「${taskInfo.content}」`);
       operationLog.push(`  原本：${reclass.current_area} / ${reclass.current_product}`);
       operationLog.push(`  改為：${reclass.new_area} / ${reclass.new_product}`);
       operationLog.push(`  原因：${reclass.reason}`);
 
-      // 找到目標 Area
-      let targetArea = await prisma.area.findFirst({
-        where: { user_id: userId, name: reclass.new_area, deleted_at: null },
-      });
-
-      if (!targetArea) {
-        targetArea = await prisma.area.create({
-          data: {
-            user_id: userId,
-            name: reclass.new_area,
-            is_custom: true,
-          },
-        });
-      }
-
-      // 找到目標 Product
-      let targetProduct = await prisma.product.findFirst({
-        where: { user_id: userId, area_id: targetArea.id, name: reclass.new_product, deleted_at: null },
-      });
-
-      if (!targetProduct) {
-        targetProduct = await prisma.product.create({
-          data: {
-            user_id: userId,
-            area_id: targetArea.id,
-            name: reclass.new_product,
-            status: Status.ACTIVE,
-            lifecycle: Lifecycle.FINITE,
-          },
-        });
-      }
+      // ✅ 優化：使用快取獲取或創建目標 Area 和 Product
+      const targetAreaId = await getOrCreateArea(reclass.new_area);
+      const targetProductId = await getOrCreateProduct(targetAreaId, reclass.new_area, reclass.new_product);
 
       // 更新任務
       await prisma.task.update({
         where: { id: reclass.task_id },
         data: {
-          product_id: targetProduct.id,
+          product_id: targetProductId,
           ai_analysis: {
-            ...(task.ai_analysis as object || {}),
+            ...(taskInfo.aiAnalysis || {}),
             reclassification_reason: reclass.reason,
             reclassified_at: new Date().toISOString(),
           },
@@ -406,20 +392,23 @@ ${structureSummary}
       reclassifyCount++;
     }
 
-    // 清理空的 Products 和 Areas
+    // ✅ 優化：清理空的 Products 和 Areas（使用批量更新）
     const emptyProducts = await prisma.product.findMany({
       where: {
         user_id: userId,
         deleted_at: null,
-        tasks: { none: { deleted_at: null } },
+        tasks: { none: { deleted_at: null, status: { not: Status.ARCHIVE } } },
       },
+      select: { id: true },
     });
 
-    for (const product of emptyProducts) {
-      await prisma.product.update({
-        where: { id: product.id },
+    // ✅ 批量軟刪除空 Products
+    if (emptyProducts.length > 0) {
+      await prisma.product.updateMany({
+        where: { id: { in: emptyProducts.map(p => p.id) } },
         data: { deleted_at: new Date() },
       });
+      operationLog.push(`🧹 清理空 Product：${emptyProducts.length} 個`);
     }
 
     const emptyAreas = await prisma.area.findMany({
@@ -428,20 +417,15 @@ ${structureSummary}
         deleted_at: null,
         products: { none: { deleted_at: null } },
       },
+      select: { id: true },
     });
 
-    for (const area of emptyAreas) {
-      await prisma.area.update({
-        where: { id: area.id },
+    // ✅ 批量軟刪除空 Areas
+    if (emptyAreas.length > 0) {
+      await prisma.area.updateMany({
+        where: { id: { in: emptyAreas.map(a => a.id) } },
         data: { deleted_at: new Date() },
       });
-    }
-
-    // 添加清理操作日誌
-    if (emptyProducts.length > 0) {
-      operationLog.push(`🧹 清理空 Product：${emptyProducts.length} 個`);
-    }
-    if (emptyAreas.length > 0) {
       operationLog.push(`🧹 清理空 Area：${emptyAreas.length} 個`);
     }
 

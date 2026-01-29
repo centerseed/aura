@@ -42,6 +42,7 @@ model Area {
   user            User      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   products        Product[]
 
+  @@index([user_id, deleted_at])
   @@map("areas")
 }
 
@@ -64,6 +65,8 @@ model Product {
   tasks         Task[]
   topics        Topic[]
 
+  @@index([user_id, deleted_at])
+  @@index([area_id, deleted_at])
   @@map("products")
 }
 
@@ -80,6 +83,8 @@ model Topic {
   product         Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user            User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([product_id, deleted_at])
+  @@index([user_id, deleted_at])
   @@map("topics")
 }
 
@@ -106,6 +111,9 @@ model Task {
   user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   ai_metadata             TaskAIMetadata?
 
+  @@index([product_id, deleted_at, status])
+  @@index([user_id, deleted_at, status])
+  @@index([created_at])
   @@map("tasks")
 }
 
@@ -158,6 +166,7 @@ model Milestone {
   description String?   @db.VarChar
   user        User      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([user_id, deleted_at, target_date, status])
   @@map("milestones")
 }
 

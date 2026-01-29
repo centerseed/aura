@@ -28,6 +28,9 @@ const AdjustmentIntentSchema = z.object({
 // POST /api/adjust-tags
 export async function POST(request: NextRequest) {
   try {
+    const timings: Record<string, number> = {};
+    const startTotal = Date.now();
+
     const userId = await authenticateRequest(request, prisma);
     const body = await request.json();
     const { text, preview = false, confirmed = false, logId = null } = body;
@@ -36,7 +39,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "text is required" }, { status: 400 });
     }
 
-    // 獲取用戶現有結構
+    // 獲取用戶現有結構（只查詢未完成的任務）
+    const startDbStructure = Date.now();
     const existingAreas = await prisma.area.findMany({
       where: { user_id: userId, deleted_at: null },
       include: {
@@ -45,7 +49,10 @@ export async function POST(request: NextRequest) {
           include: {
             topics: { where: { deleted_at: null } },
             tasks: {
-              where: { deleted_at: null },
+              where: {
+                deleted_at: null,
+                status: { not: Status.ARCHIVE },  // ✅ 排除已完成任務
+              },
               orderBy: { created_at: "desc" },
             },
           },
@@ -55,7 +62,15 @@ export async function POST(request: NextRequest) {
 
     // 構建結構摘要
     let contextSummary = "### 用戶現有結構:\n\n";
-    const taskMap: Record<string, { areaName: string; productName: string; content: string; topicName: string | null }> = {};
+    // ✅ 優化：擴展 taskMap 以包含執行模式需要的所有資訊
+    const taskMap: Record<string, {
+      areaName: string;
+      productName: string;
+      content: string;
+      topicName: string | null;
+      productId: string;
+      aiAnalysis: object | null;
+    }> = {};
 
     for (const area of existingAreas) {
       contextSummary += `**Area: ${area.name}**\n`;
@@ -78,13 +93,17 @@ export async function POST(request: NextRequest) {
             productName: product.name,
             content: task.content,
             topicName: topicName,
+            productId: product.id,
+            aiAnalysis: task.ai_analysis as object | null,
           };
         }
       }
       contextSummary += "\n";
     }
+    timings["db_structure"] = Date.now() - startDbStructure;
 
     // 調用 AI 解析用戶意圖
+    const startAI = Date.now();
     const { object: intent } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: AdjustmentIntentSchema,
@@ -114,6 +133,7 @@ ${text}
 
 請分析用戶意圖並找出需要調整的任務。reasoning 請用繁體中文說明。`,
     });
+    timings["ai_generateObject"] = Date.now() - startAI;
 
     console.log("Adjustment Intent:", intent);
 
@@ -151,13 +171,11 @@ ${text}
 
       if (intent.intent_type === "move_tasks" && intent.target_product) {
         for (const match of intent.task_matches) {
-          const task = await prisma.task.findUnique({
-            where: { id: match.task_id },
-          });
-          if (task && !task.deleted_at) {
-            const taskInfo = taskMap[match.task_id];
+          // ✅ 優化：直接使用 taskMap，不需要查詢資料庫
+          const taskInfo = taskMap[match.task_id];
+          if (taskInfo) {
             previewLog.push(
-              `將「${task.content}」\n從 ${taskInfo.areaName} / ${taskInfo.productName}\n移到 ${intent.target_area || taskInfo.areaName} / ${intent.target_product}`
+              `將「${taskInfo.content}」\n從 ${taskInfo.areaName} / ${taskInfo.productName}\n移到 ${intent.target_area || taskInfo.areaName} / ${intent.target_product}`
             );
 
             structuredOperations.push({
@@ -166,7 +184,7 @@ ${text}
               from: {
                 area: taskInfo.areaName,
                 product: taskInfo.productName,
-                taskTitle: match.task_title || task.content,
+                taskTitle: match.task_title || taskInfo.content,
               },
               to: {
                 area: intent.target_area || taskInfo.areaName,
@@ -179,13 +197,11 @@ ${text}
 
       if (intent.intent_type === "change_topic" && intent.target_topic) {
         for (const match of intent.task_matches) {
-          const task = await prisma.task.findUnique({
-            where: { id: match.task_id },
-          });
-          if (task && !task.deleted_at) {
-            const taskInfo = taskMap[match.task_id];
+          // ✅ 優化：直接使用 taskMap，不需要查詢資料庫
+          const taskInfo = taskMap[match.task_id];
+          if (taskInfo) {
             previewLog.push(
-              `將「${task.content}」的 Topic\n從 ${taskInfo.topicName || "(無)"}\n改為 ${intent.target_topic}`
+              `將「${taskInfo.content}」的 Topic\n從 ${taskInfo.topicName || "(無)"}\n改為 ${intent.target_topic}`
             );
 
             structuredOperations.push({
@@ -195,7 +211,7 @@ ${text}
                 area: taskInfo.areaName,
                 product: taskInfo.productName,
                 topic: taskInfo.topicName || undefined,
-                taskTitle: match.task_title || task.content,
+                taskTitle: match.task_title || taskInfo.content,
               },
               to: {
                 topic: intent.target_topic,
@@ -206,6 +222,7 @@ ${text}
       }
 
       // 創建評估 Log (PENDING 狀態)
+      const startDbLog = Date.now();
       const evaluationLog = await prisma.systemEvaluationLog.create({
         data: {
           user_id: userId,
@@ -218,6 +235,9 @@ ${text}
           user_action: "PENDING",
         },
       });
+      timings["db_createLog"] = Date.now() - startDbLog;
+      timings["total"] = Date.now() - startTotal;
+      console.log("⏱️ [adjust-tags] Timings (preview):", JSON.stringify(timings, null, 2));
 
       return NextResponse.json({
         success: true,
@@ -236,6 +256,7 @@ ${text}
 
     const operationLog: string[] = [];
     let movedCount = 0;
+    const startExecution = Date.now();
 
     // 執行移動操作
     if (intent.intent_type === "move_tasks" && intent.target_product) {
@@ -288,29 +309,25 @@ ${text}
         }, { status: 404 });
       }
 
-      // 移動所有匹配的任務
+      // ✅ 優化：使用 taskMap 資料，不需要查詢資料庫
       for (const match of intent.task_matches) {
-        const task = await prisma.task.findUnique({
-          where: { id: match.task_id },
-        });
-
-        if (!task || task.deleted_at) continue;
+        const taskInfo = taskMap[match.task_id];
+        if (!taskInfo) continue;
 
         await prisma.task.update({
           where: { id: match.task_id },
           data: {
             product_id: targetProduct.id,
             ai_analysis: {
-              ...(task.ai_analysis as object || {}),
+              ...(taskInfo.aiAnalysis || {}),
               manual_adjustment: `移到 ${intent.target_area || ""} / ${intent.target_product}`,
               adjusted_at: new Date().toISOString(),
             },
           },
         });
 
-        const taskInfo = taskMap[match.task_id];
         operationLog.push(
-          `✅ 移動「${task.content}」\n   從 ${taskInfo.areaName} / ${taskInfo.productName} → ${intent.target_area || taskInfo.areaName} / ${intent.target_product}`
+          `✅ 移動「${taskInfo.content}」\n   從 ${taskInfo.areaName} / ${taskInfo.productName} → ${intent.target_area || taskInfo.areaName} / ${intent.target_product}`
         );
         movedCount++;
       }
@@ -318,51 +335,61 @@ ${text}
 
     // 執行 Topic 變更操作
     if (intent.intent_type === "change_topic" && intent.target_topic) {
+      // ✅ 優化：建立 Topic 快取，避免重複查詢/創建相同 Topic
+      const topicCache = new Map<string, string | null>(); // productId::topicName -> topicId
+
       for (const match of intent.task_matches) {
-        const task = await prisma.task.findUnique({
-          where: { id: match.task_id },
-          include: { product: true },
-        });
+        const taskInfo = taskMap[match.task_id];
+        if (!taskInfo) continue;
 
-        if (!task || task.deleted_at || !task.product) continue;
+        const cacheKey = `${taskInfo.productId}::${intent.target_topic}`;
+        let targetTopicId: string | null = null;
 
-        // 找到或創建目標 Topic
-        let targetTopic = await prisma.topic.findFirst({
-          where: {
-            user_id: userId,
-            product_id: task.product_id,
-            name: intent.target_topic,
-            deleted_at: null,
-          },
-        });
-
-        if (!targetTopic && intent.target_topic.trim() !== "") {
-          targetTopic = await prisma.topic.create({
-            data: {
+        // 檢查快取
+        if (topicCache.has(cacheKey)) {
+          targetTopicId = topicCache.get(cacheKey) ?? null;
+        } else {
+          // 找到或創建目標 Topic
+          let targetTopic = await prisma.topic.findFirst({
+            where: {
               user_id: userId,
-              product_id: task.product_id,
+              product_id: taskInfo.productId,
               name: intent.target_topic,
+              deleted_at: null,
             },
           });
-          operationLog.push(`➕ 創建新 Topic：${intent.target_topic}`);
+
+          if (!targetTopic && intent.target_topic.trim() !== "") {
+            targetTopic = await prisma.topic.create({
+              data: {
+                user_id: userId,
+                product_id: taskInfo.productId,
+                name: intent.target_topic,
+                created_at: new Date(),
+              },
+            });
+            operationLog.push(`➕ 創建新 Topic：${intent.target_topic}`);
+          }
+
+          targetTopicId = targetTopic?.id ?? null;
+          topicCache.set(cacheKey, targetTopicId);
         }
 
         // 更新任務的 Topic
         await prisma.task.update({
           where: { id: match.task_id },
           data: {
-            topic_id: targetTopic?.id ?? null,
+            topic_id: targetTopicId,
             ai_analysis: {
-              ...(task.ai_analysis as object || {}),
+              ...(taskInfo.aiAnalysis || {}),
               manual_topic_change: intent.target_topic,
               topic_changed_at: new Date().toISOString(),
             },
           },
         });
 
-        const taskInfo = taskMap[match.task_id];
         operationLog.push(
-          `🏷️  更改「${task.content}」的 Topic\n   從 ${taskInfo.topicName || "(無)"} → ${intent.target_topic}`
+          `🏷️  更改「${taskInfo.content}」的 Topic\n   從 ${taskInfo.topicName || "(無)"} → ${intent.target_topic}`
         );
         movedCount++;
       }
@@ -381,6 +408,10 @@ ${text}
         },
       });
     }
+
+    timings["db_execution"] = Date.now() - startExecution;
+    timings["total"] = Date.now() - startTotal;
+    console.log("⏱️ [adjust-tags] Timings (execute):", JSON.stringify(timings, null, 2));
 
     return NextResponse.json({
       success: true,
