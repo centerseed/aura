@@ -30,6 +30,12 @@ interface ReorganizeProposal {
     consolidated_narrative: string;
     reasoning: string;
     confidence: number;
+    // 語意守恆映射表
+    semantic_preservation?: Array<{
+      original_task_id: string;
+      preserved_in: "title" | "narrative" | "sub_item";
+      key_intent: string;
+    }>;
   }>;
   reasoning: string;
   logId?: string;
@@ -256,15 +262,33 @@ export async function POST(
             },
           });
 
-          // 構建 sub_items 陣列
-          const subItems = subTasks.map((subTask, idx) => ({
+          // ✅ 保留 parent task 原有的 sub_items（包含已完成的項目）
+          const existingSubItems = ((parentTask as any).sub_items as Array<{
+            id: string;
+            content: string;
+            completed: boolean;
+            created_at: string;
+            completed_at: string | null;
+            order: number;
+          }>) || [];
+
+          // 計算新 sub_items 的起始 order（接在原有的後面）
+          const startOrder = existingSubItems.length > 0
+            ? Math.max(...existingSubItems.map(s => s.order ?? 0)) + 1
+            : 0;
+
+          // 構建新的 sub_items 陣列（來自被整合的 tasks）
+          const newSubItems = subTasks.map((subTask, idx) => ({
             id: subTask.id, // 使用原 Task ID 作為 sub-item ID
             content: subTask.content,
             completed: false,
             created_at: new Date().toISOString(),
             completed_at: null,
-            order: idx,
+            order: startOrder + idx,
           }));
+
+          // 合併：原有的 sub_items + 新整合的 sub_items
+          const subItems = [...existingSubItems, ...newSubItems];
 
           // ✅ 合併所有 sub tasks 的 references 到 parent task（使用統一去重函數）
           const parentReferences = ((parentTask as any).references as Reference[]) || [];
@@ -286,6 +310,31 @@ export async function POST(
             ? new Date(Math.max(...allDueDates.map(d => d.getTime())))
             : null;
 
+          // 建立語意映射表（用於追溯）
+          const semanticMap = new Map(
+            (consolidation.semantic_preservation || []).map(sp => [sp.original_task_id, sp])
+          );
+
+          // ✅ 只對「新加入的 sub_items」增強語意資訊（原有的保持不變）
+          const enrichedNewSubItems = newSubItems.map(item => {
+            const semanticInfo = semanticMap.get(item.id);
+            const originalTask = subTasks.find(t => t.id === item.id);
+            const originalAnalysis = (originalTask?.ai_analysis as Record<string, unknown>) || {};
+
+            return {
+              ...item,
+              // 語意守恆欄位
+              key_intent: semanticInfo?.key_intent || null,
+              preserved_in: semanticInfo?.preserved_in || "sub_item",
+              // 保留原始上下文（可追溯）
+              original_narrative: originalAnalysis.narrative || null,
+              original_due_date: originalTask?.due_date?.toISOString() || null,
+            };
+          });
+
+          // ✅ 合併：原有的 sub_items（包含已完成狀態）+ 新增強的 sub_items
+          const enrichedSubItems = [...existingSubItems, ...enrichedNewSubItems];
+
           // 更新 parent task
           const parentAnalysis = (parentTask.ai_analysis as Record<string, unknown>) || {};
           await tx.task.update({
@@ -293,13 +342,16 @@ export async function POST(
             data: {
               content: consolidation.consolidated_title,
               due_date: latestDueDate, // ✅ 取所有被整合 tasks 中最晚的 due_date
-              sub_items: subItems as any,
+              sub_items: enrichedSubItems as any,
               references: mergedReferences as any,
               ai_analysis: {
                 ...parentAnalysis,
                 narrative: consolidation.consolidated_narrative,
                 consolidation_reasoning: consolidation.reasoning,
                 consolidated_at: new Date().toISOString(),
+                // ✅ 語意守恆追溯資訊
+                semantic_preservation: consolidation.semantic_preservation || [],
+                consolidated_task_count: validSubTaskIds.length + 1, // parent + subs
               },
             },
           });

@@ -33,15 +33,22 @@ function getDateRange(tasks: TaskCard[], milestones: Milestone[]) {
 
   if (dates.length === 0) {
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    endDate.setHours(0, 0, 0, 0);
     return {
       start: now,
-      end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 天後
+      end: endDate,
     };
   }
 
   const sortedDates = dates.sort((a, b) => a.getTime() - b.getTime());
   const start = new Date(sortedDates[0]);
   const end = new Date(sortedDates[sortedDates.length - 1]);
+
+  // 統一設為午夜時間,確保時間基準一致
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
 
   // 加上一些 padding
   start.setDate(start.getDate() - 7);
@@ -68,20 +75,29 @@ function generateWeekLabels(start: Date, end: Date) {
   return weeks;
 }
 
+// 將日期轉為本地午夜,避免時區問題
+function toLocalMidnight(date: Date | string): Date {
+  const d = date instanceof Date ? date : new Date(date);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 // 計算任務在時間軸上的位置和寬度
 function calculateTaskPosition(
   task: { start_date?: string | Date | null; due_date: string | Date },
   rangeStart: Date,
   rangeEnd: Date
 ): { left: number; width: number } {
-  const totalDays = (rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24);
-  const dueDate = task.due_date instanceof Date ? task.due_date : new Date(task.due_date);
+  // 統一使用本地午夜時間
+  const rangeStartLocal = toLocalMidnight(rangeStart);
+  const rangeEndLocal = toLocalMidnight(rangeEnd);
+  const totalDays = (rangeEndLocal.getTime() - rangeStartLocal.getTime()) / (1000 * 60 * 60 * 24);
+  const dueDate = toLocalMidnight(task.due_date);
 
   if (task.start_date) {
     // Case 1: Has start_date → show as bar
-    const startDate = task.start_date instanceof Date ? task.start_date : new Date(task.start_date);
-    const taskStartDay = (startDate.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24);
-    const taskEndDay = (dueDate.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24);
+    const startDate = toLocalMidnight(task.start_date);
+    const taskStartDay = (startDate.getTime() - rangeStartLocal.getTime()) / (1000 * 60 * 60 * 24);
+    const taskEndDay = (dueDate.getTime() - rangeStartLocal.getTime()) / (1000 * 60 * 60 * 24);
 
     const left = (taskStartDay / totalDays) * 100;
     const width = ((taskEndDay - taskStartDay) / totalDays) * 100;
@@ -117,6 +133,17 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
   const { start, end } = useMemo(() => getDateRange(allTasks, milestones), [allTasks, milestones]);
   const weekLabels = useMemo(() => generateWeekLabels(start, end), [start, end]);
 
+  // 計算實際的時間軸範圍（基於週標籤）
+  const timelineRange = useMemo(() => {
+    if (weekLabels.length === 0) {
+      return { start, end };
+    }
+    const timelineStart = weekLabels[0];
+    const timelineEnd = new Date(weekLabels[weekLabels.length - 1]);
+    timelineEnd.setDate(timelineEnd.getDate() + 7); // 最後一週的結束日期
+    return { start: timelineStart, end: timelineEnd };
+  }, [weekLabels, start, end]);
+
   const toggleArea = (areaId: string) => {
     setExpandedAreas((prev) => {
       const next = new Set(prev);
@@ -135,16 +162,24 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
     });
   };
 
-  // 今天的標記線位置
-  const todayPosition = useMemo(() => {
-    // 設置為今天的午夜 (00:00:00)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // 計算日期在時間軸上的像素位置 (直接用天數計算)
+  const getDatePositionPx = useMemo(() => {
+    if (weekLabels.length === 0) return () => 0;
 
-    const totalDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-    const daysSinceStart = (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-    return (daysSinceStart / totalDays) * 100;
-  }, [start, end]);
+    const firstWeek = toLocalMidnight(weekLabels[0]);
+    const pxPerDay = 80 / 7;
+
+    return (date: Date | string) => {
+      const d = toLocalMidnight(date);
+      const daysSinceStart = (d.getTime() - firstWeek.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceStart * pxPerDay;
+    };
+  }, [weekLabels]);
+
+  // 今天的位置
+  const todayTimelinePx = useMemo(() => {
+    return getDatePositionPx(new Date());
+  }, [getDatePositionPx]);
 
   return (
     <Card className="bg-white/5 border-white/10 backdrop-blur-xl overflow-hidden">
@@ -168,12 +203,21 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
 
             {/* 時間軸 */}
             <div className="flex-1 relative overflow-x-auto">
-              <div className="flex h-full">
+              <div className="relative flex h-full" style={{ minWidth: `${weekLabels.length * 80}px` }}>
+                {/* 今天標記線 */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
+                  style={{ left: `${todayTimelinePx}px` }}
+                >
+                  <div className="absolute -top-0 left-1/2 -translate-x-1/2 text-xs text-red-400 whitespace-nowrap">
+                    今天
+                  </div>
+                </div>
                 {weekLabels.map((week, idx) => (
                   <div
                     key={idx}
-                    className="flex-1 px-2 py-3 border-r border-white/5 text-center"
-                    style={{ minWidth: "80px" }}
+                    className="px-2 py-3 border-r border-white/5 text-center shrink-0"
+                    style={{ width: "80px" }}
                   >
                     <div className="text-xs text-white/60">
                       {week.getMonth() + 1}/{week.getDate()}
@@ -187,16 +231,6 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
 
         {/* 甘特圖內容 */}
         <div className="relative">
-          {/* 今天標記線 */}
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-20 pointer-events-none"
-            style={{ left: `calc(256px + (100% - 256px) * ${todayPosition / 100})` }}
-          >
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-xs text-red-400 bg-red-900/50 px-1 rounded">
-              今天
-            </div>
-          </div>
-
           {/* Areas 和 Products */}
           {areas.map((area) => {
             const isExpanded = expandedAreas.has(area.id);
@@ -225,19 +259,20 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                   </div>
 
                   {/* Area timeline */}
-                  <div className="flex-1 relative py-3">
-                    {areaMilestones.map((milestone) => {
-                      const pos = calculateTaskPosition(
-                        { due_date: milestone.target_date },
-                        start,
-                        end
-                      );
-                      return (
-                        <div
-                          key={milestone.id}
-                          className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
-                          style={{ left: `${pos.left}%` }}
-                        >
+                  <div className="flex-1 relative overflow-x-auto">
+                    <div className="relative py-3" style={{ minWidth: `${weekLabels.length * 80}px` }}>
+                      {/* 今天標記線 */}
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-10 pointer-events-none"
+                        style={{ left: `${todayTimelinePx}px` }}
+                      />
+                      {areaMilestones.map((milestone) => {
+                        return (
+                          <div
+                            key={milestone.id}
+                            className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
+                            style={{ left: `${getDatePositionPx(milestone.target_date)}px` }}
+                          >
                           <div className="relative">
                             <Flag
                               className="w-5 h-5 text-indigo-400 fill-purple-400 drop-shadow-lg group-hover:scale-125 transition-transform"
@@ -252,6 +287,7 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                         </div>
                       );
                     })}
+                    </div>
                   </div>
                 </div>
 
@@ -274,20 +310,21 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                           </div>
 
                           {/* Product timeline */}
-                          <div className="flex-1 relative py-3">
-                            {/* Product milestones */}
-                            {productMilestones.map((milestone) => {
-                              const pos = calculateTaskPosition(
-                                { due_date: milestone.target_date },
-                                start,
-                                end
-                              );
-                              return (
-                                <div
-                                  key={milestone.id}
-                                  className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
-                                  style={{ left: `${pos.left}%` }}
-                                >
+                          <div className="flex-1 relative overflow-x-auto">
+                            <div className="relative py-3" style={{ minWidth: `${weekLabels.length * 80}px` }}>
+                              {/* 今天標記線 */}
+                              <div
+                                className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-10 pointer-events-none"
+                                style={{ left: `${todayTimelinePx}px` }}
+                              />
+                              {/* Product milestones */}
+                              {productMilestones.map((milestone) => {
+                                return (
+                                  <div
+                                    key={milestone.id}
+                                    className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
+                                    style={{ left: `${getDatePositionPx(milestone.target_date)}px` }}
+                                  >
                                   <div className="relative">
                                     <Star
                                       className="w-5 h-5 text-yellow-300 fill-yellow-300 drop-shadow-lg group-hover:scale-125 transition-transform"
@@ -302,16 +339,16 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                                 </div>
                               );
                             })}
+                            </div>
                           </div>
                         </div>
 
                         {/* Task rows */}
                         {tasksWithDates.map((task) => {
-                          const pos = calculateTaskPosition(
-                            task as { start_date?: string | null; due_date: string },
-                            start,
-                            end
-                          );
+                          // 直接用天數計算位置
+                          const duePx = getDatePositionPx(task.due_date!);
+                          const startPx = task.start_date ? getDatePositionPx(task.start_date) : duePx;
+                          const widthPx = task.start_date ? Math.max(8, duePx - startPx) : 8;
                           const config = drawerConfig[task.drawer] || drawerConfig.INBOX;
                           const isTaskExpanded = expandedTasks.has(task.id);
                           const hasSubItems = task.sub_items && task.sub_items.length > 0;
@@ -347,14 +384,23 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                                 </div>
 
                                 {/* Task timeline */}
-                                <div className="flex-1 relative py-2.5">
-                                  <div
-                                    className="absolute top-1/2 -translate-y-1/2 group"
-                                    style={{ left: `${pos.left}%`, width: `${pos.width}%` }}
-                                  >
+                                <div className="flex-1 relative overflow-x-auto">
+                                  <div className="relative py-2.5" style={{ minWidth: `${weekLabels.length * 80}px` }}>
+                                    {/* 今天標記線 */}
+                                    <div
+                                      className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-10 pointer-events-none"
+                                      style={{ left: `${todayTimelinePx}px` }}
+                                    />
+                                    <div
+                                      className="absolute top-1/2 -translate-y-1/2 group"
+                                      style={{
+                                        left: `${startPx}px`,
+                                        width: `${widthPx}px`
+                                      }}
+                                    >
                                     <div
                                       className={`
-                                        ${pos.width > 2 ? 'h-3' : 'h-2'}
+                                        ${widthPx > 10 ? 'h-3' : 'h-2'}
                                         rounded-full
                                         ${config.dotColor}
                                         relative
@@ -376,6 +422,7 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                                         )}
                                       </div>
                                     </div>
+                                  </div>
                                   </div>
                                 </div>
                               </div>

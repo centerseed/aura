@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "894512935237",
+    "project_id": "zentropy-4f7a5",
+    "storage_bucket": "zentropy-4f7a5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:894512935237:android:6f16a7c05c560e8df88e2c",
+        "android_client_info": {
+          "package_name": "com.zentropy.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "894512935237-7rpe00ambv2is8e7hp8fr6c35m8mavbq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFkEOGt_6T97Hmde9dcy_74y-SfGgUERQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "894512935237-7rpe00ambv2is8e7hp8fr6c35m8mavbq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "894512935237-4omrejflpe7nu5t5ij8curuq0gbuklcu.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.naruvia.zentropy"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
