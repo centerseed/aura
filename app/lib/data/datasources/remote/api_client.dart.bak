@@ -1,0 +1,104 @@
+import 'package:dio/dio.dart';
+import 'package:retrofit/retrofit.dart';
+
+import '../models/brain_dump_models.dart';
+import '../models/task_model.dart';
+import '../models/area_model.dart';
+import '../models/product_model.dart';
+
+part 'api_client.g.dart';
+
+@RestApi()
+abstract class ApiClient {
+  factory ApiClient(Dio dio, {String? baseUrl}) = _ApiClient;
+
+  // ==================== Auth ====================
+
+  @POST('/api/auth/signin')
+  Future<Map<String, dynamic>> signIn(@Body() Map<String, dynamic> body);
+
+  @GET('/api/me')
+  Future<Map<String, dynamic>> getCurrentUser();
+
+  // ==================== Brain Dump ====================
+
+  @POST('/api/brain-dump')
+  Future<BrainDumpResponse> brainDump(@Body() BrainDumpRequest request);
+
+  // ==================== Tasks ====================
+
+  @GET('/api/tasks')
+  Future<List<TaskModel>> getTasks({
+    @Query('status') String? status,
+    @Query('due_date_from') String? dueDateFrom,
+    @Query('due_date_to') String? dueDateTo,
+  });
+
+  @POST('/api/tasks')
+  Future<TaskModel> createTask(@Body() Map<String, dynamic> request);
+
+  @PATCH('/api/tasks/{taskId}')
+  Future<TaskModel> updateTask(
+    @Path('taskId') String taskId,
+    @Body() Map<String, dynamic> request,
+  );
+
+  @DELETE('/api/tasks/{taskId}')
+  Future<void> deleteTask(@Path('taskId') String taskId);
+
+  @PATCH('/api/tasks/{taskId}/sub-items/{subItemId}')
+  Future<TaskModel> updateSubItem(
+    @Path('taskId') String taskId,
+    @Path('subItemId') String subItemId,
+    @Body() Map<String, dynamic> request,
+  );
+
+  // ==================== Library ====================
+
+  @GET('/api/library')
+  Future<Map<String, dynamic>> getLibrary();
+
+  // ==================== Areas ====================
+
+  @GET('/api/areas')
+  Future<List<AreaModel>> getAreas();
+
+  @POST('/api/areas')
+  Future<AreaModel> createArea(@Body() Map<String, dynamic> request);
+
+  @PATCH('/api/areas/{id}')
+  Future<AreaModel> updateArea(
+    @Path('id') String id,
+    @Body() Map<String, dynamic> request,
+  );
+
+  @DELETE('/api/areas/{id}')
+  Future<void> deleteArea(@Path('id') String id);
+
+  // ==================== Products ====================
+
+  @GET('/api/products')
+  Future<List<ProductModel>> getProducts();
+
+  @POST('/api/products')
+  Future<ProductModel> createProduct(@Body() Map<String, dynamic> request);
+
+  @PATCH('/api/products/{id}')
+  Future<ProductModel> updateProduct(
+    @Path('id') String id,
+    @Body() Map<String, dynamic> request,
+  );
+
+  @DELETE('/api/products/{id}')
+  Future<void> deleteProduct(@Path('id') String id);
+
+  // ==================== Milestones ====================
+
+  @GET('/api/milestones')
+  Future<List<Map<String, dynamic>>> getMilestones();
+
+  @POST('/api/milestones')
+  Future<Map<String, dynamic>> createMilestone(
+    @Body() Map<String, dynamic> request,
+  );
+}

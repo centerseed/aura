@@ -1,134 +1,439 @@
-# 實作計畫：Librarian Insight Engine (圖書管理員洞察引擎)
-> **Naruvia 的自我進化核心：基於神經符號 (Neuro-Symbolic) 的記憶與治理系統**
+# 架構設計：Universal Librarian Engine (通用記憶引擎)
+> **一個可跨專案復用的 AI 記憶與學習微服務**
 
-**狀態**: 草案 (Draft)
-**版本**: 1.0
+**狀態**: 設計中 (Design)
+**版本**: 2.0
 **日期**: 2026-01-30
 
 ---
 
-## 1. 執行摘要 (Executive Summary)
+## 1. 願景 (Vision)
 
-**Librarian Insight Engine** 是 Naruvia 區別於傳統 To-Do List 的核心護城河。它不只是一個被動記錄任務的數據庫，而是一個**主動學習用戶行為、自動歸納治理規則的智能系統**。
+**Universal Librarian Engine** 不是為單一專案設計的記憶系統，而是一個**通用的 AI 學習基礎設施**，可以透過 Adapter 層服務於不同的應用場景：
 
-本計畫旨在解決 AI 應用常見的「越用越笨」或「上下文遺忘」問題。透過 **System 1 (直覺反應)** 與 **System 2 (深層思考)** 的混合架構，讓 AI 隨著用戶的使用時間增長，自動適應並模仿用戶的分類邏輯、命名習慣與優先級判斷，最終達成「比你自己更了解你自己」的境界。
-
----
-
-## 2. 核心架構：神經符號混合模型 (Neuro-Symbolic Hybrid Model)
-
-我們採用 **"Reflexion" (反思)** 架構，將系統分為兩個認知層次：
-
-### 2.1 System 1: The Fast Retrieval (快思考)
-*   **角色**: 直覺反應，處理即時請求。
-*   **技術**: Vector Search (pgvector) + RAG。
-*   **功能**: 當用戶輸入 "Buy RTX 5090" 時，系統**不需思考**，直接根據過往向量，瞬間判斷這屬於 "Entertainment" 或 "Work" (取決於之前的訓練)。
-*   **特點**: 低延遲 (<200ms)、低成本。
-
-### 2.2 System 2: The Slow Distillation (慢思考)
-*   **角色**: 深度學習，處理規則歸納。
-*   **技術**: LLM (Claude/GPT-4) + Chain of Thought。
-*   **功能**: 當用戶糾正 AI "NO! RTX 5090 is for Deep Learning!" 時，System 2 會啟動，分析這數百次的糾正，歸納出一條明確規則：`IF item contains "GPU" AND context is "AI Research" THEN tag = "Work"`。
-*   **特點**: 高成本、非同步運行 (Background Job)。
+- **Naruvia**: 任務分類規則蒸餾 (Task → Category/Priority)
+- **Havital**: 訓練對話壓縮與用戶檔案生成 (Conversation → User Profile)
+- **未來專案**: 任何需要「越用越聰明」的 AI 應用
 
 ---
 
-## 3. 資料架構 (Data Schema)
+## 2. 核心理念：System 1 + System 2
 
-利用 Supabase 的 PostgreSQL 特性，我們將結構化數據與向量數據混合儲存。
+基於認知心理學的雙系統理論：
 
-### 3.1 核心資料表
+### 2.1 System 1: The Fast Path (快思考)
+- **角色**: 即時反應，處理用戶請求
+- **技術**: 向量檢索 / 檔案載入
+- **延遲**: < 200ms
+- **成本**: 極低（本地計算或簡單查詢）
 
-#### `memories` (長期記憶庫)
-存放所有經過蒸餾的知識與觀察。
-```sql
-CREATE TABLE memories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id),
-    content TEXT NOT NULL,           -- 記憶內容 (例如：規則描述)
-    embedding VECTOR(768),           -- 語意向量 (Gemini 004)
-    memory_type TEXT NOT NULL,       -- 'observation' (觀察), 'rule' (規則), 'fact' (事實)
-    confidence_score FLOAT DEFAULT 0.5, -- 置信度 (經過幾次驗證？)
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    last_accessed_at TIMESTAMPTZ DEFAULT NOW()
-);
+### 2.2 System 2: The Slow Path (慢思考)
+- **角色**: 深度學習，歸納新知識
+- **技術**: LLM 蒸餾 + 模式分析
+- **執行**: 非同步 / 背景任務
+- **成本**: 低（按需觸發，非每次請求）
+
+---
+
+## 3. 通用架構設計
+
+### 3.1 三層架構
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                Layer 1: Core Engine (核心引擎)              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Interface (抽象介面)                                 │  │
+│  │  - observe(event)      // 記錄事件                   │  │
+│  │  - recall(context)     // 檢索記憶                   │  │
+│  │  - reflect()           // 蒸餾新知識                 │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  實作核心邏輯（與專案無關）：                                │
+│  - 向量相似度計算                                           │
+│  - LLM 呼叫封裝                                             │
+│  - 蒸餾工作流                                               │
+└────────────────────────────────────────────────────────────┘
+                            ↕ (Adapter 層)
+┌────────────────────────────────────────────────────────────┐
+│           Layer 2: Domain Adapters (領域適配器)             │
+│  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │  Naruvia        │  │  Havital        │  ...             │
+│  │  Adapter        │  │  Adapter        │                  │
+│  ├─────────────────┤  ├─────────────────┤                  │
+│  │ 資料格式轉換     │  │ 資料格式轉換     │                  │
+│  │ PostgreSQL      │  │ Firestore       │                  │
+│  │ 規則型記憶       │  │ 對話型記憶       │                  │
+│  └─────────────────┘  └─────────────────┘                  │
+└────────────────────────────────────────────────────────────┘
+                            ↕
+┌────────────────────────────────────────────────────────────┐
+│          Layer 3: Storage Backends (儲存後端)               │
+│  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │  PostgreSQL     │  │  Firestore      │  ...             │
+│  │  + pgvector     │  │  NoSQL          │                  │
+│  └─────────────────┘  └─────────────────┘                  │
+└────────────────────────────────────────────────────────────┘
 ```
 
-#### `correction_logs` (修正日誌 - 負樣本庫)
-這是 AI 學習的最重要來源。記錄 AI 犯錯與用戶修正的過程。
-```sql
-CREATE TABLE correction_logs (
-    id UUID PRIMARY KEY,
-    user_id UUID,
-    original_input TEXT,             -- 用戶原始輸入 ("Buy milk")
-    ai_prediction JSONB,             -- AI 猜測 ("Category: Work")
-    user_correction JSONB,           -- 用戶修正 ("Category: Personal")
-    feedback_text TEXT,              -- 用戶罵 AI 的話 (可選)
-    processed BOOLEAN DEFAULT FALSE  -- 是否已被 System 2 蒸餾過？
-);
+### 3.2 核心抽象介面
+
+所有 Adapter 必須實作以下介面：
+
+```
+LibrarianAdapter {
+  // 記錄事件（用戶修正、對話輸入等）
+  observe(event: Event): Promise<void>
+
+  // 檢索相關記憶（給 LLM 提供上下文）
+  recall(query: Query): Promise<Memory[]>
+
+  // 觸發蒸餾（背景任務）
+  reflect(): Promise<Insight[]>
+
+  // 格式化輸出（給特定專案使用）
+  format(memory: Memory): ProjectSpecificFormat
+}
 ```
 
 ---
 
-## 4. 運作流程 (The Workflow)
+## 4. 不同專案的 Adapter 設計
 
-### 流程一：推論 (Inference) - 用戶輸入時
-1.  **Input**: 用戶輸入 "Schedule meeting with John".
-2.  **Retrieve**: 系統將 "Schedule meeting with John" 轉為向量，在 `memories` 中搜尋最相關的規則。
-    *   *Match*: 找到規則 "John is the CEO"。
-3.  **Augment**: 將 "John is the CEO" 注入 Prompt。
-4.  **Generate**: LLM 輸出 "Creating generic High Priority task for meeting with CEO."
+### 4.1 Naruvia Adapter (規則型記憶)
 
-### 流程二：蒸餾 (Distillation) - 用戶修正後
-1.  **Trigger**: 用戶把上述任務的 Priority 從 "High" 改為 "Low"。
-2.  **Log**: 寫入 `correction_logs`。
-3.  **Reflect (System 2)**:
-    *   背景排程 (Cron Job) 每晚啟動。
-    *   讀取未處理的 logs。
-    *   LLM 分析模式：「為什麼用戶這次改為 Low？喔，因為標題裡有 'Coffee Chat'」。
-    *   生成新規則：`IF title contains "Coffee Chat" THEN priority = "Low"`。
-4.  **Upsert**: 將新規則寫入 `memories`。
+**場景**: 任務分類學習
 
----
+**資料流**:
+```
+用戶修正任務分類
+    ↓
+observe({
+  type: 'correction',
+  input: '買 RTX 5090',
+  aiPrediction: { category: 'Personal' },
+  userCorrection: { category: 'Company Asset' }
+})
+    ↓
+寫入 correction_logs (PostgreSQL)
+    ↓
+累積 10-15 筆 → 觸發 reflect()
+    ↓
+向量分群 + LLM 歸納規則
+    ↓
+儲存到 memories 表 (帶向量)
+    ↓
+下次 recall('買顯卡') → 返回規則
+```
 
-## 5. MCP 整合 (Model Context Protocol)
+**記憶類型**:
+- **Episodic**: 原始修正紀錄
+- **Semantic**: 蒸餾的分類規則（IF-THEN 格式）
 
-Librarian Engine 將作為一個 **MCP Server** 運作，這意味著它不僅服務 Naruvia App，還能被 Cursor, Claude Desktop 等外部工具調用。
-
-### 工具定義 (MCP Tools)
-*   `access_memory(query)`: 讓外部 Agent 查詢該用戶的 Naruvia 記憶。
-*   `record_observation(content)`: 讓外部 Agent 貢獻觀察給 Naruvia。
-
----
-
-## 6. 導入階段 (Implementation Phases)
-
-### Phase 1: 基礎建設 (The Foundation)
-*   [ ] 建立 Supabase `memories` 和 `correction_logs` 表格。
-*   [ ] 啟用 `pgvector` extension。
-*   [ ] 實作基本的 RAG 檢索 API (Next.js Edge Function)。
-
-### Phase 2: 學習迴路 (The Learning Loop)
-*   [ ] 在 Flutter App 端實作「修正捕捉」邏輯 (當用戶修改 AI 建議時觸發)。
-*   [ ] 實作 "Diff Analysis"：比較 AI 建議與用戶最終結果的差異。
-*   [ ] 建立簡單的 Rule Generator (System 2) 腳本。
-
-### Phase 3: 自動化與優化 (Automation)
-*   [ ] 部署 Cron Job 自動執行蒸餾。
-*   [ ] 實作「規則衝突」的仲裁機制 (當兩條規則打架時怎麼辦)。
-*   [ ] 上線 MCP Server。
+**儲存**: PostgreSQL + pgvector
 
 ---
 
-## 7. 風險與緩解
+### 4.2 Havital Adapter (對話型記憶)
 
-1.  **冷啟動問題**: 一開始沒規則，AI 很笨。
-    *   *解法*: 預載入一套「通用模板」 (General Purpose Template)，隨著使用逐漸被個人規則替換。
-2.  **規則污染**: AI 學到錯誤規則 (例如把所有紅色東西都當作緊急)。
-    *   *解法*: 規則老化機制 (Rule Decay)。太久沒被驗證的規則自動降權。
+**場景**: 訓練教練對話壓縮
+
+**資料流**:
+```
+用戶與 Rizo 對話
+    ↓
+observe({
+  type: 'conversation',
+  messages: [...最近 10 輪對話]
+})
+    ↓
+寫入 conversation_history (Firestore)
+    ↓
+每 20 輪對話 → 觸發 reflect()
+    ↓
+LLM 壓縮為用戶檔案
+    ↓
+儲存到 user_profiles (Firestore)
+    ↓
+下次 recall() → 返回壓縮檔案 + 最近 5 輪
+```
+
+**記憶類型**:
+- **Episodic**: 完整對話歷史
+- **Semantic**: 用戶訓練偏好檔案（結構化 JSON）
+
+**儲存**: Firestore (NoSQL)
 
 ---
 
-## 8. 結論
+### 4.3 通用 Adapter (未來擴展)
 
-Librarian Insight Engine 是 Naruvia 的靈魂。它將單次互動的價值轉化為長期資產，實現了「越用越好用」的承諾。透過上述的神經符號架構，我們能在保持低成本的同時，提供高度個人化的 AI 體驗。
+可支援：
+- 客服機器人：FAQ 蒸餾
+- 程式碼助手：常見 bug pattern 學習
+- 寫作助手：用戶風格檔案
+
+---
+
+## 5. API 設計
+
+### 5.1 RESTful API (跨專案統一介面)
+
+#### 記錄事件
+```http
+POST /api/v1/librarian/observe
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "project_id": "naruvia",  // 或 "havital"
+  "user_id": "xxx",
+  "event": {
+    "type": "correction" | "conversation" | "feedback",
+    "data": { ... }  // 專案特定格式
+  }
+}
+```
+
+#### 檢索記憶
+```http
+POST /api/v1/librarian/recall
+Content-Type: application/json
+
+{
+  "project_id": "naruvia",
+  "user_id": "xxx",
+  "query": "買 GPU",
+  "top_k": 5
+}
+
+Response:
+{
+  "memories": [
+    {
+      "content": "IF input contains 'GPU' THEN category = 'Company Asset'",
+      "confidence": 0.85,
+      "type": "semantic"
+    }
+  ]
+}
+```
+
+#### 觸發蒸餾
+```http
+POST /api/v1/librarian/reflect
+{
+  "project_id": "naruvia",
+  "user_id": "xxx"
+}
+
+Response 202:
+{
+  "job_id": "xxx",
+  "status": "queued"
+}
+```
+
+### 5.2 內部 Adapter 介面
+
+每個專案提供自己的 Adapter 實作：
+
+```
+LibrarianAdapter {
+  // 專案特定的資料驗證
+  validateEvent(event): boolean
+
+  // 轉換為通用格式
+  transformToMemory(event): Memory
+
+  // 執行專案特定的蒸餾邏輯
+  distill(events): Insight[]
+
+  // 儲存到專案資料庫
+  save(memory): void
+}
+```
+
+---
+
+## 6. 部署架構
+
+### 6.1 微服務模式 (生產環境)
+
+```
+┌─────────────────────────────────────────────┐
+│  Naruvia Web (Next.js)                      │
+│  - 處理 UI + 簡單 CRUD                       │
+└───────────────┬─────────────────────────────┘
+                │ HTTP
+                ↓
+┌─────────────────────────────────────────────┐
+│  Librarian Service (Node.js / Python)       │
+│  - 獨立 Cloud Run                            │
+│  - 處理 observe / recall / reflect           │
+│  - 載入不同 Adapter                          │
+└───────────────┬─────────────────────────────┘
+                │
+      ┌─────────┴──────────┐
+      ↓                    ↓
+┌──────────────┐    ┌──────────────┐
+│ PostgreSQL   │    │ Firestore    │
+│ (Naruvia)    │    │ (Havital)    │
+└──────────────┘    └──────────────┘
+```
+
+### 6.2 嵌入式模式 (開發/小型專案)
+
+```
+┌─────────────────────────────────────────────┐
+│  Next.js App                                 │
+│  ├── API Routes (業務邏輯)                   │
+│  ├── Librarian Core (npm package)           │
+│  │   └── Adapter 實作                        │
+│  └── 直接連接資料庫                           │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 7. 關鍵設計決策
+
+### 7.1 為什麼不用向量資料庫（對所有專案）？
+
+| 專案 | 記憶類型 | 是否需要向量 | 原因 |
+|------|---------|-------------|------|
+| Naruvia | 規則蒸餾 | ✅ 需要 | 相似修正分群需要向量相似度 |
+| Havital | 對話壓縮 | ❌ 不需要 | 時間序列壓縮，直接用 LLM 摘要 |
+
+**結論**: Adapter 層決定是否使用向量檢索
+
+### 7.2 為什麼用 Adapter 而非硬編碼？
+
+| 方案 | 彈性 | 維護成本 | 跨專案復用 |
+|------|------|---------|-----------|
+| 硬編碼 | 低 | 高 | 難 |
+| Adapter | 高 | 低 | 易 |
+
+### 7.3 同步 vs 非同步蒸餾
+
+| 觸發方式 | 延遲 | 成本 | 適用場景 |
+|---------|------|------|---------|
+| 同步（每次請求） | 高 | 高 | 不適用 |
+| 非同步（閾值觸發） | 低 | 低 | ✅ Naruvia（10 筆修正） |
+| 定時（Cron） | 最低 | 最低 | ✅ Havital（每日壓縮） |
+
+---
+
+## 8. 實作階段
+
+### Phase 1: 核心引擎 (2 週)
+- [ ] 定義核心介面 (observe/recall/reflect)
+- [ ] 實作 LLM 蒸餾工作流
+- [ ] 建立 API 框架
+
+### Phase 2: Naruvia Adapter (1 週)
+- [ ] 實作 PostgreSQL + pgvector Adapter
+- [ ] 規則蒸餾邏輯
+- [ ] POC 驗證（見 032 文件）
+
+### Phase 3: Havital Adapter (1 週)
+- [ ] 實作 Firestore Adapter
+- [ ] 對話壓縮邏輯
+- [ ] 整合到 Rizo Agent
+
+### Phase 4: 生產部署 (1 週)
+- [ ] Docker 容器化
+- [ ] Cloud Run 部署
+- [ ] 監控與日誌
+
+---
+
+## 9. 成本估算
+
+### 單用戶月成本（Naruvia）
+
+| 項目 | 數量 | 單價 | 成本 |
+|------|------|------|------|
+| Embedding | 100 次修正 | 免費 | $0 |
+| 蒸餾（Gemini Flash） | 10 次 | $0.0001/次 | $0.001 |
+| 向量檢索 | 1000 次 | 本地計算 | $0 |
+| **總計** | - | - | **< $0.01/月** |
+
+### 單用戶月成本（Havital）
+
+| 項目 | 數量 | 單價 | 成本 |
+|------|------|------|------|
+| 對話壓縮 | 3 次（每 10 輪） | $0.02/次 | $0.06 |
+| 節省的 Token | - | - | -$2.5 |
+| **淨節省** | - | - | **-$2.44/月** |
+
+---
+
+## 10. 技術選型
+
+### 10.1 核心服務語言
+
+| 語言 | 優點 | 缺點 | 建議 |
+|------|------|------|------|
+| TypeScript | 與 Next.js 無縫整合 | 缺少 ML 工具 | ✅ 優先 |
+| Python | AI 生態豐富 | 需要獨立服務 | 特定 Adapter 使用 |
+
+**結論**: 核心用 TypeScript，Naruvia Adapter 可選用 Python（如需 DBSCAN）
+
+### 10.2 儲存選型
+
+由各 Adapter 決定：
+- Naruvia: PostgreSQL + pgvector
+- Havital: Firestore
+- 其他: Redis / MongoDB / ...
+
+---
+
+## 11. 監控與治理
+
+### 11.1 關鍵指標
+
+| 指標 | 目標 | 說明 |
+|------|------|------|
+| 蒸餾成功率 | > 95% | 無錯誤完成 |
+| 記憶檢索延遲 | < 200ms | System 1 性能 |
+| 規則有效性 | > 90% | 人工抽檢 |
+| 成本控制 | < $1/用戶/月 | LLM 成本 |
+
+### 11.2 規則老化機制
+
+防止過時規則污染：
+- 30 天未使用 → 降權 50%
+- 60 天未使用 → 歸檔
+- 用戶明確否定 → 立即刪除
+
+---
+
+## 12. 未來展望
+
+### MCP Server 支援
+讓 Librarian 可被外部工具（Cursor, Claude Desktop）呼叫：
+
+```
+MCP Tools:
+- access_memory(user_id, query)
+- record_observation(user_id, content)
+```
+
+### 跨專案記憶共享
+（需隱私審慎設計）
+- 匿名化的「通用模板」
+- 新用戶冷啟動加速
+
+---
+
+## 13. 結論
+
+Universal Librarian Engine 的核心價值：
+
+1. **可復用**: 一次開發，多專案受益
+2. **低成本**: 按需蒸餾，非每次請求
+3. **可擴展**: Adapter 模式支援任意資料庫
+4. **高效能**: System 1 快速檢索 + System 2 背景學習
+
+透過這個架構，我們將「AI 記憶」從單一專案的功能提升為可復用的基礎設施。
