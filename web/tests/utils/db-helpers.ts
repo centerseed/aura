@@ -56,7 +56,7 @@ export async function cleanupTestData(userId?: string) {
     // ⚠️ 只允許清理明確的測試用戶：
     // - email 必須以 "test-" 開頭
     // - 或 email 必須包含 @example.com 或 @test.com
-    // - 或 auth_provider_id 必須以 "firebase-test-uid-" 開頭
+    // - 或 auth_provider_id 必須以 "firebase-test-uid-" 或 "anon-" 或 "google-" 或 "email-" 開頭
     //
     // ❌ 絕對不允許：
     // - 任何真實的 domain（@naruvia.local, @zentropy.local 等）
@@ -65,7 +65,10 @@ export async function cleanupTestData(userId?: string) {
       user.email?.startsWith('test-') ||
       user.email?.includes('@example.com') ||
       user.email?.includes('@test.com') ||
-      user.auth_provider_id?.startsWith('firebase-test-uid-')
+      user.auth_provider_id?.startsWith('firebase-test-uid-') ||
+      user.auth_provider_id?.startsWith('anon-') ||
+      user.auth_provider_id?.startsWith('google-') ||
+      user.auth_provider_id?.startsWith('email-')
     )
 
     if (!isTestUser) {
@@ -190,7 +193,7 @@ export async function createTestTopic(productId: string, userId: string, overrid
 export async function createTestTask(userId: string, productId: string, overrides: {
   id?: string
   content?: string
-  status?: 'INBOX' | 'ACTIVE' | 'MAINTAIN' | 'REFERENCE'
+  status?: 'INBOX' | 'ACTIVE' | 'MAINTAIN' | 'REFERENCE' | 'ARCHIVE'
   topic_id?: string | null
   ai_analysis?: any
   start_date?: Date | null

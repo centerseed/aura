@@ -22,6 +22,7 @@ export interface MockRequestOptions {
   headers?: Record<string, string>
   method?: string
   status?: number
+  url?: string
 }
 
 /**

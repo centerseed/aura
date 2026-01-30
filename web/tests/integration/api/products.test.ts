@@ -28,7 +28,7 @@ vi.mock('@/lib/firebase-admin', () => ({
   getAuth: () => mockAuth,
 }))
 
-import { POST } from '@/app/api/products/route'
+import { POST, GET } from '@/app/api/products/route'
 import { PATCH, DELETE } from '@/app/api/products/[id]/route'
 import { createMockRequest } from '../../utils/test-helpers'
 import {
@@ -448,6 +448,141 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data.success).toBe(true)
+    }, 30000)
+  })
+
+  describe('GET /api/products', () => {
+    it('應該獲取所有未刪除的 Products', async () => {
+      // 創建幾個 products
+      await createTestProduct(testUserId, testAreaId, { name: 'Product 1' })
+      await createTestProduct(testUserId, testAreaId, { name: 'Product 2' })
+      await createTestProduct(testUserId, testAreaId, { name: 'Product 3' })
+
+      const request = createMockRequest({
+        method: 'GET',
+        headers: { authorization: 'Bearer valid-token' },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(data)).toBe(true)
+      expect(data.length).toBeGreaterThanOrEqual(3)
+
+      // 驗證返回的 products 屬於當前用戶
+      data.forEach((product: any) => {
+        expect(product.user_id).toBe(testUserId)
+        expect(product.deleted_at).toBeNull()
+      })
+    }, 30000)
+
+    it('應該按照 display_order 和 created_at 排序', async () => {
+      // 創建 products 並設置不同的 display_order
+      const { prisma } = await import('@/lib/db')
+      const product1 = await createTestProduct(testUserId, testAreaId, { name: 'Product High Order' })
+      const product2 = await createTestProduct(testUserId, testAreaId, { name: 'Product Low Order' })
+
+      // 更新 display_order
+      await prisma.product.update({
+        where: { id: product1.id },
+        data: { display_order: 10 },
+      })
+      await prisma.product.update({
+        where: { id: product2.id },
+        data: { display_order: 5 },
+      })
+
+      const request = createMockRequest({
+        method: 'GET',
+        headers: { authorization: 'Bearer valid-token' },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+
+      // 找到這兩個 products
+      const foundProduct1 = data.find((p: any) => p.id === product1.id)
+      const foundProduct2 = data.find((p: any) => p.id === product2.id)
+
+      expect(foundProduct1).toBeDefined()
+      expect(foundProduct2).toBeDefined()
+
+      // product2 (display_order=5) 應該在 product1 (display_order=10) 之前
+      const index1 = data.findIndex((p: any) => p.id === product1.id)
+      const index2 = data.findIndex((p: any) => p.id === product2.id)
+      expect(index2).toBeLessThan(index1)
+    }, 30000)
+
+    it('應該排除已軟刪除的 Products', async () => {
+      const { prisma } = await import('@/lib/db')
+
+      // 創建一個 product 並軟刪除
+      const deletedProduct = await createTestProduct(testUserId, testAreaId, { name: 'Deleted Product' })
+      await prisma.product.update({
+        where: { id: deletedProduct.id },
+        data: { deleted_at: new Date() },
+      })
+
+      const request = createMockRequest({
+        method: 'GET',
+        headers: { authorization: 'Bearer valid-token' },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+
+      // 驗證已刪除的 product 不在列表中
+      const foundDeleted = data.find((p: any) => p.id === deletedProduct.id)
+      expect(foundDeleted).toBeUndefined()
+    }, 30000)
+
+    it('應該在未認證時返回 401', async () => {
+      mockVerifyIdToken.mockRejectedValue(new Error('Invalid token'))
+
+      const request = createMockRequest({
+        method: 'GET',
+        headers: {},
+      })
+
+      const response = await GET(request)
+
+      expect(response.status).toBe(401)
+      const data = await response.json()
+      expect(data.error).toBe('Unauthorized')
+    }, 30000)
+
+    it('應該在沒有 products 時返回空陣列', async () => {
+      // 創建新用戶（沒有 products）
+      const newUser = await createTestUser({
+        auth_provider_id: `firebase-new-${randomUUID()}`,
+      })
+
+      // 暫時修改 mock 返回新用戶的 uid
+      const originalFirebaseUid = testFirebaseUid
+      mockVerifyIdToken.mockResolvedValue({ uid: newUser.auth_provider_id })
+
+      const request = createMockRequest({
+        method: 'GET',
+        headers: { authorization: 'Bearer valid-token' },
+      })
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(data)).toBe(true)
+      expect(data.length).toBe(0)
+
+      // 恢復原來的 mock
+      mockVerifyIdToken.mockResolvedValue({ uid: originalFirebaseUid })
+
+      // 清理新用戶
+      await cleanupTestData(newUser.id)
     }, 30000)
   })
 })

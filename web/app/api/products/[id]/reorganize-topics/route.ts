@@ -19,8 +19,12 @@ const ReorganizeProposalSchema = z.object({
       task_id: z.string(),
       suggested_due_date: z.string().nullable(),
       urgency_level: z.enum(["critical", "high", "medium", "low"]),
+      time_confidence: z.number().min(0).max(1).describe("時間推斷的信心度 (0-1)"),
+      reasoning: z.string().describe("時間推斷的理由"),
     })
   ),
+
+  reasoning: z.string().describe("重組的理由與邏輯（繁體中文）"),
 
   task_consolidations: z.array(
     z.object({
@@ -232,6 +236,7 @@ export async function POST(
       time_inferences: filteredTimeInferences,
       task_consolidations: result.task_consolidations || [],
       tasks_context: tasksContext,
+      reasoning: result.reasoning,
       logId: evaluationLog.id,
     });
   } catch (error) {
@@ -334,8 +339,9 @@ ${milestonesCompact}
 # 時間推斷
 
 - 只對「沒有 due_date」的 Task 建議時間，已有 due_date 的設為 null
-- 所有 Task 都要設定 urgency_level
+- 所有 Task 都要設定 urgency_level 和 time_confidence (0-1)
 - 優先參考 Milestone 時間
+- 每個推斷都要提供 reasoning 說明理由
 
 ---
 
@@ -419,5 +425,6 @@ ${milestonesCompact}
 - 使用繁體中文
 - 所有 task_id 必須來自上方列表
 - task_consolidations 中的 consolidated_title 必須能反推出所有子任務
-- sub_task_ids 可以包含 \`sub:xxx\` 格式（代表 pending_sub_item 的 ID）`;
+- sub_task_ids 可以包含 \`sub:xxx\` 格式（代表 pending_sub_item 的 ID）
+- reasoning 欄位必須總結整個重組建議的核心理由（2-3 句話）`;
 }

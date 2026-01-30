@@ -81,43 +81,6 @@ function toLocalMidnight(date: Date | string): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-// 計算任務在時間軸上的位置和寬度
-function calculateTaskPosition(
-  task: { start_date?: string | Date | null; due_date: string | Date },
-  rangeStart: Date,
-  rangeEnd: Date
-): { left: number; width: number } {
-  // 統一使用本地午夜時間
-  const rangeStartLocal = toLocalMidnight(rangeStart);
-  const rangeEndLocal = toLocalMidnight(rangeEnd);
-  const totalDays = (rangeEndLocal.getTime() - rangeStartLocal.getTime()) / (1000 * 60 * 60 * 24);
-  const dueDate = toLocalMidnight(task.due_date);
-
-  if (task.start_date) {
-    // Case 1: Has start_date → show as bar
-    const startDate = toLocalMidnight(task.start_date);
-    const taskStartDay = (startDate.getTime() - rangeStartLocal.getTime()) / (1000 * 60 * 60 * 24);
-    const taskEndDay = (dueDate.getTime() - rangeStartLocal.getTime()) / (1000 * 60 * 60 * 24);
-
-    const left = (taskStartDay / totalDays) * 100;
-    const width = ((taskEndDay - taskStartDay) / totalDays) * 100;
-
-    return {
-      left: Math.max(0, Math.min(100, left)),
-      width: Math.max(1, Math.min(100, width)) // Minimum 1% width
-    };
-  } else {
-    // Case 2: No start_date → show as point (existing behavior)
-    const daysSinceStart = (dueDate.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24);
-    const left = (daysSinceStart / totalDays) * 100;
-
-    return {
-      left: Math.max(0, Math.min(100, left)),
-      width: 2 // Keep as point
-    };
-  }
-}
-
 function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps) {
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(
     new Set(areas.map((a) => a.id))
@@ -132,17 +95,7 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
 
   const { start, end } = useMemo(() => getDateRange(allTasks, milestones), [allTasks, milestones]);
   const weekLabels = useMemo(() => generateWeekLabels(start, end), [start, end]);
-
-  // 計算實際的時間軸範圍（基於週標籤）
-  const timelineRange = useMemo(() => {
-    if (weekLabels.length === 0) {
-      return { start, end };
-    }
-    const timelineStart = weekLabels[0];
-    const timelineEnd = new Date(weekLabels[weekLabels.length - 1]);
-    timelineEnd.setDate(timelineEnd.getDate() + 7); // 最後一週的結束日期
-    return { start: timelineStart, end: timelineEnd };
-  }, [weekLabels, start, end]);
+  const timelineWidth = weekLabels.length * 80;
 
   const toggleArea = (areaId: string) => {
     setExpandedAreas((prev) => {
@@ -176,10 +129,93 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
     };
   }, [weekLabels]);
 
-  // 今天的位置
+  // 今天的日期和位置
+  const today = useMemo(() => {
+    const now = new Date();
+    const todayLocal = toLocalMidnight(now);
+    return todayLocal;
+  }, []);
+
   const todayTimelinePx = useMemo(() => {
-    return getDatePositionPx(new Date());
-  }, [getDatePositionPx]);
+    return getDatePositionPx(today);
+  }, [getDatePositionPx, today]);
+
+
+  // 構建所有行的數據
+  const rows = useMemo(() => {
+    const result: Array<{
+      type: 'area' | 'product' | 'task' | 'subitem';
+      id: string;
+      areaId?: string;
+      productId?: string;
+      taskId?: string;
+      data: Record<string, unknown>;
+    }> = [];
+
+    areas.forEach((area) => {
+      const isExpanded = expandedAreas.has(area.id);
+      const areaMilestones = milestones.filter(
+        (m) => m.entity_type === "AREA" && m.entity_id === area.id
+      );
+
+      result.push({
+        type: 'area',
+        id: area.id,
+        areaId: area.id,
+        data: { area, isExpanded, areaMilestones }
+      });
+
+      if (isExpanded) {
+        area.products.forEach((product) => {
+          const productMilestones = milestones.filter(
+            (m) => m.entity_type === "PRODUCT" && m.entity_id === product.id
+          );
+          const tasksWithDates = product.tasks.filter((t) => t.due_date);
+
+          result.push({
+            type: 'product',
+            id: product.id,
+            areaId: area.id,
+            productId: product.id,
+            data: { product, productMilestones }
+          });
+
+          tasksWithDates.forEach((task) => {
+            const isTaskExpanded = expandedTasks.has(task.id);
+            const hasSubItems = task.sub_items && task.sub_items.length > 0;
+            const duePx = getDatePositionPx(task.due_date!);
+            const startPx = task.start_date ? getDatePositionPx(task.start_date) : duePx;
+            const widthPx = task.start_date ? Math.max(8, duePx - startPx) : 8;
+            const config = drawerConfig[task.drawer] || drawerConfig.INBOX;
+
+            result.push({
+              type: 'task',
+              id: task.id,
+              areaId: area.id,
+              productId: product.id,
+              taskId: task.id,
+              data: { task, isTaskExpanded, hasSubItems, duePx, startPx, widthPx, config }
+            });
+
+            if (hasSubItems && isTaskExpanded) {
+              task.sub_items!.forEach((subItem) => {
+                result.push({
+                  type: 'subitem',
+                  id: subItem.id,
+                  areaId: area.id,
+                  productId: product.id,
+                  taskId: task.id,
+                  data: { subItem }
+                });
+              });
+            }
+          });
+        });
+      }
+    });
+
+    return result;
+  }, [areas, milestones, expandedAreas, expandedTasks, getDatePositionPx, drawerConfig]);
 
   return (
     <Card className="bg-white/5 border-white/10 backdrop-blur-xl overflow-hidden">
@@ -191,58 +227,21 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
       </CardHeader>
 
       <CardContent className="p-0">
-        {/* 時間軸 Header */}
-        <div className="border-b border-white/10 bg-slate-900/50 sticky top-0 z-10">
-          <div className="flex">
-            {/* 左側實體列 */}
-            <div className="w-64 shrink-0 px-4 py-3 border-r border-white/10">
+        <div className="flex">
+          {/* 左側固定欄 */}
+          <div className="w-64 shrink-0 border-r border-white/10">
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-white/10 bg-slate-900/50">
               <span className="text-xs font-medium text-white/50 uppercase tracking-wider">
                 實體結構
               </span>
             </div>
-
-            {/* 時間軸 */}
-            <div className="flex-1 relative overflow-x-auto">
-              <div className="relative flex h-full" style={{ minWidth: `${weekLabels.length * 80}px` }}>
-                {/* 今天標記線 */}
-                <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
-                  style={{ left: `${todayTimelinePx}px` }}
-                >
-                  <div className="absolute -top-0 left-1/2 -translate-x-1/2 text-xs text-red-400 whitespace-nowrap">
-                    今天
-                  </div>
-                </div>
-                {weekLabels.map((week, idx) => (
-                  <div
-                    key={idx}
-                    className="px-2 py-3 border-r border-white/5 text-center shrink-0"
-                    style={{ width: "80px" }}
-                  >
-                    <div className="text-xs text-white/60">
-                      {week.getMonth() + 1}/{week.getDate()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 甘特圖內容 */}
-        <div className="relative">
-          {/* Areas 和 Products */}
-          {areas.map((area) => {
-            const isExpanded = expandedAreas.has(area.id);
-            const areaMilestones = milestones.filter(
-              (m) => m.entity_type === "AREA" && m.entity_id === area.id
-            );
-
-            return (
-              <div key={area.id} className="border-b border-white/5">
-                {/* Area 行 */}
-                <div className="flex hover:bg-white/5 transition-colors">
-                  <div className="w-64 shrink-0 px-4 py-3 border-r border-white/10">
+            {/* 左側行 */}
+            {rows.map((row) => {
+              if (row.type === 'area') {
+                const { area, isExpanded } = row.data as { area: typeof areas[0]; isExpanded: boolean };
+                return (
+                  <div key={row.id} className="px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors">
                     <button
                       onClick={() => toggleArea(area.id)}
                       className="flex items-center gap-2 w-full text-left"
@@ -257,22 +256,114 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                       </span>
                     </button>
                   </div>
+                );
+              }
 
-                  {/* Area timeline */}
-                  <div className="flex-1 relative overflow-x-auto">
-                    <div className="relative py-3" style={{ minWidth: `${weekLabels.length * 80}px` }}>
-                      {/* 今天標記線 */}
-                      <div
-                        className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-10 pointer-events-none"
-                        style={{ left: `${todayTimelinePx}px` }}
-                      />
-                      {areaMilestones.map((milestone) => {
-                        return (
-                          <div
-                            key={milestone.id}
-                            className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
-                            style={{ left: `${getDatePositionPx(milestone.target_date)}px` }}
-                          >
+              if (row.type === 'product') {
+                const { product } = row.data as { product: typeof areas[0]['products'][0] };
+                return (
+                  <div key={row.id} className="px-4 py-3 pl-12 border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <span className="text-sm text-white/70">
+                      📦 {product.name}
+                    </span>
+                  </div>
+                );
+              }
+
+              if (row.type === 'task') {
+                const { task, isTaskExpanded, hasSubItems } = row.data as {
+                  task: TaskCard;
+                  isTaskExpanded: boolean;
+                  hasSubItems: boolean;
+                };
+                return (
+                  <div key={row.id} className="px-4 py-2.5 pl-16 border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <button
+                      onClick={() => hasSubItems && toggleTask(task.id)}
+                      className="flex items-center gap-1.5 w-full text-left group"
+                      disabled={!hasSubItems}
+                    >
+                      {hasSubItems ? (
+                        isTaskExpanded ? (
+                          <ChevronDown className="w-3 h-3 text-white/40 shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-3 h-3 text-white/40 shrink-0" />
+                        )
+                      ) : (
+                        <div className="w-3 h-3 shrink-0" />
+                      )}
+                      <span className={`text-xs truncate ${hasSubItems ? 'text-white/80 group-hover:text-white' : 'text-white/60'}`}>
+                        {task.title}
+                      </span>
+                      {hasSubItems && (
+                        <span className="text-[10px] text-white/40 shrink-0">
+                          {task.sub_items_meta?.completed}/{task.sub_items_meta?.total}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                );
+              }
+
+              if (row.type === 'subitem') {
+                const { subItem } = row.data as { subItem: { id: string; content: string; completed: boolean } };
+                return (
+                  <div key={row.id} className="px-4 py-2 pl-20 border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <span className={`text-xs ${subItem.completed ? 'text-white/40 line-through' : 'text-white/60'}`}>
+                      ✓ {subItem.content}
+                    </span>
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+          </div>
+
+          {/* 右側時間軸（可滾動） */}
+          <div className="flex-1 overflow-x-auto">
+            <div className="relative" style={{ minWidth: `${timelineWidth}px` }}>
+              {/* 今天標記線 - 貫穿整個時間軸 */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
+                style={{ left: `${todayTimelinePx}px` }}
+              />
+
+              {/* Header */}
+              <div className="flex border-b border-white/10 bg-slate-900/50 sticky top-0 z-10">
+                {weekLabels.map((week, idx) => (
+                  <div
+                    key={idx}
+                    className="px-2 py-3 border-r border-white/5 text-center shrink-0"
+                    style={{ width: "80px" }}
+                  >
+                    <div className="text-xs text-white/60">
+                      {week.getMonth() + 1}/{week.getDate()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 今天標籤 */}
+              <div
+                className="absolute top-1 z-30 pointer-events-none"
+                style={{ left: `${todayTimelinePx}px`, transform: 'translateX(-50%)' }}
+              >
+                <span className="text-xs text-red-400 whitespace-nowrap">今天</span>
+              </div>
+
+              {/* 時間軸行 */}
+              {rows.map((row) => {
+                if (row.type === 'area') {
+                  const { areaMilestones } = row.data as { areaMilestones: Milestone[] };
+                  return (
+                    <div key={row.id} className="relative py-3 border-b border-white/5">
+                      {areaMilestones.map((milestone) => (
+                        <div
+                          key={milestone.id}
+                          className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
+                          style={{ left: `${getDatePositionPx(milestone.target_date)}px` }}
+                        >
                           <div className="relative">
                             <Flag
                               className="w-5 h-5 text-indigo-400 fill-purple-400 drop-shadow-lg group-hover:scale-125 transition-transform"
@@ -285,178 +376,100 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
                     </div>
-                  </div>
-                </div>
+                  );
+                }
 
-                {/* Products and Tasks */}
-                {isExpanded &&
-                  area.products.map((product) => {
-                    const productMilestones = milestones.filter(
-                      (m) => m.entity_type === "PRODUCT" && m.entity_id === product.id
-                    );
-                    const tasksWithDates = product.tasks.filter((t) => t.due_date);
-
-                    return (
-                      <div key={product.id}>
-                        {/* Product row */}
-                        <div className="flex hover:bg-white/5 transition-colors border-b border-white/5">
-                          <div className="w-64 shrink-0 px-4 py-3 pl-12 border-r border-white/10">
-                            <span className="text-sm text-white/70">
-                              📦 {product.name}
-                            </span>
-                          </div>
-
-                          {/* Product timeline */}
-                          <div className="flex-1 relative overflow-x-auto">
-                            <div className="relative py-3" style={{ minWidth: `${weekLabels.length * 80}px` }}>
-                              {/* 今天標記線 */}
-                              <div
-                                className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-10 pointer-events-none"
-                                style={{ left: `${todayTimelinePx}px` }}
-                              />
-                              {/* Product milestones */}
-                              {productMilestones.map((milestone) => {
-                                return (
-                                  <div
-                                    key={milestone.id}
-                                    className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
-                                    style={{ left: `${getDatePositionPx(milestone.target_date)}px` }}
-                                  >
-                                  <div className="relative">
-                                    <Star
-                                      className="w-5 h-5 text-yellow-300 fill-yellow-300 drop-shadow-lg group-hover:scale-125 transition-transform"
-                                    />
-                                    <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-white/20 rounded px-3 py-2 text-xs text-white pointer-events-none z-30 shadow-xl">
-                                      <div className="font-semibold text-yellow-300">{milestone.name}</div>
-                                      <div className="text-white/60 text-xs mt-0.5">
-                                        {new Date(milestone.target_date).toLocaleDateString('zh-TW')}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                if (row.type === 'product') {
+                  const { productMilestones } = row.data as { productMilestones: Milestone[] };
+                  return (
+                    <div key={row.id} className="relative py-3 border-b border-white/5">
+                      {productMilestones.map((milestone) => (
+                        <div
+                          key={milestone.id}
+                          className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
+                          style={{ left: `${getDatePositionPx(milestone.target_date)}px` }}
+                        >
+                          <div className="relative">
+                            <Star
+                              className="w-5 h-5 text-yellow-300 fill-yellow-300 drop-shadow-lg group-hover:scale-125 transition-transform"
+                            />
+                            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-white/20 rounded px-3 py-2 text-xs text-white pointer-events-none z-30 shadow-xl">
+                              <div className="font-semibold text-yellow-300">{milestone.name}</div>
+                              <div className="text-white/60 text-xs mt-0.5">
+                                {new Date(milestone.target_date).toLocaleDateString('zh-TW')}
+                              </div>
                             </div>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  );
+                }
 
-                        {/* Task rows */}
-                        {tasksWithDates.map((task) => {
-                          // 直接用天數計算位置
-                          const duePx = getDatePositionPx(task.due_date!);
-                          const startPx = task.start_date ? getDatePositionPx(task.start_date) : duePx;
-                          const widthPx = task.start_date ? Math.max(8, duePx - startPx) : 8;
-                          const config = drawerConfig[task.drawer] || drawerConfig.INBOX;
-                          const isTaskExpanded = expandedTasks.has(task.id);
-                          const hasSubItems = task.sub_items && task.sub_items.length > 0;
-
-                          return (
-                            <div key={task.id}>
-                              {/* Task row */}
-                              <div className="flex hover:bg-white/5 transition-colors border-b border-white/5">
-                                <div className="w-64 shrink-0 px-4 py-2.5 pl-16 border-r border-white/10">
-                                  <button
-                                    onClick={() => hasSubItems && toggleTask(task.id)}
-                                    className="flex items-center gap-1.5 w-full text-left group"
-                                    disabled={!hasSubItems}
-                                  >
-                                    {hasSubItems ? (
-                                      isTaskExpanded ? (
-                                        <ChevronDown className="w-3 h-3 text-white/40 shrink-0" />
-                                      ) : (
-                                        <ChevronRight className="w-3 h-3 text-white/40 shrink-0" />
-                                      )
-                                    ) : (
-                                      <div className="w-3 h-3 shrink-0" />
-                                    )}
-                                    <span className={`text-xs truncate ${hasSubItems ? 'text-white/80 group-hover:text-white' : 'text-white/60'}`}>
-                                      {task.title}
-                                    </span>
-                                    {hasSubItems && (
-                                      <span className="text-[10px] text-white/40 shrink-0">
-                                        {task.sub_items_meta?.completed}/{task.sub_items_meta?.total}
-                                      </span>
-                                    )}
-                                  </button>
-                                </div>
-
-                                {/* Task timeline */}
-                                <div className="flex-1 relative overflow-x-auto">
-                                  <div className="relative py-2.5" style={{ minWidth: `${weekLabels.length * 80}px` }}>
-                                    {/* 今天標記線 */}
-                                    <div
-                                      className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-10 pointer-events-none"
-                                      style={{ left: `${todayTimelinePx}px` }}
-                                    />
-                                    <div
-                                      className="absolute top-1/2 -translate-y-1/2 group"
-                                      style={{
-                                        left: `${startPx}px`,
-                                        width: `${widthPx}px`
-                                      }}
-                                    >
-                                    <div
-                                      className={`
-                                        ${widthPx > 10 ? 'h-3' : 'h-2'}
-                                        rounded-full
-                                        ${config.dotColor}
-                                        relative
-                                        transition-opacity
-                                        hover:opacity-80
-                                      `}
-                                    >
-                                      <div className="absolute left-0 top-full mt-1 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-white/20 rounded px-2 py-1 text-xs text-white pointer-events-none z-30">
-                                        <div className="font-medium">{task.title}</div>
-                                        {task.start_date && (
-                                          <div className="text-white/50 text-xs">
-                                            {new Date(task.start_date).toLocaleDateString('zh-TW')} - {new Date(task.due_date!).toLocaleDateString('zh-TW')}
-                                          </div>
-                                        )}
-                                        {task.time_confidence !== undefined && task.time_confidence !== null && (
-                                          <div className="text-white/50 text-xs">
-                                            AI 時間推斷信心: {Math.round(task.time_confidence * 100)}%
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  </div>
-                                </div>
+                if (row.type === 'task') {
+                  const { task, startPx, widthPx, config } = row.data as {
+                    task: TaskCard;
+                    startPx: number;
+                    widthPx: number;
+                    config: { dotColor: string };
+                  };
+                  return (
+                    <div key={row.id} className="relative py-2.5 border-b border-white/5">
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 group"
+                        style={{
+                          left: `${startPx}px`,
+                          width: `${widthPx}px`
+                        }}
+                      >
+                        <div
+                          className={`
+                            ${widthPx > 10 ? 'h-3' : 'h-2'}
+                            rounded-full
+                            ${config.dotColor}
+                            relative
+                            transition-opacity
+                            hover:opacity-80
+                          `}
+                        >
+                          <div className="absolute left-0 top-full mt-1 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-white/20 rounded px-2 py-1 text-xs text-white pointer-events-none z-30">
+                            <div className="font-medium">{task.title}</div>
+                            {task.start_date && (
+                              <div className="text-white/50 text-xs">
+                                {new Date(task.start_date).toLocaleDateString('zh-TW')} - {new Date(task.due_date!).toLocaleDateString('zh-TW')}
                               </div>
-
-                              {/* Sub-items rows */}
-                              {hasSubItems && isTaskExpanded && task.sub_items!.map((subItem) => (
-                                <div
-                                  key={subItem.id}
-                                  className="flex hover:bg-white/5 transition-colors border-b border-white/5"
-                                >
-                                  <div className="w-64 shrink-0 px-4 py-2 pl-20 border-r border-white/10">
-                                    <span className={`text-xs ${subItem.completed ? 'text-white/40 line-through' : 'text-white/60'}`}>
-                                      ✓ {subItem.content}
-                                    </span>
-                                  </div>
-                                  <div className="flex-1 relative py-2">
-                                    {/* Sub-item marker */}
-                                    <div
-                                      className={`absolute top-1/2 -translate-y-1/2 left-4 w-2 h-2 rounded-full ${
-                                        subItem.completed ? 'bg-green-500/50' : 'bg-blue-500/50'
-                                      }`}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })}
+                            )}
+                            {task.time_confidence !== undefined && task.time_confidence !== null && (
+                              <div className="text-white/50 text-xs">
+                                AI 時間推斷信心: {Math.round(task.time_confidence * 100)}%
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    );
-                  })}
-              </div>
-            );
-          })}
+                    </div>
+                  );
+                }
+
+                if (row.type === 'subitem') {
+                  const { subItem } = row.data as { subItem: { id: string; completed: boolean } };
+                  return (
+                    <div key={row.id} className="relative py-2 border-b border-white/5">
+                      <div
+                        className={`absolute top-1/2 -translate-y-1/2 left-4 w-2 h-2 rounded-full ${
+                          subItem.completed ? 'bg-green-500/50' : 'bg-blue-500/50'
+                        }`}
+                      />
+                    </div>
+                  );
+                }
+
+                return null;
+              })}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

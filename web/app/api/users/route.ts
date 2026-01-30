@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     if (
       errorMessage.includes("Authorization") ||
       errorMessage.includes("Invalid or expired token") ||
+      errorMessage.includes("Missing or invalid token") ||
       errorMessage.includes("User not found")
     ) {
       return NextResponse.json({

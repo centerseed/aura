@@ -31,9 +31,8 @@ export function createMockRequest(options: MockRequestOptions = {}): Request {
     method = 'GET',
     body,
     headers = {},
+    url = 'http://localhost:3000/api/test',
   } = options
-
-  const url = 'http://localhost:3000/api/test'
 
   return {
     method,

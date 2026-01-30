@@ -52,14 +52,12 @@ function Calendar({
   }
 
   const handlePrevMonth = () => {
-    const newDate = new Date(month)
-    newDate.setMonth(currentMonth - 1)
+    const newDate = new Date(month.getFullYear(), currentMonth - 1, 1)
     handleMonthChange(newDate)
   }
 
   const handleNextMonth = () => {
-    const newDate = new Date(month)
-    newDate.setMonth(currentMonth + 1)
+    const newDate = new Date(month.getFullYear(), currentMonth + 1, 1)
     handleMonthChange(newDate)
   }
 
