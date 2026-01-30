@@ -109,14 +109,17 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
-    const data = await response.json()
+    const json = await response.json()
 
     expect(response.status).toBe(200)
-    expect(Array.isArray(data)).toBe(true)
-    expect(data.length).toBeGreaterThanOrEqual(2)
+    expect(json.success).toBe(true)
+    expect(Array.isArray(json.data)).toBe(true)
+    expect(json.data.length).toBeGreaterThanOrEqual(2)
+    expect(json.meta).toBeDefined()
+    expect(json.meta.total).toBeGreaterThanOrEqual(2)
 
     // 驗證第一個任務的格式化
-    const task1 = data.find((t: any) => t.title === '完成專案文件')
+    const task1 = json.data.find((t: any) => t.title === '完成專案文件')
     expect(task1).toBeDefined()
     expect(task1).toMatchObject({
       title: '完成專案文件',
@@ -135,7 +138,7 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     // 驗證第二個任務（未分類 topic）
-    const task2 = data.find((t: any) => t.title === '學習 React')
+    const task2 = json.data.find((t: any) => t.title === '學習 React')
     expect(task2).toBeDefined()
     expect(task2).toMatchObject({
       title: '學習 React',
@@ -157,9 +160,11 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
+    const json = await response.json()
 
     expect(response.status).toBe(401)
-    expect(await response.json()).toEqual({ error: 'Unauthorized' })
+    expect(json.success).toBe(false)
+    expect(json.error.code).toBe('UNAUTHORIZED')
   })
 
   it('應該在 Firebase token 無效時返回 401', async () => {
@@ -198,10 +203,10 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
-    const data = await response.json()
+    const json = await response.json()
 
     // 確認回傳的任務中沒有已刪除的任務
-    const deletedTask = data.find((t: any) => t.title === '已刪除的任務')
+    const deletedTask = json.data.find((t: any) => t.title === '已刪除的任務')
     expect(deletedTask).toBeUndefined()
   })
 
@@ -222,10 +227,10 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
-    const data = await response.json()
+    const json = await response.json()
 
     // 確認沒有返回其他用戶的任務
-    const otherUserTask = data.find((t: any) => t.title === '其他用戶的任務')
+    const otherUserTask = json.data.find((t: any) => t.title === '其他用戶的任務')
     expect(otherUserTask).toBeUndefined()
 
     // 清理其他用戶資料
@@ -247,10 +252,11 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
-    const data = await response.json()
+    const json = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data).toEqual([])
+    expect(json.success).toBe(true)
+    expect(json.data).toEqual([])
 
     // 清理
     await cleanupTestData(emptyUser.id)
@@ -269,9 +275,9 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
-    const data = await response.json()
+    const json = await response.json()
 
-    const simpleTask = data.find((t: any) => t.title === '簡單任務')
+    const simpleTask = json.data.find((t: any) => t.title === '簡單任務')
     expect(simpleTask).toBeDefined()
     expect(simpleTask).toMatchObject({
       narrative: null,
@@ -296,9 +302,9 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
-    const data = await response.json()
+    const json = await response.json()
 
-    const taskWithDates = data.find((t: any) => t.title === 'Task with dates')
+    const taskWithDates = json.data.find((t: any) => t.title === 'Task with dates')
     expect(taskWithDates).toBeDefined()
     expect(taskWithDates.start_date).toBe('2024-06-15T10:30:00.000Z')
     expect(taskWithDates.due_date).toBe('2024-06-15T10:30:00.000Z')
@@ -325,9 +331,9 @@ describe('GET /api/tasks (Integration)', () => {
     })
 
     const response = await GET(request)
-    const data = await response.json()
+    const json = await response.json()
 
-    const taskTitles = data.map((t: any) => t.title)
+    const taskTitles = json.data.map((t: any) => t.title)
     const thirdIndex = taskTitles.indexOf('Third task')
     const secondIndex = taskTitles.indexOf('Second task')
     const firstIndex = taskTitles.indexOf('First task')
