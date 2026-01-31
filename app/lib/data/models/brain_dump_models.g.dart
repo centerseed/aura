@@ -25,7 +25,10 @@ _$BrainDumpResponseImpl _$$BrainDumpResponseImplFromJson(
 
 Map<String, dynamic> _$$BrainDumpResponseImplToJson(
   _$BrainDumpResponseImpl instance,
-) => <String, dynamic>{'success': instance.success, 'items': instance.items};
+) => <String, dynamic>{
+  'success': instance.success,
+  'items': instance.items.map((e) => e.toJson()).toList(),
+};
 
 _$BrainDumpItemImpl _$$BrainDumpItemImplFromJson(Map<String, dynamic> json) =>
     _$BrainDumpItemImpl(
@@ -46,11 +49,12 @@ Map<String, dynamic> _$$BrainDumpItemImplToJson(_$BrainDumpItemImpl instance) =>
       'title': instance.title,
       'narrative': instance.narrative,
       'drawer': instance.drawer,
-      'tag': instance.tag,
-      'due_date': instance.dueDate,
-      'time_confidence': instance.timeConfidence,
-      'time_reasoning': instance.timeReasoning,
-      'inferred_from_milestone': instance.inferredFromMilestone,
+      'tag': instance.tag.toJson(),
+      if (instance.dueDate case final value?) 'due_date': value,
+      if (instance.timeConfidence case final value?) 'time_confidence': value,
+      if (instance.timeReasoning case final value?) 'time_reasoning': value,
+      if (instance.inferredFromMilestone case final value?)
+        'inferred_from_milestone': value,
     };
 
 _$BrainDumpTagImpl _$$BrainDumpTagImplFromJson(Map<String, dynamic> json) =>
@@ -64,5 +68,5 @@ Map<String, dynamic> _$$BrainDumpTagImplToJson(_$BrainDumpTagImpl instance) =>
     <String, dynamic>{
       'area': instance.area,
       'product': instance.product,
-      'topic': instance.topic,
+      if (instance.topic case final value?) 'topic': value,
     };

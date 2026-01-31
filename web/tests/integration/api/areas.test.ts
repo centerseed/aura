@@ -80,7 +80,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(Array.isArray(data)).toBe(true)
-      expect(data.length).toBeGreaterThanOrEqual(2)
+      expect(data.data.length).toBeGreaterThanOrEqual(2)
 
       // 驗證 Areas 結構
       const workArea = data.find((a: any) => a.name === 'Work')
@@ -103,7 +103,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(401)
       const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     }, 30000)
 
     it('應該過濾已刪除的 Areas', async () => {
@@ -171,8 +171,8 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data.success).toBe(true)
-      expect(data.created).toBe(true)
-      expect(data.area).toBeDefined()
+      expect(data.data.created).toBe(true)
+      expect(data.data.area).toBeDefined()
       expect(data.area.name).toBe('New Area')
       expect(data.area.scope).toBe('Work-related projects')
       expect(data.area.user_id).toBe(testUserId)
@@ -199,7 +199,7 @@ describe('Areas API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('name is required')
+      expect(data.error.message).toBe('name is required')
     }, 30000)
 
     it('應該更新已存在的同名 Area', async () => {
@@ -223,7 +223,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data.success).toBe(true)
-      expect(data.updated).toBe(true)
+      expect(data.data.updated).toBe(true)
       expect(data.area.id).toBe(existingArea.id)
       expect(data.area.scope).toBe('Updated scope')
     }, 30000)
@@ -241,7 +241,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(401)
       const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     }, 30000)
   })
 
@@ -282,7 +282,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(404)
       const data = await response.json()
-      expect(data.error).toBe('Area not found')
+      expect(data.error.message).toBe('Area not found')
     }, 30000)
 
     it('應該在重複名稱時返回 409', async () => {
@@ -300,7 +300,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(409)
       const data = await response.json()
-      expect(data.error).toBe('Area with this name already exists')
+      expect(data.error.message).toBe('Area with this name already exists')
     }, 30000)
 
     it('應該在無效資料時返回 400', async () => {
@@ -317,7 +317,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(400)
       const data = await response.json()
-      expect(data.error).toBe('Invalid request data')
+      expect(data.error.message).toBe('Invalid request data')
     }, 30000)
   })
 
@@ -358,7 +358,7 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(404)
       const data = await response.json()
-      expect(data.error).toBe('Area not found')
+      expect(data.error.message).toBe('Area not found')
     }, 30000)
 
     it('應該在有關聯 Products 時拒絕刪除', async () => {
@@ -376,8 +376,8 @@ describe('Areas API (Integration)', () => {
 
       expect(response.status).toBe(409)
       const data = await response.json()
-      expect(data.error).toBe('Cannot delete area with existing products')
-      expect(data.details).toContain('1 product(s)')
+      expect(data.error.message).toBe('Cannot delete area with existing products')
+      expect(data.data.details).toContain('1 product(s)')
     }, 30000)
   })
 })

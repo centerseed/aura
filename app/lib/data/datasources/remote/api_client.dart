@@ -16,19 +16,22 @@ class ApiClient {
 
   Future<Map<String, dynamic>> signIn(Map<String, dynamic> body) async {
     final response = await _dio.post('/api/auth/signin', data: body);
-    return response.data;
+    // Backend returns { success: true, data: {...}, meta: {...} }
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> getCurrentUser() async {
     final response = await _dio.get('/api/me');
-    return response.data;
+    // Backend returns { success: true, data: {...}, meta: {...} }
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   // ==================== Brain Dump ====================
 
   Future<BrainDumpResponse> brainDump(BrainDumpRequest request) async {
     final response = await _dio.post('/api/brain-dump', data: request.toJson());
-    return BrainDumpResponse.fromJson(response.data);
+    // Backend returns { success: true, data: { items: [...] }, meta: {...} }
+    return BrainDumpResponse.fromJson(response.data['data']);
   }
 
   // ==================== Tasks ====================
@@ -49,14 +52,15 @@ class ApiClient {
       },
     );
 
-    return (response.data as List)
-        .map((json) => TaskModel.fromJson(json))
-        .toList();
+    // Backend returns { success: true, data: [...], meta: {...} }
+    final data = response.data['data'] as List;
+    return data.map((json) => TaskModel.fromJson(json)).toList();
   }
 
   Future<TaskModel> createTask(Map<String, dynamic> request) async {
     final response = await _dio.post('/api/tasks', data: request);
-    return TaskModel.fromJson(response.data);
+    // Backend returns { success: true, data: { task: {...}, message: "..." }, meta: {...} }
+    return TaskModel.fromJson(response.data['data']['task']);
   }
 
   Future<TaskModel> updateTask(
@@ -67,11 +71,8 @@ class ApiClient {
     final body = {'taskId': taskId, ...request};
     final response = await _dio.patch('/api/tasks', data: body);
 
-    // Backend returns { success: true, task: {...} }
-    if (response.data['task'] != null) {
-      return TaskModel.fromJson(response.data['task']);
-    }
-    return TaskModel.fromJson(response.data);
+    // Backend returns { success: true, data: { task: {...}, message: "..." }, meta: {...} }
+    return TaskModel.fromJson(response.data['data']['task']);
   }
 
   Future<void> deleteTask(String taskId) async {
@@ -82,35 +83,38 @@ class ApiClient {
 
   Future<Map<String, dynamic>> getLibrary() async {
     final response = await _dio.get('/api/library');
-    return response.data;
+    // Backend returns { success: true, data: { areas: [...] }, meta: {...} }
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   // ==================== Areas ====================
 
   Future<List<AreaModel>> getAreas() async {
     final response = await _dio.get('/api/areas');
-    return (response.data as List)
-        .map((json) => AreaModel.fromJson(json))
-        .toList();
+    // Backend returns { success: true, data: { areas: [...] }, meta: {...} }
+    final data = response.data['data']['areas'] as List;
+    return data.map((json) => AreaModel.fromJson(json)).toList();
   }
 
   Future<AreaModel> createArea(Map<String, dynamic> request) async {
     final response = await _dio.post('/api/areas', data: request);
-    return AreaModel.fromJson(response.data);
+    // Backend returns { success: true, data: { area: {...}, created: ..., updated: ..., message: "..." }, meta: {...} }
+    return AreaModel.fromJson(response.data['data']['area']);
   }
 
   // ==================== Products ====================
 
   Future<List<ProductModel>> getProducts() async {
     final response = await _dio.get('/api/products');
-    return (response.data as List)
-        .map((json) => ProductModel.fromJson(json))
-        .toList();
+    // Backend returns { success: true, data: { products: [...] }, meta: {...} }
+    final data = response.data['data']['products'] as List;
+    return data.map((json) => ProductModel.fromJson(json)).toList();
   }
 
   Future<ProductModel> createProduct(Map<String, dynamic> request) async {
     final response = await _dio.post('/api/products', data: request);
-    return ProductModel.fromJson(response.data);
+    // Backend returns { success: true, data: { product: {...}, message: "..." }, meta: {...} }
+    return ProductModel.fromJson(response.data['data']['product']);
   }
 
   // ==================== Product AI ====================

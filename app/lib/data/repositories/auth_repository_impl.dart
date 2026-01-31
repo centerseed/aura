@@ -103,17 +103,20 @@ class AuthRepositoryImpl implements AuthRepository {
 
   Future<void> _syncWithBackend(User user) async {
     try {
-      await _apiClient.signIn({
+      final response = await _apiClient.signIn({
         'provider': 'google',
         'providerId': user.uid,
         'email': user.email,
         'name': user.displayName ?? user.email?.split('@')[0] ?? 'User',
-        'photo_url': user
-            .photoURL, // Keep this if backend adds support later, or remove if strict
+        'photo_url': user.photoURL,
       });
+
+      print('✅ Backend sync successful: ${response['data']?['id']}');
     } catch (e) {
-      // Log error but don't fail auth
-      print('Backend sync failed: $e');
+      print('❌ Backend sync failed: $e');
+      // 必須拋出錯誤，讓登入流程知道同步失敗
+      // 否則用戶會以為已登入，但後續所有 API 都會 401
+      rethrow;
     }
   }
 

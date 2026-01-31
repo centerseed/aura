@@ -20,6 +20,11 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, User>> signInWithGoogle() async {
+    return Left(AuthFailure('Mock Google sign in fail'));
+  }
+
+  @override
   Future<Either<Failure, void>> signOut() async {
     return const Right(null);
   }

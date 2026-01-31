@@ -16,6 +16,7 @@ import {
   type DragEndEvent,
   type DragOverEvent,
 } from '@dnd-kit/core'
+import { API } from '@/lib/api-client'
 import type { TaskCard, DrawerStatus } from '@/types'
 import type { ApiArea } from '../context/types'
 
@@ -23,7 +24,6 @@ interface UseDragAndDropProps {
   areas: ApiArea[]
   setAreas: React.Dispatch<React.SetStateAction<ApiArea[]>>
   refreshData: () => Promise<void>
-  getAuthHeaders: () => Promise<Record<string, string>>
   openMergeConfirmModal: (sourceTask: TaskCard, targetTask: TaskCard) => void
 }
 
@@ -36,7 +36,6 @@ export function useDragAndDrop({
   areas,
   setAreas,
   refreshData,
-  getAuthHeaders,
   openMergeConfirmModal,
 }: UseDragAndDropProps) {
   // 拖放狀態
@@ -159,28 +158,19 @@ export function useDragAndDrop({
    */
   const updateTaskStatus = async (taskId: string, newStatus: DrawerStatus) => {
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(await getAuthHeaders()),
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
+      await API.tasks.update(taskId, { status: newStatus })
 
-      if (res.ok) {
-        setAreas((prev) =>
-          prev.map((area) => ({
-            ...area,
-            products: area.products.map((product) => ({
-              ...product,
-              tasks: product.tasks.map((task) =>
-                task.id === taskId ? { ...task, drawer: newStatus } : task
-              ),
-            })),
-          }))
-        )
-      }
+      setAreas((prev) =>
+        prev.map((area) => ({
+          ...area,
+          products: area.products.map((product) => ({
+            ...product,
+            tasks: product.tasks.map((task) =>
+              task.id === taskId ? { ...task, drawer: newStatus } : task
+            ),
+          })),
+        }))
+      )
     } catch (error) {
       console.error('Failed to update task status:', error)
     }
@@ -191,19 +181,10 @@ export function useDragAndDrop({
    */
   const moveTaskToProduct = async (taskId: string, newProductId: string) => {
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(await getAuthHeaders()),
-        },
-        body: JSON.stringify({ product_id: newProductId }),
-      })
+      await API.tasks.update(taskId, { product_id: newProductId })
 
-      if (res.ok) {
-        // 需要刷新資料因為任務在不同 product 間移動
-        await refreshData()
-      }
+      // 需要刷新資料因為任務在不同 product 間移動
+      await refreshData()
     } catch (error) {
       console.error('Failed to move task:', error)
     }
@@ -214,18 +195,9 @@ export function useDragAndDrop({
    */
   const moveProductToArea = async (productId: string, newAreaId: string) => {
     try {
-      const res = await fetch(`/api/products/${productId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(await getAuthHeaders()),
-        },
-        body: JSON.stringify({ area_id: newAreaId }),
-      })
+      await API.products.update(productId, { area_id: newAreaId })
 
-      if (res.ok) {
-        await refreshData()
-      }
+      await refreshData()
     } catch (error) {
       console.error('Failed to move product:', error)
     }

@@ -28,7 +28,7 @@ vi.mock('@/lib/firebase-admin', () => ({
   getAuth: () => mockAuth,
 }))
 
-import { GET } from '@/app/api/tasks/route'
+import { GET } from '../../../app/api/tasks/route'
 import { createMockRequest } from '../../utils/test-helpers'
 import {
   createTestUser,

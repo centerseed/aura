@@ -132,7 +132,7 @@ describe('POST /api/products/reorder (Integration)', () => {
 
     expect(response.status).toBe(400)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('updates array is required')
+    expect(data.error.message).toContain('updates array is required')
   })
 
   it('應該在 updates 不是數組時返回 400', async () => {
@@ -149,7 +149,7 @@ describe('POST /api/products/reorder (Integration)', () => {
 
     expect(response.status).toBe(400)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('updates array is required')
+    expect(data.error.message).toContain('updates array is required')
   })
 
   it('應該在 update 項目缺少 id 時返回 400', async () => {
@@ -168,7 +168,7 @@ describe('POST /api/products/reorder (Integration)', () => {
 
     expect(response.status).toBe(400)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('must have id and display_order')
+    expect(data.error.message).toContain('must have id and display_order')
   })
 
   it('應該在 update 項目缺少 display_order 時返回 400', async () => {
@@ -187,7 +187,7 @@ describe('POST /api/products/reorder (Integration)', () => {
 
     expect(response.status).toBe(400)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('must have id and display_order')
+    expect(data.error.message).toContain('must have id and display_order')
   })
 
   it('應該在 display_order 不是數字時返回 400', async () => {
@@ -206,7 +206,7 @@ describe('POST /api/products/reorder (Integration)', () => {
 
     expect(response.status).toBe(400)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('must have id and display_order')
+    expect(data.error.message).toContain('must have id and display_order')
   })
 
   it('應該處理部分 products 的重新排序', async () => {
@@ -251,6 +251,6 @@ describe('POST /api/products/reorder (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data).toHaveProperty('error', 'Unauthorized')
+    expect(data.error.message).toBe('Invalid or expired token')
   })
 })

@@ -33,11 +33,14 @@ Map<String, dynamic> _$$ProductModelImplToJson(_$ProductModelImpl instance) =>
       'user_id': instance.userId,
       'area_id': instance.areaId,
       'name': instance.name,
-      'description': instance.description,
+      if (instance.description case final value?) 'description': value,
       'status': instance.status,
       'lifecycle': instance.lifecycle,
       'display_order': instance.displayOrder,
-      'created_at': instance.createdAt?.toIso8601String(),
-      'updated_at': instance.updatedAt?.toIso8601String(),
-      'deleted_at': instance.deletedAt?.toIso8601String(),
+      if (instance.createdAt?.toIso8601String() case final value?)
+        'created_at': value,
+      if (instance.updatedAt?.toIso8601String() case final value?)
+        'updated_at': value,
+      if (instance.deletedAt?.toIso8601String() case final value?)
+        'deleted_at': value,
     };

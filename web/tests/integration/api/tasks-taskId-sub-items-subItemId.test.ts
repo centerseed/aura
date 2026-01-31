@@ -120,11 +120,11 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('success', true)
-      expect(data.sub_item).toHaveProperty('completed', true)
-      expect(data.sub_item).toHaveProperty('completed_at')
-      expect(data.sub_items_meta).toHaveProperty('total', 2)
-      expect(data.sub_items_meta).toHaveProperty('completed', 2)
-      expect(data).toHaveProperty('task_completed', true)
+      expect(data.subItem).toHaveProperty('completed', true)
+      expect(data.subItem).toHaveProperty('completed_at')
+      expect(data.meta).toHaveProperty('total', 2)
+      expect(data.meta).toHaveProperty('completed', 2)
+      expect(data.data).toHaveProperty('task_completed', true)
     })
 
     it('應該成功更新 sub-item 的 content', async () => {
@@ -143,7 +143,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('success', true)
-      expect(data.sub_item).toHaveProperty('content', 'Updated sub-item content')
+      expect(data.subItem).toHaveProperty('content', 'Updated sub-item content')
     })
 
     it('應該同時更新 completed 和 content', async () => {
@@ -162,9 +162,9 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.sub_item).toHaveProperty('completed', false)
-      expect(data.sub_item).toHaveProperty('content', 'New content')
-      expect(data.sub_item).toHaveProperty('completed_at', null)
+      expect(data.subItem).toHaveProperty('completed', false)
+      expect(data.subItem).toHaveProperty('content', 'New content')
+      expect(data.subItem).toHaveProperty('completed_at', null)
     })
 
     it('應該自動 trim 空格', async () => {
@@ -182,7 +182,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.sub_item.content).toBe('Trimmed content')
+      expect(data.subItem.content).toBe('Trimmed content')
     })
 
     it('應該在未提供 completed 或 content 時返回 400', async () => {
@@ -198,7 +198,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("Either 'completed' or 'content' field is required")
+      expect(data.error.message).toContain("Either completed or content field is required")
     })
 
     it('應該在 completed 不是 boolean 時返回 400', async () => {
@@ -216,7 +216,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'completed' must be boolean")
+      expect(data.error.message).toContain("boolean")
     })
 
     it('應該在 content 不是 string 時返回 400', async () => {
@@ -234,7 +234,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'content' must be string")
+      expect(data.error.message).toContain("string")
     })
 
     it('應該在 content 為空時返回 400', async () => {
@@ -252,7 +252,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'content' cannot be empty")
+      expect(data.error.message).toContain("Content cannot be empty")
     })
 
     it('應該在 sub-item 不存在時返回 404', async () => {
@@ -271,7 +271,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Sub-item not found')
+      expect(data.error.message).toBe('Sub-item not found')
     })
 
     it('應該在任務不存在時返回 404', async () => {
@@ -290,7 +290,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Task not found')
+      expect(data.error.message).toBe('Task not found')
     })
   })
 
@@ -332,8 +332,8 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('success', true)
-      expect(data).toHaveProperty('deleted_sub_item_id', deleteSubItemId)
-      expect(data.sub_items_meta).toHaveProperty('total', 1)
+      expect(data.data).toHaveProperty('deletedSubItemId', deleteSubItemId)
+      expect(data.meta).toHaveProperty('total', 1)
 
       // 驗證資料庫中已刪除
       const updatedTask = await prisma.task.findUnique({
@@ -411,7 +411,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Sub-item not found')
+      expect(data.error.message).toBe('Sub-item not found')
     })
 
     it('應該在任務不存在時返回 404', async () => {
@@ -427,7 +427,7 @@ describe('API /api/tasks/[taskId]/sub-items/[subItemId] (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Task not found')
+      expect(data.error.message).toBe('Task not found')
     })
   })
 })

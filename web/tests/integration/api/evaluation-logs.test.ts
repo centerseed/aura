@@ -155,8 +155,8 @@ describe('Evaluation Logs API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.limit).toBe(3)
-      expect(data.offset).toBe(1)
+      expect(data.data.limit).toBe(3)
+      expect(data.data.offset).toBe(1)
       expect(data.logs.length).toBeLessThanOrEqual(3)
     })
 
@@ -172,7 +172,7 @@ describe('Evaluation Logs API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(401)
-      expect(data).toHaveProperty('error', 'Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     })
   })
 
@@ -191,7 +191,7 @@ describe('Evaluation Logs API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('success', true)
-      expect(data.log).toHaveProperty('user_action', 'APPLIED')
+      expect(data.data.log).toHaveProperty('user_action', 'APPLIED')
     })
 
     it('應該支援更新 metadata', async () => {
@@ -228,7 +228,7 @@ describe('Evaluation Logs API (Integration)', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
-      expect(data.error).toContain('required')
+      expect(data.error.message).toContain('required')
     })
 
     it('應該在缺少 userAction 時返回 400', async () => {
@@ -244,7 +244,7 @@ describe('Evaluation Logs API (Integration)', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
-      expect(data.error).toContain('required')
+      expect(data.error.message).toContain('required')
     })
 
     it('應該在 userAction 無效時返回 400', async () => {
@@ -261,7 +261,7 @@ describe('Evaluation Logs API (Integration)', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
-      expect(data.error).toContain('Invalid userAction')
+      expect(data.error.message).toContain('Invalid userAction')
     })
   })
 })

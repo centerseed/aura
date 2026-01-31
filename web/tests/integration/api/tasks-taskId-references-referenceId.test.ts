@@ -108,8 +108,8 @@ describe('PATCH /api/tasks/[taskId]/references/[referenceId] (Integration)', () 
 
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('success', true)
-    expect(data.reference).toHaveProperty('content', 'https://updated-url.com')
-    expect(data.reference).toHaveProperty('title', 'Original Title')
+    expect(data.data.reference).toHaveProperty('content', 'https://updated-url.com')
+    expect(data.data.reference).toHaveProperty('title', 'Original Title')
 
     // 驗證資料庫中的更新
     const updatedTask = await prisma.task.findUnique({
@@ -135,7 +135,7 @@ describe('PATCH /api/tasks/[taskId]/references/[referenceId] (Integration)', () 
 
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('success', true)
-    expect(data.reference).toHaveProperty('title', 'Updated Title')
+    expect(data.data.reference).toHaveProperty('title', 'Updated Title')
   })
 
   it('應該同時更新 content 和 title', async () => {
@@ -155,8 +155,8 @@ describe('PATCH /api/tasks/[taskId]/references/[referenceId] (Integration)', () 
 
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('success', true)
-    expect(data.reference).toHaveProperty('content', 'https://new-url.com')
-    expect(data.reference).toHaveProperty('title', 'New Title')
+    expect(data.data.reference).toHaveProperty('content', 'https://new-url.com')
+    expect(data.data.reference).toHaveProperty('title', 'New Title')
   })
 
   it('應該自動 trim 空格', async () => {
@@ -213,7 +213,7 @@ describe('PATCH /api/tasks/[taskId]/references/[referenceId] (Integration)', () 
     const data = await response.json()
 
     expect(response.status).toBe(404)
-    expect(data).toHaveProperty('error', 'Task not found')
+    expect(data.error.message).toBe('Task not found')
   })
 
   it('應該在 reference 不存在時返回 404', async () => {
@@ -232,7 +232,7 @@ describe('PATCH /api/tasks/[taskId]/references/[referenceId] (Integration)', () 
     const data = await response.json()
 
     expect(response.status).toBe(404)
-    expect(data).toHaveProperty('error', 'Reference not found')
+    expect(data.error.message).toBe('Reference not found')
   })
 
   it('應該在未認證時返回 500 (auth error)', async () => {
@@ -252,6 +252,6 @@ describe('PATCH /api/tasks/[taskId]/references/[referenceId] (Integration)', () 
     const data = await response.json()
 
     expect(response.status).toBe(500)
-    expect(data).toHaveProperty('error', 'Failed to update reference')
+    expect(data.error.message).toBe('Failed to update reference')
   })
 })

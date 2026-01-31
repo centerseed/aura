@@ -9,18 +9,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { auth } from '@/lib/firebase'
+import { API } from '@/lib/api-client'
 import type { Milestone, TaskCard } from '@/types'
 import type { ApiArea, DashboardDataState, DashboardStats } from '../context/types'
-
-/**
- * 獲取 Auth Headers
- */
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const user = auth.currentUser
-  if (!user) throw new Error('No authenticated user')
-  const token = await user.getIdToken()
-  return { Authorization: `Bearer ${token}` }
-}
 
 /**
  * useDashboardData Hook
@@ -51,13 +42,8 @@ export function useDashboardData() {
    */
   const loadCompletedToday = useCallback(async () => {
     try {
-      const res = await fetch('/api/tasks?completed_today=true', {
-        headers: await getAuthHeaders(),
-      })
-      if (res.ok) {
-        const tasks = await res.json()
-        setCompletedTodayTasks(tasks)
-      }
+      const tasks = await API.tasks.list({ completed_today: 'true' })
+      setCompletedTodayTasks(tasks)
     } catch (err) {
       console.error('Failed to load completed today tasks:', err)
     }
@@ -73,14 +59,9 @@ export function useDashboardData() {
       const twoWeeksAgo = new Date()
       twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
       const fromDate = twoWeeksAgo.toISOString()
-      const res = await fetch(`/api/tasks?status=ARCHIVE&from=${fromDate}`, {
-        headers: await getAuthHeaders(),
-      })
-      if (res.ok) {
-        const tasks = await res.json()
-        setRecentArchivedTasks(tasks)
-        setArchivedLoaded(true)
-      }
+      const tasks = await API.tasks.list({ status: 'ARCHIVE', from: fromDate })
+      setRecentArchivedTasks(tasks)
+      setArchivedLoaded(true)
     } catch (err) {
       console.error('Failed to load archived tasks:', err)
     } finally {
@@ -93,23 +74,14 @@ export function useDashboardData() {
    */
   const refreshData = useCallback(async () => {
     try {
-      const headers = await getAuthHeaders()
-
       // 並行載入 library 和 milestones
-      const [libraryRes, milestonesRes] = await Promise.all([
-        fetch('/api/library', { headers }),
-        fetch('/api/milestones', { headers }),
+      const [libraryData, milestonesData] = await Promise.all([
+        API.library(),
+        API.milestones.list(),
       ])
 
-      if (libraryRes.ok) {
-        const libraryData = await libraryRes.json()
-        setAreas(libraryData)
-      }
-
-      if (milestonesRes.ok) {
-        const milestonesData = await milestonesRes.json()
-        setMilestones(milestonesData)
-      }
+      setAreas(libraryData)
+      setMilestones(milestonesData)
 
       // 重新載入今日完成
       loadCompletedToday()
@@ -138,31 +110,19 @@ export function useDashboardData() {
           }
 
           try {
-            const token = await firebaseUser.getIdToken()
-            const headers = { Authorization: `Bearer ${token}` }
-
             // 獲取用戶資料
-            const userRes = await fetch('/api/me', { headers })
-            if (!userRes.ok) {
-              throw new Error('無法獲取用戶資料')
-            }
-            const userData = await userRes.json()
+            const userData = await API.users.me()
 
             setUserId(userData.id)
             setUserName(userData.displayName || userData.name || userData.email || 'User')
 
             // 獲取 Library
-            const libraryRes = await fetch('/api/library', { headers })
-            if (!libraryRes.ok) throw new Error('無法獲取資料庫內容')
-            const libraryData = await libraryRes.json()
+            const libraryData = await API.library()
             setAreas(libraryData)
 
             // 獲取 Milestones
-            const milestonesRes = await fetch('/api/milestones', { headers })
-            if (milestonesRes.ok) {
-              const milestonesData = await milestonesRes.json()
-              setMilestones(milestonesData)
-            }
+            const milestonesData = await API.milestones.list()
+            setMilestones(milestonesData)
           } catch (err) {
             setError(err instanceof Error ? err.message : '載入失敗')
           } finally {
@@ -271,7 +231,6 @@ export function useDashboardData() {
     refreshData,
     loadCompletedToday,
     loadRecentArchived,
-    getAuthHeaders,
   }
 }
 

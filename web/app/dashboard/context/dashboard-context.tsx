@@ -126,7 +126,6 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     setAreas: dataHook.setAreas,
     refreshData: dataHook.refreshData,
     loadCompletedToday: dataHook.loadCompletedToday,
-    getAuthHeaders: dataHook.getAuthHeaders,
   })
 
   // ========== 拖放 Hook ==========
@@ -134,7 +133,6 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     areas: dataHook.areas,
     setAreas: dataHook.setAreas,
     refreshData: dataHook.refreshData,
-    getAuthHeaders: dataHook.getAuthHeaders,
     openMergeConfirmModal: modalsHook.openMergeConfirmModal,
   })
 

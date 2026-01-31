@@ -83,7 +83,7 @@ describe('POST /api/products/[id]/reorganize-topics (Integration)', () => {
 
     expect(response.status).toBe(404)
     const data = await response.json()
-    expect(data.error).toBe('Product not found')
+    expect(data.error.message).toBe('Product not found')
   }, 30000)
 
   it('應該在未認證時返回 401', async () => {
@@ -117,11 +117,11 @@ describe('POST /api/products/[id]/reorganize-topics (Integration)', () => {
 
     expect(response.status).toBe(200)
     const data = await response.json()
-    expect(data.product_name).toBe('Empty Product')
-    expect(data.current_topics).toEqual([])
-    expect(data.proposed_clusters).toEqual([])
-    expect(data.time_inferences).toEqual([])
-    expect(data.reasoning).toContain('無需重組')
+    expect(data.data.product_name).toBe('Empty Product')
+    expect(data.data.current_topics).toEqual([])
+    expect(data.data.proposed_clusters).toEqual([])
+    expect(data.data.time_inferences).toEqual([])
+    expect(data.data.reasoning).toContain('無需重組')
   }, 30000)
 
   it('應該返回 AI 重組建議（含 Topics 分群）', async () => {
@@ -168,14 +168,14 @@ describe('POST /api/products/[id]/reorganize-topics (Integration)', () => {
     const data = await response.json()
 
     // 驗證回應結構
-    expect(data.product_id).toBe(testProductId)
-    expect(data.product_name).toBe('Website Project')
+    expect(data.data.product_id).toBe(testProductId)
+    expect(data.data.product_name).toBe('Website Project')
     expect(Array.isArray(data.current_topics)).toBe(true)
     expect(Array.isArray(data.proposed_clusters)).toBe(true)
     expect(Array.isArray(data.time_inferences)).toBe(true)
     expect(Array.isArray(data.tasks_context)).toBe(true)
     expect(typeof data.reasoning).toBe('string')
-    expect(data.logId).toBeDefined() // SystemEvaluationLog ID
+    expect(data.data.logId).toBeDefined() // SystemEvaluationLog ID
   }, 30000)
 
   it('應該提供時間推斷（基於 Milestones）', async () => {
@@ -252,7 +252,7 @@ describe('POST /api/products/[id]/reorganize-topics (Integration)', () => {
     const data = await response.json()
 
     // 驗證 Log ID 存在
-    expect(data.logId).toBeDefined()
+    expect(data.data.logId).toBeDefined()
     expect(typeof data.logId).toBe('string')
 
     // 檢查 Log 是否實際創建

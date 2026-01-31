@@ -111,9 +111,9 @@ describe('POST /api/suggest-product (Integration)', () => {
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('success', true)
     expect(data).toHaveProperty('suggestion')
-    expect(data.suggestion).toHaveProperty('suggested_name')
-    expect(data.suggestion).toHaveProperty('reasoning')
-    expect(data.suggestion).toHaveProperty('alternative_names')
+    expect(data.data.suggestion).toHaveProperty('suggested_name')
+    expect(data.data.suggestion).toHaveProperty('reasoning')
+    expect(data.data.suggestion).toHaveProperty('alternative_names')
     expect(Array.isArray(data.suggestion.alternative_names)).toBe(true)
   })
 
@@ -151,7 +151,7 @@ describe('POST /api/suggest-product (Integration)', () => {
 
     expect(response.status).toBe(400)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('required')
+    expect(data.error.message).toContain('required')
   })
 
   it('應該在缺少 areaId 時返回 400', async () => {
@@ -168,7 +168,7 @@ describe('POST /api/suggest-product (Integration)', () => {
 
     expect(response.status).toBe(400)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('required')
+    expect(data.error.message).toContain('required')
   })
 
   it('應該支援可選的 taskNarrative', async () => {
@@ -227,7 +227,7 @@ describe('POST /api/suggest-product (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data).toHaveProperty('error', 'Unauthorized')
+    expect(data.error.message).toBe('Invalid or expired token')
   })
 
   it('應該在 AI 調用失敗時返回 500', async () => {
@@ -248,6 +248,6 @@ describe('POST /api/suggest-product (Integration)', () => {
 
     expect(response.status).toBe(500)
     expect(data).toHaveProperty('error')
-    expect(data.error).toContain('Failed to suggest product name')
+    expect(data.error.message).toContain('Failed to suggest product name')
   })
 })

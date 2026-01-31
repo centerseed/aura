@@ -28,7 +28,7 @@ vi.mock('@/lib/firebase-admin', () => ({
   getAuth: () => mockAuth,
 }))
 
-import { GET, DELETE } from '@/app/api/tasks/[taskId]/route'
+import { GET, DELETE } from '../../../app/api/tasks/[taskId]/route'
 import { createMockRequest } from '../../utils/test-helpers'
 import {
   createTestUser,
@@ -92,19 +92,20 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await GET(request, { params: Promise.resolve({ taskId: testTaskId }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data).toHaveProperty('id', testTaskId)
-      expect(data).toHaveProperty('title', 'Test Task')
-      expect(data).toHaveProperty('drawer')
-      expect(data).toHaveProperty('lifecycle')
-      expect(data).toHaveProperty('tag')
-      expect(data.tag).toHaveProperty('area')
-      expect(data.tag).toHaveProperty('product')
-      expect(data.tag).toHaveProperty('topic')
-      expect(data).toHaveProperty('sub_items')
-      expect(data).toHaveProperty('references')
+      expect(json.success).toBe(true)
+      expect(json.data).toHaveProperty('id', testTaskId)
+      expect(json.data).toHaveProperty('title', 'Test Task')
+      expect(json.data).toHaveProperty('drawer')
+      expect(json.data).toHaveProperty('lifecycle')
+      expect(json.data).toHaveProperty('tag')
+      expect(json.data.tag).toHaveProperty('area')
+      expect(json.data.tag).toHaveProperty('product')
+      expect(json.data.tag).toHaveProperty('topic')
+      expect(json.data).toHaveProperty('sub_items')
+      expect(json.data).toHaveProperty('references')
     })
 
     it('應該在缺少 taskId 時返回 400', async () => {
@@ -114,10 +115,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await GET(request, { params: Promise.resolve({ taskId: '' }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data).toHaveProperty('error')
+      expect(json.success).toBe(false)
+      expect(json.error).toBeDefined()
     })
 
     it('應該在任務不存在時返回 404', async () => {
@@ -128,10 +130,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await GET(request, { params: Promise.resolve({ taskId: nonExistentId }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Task not found')
+      expect(json.success).toBe(false)
+      expect(json.error.code).toBe('NOT_FOUND')
     })
 
     it('應該在任務被軟刪除時返回 404', async () => {
@@ -150,10 +153,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await GET(request, { params: Promise.resolve({ taskId: deletedTask.id }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Task not found')
+      expect(json.success).toBe(false)
+      expect(json.error.code).toBe('NOT_FOUND')
     })
 
     it('應該在未認證時返回 401', async () => {
@@ -165,10 +169,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await GET(request, { params: Promise.resolve({ taskId: testTaskId }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(401)
-      expect(data).toHaveProperty('error', 'Unauthorized')
+      expect(json.success).toBe(false)
+      expect(json.error.code).toBe('UNAUTHORIZED')
     })
   })
 
@@ -184,12 +189,12 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await DELETE(request, { params: Promise.resolve({ taskId: taskToDelete.id }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data).toHaveProperty('success', true)
-      expect(data).toHaveProperty('message')
-      expect(data).toHaveProperty('taskId', taskToDelete.id)
+      expect(json.success).toBe(true)
+      expect(json.data).toHaveProperty('message')
+      expect(json.data).toHaveProperty('taskId', taskToDelete.id)
 
       // 驗證任務已被軟刪除
       const deletedTask = await prisma.task.findUnique({
@@ -225,10 +230,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await DELETE(request, { params: Promise.resolve({ taskId: taskWithRefs.id }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data).toHaveProperty('referencesMigrated', 1)
+      expect(json.success).toBe(true)
+      expect(json.data).toHaveProperty('referencesMigrated', 1)
 
       // 驗證 references 已遷移到 product
       const product = await prisma.product.findUnique({
@@ -246,10 +252,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await DELETE(request, { params: Promise.resolve({ taskId: '' }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data).toHaveProperty('error')
+      expect(json.success).toBe(false)
+      expect(json.error).toBeDefined()
     })
 
     it('應該在任務不存在時返回 404', async () => {
@@ -260,10 +267,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await DELETE(request, { params: Promise.resolve({ taskId: nonExistentId }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error')
+      expect(json.success).toBe(false)
+      expect(json.error.code).toBe('NOT_FOUND')
     })
 
     it('應該在未認證時返回 401', async () => {
@@ -275,10 +283,11 @@ describe('Tasks [taskId] API (Integration)', () => {
       })
 
       const response = await DELETE(request, { params: Promise.resolve({ taskId: testTaskId }) })
-      const data = await response.json()
+      const json = await response.json()
 
       expect(response.status).toBe(401)
-      expect(data).toHaveProperty('error', 'Unauthorized')
+      expect(json.success).toBe(false)
+      expect(json.error.code).toBe('UNAUTHORIZED')
     })
   })
 })

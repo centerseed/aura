@@ -76,6 +76,12 @@ interface/        # 🟡 接口轉換層
 
 **依賴規則**: 外層可依賴內層,內層絕不依賴外層。Domain 層絕不引用 FastAPI 或 Firestore。
 
+**型別與命名規範** (強制執行):
+- **資料庫層** (`infrastructure/repositories`): Prisma 原生格式 (camelCase + Date 物件,如 `createdAt: Date`)
+- **領域層** (`domain/entities` & `domain/interfaces`): API 標準格式 (snake_case + ISO string,如 `created_at: string`)
+- **Repository 層責任**: 必須實作 `toDomain()` 與 `toPrisma()` 方法完整處理格式轉換,嚴禁讓型別不匹配洩漏到 Use Case 層
+- **Use Case 層禁令**: 只處理業務邏輯,絕不進行型別轉換或格式處理 (發現需要轉換即表示 Repository 層實作不完整)
+
 ### TDD (Test-Driven Development) 強制性
 開發順序 (不可違反):
 1. 先寫失敗的單元測試

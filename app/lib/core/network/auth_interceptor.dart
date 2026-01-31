@@ -17,16 +17,22 @@ class AuthInterceptor extends Interceptor {
       final user = _firebaseAuth.currentUser;
 
       if (user != null) {
-        // 獲取最新的 ID Token
-        final token = await user.getIdToken();
+        // 強制刷新 Token 確保有效性
+        final token = await user.getIdToken(true);
 
-        if (token != null) {
+        if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
+          print('🔑 Token attached (${token.length} chars) for ${options.uri}');
+        } else {
+          print('⚠️ Token is null/empty for user: ${user.uid}');
         }
+      } else {
+        print('⚠️ No authenticated user for ${options.uri}');
       }
 
       handler.next(options);
     } catch (e) {
+      print('❌ Auth error: $e');
       handler.reject(
         DioException(
           requestOptions: options,

@@ -1,5 +1,6 @@
 {
   "devDependencies": {
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "vite-tsconfig-paths": "^6.0.5"
   }
 }

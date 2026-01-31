@@ -32,10 +32,13 @@ Map<String, dynamic> _$$AreaModelImplToJson(_$AreaModelImpl instance) =>
       'user_id': instance.userId,
       'name': instance.name,
       'description': instance.description,
-      'scope': instance.scope,
-      'rolling_summary': instance.rollingSummary,
+      if (instance.scope case final value?) 'scope': value,
+      if (instance.rollingSummary case final value?) 'rolling_summary': value,
       'is_custom': instance.isCustom,
-      'created_at': instance.createdAt?.toIso8601String(),
-      'updated_at': instance.updatedAt?.toIso8601String(),
-      'deleted_at': instance.deletedAt?.toIso8601String(),
+      if (instance.createdAt?.toIso8601String() case final value?)
+        'created_at': value,
+      if (instance.updatedAt?.toIso8601String() case final value?)
+        'updated_at': value,
+      if (instance.deletedAt?.toIso8601String() case final value?)
+        'deleted_at': value,
     };

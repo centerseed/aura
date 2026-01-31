@@ -89,7 +89,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data.success).toBe(true)
-      expect(data.product).toBeDefined()
+      expect(data.data.product).toBeDefined()
       expect(data.product.name).toBe('New Product')
       expect(data.product.area_id).toBe(testAreaId)
       expect(data.product.user_id).toBe(testUserId)
@@ -137,7 +137,7 @@ describe('Products API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid request data')
+      expect(data.error.message).toBe('Invalid request data')
     }, 30000)
 
     it('應該在缺少 name 時返回 400', async () => {
@@ -153,7 +153,7 @@ describe('Products API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid request data')
+      expect(data.error.message).toBe('Invalid request data')
     }, 30000)
 
     it('應該在 Area 不存在時返回 404', async () => {
@@ -172,7 +172,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(404)
       const data = await response.json()
-      expect(data.error).toBe('Area not found')
+      expect(data.error.message).toBe('Area not found')
     }, 30000)
 
     it('應該在重複名稱時返回 409', async () => {
@@ -193,7 +193,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(409)
       const data = await response.json()
-      expect(data.error).toBe('Product with this name already exists in this area')
+      expect(data.error.message).toBe('Product with this name already exists in this area')
     }, 30000)
 
     it('應該允許不同 Areas 有同名 Product', async () => {
@@ -235,7 +235,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(401)
       const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     }, 30000)
   })
 
@@ -305,7 +305,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(404)
       const data = await response.json()
-      expect(data.error).toBe('Product not found')
+      expect(data.error.message).toBe('Product not found')
     }, 30000)
 
     it('應該在重複名稱時返回 409', async () => {
@@ -325,7 +325,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(409)
       const data = await response.json()
-      expect(data.error).toBe('Product with this name already exists in this area')
+      expect(data.error.message).toBe('Product with this name already exists in this area')
     }, 30000)
 
     it('應該在無效資料時返回 400', async () => {
@@ -344,7 +344,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(400)
       const data = await response.json()
-      expect(data.error).toBe('Invalid request data')
+      expect(data.error.message).toBe('Invalid request data')
     }, 30000)
   })
 
@@ -387,7 +387,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(404)
       const data = await response.json()
-      expect(data.error).toBe('Product not found')
+      expect(data.error.message).toBe('Product not found')
     }, 30000)
 
     it('應該在有 active tasks 時拒絕刪除', async () => {
@@ -411,8 +411,8 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(409)
       const data = await response.json()
-      expect(data.error).toBe('Cannot delete product with active tasks')
-      expect(data.details).toContain('1 active task(s)')
+      expect(data.error.message).toBe('Cannot delete product with active tasks')
+      expect(data.data.details).toContain('1 active task(s)')
     }, 30000)
 
     it('應該允許刪除有 ARCHIVE 任務的 Product', async () => {
@@ -468,7 +468,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(Array.isArray(data)).toBe(true)
-      expect(data.length).toBeGreaterThanOrEqual(3)
+      expect(data.data.length).toBeGreaterThanOrEqual(3)
 
       // 驗證返回的 products 屬於當前用戶
       data.forEach((product: any) => {
@@ -553,7 +553,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(401)
       const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     }, 30000)
 
     it('應該在沒有 products 時返回空陣列', async () => {
@@ -576,7 +576,7 @@ describe('Products API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(Array.isArray(data)).toBe(true)
-      expect(data.length).toBe(0)
+      expect(data.data.length).toBe(0)
 
       // 恢復原來的 mock
       mockVerifyIdToken.mockResolvedValue({ uid: originalFirebaseUid })

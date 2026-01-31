@@ -73,12 +73,12 @@ describe('GET /api/users (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data).toHaveProperty('id', testUserId)
-    expect(data).toHaveProperty('email', 'user-test@example.com')
-    expect(data).toHaveProperty('name', 'Test User')
-    expect(data).toHaveProperty('displayName')
-    expect(data).toHaveProperty('areas')
-    expect(data).toHaveProperty('hasAreas')
+    expect(data.data).toHaveProperty('id', testUserId)
+    expect(data.data).toHaveProperty('email', 'user-test@example.com')
+    expect(data.data).toHaveProperty('name', 'Test User')
+    expect(data.data).toHaveProperty('displayName')
+    expect(data.data).toHaveProperty('areas')
+    expect(data.data).toHaveProperty('hasAreas')
     expect(Array.isArray(data.areas)).toBe(true)
   })
 
@@ -97,7 +97,7 @@ describe('GET /api/users (Integration)', () => {
 
     expect(response.status).toBe(200)
     expect(data.areas.length).toBeGreaterThanOrEqual(2)
-    expect(data.hasAreas).toBe(true)
+    expect(data.data.hasAreas).toBe(true)
   })
 
   it('應該在未認證時返回 401', async () => {
@@ -112,7 +112,7 @@ describe('GET /api/users (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data).toHaveProperty('error', 'Unauthorized')
+    expect(data.error.message).toBe('Invalid or expired token')
   })
 
   it('應該在缺少 authorization header 時返回 401', async () => {
@@ -139,7 +139,7 @@ describe('GET /api/users (Integration)', () => {
 
     expect(response.status).toBe(200)
     // displayName 應該是 name 或 email（如果 name 不存在）
-    expect(data.displayName).toBe('Test User')
+    expect(data.data.displayName).toBe('Test User')
   })
 
   it('應該在用戶不存在資料庫時返回錯誤', async () => {

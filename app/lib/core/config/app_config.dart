@@ -1,22 +1,32 @@
+import 'package:flutter/foundation.dart';
+
 /// 應用配置類
 /// 處理環境變數與 API 端點配置
 class AppConfig {
   // 私有構造函數
   AppConfig._();
 
-  /// 環境類型
-  static const Environment environment = Environment.production;
+  /// 環境類型 (根據編譯模式自動判斷)
+  static Environment get environment {
+    if (kDebugMode) {
+      return Environment.development;
+    } else if (kReleaseMode) {
+      return Environment.production;
+    } else {
+      // kProfileMode
+      return Environment.staging;
+    }
+  }
 
-  /// API Base URL
-  /// API Base URL
+  /// API Base URL (後端已拆分為獨立 API 服務)
   static String get apiBaseUrl {
     switch (environment) {
       case Environment.development:
-        return 'http://localhost:3001'; // Port 3000 occupied by Grafana
+        return 'http://localhost:3001'; // 本地開發環境
       case Environment.staging:
-        return 'https://zentropy-web-isakqhri2a-de.a.run.app';
+        return 'https://zentropy-api-894512935237.asia-east1.run.app';
       case Environment.production:
-        return 'https://zentropy-web-isakqhri2a-de.a.run.app';
+        return 'https://zentropy-api-894512935237.asia-east1.run.app';
     }
   }
 

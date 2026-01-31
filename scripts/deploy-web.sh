@@ -1,49 +1,118 @@
 #!/bin/bash
+# ============================================================================
+# deploy-web.sh - 部署 Frontend 到 Firebase Hosting
+# ============================================================================
+#
+# 使用方式：
+#   ./scripts/deploy-web.sh
+#
+# 功能：
+#   - 建置 Next.js 前端專案
+#   - 部署至 Firebase Hosting
+# ============================================================================
 
-# 前端部署腳本 - Next.js to Cloud Run (使用 Secret Manager)
-# 使用方式: ./scripts/deploy-web.sh
+set -e  # 遇到錯誤立即退出
 
-set -e
+# 顏色輸出
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-echo "🚀 開始部署前端到 Cloud Run..."
+# 配置變數
+WEB_DIR="web"
+FIREBASE_PROJECT="zentropy-app"
 
-# 設定變數
-PROJECT_ID="zentropy-4f7a5"
-REGION="asia-east1"
-SERVICE_NAME="zentropy-web"
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}  部署 Zentropy Frontend${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
 
-# 切換到 web 目錄
-cd "$(dirname "$0")/../web"
+# 1. 檢查是否在專案根目錄
+if [ ! -d "$WEB_DIR" ]; then
+  echo -e "${RED}錯誤：找不到 web/ 目錄，請在專案根目錄執行此腳本${NC}"
+  exit 1
+fi
 
-echo "📦 建置並推送 Docker 映像..."
-gcloud builds submit --tag gcr.io/${PROJECT_ID}/${SERVICE_NAME} --project ${PROJECT_ID}
+# 2. 檢查 Firebase CLI
+if ! command -v firebase &> /dev/null; then
+  echo -e "${RED}錯誤：找不到 Firebase CLI，請執行: npm install -g firebase-tools${NC}"
+  exit 1
+fi
 
-echo "🚢 部署到 Cloud Run (使用 Secret Manager)..."
-gcloud run deploy ${SERVICE_NAME} \
-  --image gcr.io/${PROJECT_ID}/${SERVICE_NAME} \
-  --platform managed \
-  --region ${REGION} \
-  --allow-unauthenticated \
-  --memory 256Mi \
-  --cpu 1 \
-  --min-instances 0 \
-  --max-instances 10 \
-  --timeout 300 \
-  --port 8080 \
-  --update-secrets DATABASE_URL=database-url:latest,GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest,FIREBASE_ADMIN_KEY=firebase-admin-key:latest \
-  --set-env-vars NODE_ENV=production,NEXT_PUBLIC_FIREBASE_API_KEY=REDACTED_FIREBASE_API_KEY,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=zentropy-4f7a5.firebasestorage.app,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=894512935237,NEXT_PUBLIC_FIREBASE_APP_ID=1:894512935237:web:2533f9a2e7d09321f88e2c \
-  --project ${PROJECT_ID}
+# 3. 切換到 web 目錄
+cd "$WEB_DIR"
+echo -e "${GREEN}[1/4] 準備前端專案...${NC}"
+
+# 4. 安裝依賴 (如果需要)
+if [ ! -d "node_modules" ]; then
+  echo -e "${YELLOW}安裝依賴...${NC}"
+  npm install
+fi
+
+# 5. 建置 Next.js (靜態導出模式)
+echo -e "${GREEN}[2/4] 建置 Next.js 前端...${NC}"
+npm run build
+
+# 6. 檢查 firebase.json
+if [ ! -f "firebase.json" ]; then
+  echo -e "${YELLOW}創建 firebase.json...${NC}"
+  cat > firebase.json << 'FIREBASEJSON'
+{
+  "hosting": {
+    "public": "out",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|ico)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      }
+    ]
+  }
+}
+FIREBASEJSON
+fi
+
+# 7. 登入 Firebase (如果需要)
+echo -e "${GREEN}[3/4] 驗證 Firebase 登入...${NC}"
+firebase login --reauth
+
+# 8. 部署至 Firebase Hosting
+echo -e "${GREEN}[4/4] 部署至 Firebase Hosting...${NC}"
+firebase deploy --only hosting --project "$FIREBASE_PROJECT"
 
 echo ""
-echo "✅ 前端部署完成！"
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}  部署成功！${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo -e "${BLUE}前端 URL:${NC} https://${FIREBASE_PROJECT}.web.app"
 echo ""
-echo "🌐 取得服務 URL..."
-SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} \
-  --region ${REGION} \
-  --project ${PROJECT_ID} \
-  --format 'value(status.url)')
-
-echo "📍 服務已部署至: ${SERVICE_URL}"
+echo -e "${YELLOW}注意：${NC}"
+echo -e "  - 請確保 Next.js 配置為靜態導出模式 (output: 'export')"
+echo -e "  - 前端會呼叫已部署的 API (需在環境變數設定 API_URL)"
 echo ""
-echo "🧪 測試端點:"
-echo "   curl ${SERVICE_URL}"

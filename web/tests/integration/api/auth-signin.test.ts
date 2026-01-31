@@ -36,9 +36,9 @@ describe('POST /api/auth/signin (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('id')
-      expect(data).toHaveProperty('email', email)
-      expect(data).toHaveProperty('name', 'Google User')
-      expect(data).toHaveProperty('authProvider', 'GOOGLE')
+      expect(data.data).toHaveProperty('email', email)
+      expect(data.data).toHaveProperty('name', 'Google User')
+      expect(data.data).toHaveProperty('authProvider', 'GOOGLE')
 
       testUserIds.push(data.id)
     })
@@ -96,7 +96,7 @@ describe('POST /api/auth/signin (Integration)', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
-      expect(data.error).toContain('Google')
+      expect(data.error.message).toContain('Google')
     })
 
     it('應該在缺少 email 時返回 400', async () => {
@@ -113,7 +113,7 @@ describe('POST /api/auth/signin (Integration)', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
-      expect(data.error).toContain('Google')
+      expect(data.error.message).toContain('Google')
     })
 
     it('應該在沒有 name 時使用 email 前綴作為名稱', async () => {
@@ -133,7 +133,7 @@ describe('POST /api/auth/signin (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.name).toBe('autoname')
+      expect(data.data.name).toBe('autoname')
 
       testUserIds.push(data.id)
     })
@@ -156,9 +156,9 @@ describe('POST /api/auth/signin (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('id')
-      expect(data).toHaveProperty('email', null)
-      expect(data).toHaveProperty('name', '訪客')
-      expect(data).toHaveProperty('authProvider', 'ANONYMOUS')
+      expect(data.data).toHaveProperty('email', null)
+      expect(data.data).toHaveProperty('name', '訪客')
+      expect(data.data).toHaveProperty('authProvider', 'ANONYMOUS')
 
       testUserIds.push(data.id)
     })
@@ -208,7 +208,7 @@ describe('POST /api/auth/signin (Integration)', () => {
 
       expect(response.status).toBe(400)
       expect(data).toHaveProperty('error')
-      expect(data.error).toContain('匿名')
+      expect(data.error.message).toContain('匿名')
     })
 
     it('應該支援自訂名稱的匿名用戶', async () => {
@@ -227,7 +227,7 @@ describe('POST /api/auth/signin (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.name).toBe('Custom Guest')
+      expect(data.data.name).toBe('Custom Guest')
 
       testUserIds.push(data.id)
     })
@@ -251,9 +251,9 @@ describe('POST /api/auth/signin (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('id')
-      expect(data).toHaveProperty('email', email)
-      expect(data).toHaveProperty('name', 'Email User')
-      expect(data).toHaveProperty('authProvider', 'EMAIL')
+      expect(data.data).toHaveProperty('email', email)
+      expect(data.data).toHaveProperty('name', 'Email User')
+      expect(data.data).toHaveProperty('authProvider', 'EMAIL')
 
       testUserIds.push(data.id)
     })
@@ -337,7 +337,7 @@ describe('POST /api/auth/signin (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data).toHaveProperty('error', '需要提供認證方式')
+      expect(data.error.message).toBe('需要提供認證方式')
     })
 
     it('應該在不支援的 provider 時返回 400', async () => {
@@ -352,7 +352,7 @@ describe('POST /api/auth/signin (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data).toHaveProperty('error', '不支援的認證方式')
+      expect(data.error.message).toBe('不支援的認證方式')
     })
   })
 })

@@ -100,10 +100,10 @@ describe('POST /api/tasks/[taskId]/merge-into (Integration)', () => {
 
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('success', true)
-    expect(data).toHaveProperty('source_task_id', sourceTask.id)
-    expect(data).toHaveProperty('target_task_id', targetTask.id)
-    expect(data.new_sub_item).toHaveProperty('content', 'Source Task')
-    expect(data.sub_items_meta).toHaveProperty('total', 1)
+    expect(data.data).toHaveProperty('source_task_id', sourceTask.id)
+    expect(data.data).toHaveProperty('target_task_id', targetTask.id)
+    expect(data.data.new_sub_item).toHaveProperty('content', 'Source Task')
+    expect(data.data.sub_items_meta).toHaveProperty('total', 1)
 
     // 驗證來源任務已被軟刪除
     const deletedSource = await prisma.task.findUnique({
@@ -145,8 +145,8 @@ describe('POST /api/tasks/[taskId]/merge-into (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data.new_sub_item).toHaveProperty('completed', true)
-    expect(data.new_sub_item).toHaveProperty('completed_at')
+    expect(data.data.new_sub_item).toHaveProperty('completed', true)
+    expect(data.data.new_sub_item).toHaveProperty('completed_at')
   })
 
   it('應該合並 start_date (取最早的)', async () => {
@@ -300,7 +300,7 @@ describe('POST /api/tasks/[taskId]/merge-into (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data).toHaveProperty('error', 'targetTaskId is required')
+    expect(data.error.message).toBe('targetTaskId is required')
   })
 
   it('應該在嘗試將任務合併到自己時返回 400', async () => {
@@ -322,7 +322,7 @@ describe('POST /api/tasks/[taskId]/merge-into (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data).toHaveProperty('error', 'Cannot merge a task into itself')
+    expect(data.error.message).toBe('Cannot merge a task into itself')
   })
 
   it('應該在來源任務不存在時返回 404', async () => {
@@ -345,7 +345,7 @@ describe('POST /api/tasks/[taskId]/merge-into (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(404)
-    expect(data).toHaveProperty('error', 'Source task not found')
+    expect(data.error.message).toBe('Source task not found')
   })
 
   it('應該在目標任務不存在時返回 404', async () => {
@@ -368,7 +368,7 @@ describe('POST /api/tasks/[taskId]/merge-into (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(404)
-    expect(data).toHaveProperty('error', 'Target task not found')
+    expect(data.error.message).toBe('Target task not found')
   })
 
   it('應該保留原 task 的元數據', async () => {
@@ -395,6 +395,6 @@ describe('POST /api/tasks/[taskId]/merge-into (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data.new_sub_item).toHaveProperty('original_task_id', sourceTask.id)
+    expect(data.data.new_sub_item).toHaveProperty('original_task_id', sourceTask.id)
   })
 })

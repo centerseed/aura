@@ -74,13 +74,13 @@ describe('GET /api/me (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data).toHaveProperty('id', testUserId)
-    expect(data).toHaveProperty('email', 'test@example.com')
-    expect(data).toHaveProperty('name', 'Test User')
-    expect(data).toHaveProperty('displayName')
+    expect(data.data).toHaveProperty('id', testUserId)
+    expect(data.data).toHaveProperty('email', 'test@example.com')
+    expect(data.data).toHaveProperty('name', 'Test User')
+    expect(data.data).toHaveProperty('displayName')
     expect(data).toHaveProperty('auth_provider')
-    expect(data).toHaveProperty('areas')
-    expect(data).toHaveProperty('hasAreas')
+    expect(data.data).toHaveProperty('areas')
+    expect(data.data).toHaveProperty('hasAreas')
     expect(Array.isArray(data.areas)).toBe(true)
   })
 
@@ -99,7 +99,7 @@ describe('GET /api/me (Integration)', () => {
 
     expect(response.status).toBe(200)
     expect(data.areas.length).toBeGreaterThanOrEqual(2)
-    expect(data.hasAreas).toBe(true)
+    expect(data.data.hasAreas).toBe(true)
   })
 
   it('應該在未認證時返回 401', async () => {
@@ -112,7 +112,7 @@ describe('GET /api/me (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data).toHaveProperty('error', 'Unauthorized')
+    expect(data.error.message).toBe('Invalid or expired token')
   })
 
   it('應該在 token 無效時返回 401', async () => {
@@ -127,7 +127,7 @@ describe('GET /api/me (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data).toHaveProperty('error', 'Invalid token')
+    expect(data.error.message).toBe('Invalid token')
   })
 
   it('應該在用戶不存在時返回 404', async () => {
@@ -143,7 +143,7 @@ describe('GET /api/me (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(404)
-    expect(data).toHaveProperty('error', 'User not found')
+    expect(data.error.message).toBe('User not found')
   })
 
   it('應該正確設定 displayName（使用 name）', async () => {
@@ -156,7 +156,7 @@ describe('GET /api/me (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data.displayName).toBe('Test User')
+    expect(data.data.displayName).toBe('Test User')
   })
 
   it('應該在沒有 Bearer 前綴時返回 401', async () => {
@@ -169,6 +169,6 @@ describe('GET /api/me (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data).toHaveProperty('error', 'Unauthorized')
+    expect(data.error.message).toBe('Invalid or expired token')
   })
 })

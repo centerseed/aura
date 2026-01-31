@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # 為嵌套對象自動調用 toJson() 方法
+          explicit_to_json: true
+          # 為 null 值字段生成 toJson 代碼
+          include_if_null: false

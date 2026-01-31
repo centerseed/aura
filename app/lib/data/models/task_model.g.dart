@@ -39,26 +39,33 @@ _$TaskModelImpl _$$TaskModelImplFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['deleted_at'] as String),
     );
 
-Map<String, dynamic> _$$TaskModelImplToJson(_$TaskModelImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'user_id': instance.userId,
-      'product_id': instance.productId,
-      'topic_id': instance.topicId,
-      'content': instance.content,
-      'status': instance.status,
-      'due_date': instance.dueDate?.toIso8601String(),
-      'start_date': instance.startDate?.toIso8601String(),
-      'time_confidence': instance.timeConfidence,
-      'inferred_from_milestone': instance.inferredFromMilestone,
-      'ai_analysis': instance.aiAnalysis,
-      'sub_items': instance.subItems,
-      'tag': instance.tag,
-      'tags': instance.tags,
-      'created_at': instance.createdAt?.toIso8601String(),
-      'updated_at': instance.updatedAt?.toIso8601String(),
-      'deleted_at': instance.deletedAt?.toIso8601String(),
-    };
+Map<String, dynamic> _$$TaskModelImplToJson(
+  _$TaskModelImpl instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'user_id': instance.userId,
+  'product_id': instance.productId,
+  if (instance.topicId case final value?) 'topic_id': value,
+  'content': instance.content,
+  'status': instance.status,
+  if (instance.dueDate?.toIso8601String() case final value?) 'due_date': value,
+  if (instance.startDate?.toIso8601String() case final value?)
+    'start_date': value,
+  if (instance.timeConfidence case final value?) 'time_confidence': value,
+  if (instance.inferredFromMilestone case final value?)
+    'inferred_from_milestone': value,
+  if (instance.aiAnalysis case final value?) 'ai_analysis': value,
+  if (instance.subItems?.map((e) => e.toJson()).toList() case final value?)
+    'sub_items': value,
+  if (instance.tag case final value?) 'tag': value,
+  if (instance.tags case final value?) 'tags': value,
+  if (instance.createdAt?.toIso8601String() case final value?)
+    'created_at': value,
+  if (instance.updatedAt?.toIso8601String() case final value?)
+    'updated_at': value,
+  if (instance.deletedAt?.toIso8601String() case final value?)
+    'deleted_at': value,
+};
 
 _$SubItemModelImpl _$$SubItemModelImplFromJson(Map<String, dynamic> json) =>
     _$SubItemModelImpl(
@@ -75,5 +82,6 @@ Map<String, dynamic> _$$SubItemModelImplToJson(_$SubItemModelImpl instance) =>
       'id': instance.id,
       'content': instance.content,
       'completed': instance.completed,
-      'completed_at': instance.completedAt?.toIso8601String(),
+      if (instance.completedAt?.toIso8601String() case final value?)
+        'completed_at': value,
     };

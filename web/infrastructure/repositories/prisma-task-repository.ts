@@ -6,7 +6,7 @@
  */
 
 import { prisma } from '@/lib/db'
-import { Status as PrismaStatus } from '@prisma/client'
+import { Status as PrismaStatus, Prisma } from '@prisma/client'
 import type {
   ITaskRepository,
   TaskData,
@@ -129,7 +129,7 @@ export class PrismaTaskRepository implements ITaskRepository {
     }
 
     // 如果需要更新 narrative，先取得現有的 ai_analysis
-    let aiAnalysisUpdate: unknown = undefined
+    let aiAnalysisUpdate: Prisma.InputJsonValue | undefined = undefined
     if (data.narrative !== undefined) {
       const existingTask = await prisma.task.findUnique({
         where: { id },
@@ -400,8 +400,8 @@ export class PrismaTaskRepository implements ITaskRepository {
    */
   private serializeAIAnalysis(
     analysis: TaskData['aiAnalysis']
-  ): Record<string, unknown> | null {
-    if (!analysis) return null
+  ): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue {
+    if (!analysis) return Prisma.JsonNull
 
     return {
       narrative: analysis.narrative,

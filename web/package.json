@@ -19,8 +19,14 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "deploy:web": "bash ../scripts/deploy-web.sh",
-    "deploy:backend": "bash ../scripts/deploy-backend.sh",
+    "local:dev": "bash ../scripts/local-run.sh dev",
+    "local:test": "bash ../scripts/local-run.sh test",
+    "local:build": "bash ../scripts/local-run.sh build",
+    "local:full": "bash ../scripts/local-run.sh full",
+    "deploy:web": "bash ../scripts/deploy-web-firebase.sh production",
+    "deploy:web:staging": "bash ../scripts/deploy-web-firebase.sh staging",
+    "deploy:backend": "bash ../scripts/deploy-backend-cloudrun.sh production",
+    "deploy:backend:staging": "bash ../scripts/deploy-backend-cloudrun.sh staging",
     "deploy:all": "bash ../scripts/deploy-all.sh"
   },
   "dependencies": {

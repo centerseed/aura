@@ -7,6 +7,7 @@
 'use client'
 
 import { useCallback } from 'react'
+import { API } from '@/lib/api-client'
 import type { DrawerStatus, TaskCard } from '@/types'
 import type { ApiArea } from '../context/types'
 
@@ -15,7 +16,6 @@ interface UseTaskOperationsProps {
   setAreas: React.Dispatch<React.SetStateAction<ApiArea[]>>
   refreshData: () => Promise<void>
   loadCompletedToday: () => Promise<void>
-  getAuthHeaders: () => Promise<Record<string, string>>
 }
 
 /**
@@ -28,7 +28,6 @@ export function useTaskOperations({
   setAreas,
   refreshData,
   loadCompletedToday,
-  getAuthHeaders,
 }: UseTaskOperationsProps) {
   /**
    * 完成任務（移至 ARCHIVE）
@@ -36,36 +35,27 @@ export function useTaskOperations({
   const handleTaskComplete = useCallback(
     async (taskId: string) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await getAuthHeaders()),
-          },
-          body: JSON.stringify({ status: 'ARCHIVE' }),
-        })
+        await API.tasks.update(taskId, { status: 'ARCHIVE' })
 
-        if (res.ok) {
-          // 更新本地狀態
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId ? { ...task, drawer: 'ARCHIVE' as DrawerStatus } : task
-                ),
-              })),
-            }))
-          )
-          // 重新載入今日完成
-          loadCompletedToday()
-        }
+        // 更新本地狀態
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId ? { ...task, drawer: 'ARCHIVE' as DrawerStatus } : task
+              ),
+            })),
+          }))
+        )
+        // 重新載入今日完成
+        loadCompletedToday()
       } catch (error) {
         console.error('Failed to complete task:', error)
       }
     },
-    [setAreas, loadCompletedToday, getAuthHeaders]
+    [setAreas, loadCompletedToday]
   )
 
   /**
@@ -74,33 +64,24 @@ export function useTaskOperations({
   const handleTaskEdit = useCallback(
     async (taskId: string, newTitle: string) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await getAuthHeaders()),
-          },
-          body: JSON.stringify({ content: newTitle }),
-        })
+        await API.tasks.update(taskId, { content: newTitle })
 
-        if (res.ok) {
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId ? { ...task, title: newTitle } : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId ? { ...task, title: newTitle } : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to edit task:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   /**
@@ -109,33 +90,24 @@ export function useTaskOperations({
   const handleTaskStatusChange = useCallback(
     async (taskId: string, newStatus: DrawerStatus) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await getAuthHeaders()),
-          },
-          body: JSON.stringify({ status: newStatus }),
-        })
+        await API.tasks.update(taskId, { status: newStatus })
 
-        if (res.ok) {
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId ? { ...task, drawer: newStatus } : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId ? { ...task, drawer: newStatus } : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to change task status:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   /**
@@ -144,46 +116,37 @@ export function useTaskOperations({
   const handleSubItemToggle = useCallback(
     async (taskId: string, subItemId: string, completed: boolean) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/sub-items/${subItemId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await getAuthHeaders()),
-          },
-          body: JSON.stringify({ completed }),
-        })
+        await API.tasks.subItems.update(taskId, subItemId, { completed })
 
-        if (res.ok) {
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId
-                    ? {
-                        ...task,
-                        sub_items: task.sub_items?.map((item) =>
-                          item.id === subItemId
-                            ? {
-                                ...item,
-                                completed,
-                                completed_at: completed ? new Date().toISOString() : null,
-                              }
-                            : item
-                        ),
-                      }
-                    : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      sub_items: task.sub_items?.map((item) =>
+                        item.id === subItemId
+                          ? {
+                              ...item,
+                              completed,
+                              completed_at: completed ? new Date().toISOString() : null,
+                            }
+                          : item
+                      ),
+                    }
+                  : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to toggle sub-item:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   /**
@@ -192,34 +155,29 @@ export function useTaskOperations({
   const handleSubItemDelete = useCallback(
     async (taskId: string, subItemId: string) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/sub-items/${subItemId}`, {
-          method: 'DELETE',
-          headers: await getAuthHeaders(),
-        })
+        await API.tasks.subItems.delete(taskId, subItemId)
 
-        if (res.ok) {
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId
-                    ? {
-                        ...task,
-                        sub_items: task.sub_items?.filter((item) => item.id !== subItemId),
-                      }
-                    : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      sub_items: task.sub_items?.filter((item) => item.id !== subItemId),
+                    }
+                  : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to delete sub-item:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   /**
@@ -228,40 +186,31 @@ export function useTaskOperations({
   const handleSubItemEdit = useCallback(
     async (taskId: string, subItemId: string, content: string) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/sub-items/${subItemId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await getAuthHeaders()),
-          },
-          body: JSON.stringify({ content }),
-        })
+        await API.tasks.subItems.update(taskId, subItemId, { content })
 
-        if (res.ok) {
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId
-                    ? {
-                        ...task,
-                        sub_items: task.sub_items?.map((item) =>
-                          item.id === subItemId ? { ...item, content } : item
-                        ),
-                      }
-                    : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      sub_items: task.sub_items?.map((item) =>
+                        item.id === subItemId ? { ...item, content } : item
+                      ),
+                    }
+                  : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to edit sub-item:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   /**
@@ -270,39 +219,29 @@ export function useTaskOperations({
   const handleSubItemAdd = useCallback(
     async (taskId: string, content: string) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/sub-items`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await getAuthHeaders()),
-          },
-          body: JSON.stringify({ content }),
-        })
+        const newSubItem = await API.tasks.subItems.add(taskId, { content })
 
-        if (res.ok) {
-          const newSubItem = await res.json()
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId
-                    ? {
-                        ...task,
-                        sub_items: [...(task.sub_items || []), newSubItem],
-                      }
-                    : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      sub_items: [...(task.sub_items || []), newSubItem],
+                    }
+                  : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to add sub-item:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   /**
@@ -311,34 +250,29 @@ export function useTaskOperations({
   const handleReferenceDelete = useCallback(
     async (taskId: string, referenceId: string) => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/references/${referenceId}`, {
-          method: 'DELETE',
-          headers: await getAuthHeaders(),
-        })
+        await API.tasks.references.delete(taskId, referenceId)
 
-        if (res.ok) {
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId
-                    ? {
-                        ...task,
-                        references: task.references?.filter((ref) => ref.id !== referenceId),
-                      }
-                    : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      references: task.references?.filter((ref) => ref.id !== referenceId),
+                    }
+                  : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to delete reference:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   /**
@@ -355,39 +289,30 @@ export function useTaskOperations({
           body.start_date = startDate ? startDate.toISOString() : null
         }
 
-        const res = await fetch(`/api/tasks/${taskId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await getAuthHeaders()),
-          },
-          body: JSON.stringify(body),
-        })
+        await API.tasks.update(taskId, body)
 
-        if (res.ok) {
-          setAreas((prev) =>
-            prev.map((area) => ({
-              ...area,
-              products: area.products.map((product) => ({
-                ...product,
-                tasks: product.tasks.map((task) =>
-                  task.id === taskId
-                    ? {
-                        ...task,
-                        due_date: dueDate ? dueDate.toISOString() : null,
-                        start_date: startDate !== undefined ? (startDate ? startDate.toISOString() : null) : task.start_date,
-                      }
-                    : task
-                ),
-              })),
-            }))
-          )
-        }
+        setAreas((prev) =>
+          prev.map((area) => ({
+            ...area,
+            products: area.products.map((product) => ({
+              ...product,
+              tasks: product.tasks.map((task) =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      due_date: dueDate ? dueDate.toISOString() : null,
+                      start_date: startDate !== undefined ? (startDate ? startDate.toISOString() : null) : task.start_date,
+                    }
+                  : task
+              ),
+            })),
+          }))
+        )
       } catch (error) {
         console.error('Failed to update task due date:', error)
       }
     },
-    [setAreas, getAuthHeaders]
+    [setAreas]
   )
 
   return {

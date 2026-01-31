@@ -77,8 +77,8 @@ describe('POST /api/reorganize (Integration)', () => {
 
     expect(response.status).toBe(200)
     expect(data.success).toBe(true)
-    expect(data.message).toBe('No data to reorganize')
-    expect(data.changes).toEqual({
+    expect(data.data.message).toBe('No data to reorganize')
+    expect(data.data.changes).toEqual({
       merges: 0,
       reclassifications: 0,
     })
@@ -117,7 +117,7 @@ describe('POST /api/reorganize (Integration)', () => {
 
     expect(response.status).toBe(200)
     expect(data.success).toBe(true)
-    expect(data.preview).toBe(true)
+    expect(data.data.preview).toBe(true)
     expect(data).toHaveProperty('analysis')
     expect(data).toHaveProperty('structured_operations')
     expect(data).toHaveProperty('estimated_changes')
@@ -138,7 +138,7 @@ describe('POST /api/reorganize (Integration)', () => {
 
     expect(response.status).toBe(401)
     const data = await response.json()
-    expect(data.error).toBe('Unauthorized')
+    expect(data.error.message).toBe('Invalid or expired token')
   }, 30000)
 
   it('應該執行重組操作（confirmed 模式）', async () => {

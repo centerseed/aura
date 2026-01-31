@@ -99,7 +99,7 @@ describe('GET /api/library (Integration)', () => {
 
     expect(response.status).toBe(200)
     expect(Array.isArray(data)).toBe(true)
-    expect(data.length).toBeGreaterThan(0)
+    expect(data.data.length).toBeGreaterThan(0)
 
     // 驗證 Area 結構
     const area = data[0]
@@ -195,7 +195,7 @@ describe('GET /api/library (Integration)', () => {
     const data = await response.json()
 
     expect(response.status).toBe(401)
-    expect(data).toHaveProperty('error', 'Unauthorized')
+    expect(data.error.message).toBe('Invalid or expired token')
   })
 
   it('應該按照正確的順序排序（Area 按 name，Product 按 display_order）', async () => {

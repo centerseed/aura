@@ -8,7 +8,9 @@ import dotenv from 'dotenv'
 dotenv.config({ path: '.env.test' })
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+  ],
   test: {
     // Test environment
     environment: 'happy-dom',
@@ -69,9 +71,11 @@ export default defineConfig(({ mode }) => ({
     // Reporter
     reporters: ['verbose'],
   },
+  // Resolve configuration
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
     },
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
 }))

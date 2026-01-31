@@ -100,12 +100,12 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('success', true)
-      expect(data.reference).toHaveProperty('id')
-      expect(data.reference).toHaveProperty('type', 'url')
-      expect(data.reference).toHaveProperty('content', 'https://example.com')
-      expect(data.reference).toHaveProperty('title', 'Example Website')
-      expect(data.reference).toHaveProperty('created_at')
-      expect(data).toHaveProperty('total', 1)
+      expect(data.data.reference).toHaveProperty('id')
+      expect(data.data.reference).toHaveProperty('type', 'url')
+      expect(data.data.reference).toHaveProperty('content', 'https://example.com')
+      expect(data.data.reference).toHaveProperty('title', 'Example Website')
+      expect(data.data.reference).toHaveProperty('created_at')
+      expect(data.data).toHaveProperty('total', 1)
     })
 
     it('應該成功新增 note reference', async () => {
@@ -126,8 +126,8 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('success', true)
-      expect(data.reference).toHaveProperty('type', 'note')
-      expect(data.reference).toHaveProperty('content', 'This is a note about the task')
+      expect(data.data.reference).toHaveProperty('type', 'note')
+      expect(data.data.reference).toHaveProperty('content', 'This is a note about the task')
     })
 
     it('應該自動 trim 空格', async () => {
@@ -221,7 +221,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data).toHaveProperty('total', 2) // 原本 1 個 + 新增 1 個
+      expect(data.data).toHaveProperty('total', 2) // 原本 1 個 + 新增 1 個
     })
 
     it('應該在 type 無效時返回 400', async () => {
@@ -240,7 +240,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'type' must be 'url' or 'note'")
+      expect(data.error.message).toContain("'type' must be 'url' or 'note'")
     })
 
     it('應該在 type 缺失時返回 400', async () => {
@@ -258,7 +258,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'type' must be 'url' or 'note'")
+      expect(data.error.message).toContain("'type' must be 'url' or 'note'")
     })
 
     it('應該在 content 缺失時返回 400', async () => {
@@ -276,7 +276,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'content' is required and cannot be empty")
+      expect(data.error.message).toContain("'content' is required and cannot be empty")
     })
 
     it('應該在 content 為空時返回 400', async () => {
@@ -295,7 +295,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'content' is required and cannot be empty")
+      expect(data.error.message).toContain("'content' is required and cannot be empty")
     })
 
     it('應該在 content 不是 string 時返回 400', async () => {
@@ -314,7 +314,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'content' is required and cannot be empty")
+      expect(data.error.message).toContain("'content' is required and cannot be empty")
     })
 
     it('應該在任務不存在時返回 404', async () => {
@@ -334,7 +334,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Task not found')
+      expect(data.error.message).toBe('Task not found')
     })
 
     it('應該在未認證時返回 401', async () => {
@@ -355,7 +355,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(401)
-      expect(data).toHaveProperty('error', 'Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     })
   })
 
@@ -396,7 +396,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveProperty('success', true)
-      expect(data).toHaveProperty('total', 1) // 原本 2 個,刪除 1 個剩 1 個
+      expect(data.data).toHaveProperty('total', 1) // 原本 2 個,刪除 1 個剩 1 個
 
       // 驗證資料庫中已刪除
       const updatedTask = await prisma.task.findUnique({
@@ -420,7 +420,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain("'referenceId' query parameter is required")
+      expect(data.error.message).toContain("'referenceId' query parameter is required")
     })
 
     it('應該在 reference 不存在時返回 404', async () => {
@@ -437,7 +437,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Reference not found')
+      expect(data.error.message).toBe('Reference not found')
     })
 
     it('應該在任務不存在時返回 404', async () => {
@@ -454,7 +454,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
-      expect(data).toHaveProperty('error', 'Task not found')
+      expect(data.error.message).toBe('Task not found')
     })
 
     it('應該在未認證時返回 401', async () => {
@@ -472,7 +472,7 @@ describe('API /api/tasks/[taskId]/references (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(401)
-      expect(data).toHaveProperty('error', 'Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     })
   })
 })

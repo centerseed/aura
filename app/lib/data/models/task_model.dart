@@ -4,7 +4,7 @@ import '../../domain/entities/task.dart';
 part 'task_model.freezed.dart';
 part 'task_model.g.dart';
 
-@freezed
+@Freezed(toJson: true)
 class TaskModel with _$TaskModel {
   const factory TaskModel({
     required String id,
@@ -69,7 +69,7 @@ class TaskModel with _$TaskModel {
   }
 }
 
-@freezed
+@Freezed(toJson: true)
 class SubItemModel with _$SubItemModel {
   const factory SubItemModel({
     required String id,

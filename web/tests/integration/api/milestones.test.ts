@@ -119,7 +119,7 @@ describe('Milestones API (Integration)', () => {
 
       expect(response.status).toBe(200)
       expect(Array.isArray(data)).toBe(true)
-      expect(data.length).toBeGreaterThanOrEqual(2)
+      expect(data.data.length).toBeGreaterThanOrEqual(2)
 
       // 驗證 Product Milestone
       const productMilestone = data.find((m: any) => m.name === 'Product Launch')
@@ -204,7 +204,7 @@ describe('Milestones API (Integration)', () => {
 
       expect(response.status).toBe(401)
       const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     }, 30000)
 
     it('應該過濾已刪除的 Milestones', async () => {
@@ -266,11 +266,11 @@ describe('Milestones API (Integration)', () => {
 
       expect(response.status).toBe(201)
       expect(data).toBeDefined()
-      expect(data.name).toBe('New Milestone')
-      expect(data.entity_type).toBe('PRODUCT')
-      expect(data.entity_id).toBe(testProductId)
-      expect(data.priority).toBe(7)
-      expect(data.status).toBe('planned')
+      expect(data.data.name).toBe('New Milestone')
+      expect(data.data.entity_type).toBe('PRODUCT')
+      expect(data.data.entity_id).toBe(testProductId)
+      expect(data.data.priority).toBe(7)
+      expect(data.data.status).toBe('planned')
 
       // 驗證資料庫中的 Milestone
       const { prisma } = await import('@/lib/db')
@@ -297,8 +297,8 @@ describe('Milestones API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(201)
-      expect(data.priority).toBe(5) // 預設值
-      expect(data.status).toBe('planned') // 預設值
+      expect(data.data.priority).toBe(5) // 預設值
+      expect(data.data.status).toBe('planned') // 預設值
     }, 30000)
 
     it('應該在缺少必填欄位時返回 400', async () => {
@@ -315,7 +315,7 @@ describe('Milestones API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Validation failed')
+      expect(data.error.message).toBe('Validation failed')
     }, 30000)
 
     it('應該在無效日期格式時返回 400', async () => {
@@ -334,7 +334,7 @@ describe('Milestones API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Validation failed')
+      expect(data.error.message).toBe('Validation failed')
     }, 30000)
 
     it('應該在未認證時返回 401', async () => {
@@ -355,7 +355,7 @@ describe('Milestones API (Integration)', () => {
 
       expect(response.status).toBe(401)
       const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error.message).toBe('Invalid or expired token')
     }, 30000)
   })
 
@@ -393,9 +393,9 @@ describe('Milestones API (Integration)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.name).toBe('Updated Name')
-      expect(data.priority).toBe(8)
-      expect(data.status).toBe('in_progress')
+      expect(data.data.name).toBe('Updated Name')
+      expect(data.data.priority).toBe(8)
+      expect(data.data.status).toBe('in_progress')
     }, 30000)
 
     it('應該在 Milestone 不存在時返回 404', async () => {
@@ -412,7 +412,7 @@ describe('Milestones API (Integration)', () => {
 
       expect(response.status).toBe(404)
       const data = await response.json()
-      expect(data.error).toBe('Milestone not found')
+      expect(data.error.message).toBe('Milestone not found')
     }, 30000)
 
     it('應該在無效資料時返回 400', async () => {
@@ -443,7 +443,7 @@ describe('Milestones API (Integration)', () => {
 
       expect(response.status).toBe(400)
       const data = await response.json()
-      expect(data.error).toBe('Validation failed')
+      expect(data.error.message).toBe('Validation failed')
     }, 30000)
   })
 
@@ -497,7 +497,7 @@ describe('Milestones API (Integration)', () => {
 
       expect(response.status).toBe(404)
       const data = await response.json()
-      expect(data.error).toBe('Milestone not found')
+      expect(data.error.message).toBe('Milestone not found')
     }, 30000)
   })
 })
