@@ -22,6 +22,7 @@ import {
   Check,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 
 interface Reference {
   id: string;
@@ -229,7 +230,7 @@ export function ProductDetailModal({
       if (!user) return;
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/products/${product.id}/references`, {
+      const res = await fetch(`${API_BASE_URL}/api/products/${product.id}/references`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -278,7 +279,7 @@ export function ProductDetailModal({
       }
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/products/${product.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/products/${product.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -328,7 +329,7 @@ export function ProductDetailModal({
       }
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/products/${product.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/products/${product.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -360,7 +361,7 @@ export function ProductDetailModal({
       if (!user) throw new Error("未登入");
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/products/${product.id}/references`, {
+      const res = await fetch(`${API_BASE_URL}/api/products/${product.id}/references`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -404,7 +405,7 @@ export function ProductDetailModal({
       if (!user) throw new Error("未登入");
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/products/${product.id}/references`, {
+      const res = await fetch(`${API_BASE_URL}/api/products/${product.id}/references`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

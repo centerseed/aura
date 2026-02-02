@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/product.dart';
+import '../../domain/entities/reference.dart';
 import '../../domain/entities/reorganize_proposal.dart';
 import '../../domain/repositories/product_repository.dart';
 import '../datasources/remote/api_client.dart';
@@ -72,6 +73,67 @@ class ProductRepositoryImpl implements ProductRepository {
     } catch (e) {
       if (e is DioException) {
         return Left(ServerFailure(e.message ?? 'Apply reorganization failed'));
+      }
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Reference>>> getProductReferences(
+    String productId,
+  ) async {
+    try {
+      final referenceModels = await _apiClient.getProductReferences(productId);
+      final references = referenceModels.map((model) => model.toEntity()).toList();
+      return Right(references);
+    } catch (e) {
+      if (e is DioException) {
+        return Left(ServerFailure(e.message ?? 'Failed to fetch references'));
+      }
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Reference>> addProductReference({
+    required String productId,
+    required ReferenceType type,
+    required String content,
+    String? title,
+  }) async {
+    try {
+      final typeString = type == ReferenceType.url ? 'url' : 'note';
+      final referenceModel = await _apiClient.addProductReference(
+        productId: productId,
+        type: typeString,
+        content: content,
+        title: title,
+      );
+      return Right(referenceModel.toEntity());
+    } catch (e) {
+      if (e is DioException) {
+        return Left(ServerFailure(e.message ?? 'Failed to add reference'));
+      }
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteProductReference({
+    required String productId,
+    required String referenceId,
+    String? taskId,
+  }) async {
+    try {
+      await _apiClient.deleteProductReference(
+        productId: productId,
+        referenceId: referenceId,
+        taskId: taskId,
+      );
+      return const Right(null);
+    } catch (e) {
+      if (e is DioException) {
+        return Left(ServerFailure(e.message ?? 'Failed to delete reference'));
       }
       return Left(ServerFailure(e.toString()));
     }

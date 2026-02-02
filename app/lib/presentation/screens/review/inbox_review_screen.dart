@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dual_cache/flutter_dual_cache.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/providers.dart';
+import '../../../data/repositories/unified/unified_repositories.dart';
 import '../../../domain/entities/area.dart';
 import '../../../domain/entities/product.dart';
 import '../../../domain/entities/task.dart';
-import '../../providers/cached_data_provider.dart';
 import '../project/project_detail_screen.dart';
 
 class InboxReviewScreen extends ConsumerStatefulWidget {
@@ -46,26 +48,49 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
   }
 
   Widget _buildStructureView() {
-    final areasState = ref.watch(cachedAreasProvider);
-    final productsState = ref.watch(cachedProductsProvider);
-    final tasksState = ref.watch(cachedActiveTasksProvider);
+    final areasAsync = ref.watch(cachedAreasStreamProvider);
+    final productsAsync = ref.watch(cachedProductsStreamProvider);
+    final tasksAsync = ref.watch(cachedTasksStreamProvider);
 
     return RefreshIndicator(
       onRefresh: () async {
         await Future.wait([
-          ref.read(cachedActiveTasksProvider.notifier).refresh(),
-          ref.read(cachedAreasProvider.notifier).refresh(),
-          ref.read(cachedProductsProvider.notifier).refresh(),
+          (ref.read(taskRepositoryProvider) as TaskUnifiedRepository).refresh(),
+          (ref.read(areaRepositoryProvider) as AreaUnifiedRepository).refresh(),
+          (ref.read(productRepositoryProvider) as ProductUnifiedRepository)
+              .refresh(),
         ]);
       },
-      child: _buildContent(areasState, productsState, tasksState),
+      child: _buildContentFromAsync(areasAsync, productsAsync, tasksAsync),
+    );
+  }
+
+  Widget _buildContentFromAsync(
+    AsyncValue<CacheState<List<Area>>> areasAsync,
+    AsyncValue<CacheState<List<Product>>> productsAsync,
+    AsyncValue<CacheState<List<Task>>> tasksAsync,
+  ) {
+    // Extract cache states (handle AsyncValue)
+    final areasState = areasAsync.valueOrNull;
+    final productsState = productsAsync.valueOrNull;
+    final tasksState = tasksAsync.valueOrNull;
+
+    // If all streams are not yet loaded
+    if (areasState == null && productsState == null && tasksState == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return _buildContent(
+      areasState ?? const CacheState(),
+      productsState ?? const CacheState(),
+      tasksState ?? const CacheState(),
     );
   }
 
   Widget _buildContent(
-    CachedState<List<Area>> areasState,
-    CachedState<List<Product>> productsState,
-    CachedState<List<Task>> tasksState,
+    CacheState<List<Area>> areasState,
+    CacheState<List<Product>> productsState,
+    CacheState<List<Task>> tasksState,
   ) {
     // 顯示 Loading（只有在完全沒有資料時）
     if (!areasState.hasData && !productsState.hasData && !tasksState.hasData) {
@@ -97,9 +122,13 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () {
-                    ref.read(cachedActiveTasksProvider.notifier).refresh();
-                    ref.read(cachedAreasProvider.notifier).refresh();
-                    ref.read(cachedProductsProvider.notifier).refresh();
+                    (ref.read(taskRepositoryProvider) as TaskUnifiedRepository)
+                        .refresh();
+                    (ref.read(areaRepositoryProvider) as AreaUnifiedRepository)
+                        .refresh();
+                    (ref.read(productRepositoryProvider)
+                            as ProductUnifiedRepository)
+                        .refresh();
                   },
                   child: const Text('重試'),
                 ),

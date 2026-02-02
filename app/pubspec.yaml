@@ -71,6 +71,12 @@ dependencies:
   dartz: ^0.10.1
   equatable: ^2.0.7
   intl: ^0.20.2
+  rxdart: ^0.28.0
+
+  # 雙軌緩存 Repository 模組
+  flutter_dual_cache:
+    path: ../packages/flutter_dual_cache
+  url_launcher: ^6.3.2
 
 
 dev_dependencies:
@@ -91,6 +97,7 @@ dev_dependencies:
   
   # 測試
   mockito: ^5.4.4
+  mocktail: ^1.0.4
   flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the

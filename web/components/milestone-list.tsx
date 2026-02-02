@@ -37,7 +37,7 @@ function getDaysRemaining(targetDate: string): number {
 
 export function MilestoneList({ milestones, onEdit, onDelete }: MilestoneListProps) {
   // 過濾並排序：只顯示未完成、未取消、且未過期的，按日期排序
-  const activeMilestones = milestones
+  const activeMilestones = (Array.isArray(milestones) ? milestones : [])
     .filter((m) => {
       // 排除已完成和已取消的
       if (m.status === "completed" || m.status === "cancelled") return false;

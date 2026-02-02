@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import 'package:app/domain/entities/task.dart' as entity;
 import 'package:app/domain/entities/brain_dump_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -10,7 +9,6 @@ import '../../../core/di/providers.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/area_provider.dart';
-import '../../providers/provider_extensions.dart';
 import '../dashboard/widgets/task_edit_bottom_sheet.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
@@ -69,7 +67,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         (brainDumpResult) {
           if (mounted) {
             _textController.clear();
-            ref.refresh(activeTasksProvider);
+            // repository 會自動靜默刷新快取
             // Dismiss keyboard
             FocusScope.of(context).unfocus();
 
@@ -401,7 +399,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     builder: (context, ref, child) {
                       final areasAsync = ref.watch(areasUnwrappedProvider);
                       final productsAsync = ref.watch(productsUnwrappedProvider);
-                      final tasksAsync = ref.watch(activeTasksProvider).unwrap();
+                      final taskState = ref.watch(activeTasksProvider);
 
                       Widget buildTaskItem(entity.Task task) {
                         return GestureDetector(
@@ -524,8 +522,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                           // Prepare Today's Tasks
                           final now = DateTime.now();
                           List<entity.Task> todayTasks = [];
-                          tasksAsync.whenData((tasks) {
-                            todayTasks = tasks.where((t) {
+                          if (taskState.hasData) {
+                            todayTasks = taskState.tasks!.where((t) {
                               if (t.createdAt == null) return false;
                               final d = t.createdAt!.toLocal();
                               return d.year == now.year &&
@@ -537,7 +535,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                 a.createdAt ?? DateTime(0),
                               ),
                             );
-                          });
+                          }
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

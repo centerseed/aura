@@ -26,6 +26,7 @@ describe('GetProductsUseCase', () => {
 
   describe('成功情況', () => {
     it('應該返回用戶的所有 products', async () => {
+      const now = new Date()
       const mockProducts = [
         {
           id: 'product-1',
@@ -36,13 +37,16 @@ describe('GetProductsUseCase', () => {
           status: 'ACTIVE' as const,
           lifecycle: 'FINITE' as const,
           display_order: 0,
-          created_at: new Date(),
-          updated_at: new Date(),
+          created_at: now,
+          updated_at: now,
           deleted_at: null,
+          references: [],
+          tasks: [],
           area: {
             id: 'area-123',
             name: 'Test Area',
             scope: 'work',
+            description: null,
           },
         },
       ] as any
@@ -51,10 +55,51 @@ describe('GetProductsUseCase', () => {
 
       const result = await useCase.execute({ userId: 'user-123' })
 
-      expect(result.products).toEqual(mockProducts)
       expect(result.products.length).toBe(1)
+      expect(result.products[0]).toEqual({
+        id: 'product-1',
+        user_id: 'user-123',
+        area_id: 'area-123',
+        name: 'Product 1',
+        description: null,
+        status: 'ACTIVE',
+        lifecycle: 'FINITE',
+        display_order: 0,
+        created_at: now,
+        updated_at: now,
+        references: [],
+        tasks: [],
+        area: {
+          id: 'area-123',
+          name: 'Test Area',
+          scope: 'work',
+          description: null,
+        },
+      })
       expect(prisma.product.findMany).toHaveBeenCalledWith({
         where: { user_id: 'user-123', deleted_at: null },
+        include: {
+          area: {
+            select: {
+              id: true,
+              name: true,
+              scope: true,
+              description: true,
+            },
+          },
+          tasks: {
+            where: {
+              deleted_at: null,
+              status: { not: 'ARCHIVE' },
+            },
+            include: {
+              topic: true,
+            },
+            orderBy: {
+              created_at: 'desc',
+            },
+          },
+        },
         orderBy: [{ display_order: 'asc' }, { created_at: 'desc' }],
       })
     })

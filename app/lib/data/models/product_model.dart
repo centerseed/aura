@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../domain/entities/product.dart';
+import 'reference_model.dart';
+import 'task_model.dart';
 
 part 'product_model.freezed.dart';
 part 'product_model.g.dart';
@@ -18,6 +20,10 @@ class ProductModel with _$ProductModel {
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+    // 關聯資料
+    List<ReferenceModel>? references,
+    List<TaskModel>? tasks,
+    @JsonKey(name: 'recent_tasks') List<TaskModel>? recentTasks,
   }) = _ProductModel;
 
   factory ProductModel.fromJson(Map<String, dynamic> json) =>
@@ -35,6 +41,9 @@ class ProductModel with _$ProductModel {
     displayOrder: displayOrder,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    references: references?.map((r) => r.toEntity()).toList(),
+    tasks: tasks?.map((t) => t.toEntity()).toList(),
+    recentTasks: recentTasks?.map((t) => t.toEntity()).toList(),
   );
 
   ProductStatus _parseStatus(String status) {

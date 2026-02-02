@@ -68,9 +68,10 @@ export function StructureView({
 }: StructureViewProps) {
   // 篩選顯示的 Areas，並在 showArchive 時合併近兩週完成的任務
   const displayAreas = useMemo(() => {
-    const baseAreas = selectedArea ? areas.filter((a) => a.name === selectedArea) : areas
+    const safeAreas = Array.isArray(areas) ? areas : []
+    const baseAreas = selectedArea ? safeAreas.filter((a) => a.name === selectedArea) : safeAreas
 
-    if (!showArchive || recentArchivedTasks.length === 0) {
+    if (!showArchive || !Array.isArray(recentArchivedTasks) || recentArchivedTasks.length === 0) {
       return baseAreas
     }
 
@@ -89,12 +90,12 @@ export function StructureView({
     // 合併到對應的 Product
     return baseAreas.map((area) => ({
       ...area,
-      products: area.products.map((product) => {
+      products: (Array.isArray(area.products) ? area.products : []).map((product) => {
         const archivedTasks = archivedByProduct.get(product.id) || []
         if (archivedTasks.length === 0) return product
         return {
           ...product,
-          tasks: [...product.tasks, ...archivedTasks],
+          tasks: [...(Array.isArray(product.tasks) ? product.tasks : []), ...archivedTasks],
         }
       }),
     }))

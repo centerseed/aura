@@ -25,7 +25,7 @@ mixin _$TaskModel {
   @JsonKey(name: 'user_id')
   String get userId => throw _privateConstructorUsedError;
   @JsonKey(name: 'product_id')
-  String get productId => throw _privateConstructorUsedError;
+  String? get productId => throw _privateConstructorUsedError;
   @JsonKey(name: 'topic_id')
   String? get topicId => throw _privateConstructorUsedError;
   String get content => throw _privateConstructorUsedError;
@@ -71,7 +71,7 @@ abstract class $TaskModelCopyWith<$Res> {
   $Res call({
     String id,
     @JsonKey(name: 'user_id') String userId,
-    @JsonKey(name: 'product_id') String productId,
+    @JsonKey(name: 'product_id') String? productId,
     @JsonKey(name: 'topic_id') String? topicId,
     String content,
     String status,
@@ -106,7 +106,7 @@ class _$TaskModelCopyWithImpl<$Res, $Val extends TaskModel>
   $Res call({
     Object? id = null,
     Object? userId = null,
-    Object? productId = null,
+    Object? productId = freezed,
     Object? topicId = freezed,
     Object? content = null,
     Object? status = null,
@@ -132,10 +132,10 @@ class _$TaskModelCopyWithImpl<$Res, $Val extends TaskModel>
                 ? _value.userId
                 : userId // ignore: cast_nullable_to_non_nullable
                       as String,
-            productId: null == productId
+            productId: freezed == productId
                 ? _value.productId
                 : productId // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as String?,
             topicId: freezed == topicId
                 ? _value.topicId
                 : topicId // ignore: cast_nullable_to_non_nullable
@@ -210,7 +210,7 @@ abstract class _$$TaskModelImplCopyWith<$Res>
   $Res call({
     String id,
     @JsonKey(name: 'user_id') String userId,
-    @JsonKey(name: 'product_id') String productId,
+    @JsonKey(name: 'product_id') String? productId,
     @JsonKey(name: 'topic_id') String? topicId,
     String content,
     String status,
@@ -244,7 +244,7 @@ class __$$TaskModelImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? userId = null,
-    Object? productId = null,
+    Object? productId = freezed,
     Object? topicId = freezed,
     Object? content = null,
     Object? status = null,
@@ -270,10 +270,10 @@ class __$$TaskModelImplCopyWithImpl<$Res>
             ? _value.userId
             : userId // ignore: cast_nullable_to_non_nullable
                   as String,
-        productId: null == productId
+        productId: freezed == productId
             ? _value.productId
             : productId // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as String?,
         topicId: freezed == topicId
             ? _value.topicId
             : topicId // ignore: cast_nullable_to_non_nullable
@@ -341,7 +341,7 @@ class _$TaskModelImpl extends _TaskModel {
   const _$TaskModelImpl({
     required this.id,
     @JsonKey(name: 'user_id') required this.userId,
-    @JsonKey(name: 'product_id') required this.productId,
+    @JsonKey(name: 'product_id') this.productId,
     @JsonKey(name: 'topic_id') this.topicId,
     required this.content,
     required this.status,
@@ -372,7 +372,7 @@ class _$TaskModelImpl extends _TaskModel {
   final String userId;
   @override
   @JsonKey(name: 'product_id')
-  final String productId;
+  final String? productId;
   @override
   @JsonKey(name: 'topic_id')
   final String? topicId;
@@ -526,7 +526,7 @@ abstract class _TaskModel extends TaskModel {
   const factory _TaskModel({
     required final String id,
     @JsonKey(name: 'user_id') required final String userId,
-    @JsonKey(name: 'product_id') required final String productId,
+    @JsonKey(name: 'product_id') final String? productId,
     @JsonKey(name: 'topic_id') final String? topicId,
     required final String content,
     required final String status,
@@ -555,7 +555,7 @@ abstract class _TaskModel extends TaskModel {
   String get userId;
   @override
   @JsonKey(name: 'product_id')
-  String get productId;
+  String? get productId;
   @override
   @JsonKey(name: 'topic_id')
   String? get topicId;

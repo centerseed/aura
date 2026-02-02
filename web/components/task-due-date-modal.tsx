@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 
 interface TaskDueDateModalProps {
   isOpen: boolean;
@@ -60,7 +61,7 @@ export function TaskDueDateModal({
       const token = await user.getIdToken();
 
       const fieldName = dateType === "due" ? "due_date" : "start_date";
-      const res = await fetch("/api/tasks", {
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

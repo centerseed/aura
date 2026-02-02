@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { CreateTaskUseCase } from '@/application/use-cases/tasks/create-task'
 import { ValidationException } from '@/lib/api-response'
 import { TaskStatus } from '@/domain/value-objects/task-status'
+import { VALID_USER_ID, VALID_PRODUCT_ID, VALID_TOPIC_ID, VALID_TASK_ID } from '../../../helpers/test-uuids'
 
 // Mock TaskRepository
 const mockCreate = vi.fn()
@@ -31,7 +32,7 @@ describe('CreateTaskUseCase', () => {
       await expect(
         useCase.execute({
           userId: '',
-          productId: 'product-123',
+          productId: VALID_PRODUCT_ID,
           content: 'Test Task',
         })
       ).rejects.toThrow(ValidationException)
@@ -40,18 +41,28 @@ describe('CreateTaskUseCase', () => {
     it('應該拋出錯誤當 productId 為空', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
+          userId: VALID_USER_ID,
           productId: '',
           content: 'Test Task',
         })
       ).rejects.toThrow(ValidationException)
     })
 
+    it('應該拋出錯誤當 productId 格式無效', async () => {
+      await expect(
+        useCase.execute({
+          userId: VALID_USER_ID,
+          productId: 'invalid-uuid',
+          content: 'Test Task',
+        })
+      ).rejects.toThrow('Invalid Product ID format')
+    })
+
     it('應該拋出錯誤當 content 為空', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
-          productId: 'product-123',
+          userId: VALID_USER_ID,
+          productId: VALID_PRODUCT_ID,
           content: '',
         })
       ).rejects.toThrow('Task content cannot be empty')
@@ -60,8 +71,8 @@ describe('CreateTaskUseCase', () => {
     it('應該拋出錯誤當 content 超過 500 字元', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
-          productId: 'product-123',
+          userId: VALID_USER_ID,
+          productId: VALID_PRODUCT_ID,
           content: 'a'.repeat(501),
         })
       ).rejects.toThrow('Task content must be less than 500 characters')
@@ -70,8 +81,8 @@ describe('CreateTaskUseCase', () => {
     it('應該拋出錯誤當 timeConfidence 不在 0-1 之間', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
-          productId: 'product-123',
+          userId: VALID_USER_ID,
+          productId: VALID_PRODUCT_ID,
           content: 'Test Task',
           timeConfidence: 1.5,
         })
@@ -81,8 +92,8 @@ describe('CreateTaskUseCase', () => {
     it('應該拋出錯誤當 status 無效', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
-          productId: 'product-123',
+          userId: VALID_USER_ID,
+          productId: VALID_PRODUCT_ID,
           content: 'Test Task',
           status: 'INVALID_STATUS',
         })
@@ -92,8 +103,8 @@ describe('CreateTaskUseCase', () => {
     it('應該拋出錯誤當截止日期早於開始日期', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
-          productId: 'product-123',
+          userId: VALID_USER_ID,
+          productId: VALID_PRODUCT_ID,
           content: 'Test Task',
           startDate: '2024-12-31',
           dueDate: '2024-01-01',
@@ -105,9 +116,9 @@ describe('CreateTaskUseCase', () => {
   describe('成功情況', () => {
     it('應該成功創建任務 (預設 INBOX 狀態)', async () => {
       const mockTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
+        id: VALID_TASK_ID,
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
         topicId: null,
         content: 'Test Task',
         status: TaskStatus.INBOX,
@@ -125,8 +136,8 @@ describe('CreateTaskUseCase', () => {
       mockCreate.mockResolvedValue(mockTask)
 
       const result = await useCase.execute({
-        userId: 'user-123',
-        productId: 'product-123',
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
         content: 'Test Task',
       })
 
@@ -134,8 +145,8 @@ describe('CreateTaskUseCase', () => {
       expect(result.message).toContain('Task created successfully')
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          userId: 'user-123',
-          productId: 'product-123',
+          userId: VALID_USER_ID,
+          productId: VALID_PRODUCT_ID,
           content: 'Test Task',
           status: TaskStatus.INBOX,
         })
@@ -144,9 +155,9 @@ describe('CreateTaskUseCase', () => {
 
     it('應該成功創建任務 (指定 ACTIVE 狀態)', async () => {
       const mockTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
+        id: VALID_TASK_ID,
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
         topicId: null,
         content: 'Test Task',
         status: TaskStatus.ACTIVE,
@@ -164,8 +175,8 @@ describe('CreateTaskUseCase', () => {
       mockCreate.mockResolvedValue(mockTask)
 
       const result = await useCase.execute({
-        userId: 'user-123',
-        productId: 'product-123',
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
         content: 'Test Task',
         status: 'ACTIVE',
         dueDate: '2024-12-31',
@@ -183,10 +194,10 @@ describe('CreateTaskUseCase', () => {
 
     it('應該處理可選的 topicId', async () => {
       const mockTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: 'topic-123',
+        id: VALID_TASK_ID,
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
+        topicId: VALID_TOPIC_ID,
         content: 'Test Task',
         status: TaskStatus.INBOX,
         aiAnalysis: null,
@@ -203,13 +214,13 @@ describe('CreateTaskUseCase', () => {
       mockCreate.mockResolvedValue(mockTask)
 
       const result = await useCase.execute({
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: 'topic-123',
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
+        topicId: VALID_TOPIC_ID,
         content: 'Test Task',
       })
 
-      expect(result.task.topicId).toBe('topic-123')
+      expect(result.task.topicId).toBe(VALID_TOPIC_ID)
     })
 
     it('應該正確處理日期字串轉換', async () => {
@@ -217,9 +228,9 @@ describe('CreateTaskUseCase', () => {
       const dueDate = '2024-12-31'
 
       const mockTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
+        id: VALID_TASK_ID,
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
         topicId: null,
         content: 'Test Task',
         status: TaskStatus.ACTIVE,
@@ -237,8 +248,8 @@ describe('CreateTaskUseCase', () => {
       mockCreate.mockResolvedValue(mockTask)
 
       await useCase.execute({
-        userId: 'user-123',
-        productId: 'product-123',
+        userId: VALID_USER_ID,
+        productId: VALID_PRODUCT_ID,
         content: 'Test Task',
         startDate,
         dueDate,

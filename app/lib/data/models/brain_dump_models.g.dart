@@ -14,20 +14,58 @@ Map<String, dynamic> _$$BrainDumpRequestImplToJson(
   _$BrainDumpRequestImpl instance,
 ) => <String, dynamic>{'text': instance.text};
 
-_$BrainDumpResponseImpl _$$BrainDumpResponseImplFromJson(
+_$BrainDumpTargetTaskImpl _$$BrainDumpTargetTaskImplFromJson(
   Map<String, dynamic> json,
-) => _$BrainDumpResponseImpl(
-  success: json['success'] as bool,
-  items: (json['items'] as List<dynamic>)
-      .map((e) => BrainDumpItem.fromJson(e as Map<String, dynamic>))
-      .toList(),
+) => _$BrainDumpTargetTaskImpl(
+  id: json['id'] as String,
+  content: json['content'] as String,
+  product: json['product'] as String,
 );
 
-Map<String, dynamic> _$$BrainDumpResponseImplToJson(
-  _$BrainDumpResponseImpl instance,
+Map<String, dynamic> _$$BrainDumpTargetTaskImplToJson(
+  _$BrainDumpTargetTaskImpl instance,
 ) => <String, dynamic>{
-  'success': instance.success,
-  'items': instance.items.map((e) => e.toJson()).toList(),
+  'id': instance.id,
+  'content': instance.content,
+  'product': instance.product,
+};
+
+_$BrainDumpAppendedSubItemImpl _$$BrainDumpAppendedSubItemImplFromJson(
+  Map<String, dynamic> json,
+) => _$BrainDumpAppendedSubItemImpl(
+  id: json['id'] as String,
+  content: json['content'] as String,
+  completed: json['completed'] as bool,
+  createdAt: json['created_at'] as String,
+  completedAt: json['completed_at'] as String?,
+  order: (json['order'] as num).toInt(),
+);
+
+Map<String, dynamic> _$$BrainDumpAppendedSubItemImplToJson(
+  _$BrainDumpAppendedSubItemImpl instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'content': instance.content,
+  'completed': instance.completed,
+  'created_at': instance.createdAt,
+  if (instance.completedAt case final value?) 'completed_at': value,
+  'order': instance.order,
+};
+
+_$SourceAttributionImpl _$$SourceAttributionImplFromJson(
+  Map<String, dynamic> json,
+) => _$SourceAttributionImpl(
+  sourceType: json['source_type'] as String,
+  confidence: (json['confidence'] as num).toDouble(),
+  reasoning: json['reasoning'] as String,
+);
+
+Map<String, dynamic> _$$SourceAttributionImplToJson(
+  _$SourceAttributionImpl instance,
+) => <String, dynamic>{
+  'source_type': instance.sourceType,
+  'confidence': instance.confidence,
+  'reasoning': instance.reasoning,
 };
 
 _$BrainDumpItemImpl _$$BrainDumpItemImplFromJson(Map<String, dynamic> json) =>
@@ -37,9 +75,15 @@ _$BrainDumpItemImpl _$$BrainDumpItemImplFromJson(Map<String, dynamic> json) =>
       narrative: json['narrative'] as String,
       drawer: json['drawer'] as String,
       tag: BrainDumpTag.fromJson(json['tag'] as Map<String, dynamic>),
+      strategyUsed: json['strategy_used'] as String?,
+      reasoning: json['reasoning'] as String?,
       dueDate: json['due_date'] as String?,
       timeConfidence: (json['time_confidence'] as num?)?.toDouble(),
-      timeReasoning: json['time_reasoning'] as String?,
+      dueDateSource: json['due_date_source'] == null
+          ? null
+          : SourceAttribution.fromJson(
+              json['due_date_source'] as Map<String, dynamic>,
+            ),
       inferredFromMilestone: json['inferred_from_milestone'] as String?,
     );
 
@@ -50,9 +94,12 @@ Map<String, dynamic> _$$BrainDumpItemImplToJson(_$BrainDumpItemImpl instance) =>
       'narrative': instance.narrative,
       'drawer': instance.drawer,
       'tag': instance.tag.toJson(),
+      if (instance.strategyUsed case final value?) 'strategy_used': value,
+      if (instance.reasoning case final value?) 'reasoning': value,
       if (instance.dueDate case final value?) 'due_date': value,
       if (instance.timeConfidence case final value?) 'time_confidence': value,
-      if (instance.timeReasoning case final value?) 'time_reasoning': value,
+      if (instance.dueDateSource?.toJson() case final value?)
+        'due_date_source': value,
       if (instance.inferredFromMilestone case final value?)
         'inferred_from_milestone': value,
     };

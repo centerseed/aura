@@ -25,22 +25,38 @@ _$ProductModelImpl _$$ProductModelImplFromJson(Map<String, dynamic> json) =>
       deletedAt: json['deleted_at'] == null
           ? null
           : DateTime.parse(json['deleted_at'] as String),
+      references: (json['references'] as List<dynamic>?)
+          ?.map((e) => ReferenceModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      tasks: (json['tasks'] as List<dynamic>?)
+          ?.map((e) => TaskModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      recentTasks: (json['recent_tasks'] as List<dynamic>?)
+          ?.map((e) => TaskModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
-Map<String, dynamic> _$$ProductModelImplToJson(_$ProductModelImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'user_id': instance.userId,
-      'area_id': instance.areaId,
-      'name': instance.name,
-      if (instance.description case final value?) 'description': value,
-      'status': instance.status,
-      'lifecycle': instance.lifecycle,
-      'display_order': instance.displayOrder,
-      if (instance.createdAt?.toIso8601String() case final value?)
-        'created_at': value,
-      if (instance.updatedAt?.toIso8601String() case final value?)
-        'updated_at': value,
-      if (instance.deletedAt?.toIso8601String() case final value?)
-        'deleted_at': value,
-    };
+Map<String, dynamic> _$$ProductModelImplToJson(
+  _$ProductModelImpl instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'user_id': instance.userId,
+  'area_id': instance.areaId,
+  'name': instance.name,
+  if (instance.description case final value?) 'description': value,
+  'status': instance.status,
+  'lifecycle': instance.lifecycle,
+  'display_order': instance.displayOrder,
+  if (instance.createdAt?.toIso8601String() case final value?)
+    'created_at': value,
+  if (instance.updatedAt?.toIso8601String() case final value?)
+    'updated_at': value,
+  if (instance.deletedAt?.toIso8601String() case final value?)
+    'deleted_at': value,
+  if (instance.references?.map((e) => e.toJson()).toList() case final value?)
+    'references': value,
+  if (instance.tasks?.map((e) => e.toJson()).toList() case final value?)
+    'tasks': value,
+  if (instance.recentTasks?.map((e) => e.toJson()).toList() case final value?)
+    'recent_tasks': value,
+};

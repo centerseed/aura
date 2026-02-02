@@ -233,7 +233,7 @@ export async function PATCH(request: NextRequest) {
  * Request body:
  * {
  *   content: string (required)
- *   product_id: string (required)
+ *   product_id?: string | null (optional for INBOX tasks)
  *   topic_id?: string | null
  *   status?: string (default: INBOX)
  *   start_date?: string | null (ISO format)
@@ -265,9 +265,7 @@ export async function POST(request: NextRequest) {
       throw new ValidationException('content is required', 'content')
     }
 
-    if (!product_id) {
-      throw new ValidationException('product_id is required', 'product_id')
-    }
+    // product_id 為可選: INBOX 任務可以不指定 product
 
     // 4. 執行 Use Case
     const useCase = new CreateTaskUseCase()

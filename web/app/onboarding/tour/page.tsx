@@ -4,6 +4,7 @@ import { useState, Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 import { TourScene1 } from "@/components/onboarding/tour-scene-1";
 import { TourScene2 } from "@/components/onboarding/tour-scene-2";
 import { TourScene3 } from "@/components/onboarding/tour-scene-3";
@@ -37,14 +38,14 @@ function TourContent() {
         const token = await firebaseUser.getIdToken();
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        const userRes = await fetch("/api/me", { headers });
+        const userRes = await fetch(`${API_BASE_URL}/api/me`, { headers });
         if (!userRes.ok) {
           throw new Error("無法獲取用戶資料");
         }
         const userData = await userRes.json();
         setUserId(userData.id);
 
-        const areasRes = await fetch("/api/areas", { headers });
+        const areasRes = await fetch(`${API_BASE_URL}/api/areas`, { headers });
         const areasData = await areasRes.json();
         setUserAreas(areasData.map((area: any) => area.name));
       } catch (error) {

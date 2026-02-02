@@ -195,14 +195,17 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
             );
           }
         },
-        (_) {
+        (_) async {
+          // 觸發靜默刷新
+          await silentRefreshTasks(ref);
+
           if (mounted) {
-            ref.refresh(activeTasksProvider);
-            ref.refresh(completedTodayTasksProvider);
             Navigator.of(context).pop(); // Return to dashboard
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('太棒了！任務完成！')));
+            if (mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('太棒了！任務完成！')));
+            }
           }
         },
       );

@@ -10,24 +10,48 @@ abstract class TaskRepository {
     bool? completedToday,
   });
 
-  Future<Either<Failure, Task>> createTask(String content);
+  Future<Either<Failure, Task>> createTask(String content, {String? productId});
 
   Future<Either<Failure, Task>> updateTask(Task task);
 
   /// 更新任務詳細資訊 (支援多欄位更新)
   Future<Either<Failure, Task>> updateTaskDetails({
     required String taskId,
+    String? content,
     TaskStatus? status,
+    DateTime? startDate,
     DateTime? dueDate,
     String? productId,
+    String? topicId,
+    double? timeConfidence,
     List<String>? tags,
   });
 
   Future<Either<Failure, void>> deleteTask(String taskId);
 
+  /// 更新 sub-item (支援 completed 和 content)
   Future<Either<Failure, void>> updateSubItem(
     String taskId,
+    String subItemId, {
+    bool? completed,
+    String? content,
+  });
+
+  /// 新增 sub-item
+  Future<Either<Failure, void>> addSubItem(
+    String taskId,
+    String content,
+  );
+
+  /// 刪除 sub-item
+  Future<Either<Failure, void>> deleteSubItem(
+    String taskId,
     String subItemId,
-    bool completed,
+  );
+
+  /// 重新排序 sub-items
+  Future<Either<Failure, void>> reorderSubItems(
+    String taskId,
+    List<String> subItemIds,
   );
 }

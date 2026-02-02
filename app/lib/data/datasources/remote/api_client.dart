@@ -1,38 +1,14 @@
 import 'package:dio/dio.dart';
-
-import '../../models/brain_dump_models.dart';
-import '../../models/task_model.dart';
 import '../../models/area_model.dart';
+import '../../models/brain_dump_models.dart';
 import '../../models/product_model.dart';
+import '../../models/reference_model.dart';
+import '../../models/task_model.dart';
 
-/// 簡單的 API Client (手動實現，不使用 Retrofit)
-/// 後續可以升級為 Retrofit 版本
 class ApiClient {
   final Dio _dio;
 
   ApiClient(this._dio);
-
-  // ==================== Auth ====================
-
-  Future<Map<String, dynamic>> signIn(Map<String, dynamic> body) async {
-    final response = await _dio.post('/api/auth/signin', data: body);
-    // Backend returns { success: true, data: {...}, meta: {...} }
-    return response.data['data'] as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> getCurrentUser() async {
-    final response = await _dio.get('/api/me');
-    // Backend returns { success: true, data: {...}, meta: {...} }
-    return response.data['data'] as Map<String, dynamic>;
-  }
-
-  // ==================== Brain Dump ====================
-
-  Future<BrainDumpResponse> brainDump(BrainDumpRequest request) async {
-    final response = await _dio.post('/api/brain-dump', data: request.toJson());
-    // Backend returns { success: true, data: { items: [...] }, meta: {...} }
-    return BrainDumpResponse.fromJson(response.data['data']);
-  }
 
   // ==================== Tasks ====================
 
@@ -42,109 +18,173 @@ class ApiClient {
     String? dueDateTo,
     bool? completedToday,
   }) async {
-    final response = await _dio.get(
-      '/api/tasks',
-      queryParameters: {
-        if (status != null) 'status': status,
-        if (dueDateFrom != null) 'due_date_from': dueDateFrom,
-        if (dueDateTo != null) 'due_date_to': dueDateTo,
-        if (completedToday == true) 'completed_today': 'true',
-      },
-    );
+    final queryParams = <String, dynamic>{};
+    if (status != null) queryParams['status'] = status;
+    if (dueDateFrom != null) queryParams['due_date_from'] = dueDateFrom;
+    if (dueDateTo != null) queryParams['due_date_to'] = dueDateTo;
+    if (completedToday != null) queryParams['completed_today'] = completedToday;
 
-    // Backend returns { success: true, data: [...], meta: {...} }
-    final data = response.data['data'] as List;
-    return data.map((json) => TaskModel.fromJson(json)).toList();
+    final response = await _dio.get('/tasks', queryParameters: queryParams);
+    // API 返回格式: {data: {tasks: [...], message: "..."}, meta: {...}}
+    final dataWrapper = response.data['data'];
+    final List<dynamic> tasks = dataWrapper is Map ? (dataWrapper['tasks'] ?? []) : dataWrapper;
+    return tasks.map((json) => TaskModel.fromJson(json)).toList();
   }
 
-  Future<TaskModel> createTask(Map<String, dynamic> request) async {
-    final response = await _dio.post('/api/tasks', data: request);
-    // Backend returns { success: true, data: { task: {...}, message: "..." }, meta: {...} }
-    return TaskModel.fromJson(response.data['data']['task']);
+  Future<TaskModel> createTask(Map<String, dynamic> body) async {
+    final response = await _dio.post('/tasks', data: body);
+    final data = response.data['data'] ?? response.data;
+    // API 返回 { data: { task: {...} } }，需要取得 task 物件
+    final taskData = data['task'] ?? data;
+    return TaskModel.fromJson(taskData);
   }
 
-  Future<TaskModel> updateTask(
-    String taskId,
-    Map<String, dynamic> request,
-  ) async {
-    // Backend API (route.ts line 70) expects PATCH /api/tasks with body including taskId
-    final body = {'taskId': taskId, ...request};
-    final response = await _dio.patch('/api/tasks', data: body);
-
-    // Backend returns { success: true, data: { task: {...}, message: "..." }, meta: {...} }
-    return TaskModel.fromJson(response.data['data']['task']);
+  Future<TaskModel> updateTask(String taskId, Map<String, dynamic> body) async {
+    final response = await _dio.patch('/tasks/$taskId', data: body);
+    final data = response.data['data'] ?? response.data;
+    // API 返回 { data: { task: {...} } }，需要取得 task 物件
+    final taskData = data['task'] ?? data;
+    return TaskModel.fromJson(taskData);
   }
 
   Future<void> deleteTask(String taskId) async {
-    await _dio.delete('/api/tasks/$taskId');
+    await _dio.delete('/tasks/$taskId');
   }
 
-  // ==================== Library ====================
+  Future<void> updateSubItem(
+    String taskId,
+    String subItemId,
+    Map<String, dynamic> body,
+  ) async {
+    await _dio.patch('/tasks/$taskId/sub-items/$subItemId', data: body);
+  }
 
-  Future<Map<String, dynamic>> getLibrary() async {
-    final response = await _dio.get('/api/library');
-    // Backend returns { success: true, data: { areas: [...] }, meta: {...} }
-    return response.data['data'] as Map<String, dynamic>;
+  Future<void> addSubItem(String taskId, String content) async {
+    await _dio.post('/tasks/$taskId/sub-items', data: {'content': content});
+  }
+
+  Future<void> deleteSubItem(String taskId, String subItemId) async {
+    await _dio.delete('/tasks/$taskId/sub-items/$subItemId');
+  }
+
+  Future<void> reorderSubItems(String taskId, List<String> subItemIds) async {
+    await _dio.put('/tasks/$taskId/sub-items', data: {'sub_item_ids': subItemIds});
   }
 
   // ==================== Areas ====================
 
   Future<List<AreaModel>> getAreas() async {
-    final response = await _dio.get('/api/areas');
-    // Backend returns { success: true, data: { areas: [...] }, meta: {...} }
-    final data = response.data['data']['areas'] as List;
-    return data.map((json) => AreaModel.fromJson(json)).toList();
+    final response = await _dio.get('/areas');
+    // API 返回格式: {data: {areas: [...]}, meta: {...}}
+    final dataWrapper = response.data['data'];
+    final List<dynamic> areas = dataWrapper is Map ? (dataWrapper['areas'] ?? []) : dataWrapper;
+    return areas.map((json) => AreaModel.fromJson(json)).toList();
   }
 
-  Future<AreaModel> createArea(Map<String, dynamic> request) async {
-    final response = await _dio.post('/api/areas', data: request);
-    // Backend returns { success: true, data: { area: {...}, created: ..., updated: ..., message: "..." }, meta: {...} }
-    return AreaModel.fromJson(response.data['data']['area']);
+  Future<AreaModel> createArea(Map<String, dynamic> body) async {
+    final response = await _dio.post('/areas', data: body);
+    final data = response.data['data'] ?? response.data;
+    return AreaModel.fromJson(data);
   }
 
   // ==================== Products ====================
 
   Future<List<ProductModel>> getProducts() async {
-    final response = await _dio.get('/api/products');
-    // Backend returns { success: true, data: { products: [...] }, meta: {...} }
-    final data = response.data['data']['products'] as List;
-    return data.map((json) => ProductModel.fromJson(json)).toList();
+    final response = await _dio.get('/products');
+    // API 返回格式: {data: {products: [...]}, meta: {...}}
+    final dataWrapper = response.data['data'];
+    final List<dynamic> products = dataWrapper is Map ? (dataWrapper['products'] ?? []) : dataWrapper;
+    return products.map((json) => ProductModel.fromJson(json)).toList();
   }
 
-  Future<ProductModel> createProduct(Map<String, dynamic> request) async {
-    final response = await _dio.post('/api/products', data: request);
-    // Backend returns { success: true, data: { product: {...}, message: "..." }, meta: {...} }
-    return ProductModel.fromJson(response.data['data']['product']);
+  Future<ProductModel> createProduct(Map<String, dynamic> body) async {
+    final response = await _dio.post('/products', data: body);
+    final data = response.data['data'] ?? response.data;
+    return ProductModel.fromJson(data);
   }
-
-  // ==================== Product AI ====================
 
   Future<Map<String, dynamic>> reorganizeProductTopics(String productId) async {
-    final response = await _dio.post(
-      '/api/products/$productId/reorganize-topics',
-      data: {}, // Some APIs might require empty body
-    );
+    final response = await _dio.post('/products/$productId/reorganize-topics');
     return response.data;
   }
 
-  Future<Map<String, dynamic>> applyProductReorganization(
+  Future<void> applyProductReorganization(
     String productId,
-    Map<String, dynamic> proposalJson,
+    Map<String, dynamic> proposal,
   ) async {
-    final response = await _dio.post(
-      '/api/products/$productId/apply-reorganization',
-      data: proposalJson,
+    await _dio.post(
+      '/products/$productId/apply-reorganization',
+      data: proposal,
     );
-    return response.data;
   }
 
-  // ==================== Sub-items ====================
+  // ==================== Product References ====================
 
-  Future<void> updateSubItem(
-    String taskId,
-    String subItemId,
-    Map<String, dynamic> data,
-  ) async {
-    await _dio.patch('/api/tasks/$taskId/sub-items/$subItemId', data: data);
+  /// 獲取 Product 的所有 References
+  Future<List<ReferenceModel>> getProductReferences(String productId) async {
+    final response = await _dio.get('/products/$productId/references');
+    final dataWrapper = response.data['data'];
+    final List<dynamic> references = dataWrapper is Map ? (dataWrapper['references'] ?? []) : dataWrapper;
+    return references.map((json) => ReferenceModel.fromJson(json)).toList();
+  }
+
+  /// 新增 Reference 到 Product
+  Future<ReferenceModel> addProductReference({
+    required String productId,
+    required String type,
+    required String content,
+    String? title,
+  }) async {
+    final response = await _dio.post(
+      '/products/$productId/references',
+      data: {
+        'type': type,
+        'content': content,
+        if (title != null && title.isNotEmpty) 'title': title,
+      },
+    );
+    final data = response.data['data'];
+    // 假設 API 回傳 {reference: {...}}
+    final referenceJson = data is Map ? (data['reference'] ?? data) : data;
+    return ReferenceModel.fromJson(referenceJson);
+  }
+
+  /// 刪除 Product 的 Reference
+  Future<void> deleteProductReference({
+    required String productId,
+    required String referenceId,
+    String? taskId,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'referenceId': referenceId,
+      if (taskId != null) 'taskId': taskId,
+    };
+    await _dio.delete(
+      '/products/$productId/references',
+      queryParameters: queryParams,
+    );
+  }
+
+  // ==================== Brain Dump ====================
+
+  Future<BrainDumpResponse> brainDump(BrainDumpRequest request) async {
+    final response = await _dio.post('/brain-dump', data: request.toJson());
+    // API 返回格式: {data: {action: "...", items: [...] | target_task: {...}, ...}, meta: {...}}
+    final data = response.data['data'] as Map<String, dynamic>;
+
+    // 添加 success 字段 (API 最外層有 success，但 data 裡面沒有)
+    final dataWithSuccess = {
+      'success': response.data['success'] ?? true,
+      ...data,
+    };
+
+    return BrainDumpResponse.fromJson(dataWithSuccess);
+  }
+
+  // ==================== Auth ====================
+
+  Future<Map<String, dynamic>> signIn(Map<String, dynamic> body) async {
+    final response = await _dio.post('/auth/signin', data: body);
+    return response.data;
   }
 }

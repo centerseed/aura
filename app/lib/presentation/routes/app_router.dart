@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/signin_screen.dart';
-import '../screens/dashboard/dashboard_screen.dart';
+import '../screens/home/home_screen.dart';
 import '../screens/focus/focus_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/splash/splash_screen.dart';
@@ -67,7 +67,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        builder: (context, state) => const HomeScreen(),
       ),
       GoRoute(
         path: '/profile',

@@ -57,6 +57,7 @@ export default defineConfig(({ mode }) => ({
       '.next/',
       'dist/',
       'build/',
+      'tests/archive/**',  // 排除歸檔的舊測試
     ],
 
     // Performance

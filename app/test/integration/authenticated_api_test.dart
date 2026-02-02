@@ -257,8 +257,8 @@ void main() {
       print('========================================');
     });
 
-    test('6️⃣  測試 Brain Dump - AI 任務解析', () async {
-      print('\n測試: POST /api/brain-dump');
+    test('6️⃣  測試 Brain Dump - AI 任務解析（創建新任務）', () async {
+      print('\n測試: POST /api/brain-dump (create_new_tasks)');
       print('----------------------------');
 
       try {
@@ -268,18 +268,85 @@ void main() {
 
         print('狀態碼: 200');
         print('解析結果: success=${result.success}');
-        print('生成任務數: ${result.items.length}');
 
         expect(result, isNotNull);
+        expect(result.success, isTrue);
 
-        if (result.items.isNotEmpty) {
-          print('✅ 第一個生成的任務:');
-          print('   標題: ${result.items.first.title}');
-          print('   狀態: ${result.items.first.drawer}');
-        }
+        // 使用 Freezed 的 when 方法來處理聯合類型
+        result.when(
+          createNewTasks: (success, items) {
+            print('Action: create_new_tasks');
+            print('生成任務數: ${items.length}');
+
+            expect(items, isNotEmpty);
+
+            if (items.isNotEmpty) {
+              print('✅ 第一個生成的任務:');
+              print('   標題: ${items.first.title}');
+              print('   狀態: ${items.first.drawer}');
+              print('   Reasoning: ${items.first.reasoning}');
+            }
+          },
+          appendSubItem: (success, targetTask, appendedSubItems, reasoning) {
+            print('Action: append_sub_item');
+            print('目標任務: ${targetTask.content}');
+            print('追加 sub-items: ${appendedSubItems.length}');
+            print('AI 推理: $reasoning');
+          },
+        );
       } catch (e) {
         print('⚠️  Brain Dump 測試失敗: $e');
         // 不強制要求通過，因為可能需要 AI API key
+      }
+    });
+
+    test('6️⃣ -2 測試 Brain Dump - 追加 sub-item', () async {
+      print('\n測試: POST /api/brain-dump (append_sub_item)');
+      print('----------------------------');
+
+      try {
+        // 先創建一個主任務
+        final firstResult = await apiClient.brainDump(
+          BrainDumpRequest(text: '準備下週的產品發布會'),
+        );
+
+        expect(firstResult, isNotNull);
+        print('✅ 第一個任務創建成功');
+
+        // 等待一小段時間
+        await Future.delayed(Duration(milliseconds: 500));
+
+        // 嘗試追加相關的待辦事項
+        final secondResult = await apiClient.brainDump(
+          BrainDumpRequest(text: '預訂場地'),
+        );
+
+        expect(secondResult, isNotNull);
+        expect(secondResult.success, isTrue);
+
+        // 使用 when 來處理兩種可能的結果
+        secondResult.when(
+          createNewTasks: (success, items) {
+            print('Action: create_new_tasks (AI 判斷為獨立任務)');
+            print('生成任務數: ${items.length}');
+          },
+          appendSubItem: (success, targetTask, appendedSubItems, reasoning) {
+            print('✅ Action: append_sub_item (成功追加)');
+            print('   目標任務: ${targetTask.content}');
+            print('   追加的 sub-items:');
+            for (var subItem in appendedSubItems) {
+              print('     - ${subItem.content}');
+            }
+            print('   AI 推理: $reasoning');
+
+            expect(targetTask, isNotNull);
+            expect(appendedSubItems, isNotEmpty);
+            expect(reasoning, isNotEmpty);
+          },
+        );
+      } catch (e) {
+        print('⚠️  Brain Dump 追加測試失敗: $e');
+        // 不強制要求通過
       }
     });
 

@@ -88,12 +88,12 @@ describe('TaskStatusVO', () => {
     })
 
     describe('canHaveDueDate', () => {
-      it('應該只有 ACTIVE 狀態可以設定截止日期', () => {
-        expect(TaskStatusVO.inbox().canHaveDueDate()).toBe(false)
+      it('所有狀態都可以設定截止日期', () => {
+        expect(TaskStatusVO.inbox().canHaveDueDate()).toBe(true)
         expect(TaskStatusVO.active().canHaveDueDate()).toBe(true)
-        expect(TaskStatusVO.maintain().canHaveDueDate()).toBe(false)
-        expect(TaskStatusVO.reference().canHaveDueDate()).toBe(false)
-        expect(TaskStatusVO.archive().canHaveDueDate()).toBe(false)
+        expect(TaskStatusVO.maintain().canHaveDueDate()).toBe(true)
+        expect(TaskStatusVO.reference().canHaveDueDate()).toBe(true)
+        expect(TaskStatusVO.archive().canHaveDueDate()).toBe(true)
       })
     })
   })

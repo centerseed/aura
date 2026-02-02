@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, Package, AlertCircle, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -71,7 +72,7 @@ export function ProductModal({
 
       if (editingProduct) {
         // 更新現有 Product
-        const res = await fetch(`/api/products/${editingProduct.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/products/${editingProduct.id}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -96,7 +97,7 @@ export function ProductModal({
           throw new Error("缺少 Area ID");
         }
 
-        const res = await fetch("/api/products", {
+        const res = await fetch(`${API_BASE_URL}/api/products`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -145,7 +146,7 @@ export function ProductModal({
       }
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/products/${editingProduct.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/products/${editingProduct.id}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`,

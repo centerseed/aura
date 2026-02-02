@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, FolderOpen, AlertCircle, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 
 interface AreaModalProps {
   isOpen: boolean;
@@ -85,7 +86,7 @@ export function AreaModal({
 
       if (editingArea) {
         // 更新現有 Area
-        const res = await fetch(`/api/areas/${editingArea.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/areas/${editingArea.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -105,7 +106,7 @@ export function AreaModal({
         }
       } else {
         // 創建新 Area
-        const res = await fetch("/api/areas", {
+        const res = await fetch(`${API_BASE_URL}/api/areas`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -153,7 +154,7 @@ export function AreaModal({
       }
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/areas/${editingArea.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/areas/${editingArea.id}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`,

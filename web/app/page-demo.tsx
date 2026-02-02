@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Loader2, LogIn } from "lucide-react";
 import { auth, googleProvider, signInWithPopup, signInAnonymously } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 
 // Helper function to get auth headers
 async function getAuthHeaders() {
@@ -25,7 +26,7 @@ export default function HomeDemo() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      const response = await fetch("/api/auth/signin", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -50,7 +51,7 @@ export default function HomeDemo() {
     try {
       const result = await signInAnonymously(auth);
       const user = result.user;
-      const response = await fetch("/api/auth/signin", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,7 +75,7 @@ export default function HomeDemo() {
     if (!name.trim()) return;
     setIsEntering(true);
     try {
-      const response = await fetch("/api/auth/signin", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -96,7 +97,7 @@ export default function HomeDemo() {
 
   const redirectUser = async (userData: { id: string; email?: string | null; name?: string | null }) => {
     try {
-      const libraryRes = await fetch("/api/library", { headers: await getAuthHeaders() });
+      const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       const libraryData = await libraryRes.json();
       if (!libraryData || libraryData.length === 0) {
         window.location.href = `/onboarding`;

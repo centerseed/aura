@@ -28,7 +28,7 @@ export default function HomeDemo() {
         try {
           // 獲取 Firebase ID Token
           const token = await user.getIdToken();
-          const meRes = await fetch('/api/me', {
+          const meRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -40,7 +40,8 @@ export default function HomeDemo() {
               email: user.email || undefined,
               name: user.displayName || undefined,
             });
-            setHasLibraryData(userData.hasAreas || false);
+            // 修正: API 回應格式為 { success: true, data: { user: {...} } }
+            setHasLibraryData(userData.data?.user?.hasAreas || false);
           } else {
             // 用戶在資料庫中不存在，未完成註冊
             setCurrentUser(null);
@@ -156,7 +157,7 @@ export default function HomeDemo() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      const response = await fetch("/api/auth/signin", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -184,7 +185,7 @@ export default function HomeDemo() {
     try {
       const result = await signInAnonymously(auth);
       const user = result.user;
-      const response = await fetch("/api/auth/signin", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -211,7 +212,7 @@ export default function HomeDemo() {
     if (!name.trim()) return;
     setIsEntering(true);
     try {
-      const response = await fetch("/api/auth/signin", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -243,7 +244,7 @@ export default function HomeDemo() {
       }
       const token = await currentUser.getIdToken();
 
-      const libraryRes = await fetch('/api/library', {
+      const libraryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/library`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -256,7 +257,8 @@ export default function HomeDemo() {
       // 短暫延遲確保路由過度順暢
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      if (!libraryData || libraryData.length === 0) {
+      // 修正: API 回應格式為 { success: true, data: { areas: [...] } }
+      if (!libraryData || !libraryData.data?.areas || libraryData.data.areas.length === 0) {
         router.push(`/onboarding`);
       } else {
         router.push(`/dashboard`);

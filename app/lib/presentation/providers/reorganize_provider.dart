@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/reorganize_proposal.dart';
-import 'product_provider.dart';
+import '../../core/di/providers.dart' as di;
+import '../../data/repositories/unified/task_unified_repository.dart';
 
 // State to hold the current proposal for a given product
 final reorganizeProposalProvider =
@@ -14,7 +15,7 @@ class ReorganizeController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> analyze(String productId) async {
     state = const AsyncValue.loading();
-    final repository = ref.read(productRepositoryProvider);
+    final repository = ref.read(di.productRepositoryProvider);
     final result = await repository.reorganizeTopics(productId);
 
     result.fold(
@@ -33,19 +34,21 @@ class ReorganizeController extends StateNotifier<AsyncValue<void>> {
     if (proposal == null) return;
 
     state = const AsyncValue.loading();
-    final repository = ref.read(productRepositoryProvider);
+    final repository = ref.read(di.productRepositoryProvider);
     final result = await repository.applyReorganization(productId, proposal);
 
     result.fold(
       (failure) {
         state = AsyncValue.error(failure.message, StackTrace.current);
       },
-      (_) {
+      (_) async {
         // Success - clear proposal
         ref.read(reorganizeProposalProvider.notifier).state = null;
         state = const AsyncValue.data(null);
-        // We might want to trigger a refresh of tasks here
-        // ref.refresh(activeTasksProvider); // Assuming activeTasksProvider exists and needs refresh
+
+        // 觸發任務快取的靜默刷新
+        final taskRepo = ref.read(di.taskRepositoryProvider) as TaskUnifiedRepository;
+        await taskRepo.silentRefresh();
       },
     );
   }

@@ -89,10 +89,10 @@ export class TaskStatusVO {
   }
 
   /**
-   * 是否可以設定截止日期（只有 ACTIVE 狀態可以設定）
+   * 是否可以設定截止日期（所有狀態都可以設定）
    */
   canHaveDueDate(): boolean {
-    return this.value === TaskStatus.ACTIVE
+    return true
   }
 
   /**

@@ -10,7 +10,7 @@ _$TaskModelImpl _$$TaskModelImplFromJson(Map<String, dynamic> json) =>
     _$TaskModelImpl(
       id: json['id'] as String,
       userId: json['user_id'] as String,
-      productId: json['product_id'] as String,
+      productId: json['product_id'] as String?,
       topicId: json['topic_id'] as String?,
       content: json['content'] as String,
       status: json['status'] as String,
@@ -44,7 +44,7 @@ Map<String, dynamic> _$$TaskModelImplToJson(
 ) => <String, dynamic>{
   'id': instance.id,
   'user_id': instance.userId,
-  'product_id': instance.productId,
+  if (instance.productId case final value?) 'product_id': value,
   if (instance.topicId case final value?) 'topic_id': value,
   'content': instance.content,
   'status': instance.status,

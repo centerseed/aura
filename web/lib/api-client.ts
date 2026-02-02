@@ -4,12 +4,22 @@
  * 用途：
  * - Web 前端調用獨立的 backend API (api/ 專案)
  * - 支援本地開發和生產環境
+ * - Runtime type validation (使用 Zod 驗證 API 回應格式)
  */
 
 import { getIdToken } from "./auth";
+import { ApiSchemas } from "./api-schemas";
+import type { z } from "zod";
 
 // API 基礎 URL - 根據環境變數決定
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
+/**
+ * 構建完整的 API URL
+ */
+export function apiUrl(endpoint: string): string {
+  return `${API_BASE_URL}${endpoint}`;
+}
 
 /**
  * 統一的 API 回應格式（對應 backend 的 ApiResponseBuilder）
@@ -88,13 +98,34 @@ export async function fetchWithAuth(
 }
 
 /**
- * 處理 API 回應（支援新的統一格式）
+ * 處理 API 回應（支援新的統一格式 + Runtime validation）
  */
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(
+  response: Response,
+  schema?: z.ZodType<T>
+): Promise<T> {
   const data: ApiResponse<T> = await response.json();
 
   // 檢查新的統一回應格式
   if (data.success) {
+    // Runtime type validation (如果有提供 schema)
+    if (schema) {
+      const validation = schema.safeParse(data.data);
+      if (!validation.success) {
+        console.error('❌ API Response Validation Failed:', {
+          endpoint: response.url,
+          errors: validation.error.issues,
+          receivedData: data.data,
+        });
+        throw new ApiError(
+          `API response format error: ${validation.error.issues[0].message}`,
+          'VALIDATION_ERROR',
+          response.status,
+          validation.error.issues
+        );
+      }
+      return validation.data;
+    }
     return data.data;
   } else {
     // 錯誤回應
@@ -157,17 +188,27 @@ export async function deleteAPI<T = any>(endpoint: string): Promise<T> {
 }
 
 /**
- * 便利的 API 端點集合
+ * 便利的 API 端點集合（加入 Runtime Validation）
  */
 export const API = {
   // 用戶
+  // ⚠️ 注意: getAPI 已在 handleResponse 中自動解包 data
+  // 所以這裡的型別是 data 內部的結構，不是完整的 API 回應
   users: {
-    me: () => getAPI('/api/me'),
+    me: async () => {
+      const response = await fetchWithAuth('/api/me', { method: 'GET' });
+      return handleResponse(response, ApiSchemas.me) as Promise<{ user: any }>;
+    },
     getById: (id: string) => getAPI(`/api/users/${id}`),
   },
 
   // 完整資料庫（Areas + Products + Tasks）
-  library: () => getAPI<any[]>('/api/library'),
+  // ⚠️ 注意: getAPI 已在 handleResponse 中自動解包 data
+  // ⚠️ Runtime validation: 確保回傳 { areas: [...] } 格式
+  library: async () => {
+    const response = await fetchWithAuth('/api/library', { method: 'GET' });
+    return handleResponse(response, ApiSchemas.library) as Promise<{ areas: any[] }>;
+  },
 
   // 領域
   areas: {
@@ -187,8 +228,14 @@ export const API = {
   },
 
   // 任務
+  // API 回傳格式: { tasks: [...] }
+  // ⚠️ Runtime validation: 確保回傳 { tasks: [...] } 格式
   tasks: {
-    list: (params?: any) => getAPI<any[]>('/api/tasks' + (params ? `?${new URLSearchParams(params)}` : '')),
+    list: async (params?: any) => {
+      const endpoint = '/api/tasks' + (params ? `?${new URLSearchParams(params)}` : '');
+      const response = await fetchWithAuth(endpoint, { method: 'GET' });
+      return handleResponse(response, ApiSchemas.tasks) as Promise<{ tasks: any[] }>;
+    },
     getById: (id: string) => getAPI(`/api/tasks/${id}`),
     create: (data: any) => postAPI('/api/tasks', data),
     update: (id: string, data: any) => patchAPI(`/api/tasks/${id}`, data),
@@ -213,8 +260,13 @@ export const API = {
   },
 
   // Milestones
+  // API 回傳格式: { milestones: [...] }
+  // ⚠️ Runtime validation: 確保回傳 { milestones: [...] } 格式
   milestones: {
-    list: () => getAPI<any[]>('/api/milestones'),
+    list: async () => {
+      const response = await fetchWithAuth('/api/milestones', { method: 'GET' });
+      return handleResponse(response, ApiSchemas.milestones) as Promise<{ milestones: any[] }>;
+    },
     create: (data: any) => postAPI('/api/milestones', data),
     update: (id: string, data: any) => putAPI(`/api/milestones/${id}`, data),
     delete: (id: string) => deleteAPI(`/api/milestones/${id}`),

@@ -8,7 +8,7 @@ class Task extends Equatable {
   final DateTime? dueDate;
   final DateTime? startDate; // Added start date for logic
   final double? timeConfidence;
-  final String productId;
+  final String? productId;
   final String? topicId;
   final List<SubItem>? subItems;
   final DateTime? createdAt;
@@ -30,7 +30,7 @@ class Task extends Equatable {
     this.dueDate,
     this.startDate,
     this.timeConfidence,
-    required this.productId,
+    this.productId,
     this.topicId,
     this.subItems,
     this.createdAt,

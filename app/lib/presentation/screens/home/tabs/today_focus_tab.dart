@@ -1,0 +1,659 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/di/providers.dart';
+import '../../../../domain/entities/task.dart';
+import '../../../../application/use_cases/update_sub_item_use_case.dart';
+import '../../../../application/use_cases/update_task_details_use_case.dart';
+import '../../../providers/task_provider.dart';
+import '../widgets/task_detail_bottom_sheet.dart';
+
+/// 今日焦點分頁 - 顯示最近 10 個任務並預設展開 subitems
+class TodayFocusTab extends ConsumerStatefulWidget {
+  const TodayFocusTab({super.key});
+
+  @override
+  ConsumerState<TodayFocusTab> createState() => _TodayFocusTabState();
+}
+
+class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
+  // 追蹤樂觀更新的 subitem 狀態 (taskId:subItemId -> completed)
+  final Map<String, bool> _optimisticSubItemStates = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final taskState = ref.watch(activeTasksProvider);
+    final completedTodayAsync = ref.watch(completedTodayTasksProvider);
+    final dailyProgress = ref.watch(dailyProgressProvider);
+
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: () async {
+          await refreshTasks(ref);
+          ref.invalidate(completedTodayTasksProvider);
+        },
+        color: const Color(0xFF6C63FF),
+        backgroundColor: const Color(0xFF161B22),
+        child: CustomScrollView(
+          slivers: [
+            // Header with refresh indicator
+            SliverToBoxAdapter(
+              child: _buildHeader(dailyProgress, isRefreshing: taskState.isRefreshing),
+            ),
+            // 最近任務標題
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Text(
+                  '最近任務',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            // 最近 10 個任務 - 使用 TaskDataState
+            if (taskState.showLoading)
+              const SliverToBoxAdapter(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(48.0),
+                    child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
+                  ),
+                ),
+              )
+            else if (taskState.hasError)
+              SliverToBoxAdapter(
+                child: _buildErrorState(taskState.error!),
+              )
+            else if (taskState.showContent)
+              _buildRecentTasks(taskState.tasks!),
+            // 今日完成區塊 (FutureProvider<TaskDataState>)
+            completedTodayAsync.when(
+              data: (state) => state.hasData
+                  ? _buildCompletedSection(state.tasks!)
+                  : const SliverToBoxAdapter(child: SizedBox.shrink()),
+              loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            ),
+            // 底部留白
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 100),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(DailyProgress progress, {bool isRefreshing = false}) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'Zentropy',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (isRefreshing) ...[
+                    const SizedBox(width: 12),
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.person_outline, color: Colors.white70),
+                onPressed: () => context.push('/profile'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // 今日進度卡片
+          _buildProgressCard(progress),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressCard(DailyProgress progress) {
+    final percentage = progress.total > 0
+        ? (progress.completed / progress.total * 100).round()
+        : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF6C63FF).withValues(alpha: 0.2),
+            const Color(0xFF6C63FF).withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '今天已完成 (${progress.completed}/${progress.total})',
+                        style: const TextStyle(
+                          color: Color(0xFF4ADE80),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // 進度條
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress.total > 0
+                        ? progress.completed / progress.total
+                        : 0,
+                    minHeight: 8,
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF4ADE80),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          // 百分比圓圈
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: Stack(
+              children: [
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: CircularProgressIndicator(
+                    value: progress.total > 0
+                        ? progress.completed / progress.total
+                        : 0,
+                    strokeWidth: 6,
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF4ADE80),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Text(
+                    '$percentage%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentTasks(List<Task> tasks) {
+    if (tasks.isEmpty) {
+      return SliverToBoxAdapter(
+        child: _buildEmptyState(),
+      );
+    }
+
+    // 按 due date 排序，取最近 10 個
+    final sortedTasks = List<Task>.from(tasks)
+      ..sort((a, b) {
+        if (a.dueDate == null && b.dueDate == null) return 0;
+        if (a.dueDate == null) return 1;
+        if (b.dueDate == null) return -1;
+        return a.dueDate!.compareTo(b.dueDate!);
+      });
+
+    final recentTasks = sortedTasks.take(10).toList();
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => _buildTaskCard(recentTasks[index], expanded: true),
+        childCount: recentTasks.length,
+      ),
+    );
+  }
+
+  Widget _buildTaskCard(Task task, {bool expanded = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showTaskDetails(task),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161B22),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: task.isOverdue
+                    ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                    : task.isToday
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
+                        : Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // 完成按鈕
+                    GestureDetector(
+                      onTap: () => _completeTask(task),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // 任務內容
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            task.content,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (task.areaName != null || task.productName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                [task.areaName, task.productName]
+                                    .whereType<String>()
+                                    .join(' > '),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // 日期標籤
+                    if (task.dueDate != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getDueDateColor(task).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _formatDueDate(task.dueDate!),
+                          style: TextStyle(
+                            color: _getDueDateColor(task),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                // Sub-items (展開顯示)
+                if (expanded &&
+                    task.subItems != null &&
+                    task.subItems!.isNotEmpty)
+                  _buildSubItems(task),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubItems(Task task) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, left: 36),
+      child: Column(
+        children: task.subItems!.map((subItem) {
+          // 使用樂觀更新狀態（如果有）
+          final key = '${task.id}:${subItem.id}';
+          final isCompleted = _optimisticSubItemStates[key] ?? subItem.completed;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => _toggleSubItem(task, subItem),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isCompleted
+                          ? const Color(0xFF4ADE80)
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: isCompleted
+                            ? const Color(0xFF4ADE80)
+                            : Colors.white.withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: isCompleted
+                          ? const Icon(
+                              Icons.check,
+                              key: ValueKey('check'),
+                              size: 12,
+                              color: Colors.white,
+                            )
+                          : const SizedBox.shrink(key: ValueKey('empty')),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      color: isCompleted
+                          ? Colors.white.withValues(alpha: 0.4)
+                          : Colors.white.withValues(alpha: 0.8),
+                      fontSize: 14,
+                      decoration:
+                          isCompleted ? TextDecoration.lineThrough : null,
+                    ),
+                    child: Text(subItem.content),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCompletedSection(List<Task> completedTasks) {
+    if (completedTasks.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF4ADE80),
+                  size: 20,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  '今日完成',
+                  style: TextStyle(
+                    color: Color(0xFF4ADE80),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...completedTasks.map((task) => _buildCompletedTaskCard(task)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompletedTaskCard(Task task) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161B22).withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF4ADE80).withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.check_circle,
+              color: Color(0xFF4ADE80),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                task.content,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 14,
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48.0),
+        child: Column(
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: Colors.white.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '太棒了！沒有待辦事項',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48.0),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: const TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => refreshTasks(ref),
+              child: const Text('重試'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getDueDateColor(Task task) {
+    if (task.isOverdue) return const Color(0xFFEF4444);
+    if (task.isToday) return const Color(0xFFF59E0B);
+    return const Color(0xFF3B82F6);
+  }
+
+  String _formatDueDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(date.year, date.month, date.day);
+
+    final diff = dueDay.difference(today).inDays;
+
+    if (diff < 0) return '逾期 ${-diff} 天';
+    if (diff == 0) return '今天';
+    if (diff == 1) return '明天';
+    if (diff < 7) return '${diff} 天後';
+    return '${date.month}/${date.day}';
+  }
+
+  void _showTaskDetails(Task task) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => TaskDetailBottomSheet(task: task),
+    );
+  }
+
+  Future<void> _completeTask(Task task) async {
+    HapticFeedback.mediumImpact();
+
+    final useCase = ref.read(updateTaskDetailsUseCaseProvider);
+    await useCase(UpdateTaskDetailsParams(
+      taskId: task.id,
+      status: TaskStatus.archive,
+    ));
+
+    // 變更後 repository 會自動靜默刷新
+    // 同時刷新今日完成 (獨立的 API 請求)
+    ref.invalidate(completedTodayTasksProvider);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('任務已完成！')),
+      );
+    }
+  }
+
+  Future<void> _toggleSubItem(Task task, SubItem subItem) async {
+    HapticFeedback.lightImpact();
+
+    final key = '${task.id}:${subItem.id}';
+    // 使用當前顯示的狀態（可能是樂觀更新的值），而非原始數據
+    final currentState = _optimisticSubItemStates[key] ?? subItem.completed;
+    final newCompleted = !currentState;
+
+    // 樂觀更新：立即更新 UI
+    setState(() {
+      _optimisticSubItemStates[key] = newCompleted;
+    });
+
+    // 發送 API 請求
+    final useCase = ref.read(updateSubItemUseCaseProvider);
+    final result = await useCase(UpdateSubItemParams(
+      taskId: task.id,
+      subItemId: subItem.id,
+      completed: newCompleted,
+    ));
+
+    result.fold(
+      (failure) {
+        // 回滾樂觀更新
+        if (mounted) {
+          setState(() {
+            _optimisticSubItemStates[key] = currentState;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('更新失敗: ${failure.message}')),
+          );
+        }
+      },
+      (_) {
+        // 成功，保持樂觀狀態
+        // repository 會自動靜默刷新快取
+      },
+    );
+  }
+}

@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/cache/cache_config.dart';
-import 'cached_data_provider.dart';
+import '../../core/di/providers.dart';
+import '../../data/repositories/unified/unified_repositories.dart';
 
 /// App 生命週期狀態
 class AppLifecycleData {
@@ -14,11 +14,11 @@ class AppLifecycleData {
     this.lastRefreshTime,
   });
 
-  /// 是否應該刷新 (節流檢查)
+  /// 是否應該刷新 (節流檢查 - 30秒)
   bool get shouldRefresh {
     if (lastRefreshTime == null) return true;
     return DateTime.now().difference(lastRefreshTime!) >
-        Duration(seconds: CacheConfig.backgroundRefreshThrottleSeconds);
+        const Duration(seconds: 30);
   }
 
   AppLifecycleData copyWith({
@@ -65,10 +65,13 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
   void _triggerSilentRefresh() {
     debugPrint('[AppLifecycle] Triggering silent refresh...');
 
-    // 刷新所有快取 Provider
-    _ref.read(cachedActiveTasksProvider.notifier).silentRefresh();
-    _ref.read(cachedAreasProvider.notifier).silentRefresh();
-    _ref.read(cachedProductsProvider.notifier).silentRefresh();
+    // 使用統一 Repository 觸發靜默刷新
+    ((_ref.read(taskRepositoryProvider) as TaskUnifiedRepository))
+        .silentRefresh();
+    ((_ref.read(areaRepositoryProvider) as AreaUnifiedRepository))
+        .silentRefresh();
+    ((_ref.read(productRepositoryProvider) as ProductUnifiedRepository))
+        .silentRefresh();
 
     state = state.copyWith(lastRefreshTime: DateTime.now());
   }

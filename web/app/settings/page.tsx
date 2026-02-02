@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { LogOut, User, Mail, Shield, Loader2, ArrowLeft } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api-client";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function SettingsPage() {
 
       try {
         const token = await firebaseUser.getIdToken();
-        const userRes = await fetch("/api/me", {
+        const userRes = await fetch(`${API_BASE_URL}/api/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

@@ -52,7 +52,7 @@ function groupTasksByDate(tasks: TaskCard[]) {
     noDueDate: [] as TaskCard[],
   };
 
-  tasks.forEach((task) => {
+  (Array.isArray(tasks) ? tasks : []).forEach((task) => {
     if (!task.due_date) {
       groups.noDueDate.push(task);
       return;

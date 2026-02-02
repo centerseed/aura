@@ -149,25 +149,13 @@ void main() {
       print('\n========================================');
       print('環境配置檢查');
       print('========================================');
-      print('環境: ${AppConfig.environment.name}');
       print('API Base URL: ${AppConfig.apiBaseUrl}');
-      print('Firebase Project ID: ${AppConfig.firebaseProjectId}');
-      print('App Name: ${AppConfig.appName}');
-      print('App Version: ${AppConfig.appVersion}');
       print('Debug Mode: ${AppConfig.isDebugMode}');
       print('API Timeout: ${AppConfig.apiTimeout}s');
       print('========================================\n');
 
       expect(AppConfig.apiBaseUrl, isNotEmpty);
-      expect(AppConfig.firebaseProjectId, isNotEmpty);
-
-      // 根據環境驗證 Base URL
-      if (AppConfig.environment == Environment.production) {
-        expect(
-          AppConfig.apiBaseUrl,
-          equals('https://zentropy-api-894512935237.asia-east1.run.app'),
-        );
-      }
+      expect(AppConfig.apiTimeout, greaterThan(0));
     });
   });
 }

@@ -170,17 +170,65 @@ abstract class _BrainDumpRequest implements BrainDumpRequest {
       throw _privateConstructorUsedError;
 }
 
-BrainDumpResponse _$BrainDumpResponseFromJson(Map<String, dynamic> json) {
-  return _BrainDumpResponse.fromJson(json);
-}
-
 /// @nodoc
 mixin _$BrainDumpResponse {
   bool get success => throw _privateConstructorUsedError;
-  List<BrainDumpItem> get items => throw _privateConstructorUsedError;
-
-  /// Serializes this BrainDumpResponse to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(bool success, List<BrainDumpItem> items)
+    createNewTasks,
+    required TResult Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )
+    appendSubItem,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(bool success, List<BrainDumpItem> items)? createNewTasks,
+    TResult? Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )?
+    appendSubItem,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(bool success, List<BrainDumpItem> items)? createNewTasks,
+    TResult Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )?
+    appendSubItem,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(BrainDumpCreateNewTasksResponse value)
+    createNewTasks,
+    required TResult Function(BrainDumpAppendSubItemResponse value)
+    appendSubItem,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(BrainDumpCreateNewTasksResponse value)? createNewTasks,
+    TResult? Function(BrainDumpAppendSubItemResponse value)? appendSubItem,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(BrainDumpCreateNewTasksResponse value)? createNewTasks,
+    TResult Function(BrainDumpAppendSubItemResponse value)? appendSubItem,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
 
   /// Create a copy of BrainDumpResponse
   /// with the given fields replaced by the non-null parameter values.
@@ -196,7 +244,7 @@ abstract class $BrainDumpResponseCopyWith<$Res> {
     $Res Function(BrainDumpResponse) then,
   ) = _$BrainDumpResponseCopyWithImpl<$Res, BrainDumpResponse>;
   @useResult
-  $Res call({bool success, List<BrainDumpItem> items});
+  $Res call({bool success});
 }
 
 /// @nodoc
@@ -213,17 +261,13 @@ class _$BrainDumpResponseCopyWithImpl<$Res, $Val extends BrainDumpResponse>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? success = null, Object? items = null}) {
+  $Res call({Object? success = null}) {
     return _then(
       _value.copyWith(
             success: null == success
                 ? _value.success
                 : success // ignore: cast_nullable_to_non_nullable
                       as bool,
-            items: null == items
-                ? _value.items
-                : items // ignore: cast_nullable_to_non_nullable
-                      as List<BrainDumpItem>,
           )
           as $Val,
     );
@@ -231,24 +275,28 @@ class _$BrainDumpResponseCopyWithImpl<$Res, $Val extends BrainDumpResponse>
 }
 
 /// @nodoc
-abstract class _$$BrainDumpResponseImplCopyWith<$Res>
+abstract class _$$BrainDumpCreateNewTasksResponseImplCopyWith<$Res>
     implements $BrainDumpResponseCopyWith<$Res> {
-  factory _$$BrainDumpResponseImplCopyWith(
-    _$BrainDumpResponseImpl value,
-    $Res Function(_$BrainDumpResponseImpl) then,
-  ) = __$$BrainDumpResponseImplCopyWithImpl<$Res>;
+  factory _$$BrainDumpCreateNewTasksResponseImplCopyWith(
+    _$BrainDumpCreateNewTasksResponseImpl value,
+    $Res Function(_$BrainDumpCreateNewTasksResponseImpl) then,
+  ) = __$$BrainDumpCreateNewTasksResponseImplCopyWithImpl<$Res>;
   @override
   @useResult
   $Res call({bool success, List<BrainDumpItem> items});
 }
 
 /// @nodoc
-class __$$BrainDumpResponseImplCopyWithImpl<$Res>
-    extends _$BrainDumpResponseCopyWithImpl<$Res, _$BrainDumpResponseImpl>
-    implements _$$BrainDumpResponseImplCopyWith<$Res> {
-  __$$BrainDumpResponseImplCopyWithImpl(
-    _$BrainDumpResponseImpl _value,
-    $Res Function(_$BrainDumpResponseImpl) _then,
+class __$$BrainDumpCreateNewTasksResponseImplCopyWithImpl<$Res>
+    extends
+        _$BrainDumpResponseCopyWithImpl<
+          $Res,
+          _$BrainDumpCreateNewTasksResponseImpl
+        >
+    implements _$$BrainDumpCreateNewTasksResponseImplCopyWith<$Res> {
+  __$$BrainDumpCreateNewTasksResponseImplCopyWithImpl(
+    _$BrainDumpCreateNewTasksResponseImpl _value,
+    $Res Function(_$BrainDumpCreateNewTasksResponseImpl) _then,
   ) : super(_value, _then);
 
   /// Create a copy of BrainDumpResponse
@@ -257,7 +305,7 @@ class __$$BrainDumpResponseImplCopyWithImpl<$Res>
   @override
   $Res call({Object? success = null, Object? items = null}) {
     return _then(
-      _$BrainDumpResponseImpl(
+      _$BrainDumpCreateNewTasksResponseImpl(
         success: null == success
             ? _value.success
             : success // ignore: cast_nullable_to_non_nullable
@@ -272,15 +320,13 @@ class __$$BrainDumpResponseImplCopyWithImpl<$Res>
 }
 
 /// @nodoc
-@JsonSerializable()
-class _$BrainDumpResponseImpl implements _BrainDumpResponse {
-  const _$BrainDumpResponseImpl({
+
+class _$BrainDumpCreateNewTasksResponseImpl
+    implements BrainDumpCreateNewTasksResponse {
+  const _$BrainDumpCreateNewTasksResponseImpl({
     required this.success,
     required final List<BrainDumpItem> items,
   }) : _items = items;
-
-  factory _$BrainDumpResponseImpl.fromJson(Map<String, dynamic> json) =>
-      _$$BrainDumpResponseImplFromJson(json);
 
   @override
   final bool success;
@@ -294,19 +340,18 @@ class _$BrainDumpResponseImpl implements _BrainDumpResponse {
 
   @override
   String toString() {
-    return 'BrainDumpResponse(success: $success, items: $items)';
+    return 'BrainDumpResponse.createNewTasks(success: $success, items: $items)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$BrainDumpResponseImpl &&
+            other is _$BrainDumpCreateNewTasksResponseImpl &&
             (identical(other.success, success) || other.success == success) &&
             const DeepCollectionEquality().equals(other._items, _items));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
     runtimeType,
@@ -319,37 +364,1089 @@ class _$BrainDumpResponseImpl implements _BrainDumpResponse {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
-  _$$BrainDumpResponseImplCopyWith<_$BrainDumpResponseImpl> get copyWith =>
-      __$$BrainDumpResponseImplCopyWithImpl<_$BrainDumpResponseImpl>(
-        this,
-        _$identity,
-      );
+  _$$BrainDumpCreateNewTasksResponseImplCopyWith<
+    _$BrainDumpCreateNewTasksResponseImpl
+  >
+  get copyWith =>
+      __$$BrainDumpCreateNewTasksResponseImplCopyWithImpl<
+        _$BrainDumpCreateNewTasksResponseImpl
+      >(this, _$identity);
 
   @override
-  Map<String, dynamic> toJson() {
-    return _$$BrainDumpResponseImplToJson(this);
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(bool success, List<BrainDumpItem> items)
+    createNewTasks,
+    required TResult Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )
+    appendSubItem,
+  }) {
+    return createNewTasks(success, items);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(bool success, List<BrainDumpItem> items)? createNewTasks,
+    TResult? Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )?
+    appendSubItem,
+  }) {
+    return createNewTasks?.call(success, items);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(bool success, List<BrainDumpItem> items)? createNewTasks,
+    TResult Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )?
+    appendSubItem,
+    required TResult orElse(),
+  }) {
+    if (createNewTasks != null) {
+      return createNewTasks(success, items);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(BrainDumpCreateNewTasksResponse value)
+    createNewTasks,
+    required TResult Function(BrainDumpAppendSubItemResponse value)
+    appendSubItem,
+  }) {
+    return createNewTasks(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(BrainDumpCreateNewTasksResponse value)? createNewTasks,
+    TResult? Function(BrainDumpAppendSubItemResponse value)? appendSubItem,
+  }) {
+    return createNewTasks?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(BrainDumpCreateNewTasksResponse value)? createNewTasks,
+    TResult Function(BrainDumpAppendSubItemResponse value)? appendSubItem,
+    required TResult orElse(),
+  }) {
+    if (createNewTasks != null) {
+      return createNewTasks(this);
+    }
+    return orElse();
   }
 }
 
-abstract class _BrainDumpResponse implements BrainDumpResponse {
-  const factory _BrainDumpResponse({
+abstract class BrainDumpCreateNewTasksResponse implements BrainDumpResponse {
+  const factory BrainDumpCreateNewTasksResponse({
     required final bool success,
     required final List<BrainDumpItem> items,
-  }) = _$BrainDumpResponseImpl;
-
-  factory _BrainDumpResponse.fromJson(Map<String, dynamic> json) =
-      _$BrainDumpResponseImpl.fromJson;
+  }) = _$BrainDumpCreateNewTasksResponseImpl;
 
   @override
   bool get success;
-  @override
   List<BrainDumpItem> get items;
 
   /// Create a copy of BrainDumpResponse
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$BrainDumpResponseImplCopyWith<_$BrainDumpResponseImpl> get copyWith =>
+  _$$BrainDumpCreateNewTasksResponseImplCopyWith<
+    _$BrainDumpCreateNewTasksResponseImpl
+  >
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$BrainDumpAppendSubItemResponseImplCopyWith<$Res>
+    implements $BrainDumpResponseCopyWith<$Res> {
+  factory _$$BrainDumpAppendSubItemResponseImplCopyWith(
+    _$BrainDumpAppendSubItemResponseImpl value,
+    $Res Function(_$BrainDumpAppendSubItemResponseImpl) then,
+  ) = __$$BrainDumpAppendSubItemResponseImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    bool success,
+    @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+    @JsonKey(name: 'appended_sub_items')
+    List<BrainDumpAppendedSubItem> appendedSubItems,
+    String reasoning,
+  });
+
+  $BrainDumpTargetTaskCopyWith<$Res> get targetTask;
+}
+
+/// @nodoc
+class __$$BrainDumpAppendSubItemResponseImplCopyWithImpl<$Res>
+    extends
+        _$BrainDumpResponseCopyWithImpl<
+          $Res,
+          _$BrainDumpAppendSubItemResponseImpl
+        >
+    implements _$$BrainDumpAppendSubItemResponseImplCopyWith<$Res> {
+  __$$BrainDumpAppendSubItemResponseImplCopyWithImpl(
+    _$BrainDumpAppendSubItemResponseImpl _value,
+    $Res Function(_$BrainDumpAppendSubItemResponseImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of BrainDumpResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? success = null,
+    Object? targetTask = null,
+    Object? appendedSubItems = null,
+    Object? reasoning = null,
+  }) {
+    return _then(
+      _$BrainDumpAppendSubItemResponseImpl(
+        success: null == success
+            ? _value.success
+            : success // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        targetTask: null == targetTask
+            ? _value.targetTask
+            : targetTask // ignore: cast_nullable_to_non_nullable
+                  as BrainDumpTargetTask,
+        appendedSubItems: null == appendedSubItems
+            ? _value._appendedSubItems
+            : appendedSubItems // ignore: cast_nullable_to_non_nullable
+                  as List<BrainDumpAppendedSubItem>,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+
+  /// Create a copy of BrainDumpResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $BrainDumpTargetTaskCopyWith<$Res> get targetTask {
+    return $BrainDumpTargetTaskCopyWith<$Res>(_value.targetTask, (value) {
+      return _then(_value.copyWith(targetTask: value));
+    });
+  }
+}
+
+/// @nodoc
+
+class _$BrainDumpAppendSubItemResponseImpl
+    implements BrainDumpAppendSubItemResponse {
+  const _$BrainDumpAppendSubItemResponseImpl({
+    required this.success,
+    @JsonKey(name: 'target_task') required this.targetTask,
+    @JsonKey(name: 'appended_sub_items')
+    required final List<BrainDumpAppendedSubItem> appendedSubItems,
+    required this.reasoning,
+  }) : _appendedSubItems = appendedSubItems;
+
+  @override
+  final bool success;
+  @override
+  @JsonKey(name: 'target_task')
+  final BrainDumpTargetTask targetTask;
+  final List<BrainDumpAppendedSubItem> _appendedSubItems;
+  @override
+  @JsonKey(name: 'appended_sub_items')
+  List<BrainDumpAppendedSubItem> get appendedSubItems {
+    if (_appendedSubItems is EqualUnmodifiableListView)
+      return _appendedSubItems;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_appendedSubItems);
+  }
+
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'BrainDumpResponse.appendSubItem(success: $success, targetTask: $targetTask, appendedSubItems: $appendedSubItems, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$BrainDumpAppendSubItemResponseImpl &&
+            (identical(other.success, success) || other.success == success) &&
+            (identical(other.targetTask, targetTask) ||
+                other.targetTask == targetTask) &&
+            const DeepCollectionEquality().equals(
+              other._appendedSubItems,
+              _appendedSubItems,
+            ) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    success,
+    targetTask,
+    const DeepCollectionEquality().hash(_appendedSubItems),
+    reasoning,
+  );
+
+  /// Create a copy of BrainDumpResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$BrainDumpAppendSubItemResponseImplCopyWith<
+    _$BrainDumpAppendSubItemResponseImpl
+  >
+  get copyWith =>
+      __$$BrainDumpAppendSubItemResponseImplCopyWithImpl<
+        _$BrainDumpAppendSubItemResponseImpl
+      >(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(bool success, List<BrainDumpItem> items)
+    createNewTasks,
+    required TResult Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )
+    appendSubItem,
+  }) {
+    return appendSubItem(success, targetTask, appendedSubItems, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(bool success, List<BrainDumpItem> items)? createNewTasks,
+    TResult? Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )?
+    appendSubItem,
+  }) {
+    return appendSubItem?.call(
+      success,
+      targetTask,
+      appendedSubItems,
+      reasoning,
+    );
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(bool success, List<BrainDumpItem> items)? createNewTasks,
+    TResult Function(
+      bool success,
+      @JsonKey(name: 'target_task') BrainDumpTargetTask targetTask,
+      @JsonKey(name: 'appended_sub_items')
+      List<BrainDumpAppendedSubItem> appendedSubItems,
+      String reasoning,
+    )?
+    appendSubItem,
+    required TResult orElse(),
+  }) {
+    if (appendSubItem != null) {
+      return appendSubItem(success, targetTask, appendedSubItems, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(BrainDumpCreateNewTasksResponse value)
+    createNewTasks,
+    required TResult Function(BrainDumpAppendSubItemResponse value)
+    appendSubItem,
+  }) {
+    return appendSubItem(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(BrainDumpCreateNewTasksResponse value)? createNewTasks,
+    TResult? Function(BrainDumpAppendSubItemResponse value)? appendSubItem,
+  }) {
+    return appendSubItem?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(BrainDumpCreateNewTasksResponse value)? createNewTasks,
+    TResult Function(BrainDumpAppendSubItemResponse value)? appendSubItem,
+    required TResult orElse(),
+  }) {
+    if (appendSubItem != null) {
+      return appendSubItem(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class BrainDumpAppendSubItemResponse implements BrainDumpResponse {
+  const factory BrainDumpAppendSubItemResponse({
+    required final bool success,
+    @JsonKey(name: 'target_task') required final BrainDumpTargetTask targetTask,
+    @JsonKey(name: 'appended_sub_items')
+    required final List<BrainDumpAppendedSubItem> appendedSubItems,
+    required final String reasoning,
+  }) = _$BrainDumpAppendSubItemResponseImpl;
+
+  @override
+  bool get success;
+  @JsonKey(name: 'target_task')
+  BrainDumpTargetTask get targetTask;
+  @JsonKey(name: 'appended_sub_items')
+  List<BrainDumpAppendedSubItem> get appendedSubItems;
+  String get reasoning;
+
+  /// Create a copy of BrainDumpResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$BrainDumpAppendSubItemResponseImplCopyWith<
+    _$BrainDumpAppendSubItemResponseImpl
+  >
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+BrainDumpTargetTask _$BrainDumpTargetTaskFromJson(Map<String, dynamic> json) {
+  return _BrainDumpTargetTask.fromJson(json);
+}
+
+/// @nodoc
+mixin _$BrainDumpTargetTask {
+  String get id => throw _privateConstructorUsedError;
+  String get content => throw _privateConstructorUsedError;
+  String get product => throw _privateConstructorUsedError;
+
+  /// Serializes this BrainDumpTargetTask to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of BrainDumpTargetTask
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $BrainDumpTargetTaskCopyWith<BrainDumpTargetTask> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $BrainDumpTargetTaskCopyWith<$Res> {
+  factory $BrainDumpTargetTaskCopyWith(
+    BrainDumpTargetTask value,
+    $Res Function(BrainDumpTargetTask) then,
+  ) = _$BrainDumpTargetTaskCopyWithImpl<$Res, BrainDumpTargetTask>;
+  @useResult
+  $Res call({String id, String content, String product});
+}
+
+/// @nodoc
+class _$BrainDumpTargetTaskCopyWithImpl<$Res, $Val extends BrainDumpTargetTask>
+    implements $BrainDumpTargetTaskCopyWith<$Res> {
+  _$BrainDumpTargetTaskCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of BrainDumpTargetTask
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? content = null,
+    Object? product = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            content: null == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String,
+            product: null == product
+                ? _value.product
+                : product // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$BrainDumpTargetTaskImplCopyWith<$Res>
+    implements $BrainDumpTargetTaskCopyWith<$Res> {
+  factory _$$BrainDumpTargetTaskImplCopyWith(
+    _$BrainDumpTargetTaskImpl value,
+    $Res Function(_$BrainDumpTargetTaskImpl) then,
+  ) = __$$BrainDumpTargetTaskImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String id, String content, String product});
+}
+
+/// @nodoc
+class __$$BrainDumpTargetTaskImplCopyWithImpl<$Res>
+    extends _$BrainDumpTargetTaskCopyWithImpl<$Res, _$BrainDumpTargetTaskImpl>
+    implements _$$BrainDumpTargetTaskImplCopyWith<$Res> {
+  __$$BrainDumpTargetTaskImplCopyWithImpl(
+    _$BrainDumpTargetTaskImpl _value,
+    $Res Function(_$BrainDumpTargetTaskImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of BrainDumpTargetTask
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? content = null,
+    Object? product = null,
+  }) {
+    return _then(
+      _$BrainDumpTargetTaskImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        product: null == product
+            ? _value.product
+            : product // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$BrainDumpTargetTaskImpl implements _BrainDumpTargetTask {
+  const _$BrainDumpTargetTaskImpl({
+    required this.id,
+    required this.content,
+    required this.product,
+  });
+
+  factory _$BrainDumpTargetTaskImpl.fromJson(Map<String, dynamic> json) =>
+      _$$BrainDumpTargetTaskImplFromJson(json);
+
+  @override
+  final String id;
+  @override
+  final String content;
+  @override
+  final String product;
+
+  @override
+  String toString() {
+    return 'BrainDumpTargetTask(id: $id, content: $content, product: $product)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$BrainDumpTargetTaskImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.product, product) || other.product == product));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, content, product);
+
+  /// Create a copy of BrainDumpTargetTask
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$BrainDumpTargetTaskImplCopyWith<_$BrainDumpTargetTaskImpl> get copyWith =>
+      __$$BrainDumpTargetTaskImplCopyWithImpl<_$BrainDumpTargetTaskImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$BrainDumpTargetTaskImplToJson(this);
+  }
+}
+
+abstract class _BrainDumpTargetTask implements BrainDumpTargetTask {
+  const factory _BrainDumpTargetTask({
+    required final String id,
+    required final String content,
+    required final String product,
+  }) = _$BrainDumpTargetTaskImpl;
+
+  factory _BrainDumpTargetTask.fromJson(Map<String, dynamic> json) =
+      _$BrainDumpTargetTaskImpl.fromJson;
+
+  @override
+  String get id;
+  @override
+  String get content;
+  @override
+  String get product;
+
+  /// Create a copy of BrainDumpTargetTask
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$BrainDumpTargetTaskImplCopyWith<_$BrainDumpTargetTaskImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+BrainDumpAppendedSubItem _$BrainDumpAppendedSubItemFromJson(
+  Map<String, dynamic> json,
+) {
+  return _BrainDumpAppendedSubItem.fromJson(json);
+}
+
+/// @nodoc
+mixin _$BrainDumpAppendedSubItem {
+  String get id => throw _privateConstructorUsedError;
+  String get content => throw _privateConstructorUsedError;
+  bool get completed => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
+  String get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'completed_at')
+  String? get completedAt => throw _privateConstructorUsedError;
+  int get order => throw _privateConstructorUsedError;
+
+  /// Serializes this BrainDumpAppendedSubItem to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of BrainDumpAppendedSubItem
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $BrainDumpAppendedSubItemCopyWith<BrainDumpAppendedSubItem> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $BrainDumpAppendedSubItemCopyWith<$Res> {
+  factory $BrainDumpAppendedSubItemCopyWith(
+    BrainDumpAppendedSubItem value,
+    $Res Function(BrainDumpAppendedSubItem) then,
+  ) = _$BrainDumpAppendedSubItemCopyWithImpl<$Res, BrainDumpAppendedSubItem>;
+  @useResult
+  $Res call({
+    String id,
+    String content,
+    bool completed,
+    @JsonKey(name: 'created_at') String createdAt,
+    @JsonKey(name: 'completed_at') String? completedAt,
+    int order,
+  });
+}
+
+/// @nodoc
+class _$BrainDumpAppendedSubItemCopyWithImpl<
+  $Res,
+  $Val extends BrainDumpAppendedSubItem
+>
+    implements $BrainDumpAppendedSubItemCopyWith<$Res> {
+  _$BrainDumpAppendedSubItemCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of BrainDumpAppendedSubItem
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? content = null,
+    Object? completed = null,
+    Object? createdAt = null,
+    Object? completedAt = freezed,
+    Object? order = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            content: null == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String,
+            completed: null == completed
+                ? _value.completed
+                : completed // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            createdAt: null == createdAt
+                ? _value.createdAt
+                : createdAt // ignore: cast_nullable_to_non_nullable
+                      as String,
+            completedAt: freezed == completedAt
+                ? _value.completedAt
+                : completedAt // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            order: null == order
+                ? _value.order
+                : order // ignore: cast_nullable_to_non_nullable
+                      as int,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$BrainDumpAppendedSubItemImplCopyWith<$Res>
+    implements $BrainDumpAppendedSubItemCopyWith<$Res> {
+  factory _$$BrainDumpAppendedSubItemImplCopyWith(
+    _$BrainDumpAppendedSubItemImpl value,
+    $Res Function(_$BrainDumpAppendedSubItemImpl) then,
+  ) = __$$BrainDumpAppendedSubItemImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String content,
+    bool completed,
+    @JsonKey(name: 'created_at') String createdAt,
+    @JsonKey(name: 'completed_at') String? completedAt,
+    int order,
+  });
+}
+
+/// @nodoc
+class __$$BrainDumpAppendedSubItemImplCopyWithImpl<$Res>
+    extends
+        _$BrainDumpAppendedSubItemCopyWithImpl<
+          $Res,
+          _$BrainDumpAppendedSubItemImpl
+        >
+    implements _$$BrainDumpAppendedSubItemImplCopyWith<$Res> {
+  __$$BrainDumpAppendedSubItemImplCopyWithImpl(
+    _$BrainDumpAppendedSubItemImpl _value,
+    $Res Function(_$BrainDumpAppendedSubItemImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of BrainDumpAppendedSubItem
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? content = null,
+    Object? completed = null,
+    Object? createdAt = null,
+    Object? completedAt = freezed,
+    Object? order = null,
+  }) {
+    return _then(
+      _$BrainDumpAppendedSubItemImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        completed: null == completed
+            ? _value.completed
+            : completed // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        createdAt: null == createdAt
+            ? _value.createdAt
+            : createdAt // ignore: cast_nullable_to_non_nullable
+                  as String,
+        completedAt: freezed == completedAt
+            ? _value.completedAt
+            : completedAt // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        order: null == order
+            ? _value.order
+            : order // ignore: cast_nullable_to_non_nullable
+                  as int,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$BrainDumpAppendedSubItemImpl implements _BrainDumpAppendedSubItem {
+  const _$BrainDumpAppendedSubItemImpl({
+    required this.id,
+    required this.content,
+    required this.completed,
+    @JsonKey(name: 'created_at') required this.createdAt,
+    @JsonKey(name: 'completed_at') this.completedAt,
+    required this.order,
+  });
+
+  factory _$BrainDumpAppendedSubItemImpl.fromJson(Map<String, dynamic> json) =>
+      _$$BrainDumpAppendedSubItemImplFromJson(json);
+
+  @override
+  final String id;
+  @override
+  final String content;
+  @override
+  final bool completed;
+  @override
+  @JsonKey(name: 'created_at')
+  final String createdAt;
+  @override
+  @JsonKey(name: 'completed_at')
+  final String? completedAt;
+  @override
+  final int order;
+
+  @override
+  String toString() {
+    return 'BrainDumpAppendedSubItem(id: $id, content: $content, completed: $completed, createdAt: $createdAt, completedAt: $completedAt, order: $order)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$BrainDumpAppendedSubItemImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.completed, completed) ||
+                other.completed == completed) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.completedAt, completedAt) ||
+                other.completedAt == completedAt) &&
+            (identical(other.order, order) || other.order == order));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    content,
+    completed,
+    createdAt,
+    completedAt,
+    order,
+  );
+
+  /// Create a copy of BrainDumpAppendedSubItem
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$BrainDumpAppendedSubItemImplCopyWith<_$BrainDumpAppendedSubItemImpl>
+  get copyWith =>
+      __$$BrainDumpAppendedSubItemImplCopyWithImpl<
+        _$BrainDumpAppendedSubItemImpl
+      >(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$BrainDumpAppendedSubItemImplToJson(this);
+  }
+}
+
+abstract class _BrainDumpAppendedSubItem implements BrainDumpAppendedSubItem {
+  const factory _BrainDumpAppendedSubItem({
+    required final String id,
+    required final String content,
+    required final bool completed,
+    @JsonKey(name: 'created_at') required final String createdAt,
+    @JsonKey(name: 'completed_at') final String? completedAt,
+    required final int order,
+  }) = _$BrainDumpAppendedSubItemImpl;
+
+  factory _BrainDumpAppendedSubItem.fromJson(Map<String, dynamic> json) =
+      _$BrainDumpAppendedSubItemImpl.fromJson;
+
+  @override
+  String get id;
+  @override
+  String get content;
+  @override
+  bool get completed;
+  @override
+  @JsonKey(name: 'created_at')
+  String get createdAt;
+  @override
+  @JsonKey(name: 'completed_at')
+  String? get completedAt;
+  @override
+  int get order;
+
+  /// Create a copy of BrainDumpAppendedSubItem
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$BrainDumpAppendedSubItemImplCopyWith<_$BrainDumpAppendedSubItemImpl>
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+SourceAttribution _$SourceAttributionFromJson(Map<String, dynamic> json) {
+  return _SourceAttribution.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SourceAttribution {
+  @JsonKey(name: 'source_type')
+  String get sourceType => throw _privateConstructorUsedError;
+  double get confidence => throw _privateConstructorUsedError;
+  String get reasoning => throw _privateConstructorUsedError;
+
+  /// Serializes this SourceAttribution to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of SourceAttribution
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SourceAttributionCopyWith<SourceAttribution> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SourceAttributionCopyWith<$Res> {
+  factory $SourceAttributionCopyWith(
+    SourceAttribution value,
+    $Res Function(SourceAttribution) then,
+  ) = _$SourceAttributionCopyWithImpl<$Res, SourceAttribution>;
+  @useResult
+  $Res call({
+    @JsonKey(name: 'source_type') String sourceType,
+    double confidence,
+    String reasoning,
+  });
+}
+
+/// @nodoc
+class _$SourceAttributionCopyWithImpl<$Res, $Val extends SourceAttribution>
+    implements $SourceAttributionCopyWith<$Res> {
+  _$SourceAttributionCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of SourceAttribution
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? sourceType = null,
+    Object? confidence = null,
+    Object? reasoning = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            sourceType: null == sourceType
+                ? _value.sourceType
+                : sourceType // ignore: cast_nullable_to_non_nullable
+                      as String,
+            confidence: null == confidence
+                ? _value.confidence
+                : confidence // ignore: cast_nullable_to_non_nullable
+                      as double,
+            reasoning: null == reasoning
+                ? _value.reasoning
+                : reasoning // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$SourceAttributionImplCopyWith<$Res>
+    implements $SourceAttributionCopyWith<$Res> {
+  factory _$$SourceAttributionImplCopyWith(
+    _$SourceAttributionImpl value,
+    $Res Function(_$SourceAttributionImpl) then,
+  ) = __$$SourceAttributionImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    @JsonKey(name: 'source_type') String sourceType,
+    double confidence,
+    String reasoning,
+  });
+}
+
+/// @nodoc
+class __$$SourceAttributionImplCopyWithImpl<$Res>
+    extends _$SourceAttributionCopyWithImpl<$Res, _$SourceAttributionImpl>
+    implements _$$SourceAttributionImplCopyWith<$Res> {
+  __$$SourceAttributionImplCopyWithImpl(
+    _$SourceAttributionImpl _value,
+    $Res Function(_$SourceAttributionImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of SourceAttribution
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? sourceType = null,
+    Object? confidence = null,
+    Object? reasoning = null,
+  }) {
+    return _then(
+      _$SourceAttributionImpl(
+        sourceType: null == sourceType
+            ? _value.sourceType
+            : sourceType // ignore: cast_nullable_to_non_nullable
+                  as String,
+        confidence: null == confidence
+            ? _value.confidence
+            : confidence // ignore: cast_nullable_to_non_nullable
+                  as double,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SourceAttributionImpl implements _SourceAttribution {
+  const _$SourceAttributionImpl({
+    @JsonKey(name: 'source_type') required this.sourceType,
+    required this.confidence,
+    required this.reasoning,
+  });
+
+  factory _$SourceAttributionImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SourceAttributionImplFromJson(json);
+
+  @override
+  @JsonKey(name: 'source_type')
+  final String sourceType;
+  @override
+  final double confidence;
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'SourceAttribution(sourceType: $sourceType, confidence: $confidence, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SourceAttributionImpl &&
+            (identical(other.sourceType, sourceType) ||
+                other.sourceType == sourceType) &&
+            (identical(other.confidence, confidence) ||
+                other.confidence == confidence) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, sourceType, confidence, reasoning);
+
+  /// Create a copy of SourceAttribution
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SourceAttributionImplCopyWith<_$SourceAttributionImpl> get copyWith =>
+      __$$SourceAttributionImplCopyWithImpl<_$SourceAttributionImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SourceAttributionImplToJson(this);
+  }
+}
+
+abstract class _SourceAttribution implements SourceAttribution {
+  const factory _SourceAttribution({
+    @JsonKey(name: 'source_type') required final String sourceType,
+    required final double confidence,
+    required final String reasoning,
+  }) = _$SourceAttributionImpl;
+
+  factory _SourceAttribution.fromJson(Map<String, dynamic> json) =
+      _$SourceAttributionImpl.fromJson;
+
+  @override
+  @JsonKey(name: 'source_type')
+  String get sourceType;
+  @override
+  double get confidence;
+  @override
+  String get reasoning;
+
+  /// Create a copy of SourceAttribution
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SourceAttributionImplCopyWith<_$SourceAttributionImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
@@ -364,12 +1461,15 @@ mixin _$BrainDumpItem {
   String get narrative => throw _privateConstructorUsedError;
   String get drawer => throw _privateConstructorUsedError;
   BrainDumpTag get tag => throw _privateConstructorUsedError;
+  @JsonKey(name: 'strategy_used')
+  String? get strategyUsed => throw _privateConstructorUsedError;
+  String? get reasoning => throw _privateConstructorUsedError;
   @JsonKey(name: 'due_date')
   String? get dueDate => throw _privateConstructorUsedError;
   @JsonKey(name: 'time_confidence')
   double? get timeConfidence => throw _privateConstructorUsedError;
-  @JsonKey(name: 'time_reasoning')
-  String? get timeReasoning => throw _privateConstructorUsedError;
+  @JsonKey(name: 'due_date_source')
+  SourceAttribution? get dueDateSource => throw _privateConstructorUsedError;
   @JsonKey(name: 'inferred_from_milestone')
   String? get inferredFromMilestone => throw _privateConstructorUsedError;
 
@@ -396,13 +1496,16 @@ abstract class $BrainDumpItemCopyWith<$Res> {
     String narrative,
     String drawer,
     BrainDumpTag tag,
+    @JsonKey(name: 'strategy_used') String? strategyUsed,
+    String? reasoning,
     @JsonKey(name: 'due_date') String? dueDate,
     @JsonKey(name: 'time_confidence') double? timeConfidence,
-    @JsonKey(name: 'time_reasoning') String? timeReasoning,
+    @JsonKey(name: 'due_date_source') SourceAttribution? dueDateSource,
     @JsonKey(name: 'inferred_from_milestone') String? inferredFromMilestone,
   });
 
   $BrainDumpTagCopyWith<$Res> get tag;
+  $SourceAttributionCopyWith<$Res>? get dueDateSource;
 }
 
 /// @nodoc
@@ -425,9 +1528,11 @@ class _$BrainDumpItemCopyWithImpl<$Res, $Val extends BrainDumpItem>
     Object? narrative = null,
     Object? drawer = null,
     Object? tag = null,
+    Object? strategyUsed = freezed,
+    Object? reasoning = freezed,
     Object? dueDate = freezed,
     Object? timeConfidence = freezed,
-    Object? timeReasoning = freezed,
+    Object? dueDateSource = freezed,
     Object? inferredFromMilestone = freezed,
   }) {
     return _then(
@@ -452,6 +1557,14 @@ class _$BrainDumpItemCopyWithImpl<$Res, $Val extends BrainDumpItem>
                 ? _value.tag
                 : tag // ignore: cast_nullable_to_non_nullable
                       as BrainDumpTag,
+            strategyUsed: freezed == strategyUsed
+                ? _value.strategyUsed
+                : strategyUsed // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            reasoning: freezed == reasoning
+                ? _value.reasoning
+                : reasoning // ignore: cast_nullable_to_non_nullable
+                      as String?,
             dueDate: freezed == dueDate
                 ? _value.dueDate
                 : dueDate // ignore: cast_nullable_to_non_nullable
@@ -460,10 +1573,10 @@ class _$BrainDumpItemCopyWithImpl<$Res, $Val extends BrainDumpItem>
                 ? _value.timeConfidence
                 : timeConfidence // ignore: cast_nullable_to_non_nullable
                       as double?,
-            timeReasoning: freezed == timeReasoning
-                ? _value.timeReasoning
-                : timeReasoning // ignore: cast_nullable_to_non_nullable
-                      as String?,
+            dueDateSource: freezed == dueDateSource
+                ? _value.dueDateSource
+                : dueDateSource // ignore: cast_nullable_to_non_nullable
+                      as SourceAttribution?,
             inferredFromMilestone: freezed == inferredFromMilestone
                 ? _value.inferredFromMilestone
                 : inferredFromMilestone // ignore: cast_nullable_to_non_nullable
@@ -480,6 +1593,20 @@ class _$BrainDumpItemCopyWithImpl<$Res, $Val extends BrainDumpItem>
   $BrainDumpTagCopyWith<$Res> get tag {
     return $BrainDumpTagCopyWith<$Res>(_value.tag, (value) {
       return _then(_value.copyWith(tag: value) as $Val);
+    });
+  }
+
+  /// Create a copy of BrainDumpItem
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $SourceAttributionCopyWith<$Res>? get dueDateSource {
+    if (_value.dueDateSource == null) {
+      return null;
+    }
+
+    return $SourceAttributionCopyWith<$Res>(_value.dueDateSource!, (value) {
+      return _then(_value.copyWith(dueDateSource: value) as $Val);
     });
   }
 }
@@ -499,14 +1626,18 @@ abstract class _$$BrainDumpItemImplCopyWith<$Res>
     String narrative,
     String drawer,
     BrainDumpTag tag,
+    @JsonKey(name: 'strategy_used') String? strategyUsed,
+    String? reasoning,
     @JsonKey(name: 'due_date') String? dueDate,
     @JsonKey(name: 'time_confidence') double? timeConfidence,
-    @JsonKey(name: 'time_reasoning') String? timeReasoning,
+    @JsonKey(name: 'due_date_source') SourceAttribution? dueDateSource,
     @JsonKey(name: 'inferred_from_milestone') String? inferredFromMilestone,
   });
 
   @override
   $BrainDumpTagCopyWith<$Res> get tag;
+  @override
+  $SourceAttributionCopyWith<$Res>? get dueDateSource;
 }
 
 /// @nodoc
@@ -528,9 +1659,11 @@ class __$$BrainDumpItemImplCopyWithImpl<$Res>
     Object? narrative = null,
     Object? drawer = null,
     Object? tag = null,
+    Object? strategyUsed = freezed,
+    Object? reasoning = freezed,
     Object? dueDate = freezed,
     Object? timeConfidence = freezed,
-    Object? timeReasoning = freezed,
+    Object? dueDateSource = freezed,
     Object? inferredFromMilestone = freezed,
   }) {
     return _then(
@@ -555,6 +1688,14 @@ class __$$BrainDumpItemImplCopyWithImpl<$Res>
             ? _value.tag
             : tag // ignore: cast_nullable_to_non_nullable
                   as BrainDumpTag,
+        strategyUsed: freezed == strategyUsed
+            ? _value.strategyUsed
+            : strategyUsed // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        reasoning: freezed == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String?,
         dueDate: freezed == dueDate
             ? _value.dueDate
             : dueDate // ignore: cast_nullable_to_non_nullable
@@ -563,10 +1704,10 @@ class __$$BrainDumpItemImplCopyWithImpl<$Res>
             ? _value.timeConfidence
             : timeConfidence // ignore: cast_nullable_to_non_nullable
                   as double?,
-        timeReasoning: freezed == timeReasoning
-            ? _value.timeReasoning
-            : timeReasoning // ignore: cast_nullable_to_non_nullable
-                  as String?,
+        dueDateSource: freezed == dueDateSource
+            ? _value.dueDateSource
+            : dueDateSource // ignore: cast_nullable_to_non_nullable
+                  as SourceAttribution?,
         inferredFromMilestone: freezed == inferredFromMilestone
             ? _value.inferredFromMilestone
             : inferredFromMilestone // ignore: cast_nullable_to_non_nullable
@@ -585,9 +1726,11 @@ class _$BrainDumpItemImpl implements _BrainDumpItem {
     required this.narrative,
     required this.drawer,
     required this.tag,
+    @JsonKey(name: 'strategy_used') this.strategyUsed,
+    this.reasoning,
     @JsonKey(name: 'due_date') this.dueDate,
     @JsonKey(name: 'time_confidence') this.timeConfidence,
-    @JsonKey(name: 'time_reasoning') this.timeReasoning,
+    @JsonKey(name: 'due_date_source') this.dueDateSource,
     @JsonKey(name: 'inferred_from_milestone') this.inferredFromMilestone,
   });
 
@@ -605,21 +1748,26 @@ class _$BrainDumpItemImpl implements _BrainDumpItem {
   @override
   final BrainDumpTag tag;
   @override
+  @JsonKey(name: 'strategy_used')
+  final String? strategyUsed;
+  @override
+  final String? reasoning;
+  @override
   @JsonKey(name: 'due_date')
   final String? dueDate;
   @override
   @JsonKey(name: 'time_confidence')
   final double? timeConfidence;
   @override
-  @JsonKey(name: 'time_reasoning')
-  final String? timeReasoning;
+  @JsonKey(name: 'due_date_source')
+  final SourceAttribution? dueDateSource;
   @override
   @JsonKey(name: 'inferred_from_milestone')
   final String? inferredFromMilestone;
 
   @override
   String toString() {
-    return 'BrainDumpItem(id: $id, title: $title, narrative: $narrative, drawer: $drawer, tag: $tag, dueDate: $dueDate, timeConfidence: $timeConfidence, timeReasoning: $timeReasoning, inferredFromMilestone: $inferredFromMilestone)';
+    return 'BrainDumpItem(id: $id, title: $title, narrative: $narrative, drawer: $drawer, tag: $tag, strategyUsed: $strategyUsed, reasoning: $reasoning, dueDate: $dueDate, timeConfidence: $timeConfidence, dueDateSource: $dueDateSource, inferredFromMilestone: $inferredFromMilestone)';
   }
 
   @override
@@ -633,11 +1781,15 @@ class _$BrainDumpItemImpl implements _BrainDumpItem {
                 other.narrative == narrative) &&
             (identical(other.drawer, drawer) || other.drawer == drawer) &&
             (identical(other.tag, tag) || other.tag == tag) &&
+            (identical(other.strategyUsed, strategyUsed) ||
+                other.strategyUsed == strategyUsed) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning) &&
             (identical(other.dueDate, dueDate) || other.dueDate == dueDate) &&
             (identical(other.timeConfidence, timeConfidence) ||
                 other.timeConfidence == timeConfidence) &&
-            (identical(other.timeReasoning, timeReasoning) ||
-                other.timeReasoning == timeReasoning) &&
+            (identical(other.dueDateSource, dueDateSource) ||
+                other.dueDateSource == dueDateSource) &&
             (identical(other.inferredFromMilestone, inferredFromMilestone) ||
                 other.inferredFromMilestone == inferredFromMilestone));
   }
@@ -651,9 +1803,11 @@ class _$BrainDumpItemImpl implements _BrainDumpItem {
     narrative,
     drawer,
     tag,
+    strategyUsed,
+    reasoning,
     dueDate,
     timeConfidence,
-    timeReasoning,
+    dueDateSource,
     inferredFromMilestone,
   );
 
@@ -678,9 +1832,11 @@ abstract class _BrainDumpItem implements BrainDumpItem {
     required final String narrative,
     required final String drawer,
     required final BrainDumpTag tag,
+    @JsonKey(name: 'strategy_used') final String? strategyUsed,
+    final String? reasoning,
     @JsonKey(name: 'due_date') final String? dueDate,
     @JsonKey(name: 'time_confidence') final double? timeConfidence,
-    @JsonKey(name: 'time_reasoning') final String? timeReasoning,
+    @JsonKey(name: 'due_date_source') final SourceAttribution? dueDateSource,
     @JsonKey(name: 'inferred_from_milestone')
     final String? inferredFromMilestone,
   }) = _$BrainDumpItemImpl;
@@ -699,14 +1855,19 @@ abstract class _BrainDumpItem implements BrainDumpItem {
   @override
   BrainDumpTag get tag;
   @override
+  @JsonKey(name: 'strategy_used')
+  String? get strategyUsed;
+  @override
+  String? get reasoning;
+  @override
   @JsonKey(name: 'due_date')
   String? get dueDate;
   @override
   @JsonKey(name: 'time_confidence')
   double? get timeConfidence;
   @override
-  @JsonKey(name: 'time_reasoning')
-  String? get timeReasoning;
+  @JsonKey(name: 'due_date_source')
+  SourceAttribution? get dueDateSource;
   @override
   @JsonKey(name: 'inferred_from_milestone')
   String? get inferredFromMilestone;

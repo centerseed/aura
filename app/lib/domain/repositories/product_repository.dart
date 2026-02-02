@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import '../../core/errors/failures.dart';
 import '../entities/product.dart';
+import '../entities/reference.dart';
 import '../entities/reorganize_proposal.dart';
 
 abstract class ProductRepository {
@@ -15,4 +16,20 @@ abstract class ProductRepository {
     String productId,
     ReorganizeProposal proposal,
   );
+
+  /// Product References Management
+  Future<Either<Failure, List<Reference>>> getProductReferences(
+    String productId,
+  );
+  Future<Either<Failure, Reference>> addProductReference({
+    required String productId,
+    required ReferenceType type,
+    required String content,
+    String? title,
+  });
+  Future<Either<Failure, void>> deleteProductReference({
+    required String productId,
+    required String referenceId,
+    String? taskId,
+  });
 }

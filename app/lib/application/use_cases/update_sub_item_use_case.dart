@@ -7,12 +7,14 @@ import 'use_case.dart';
 class UpdateSubItemParams {
   final String taskId;
   final String subItemId;
-  final bool completed;
+  final bool? completed;
+  final String? content;
 
   const UpdateSubItemParams({
     required this.taskId,
     required this.subItemId,
-    required this.completed,
+    this.completed,
+    this.content,
   });
 }
 
@@ -27,7 +29,8 @@ class UpdateSubItemUseCase extends UseCase<void, UpdateSubItemParams> {
     return await repository.updateSubItem(
       params.taskId,
       params.subItemId,
-      params.completed,
+      completed: params.completed,
+      content: params.content,
     );
   }
 }

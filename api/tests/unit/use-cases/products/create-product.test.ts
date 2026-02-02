@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { CreateProductUseCase } from '@/application/use-cases/products/create-product'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
+import { VALID_USER_ID, VALID_AREA_ID, VALID_PRODUCT_ID } from '../../../helpers/test-uuids'
 
 // Mock Prisma
 vi.mock('@/lib/db', () => ({
@@ -33,7 +34,7 @@ describe('CreateProductUseCase', () => {
       await expect(
         useCase.execute({
           userId: '',
-          areaId: 'area-123',
+          areaId: VALID_AREA_ID,
           name: 'Test Product',
         })
       ).rejects.toThrow(ValidationException)
@@ -42,7 +43,7 @@ describe('CreateProductUseCase', () => {
     it('應該拋出錯誤當 areaId 為空', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
+          userId: VALID_USER_ID,
           areaId: '',
           name: 'Test Product',
         })
@@ -52,8 +53,8 @@ describe('CreateProductUseCase', () => {
     it('應該拋出錯誤當 name 為空', async () => {
       await expect(
         useCase.execute({
-          userId: 'user-123',
-          areaId: 'area-123',
+          userId: VALID_USER_ID,
+          areaId: VALID_AREA_ID,
           name: '',
         })
       ).rejects.toThrow(ValidationException)
@@ -64,8 +65,8 @@ describe('CreateProductUseCase', () => {
 
       await expect(
         useCase.execute({
-          userId: 'user-123',
-          areaId: 'area-123',
+          userId: VALID_USER_ID,
+          areaId: VALID_AREA_ID,
           name: 'Test Product',
         })
       ).rejects.toThrow(NotFoundException)
@@ -75,8 +76,8 @@ describe('CreateProductUseCase', () => {
   describe('成功情況', () => {
     it('應該成功創建 Product', async () => {
       const mockArea = {
-        id: 'area-123',
-        user_id: 'user-123',
+        id: VALID_AREA_ID,
+        user_id: VALID_USER_ID,
         name: 'Test Area',
         scope: 'work',
         description: null,
@@ -86,9 +87,9 @@ describe('CreateProductUseCase', () => {
       }
 
       const mockProduct = {
-        id: 'product-123',
-        user_id: 'user-123',
-        area_id: 'area-123',
+        id: VALID_PRODUCT_ID,
+        user_id: VALID_USER_ID,
+        area_id: VALID_AREA_ID,
         name: 'Test Product',
         description: null,
         status: 'ACTIVE' as const,
@@ -105,8 +106,8 @@ describe('CreateProductUseCase', () => {
       vi.mocked(prisma.product.create).mockResolvedValue(mockProduct)
 
       const result = await useCase.execute({
-        userId: 'user-123',
-        areaId: 'area-123',
+        userId: VALID_USER_ID,
+        areaId: VALID_AREA_ID,
         name: 'Test Product',
         description: 'Test description',
       })

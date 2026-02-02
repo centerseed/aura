@@ -12,6 +12,7 @@ import { zhTW } from "date-fns/locale";
 import type { Milestone, MilestoneStatus, EntityType } from "@/types";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 
 interface MilestoneModalProps {
   isOpen: boolean;
@@ -70,20 +71,21 @@ export function MilestoneModal({
 
   // 根據 entityType 獲取可選實體列表
   const getEntityOptions = () => {
+    const safeAreas = Array.isArray(areas) ? areas : [];
     if (entityType === "AREA") {
-      return areas.map((area) => ({ id: area.id, name: area.name }));
+      return safeAreas.map((area) => ({ id: area.id, name: area.name }));
     } else if (entityType === "PRODUCT") {
-      return areas.flatMap((area) =>
-        area.products.map((product) => ({
+      return safeAreas.flatMap((area) =>
+        (Array.isArray(area.products) ? area.products : []).map((product) => ({
           id: product.id,
           name: `${area.name} / ${product.name}`,
         }))
       );
     } else {
       // TOPIC
-      return areas.flatMap((area) =>
-        area.products.flatMap((product) =>
-          (product.topics || []).map((topic) => ({
+      return safeAreas.flatMap((area) =>
+        (Array.isArray(area.products) ? area.products : []).flatMap((product) =>
+          (Array.isArray(product.topics) ? product.topics : []).map((topic) => ({
             id: topic.id,
             name: `${area.name} / ${product.name} / ${topic.name}`,
           }))
@@ -181,7 +183,7 @@ export function MilestoneModal({
       }
       const token = await user.getIdToken();
 
-      const res = await fetch(`/api/milestones/${editingMilestone.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/milestones/${editingMilestone.id}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`,

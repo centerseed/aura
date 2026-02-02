@@ -70,13 +70,13 @@ describe('GetCurrentUserUseCase', () => {
         firebaseUid: 'firebase-uid-123',
       })
 
-      expect(result.id).toBe('user-123')
-      expect(result.email).toBe('test@example.com')
-      expect(result.name).toBe('Test User')
-      expect(result.displayName).toBe('Test User')
-      expect(result.auth_provider).toBe('google')
-      expect(result.areas.length).toBe(1)
-      expect(result.hasAreas).toBe(true)
+      expect(result.user.id).toBe('user-123')
+      expect(result.user.email).toBe('test@example.com')
+      expect(result.user.name).toBe('Test User')
+      expect(result.user.displayName).toBe('Test User')
+      expect(result.user.auth_provider).toBe('google')
+      expect(result.user.areas.length).toBe(1)
+      expect(result.user.hasAreas).toBe(true)
     })
 
     it('應該使用 email 作為 displayName 當沒有 name', async () => {
@@ -96,8 +96,8 @@ describe('GetCurrentUserUseCase', () => {
         firebaseUid: 'firebase-uid-123',
       })
 
-      expect(result.displayName).toBe('test@example.com')
-      expect(result.hasAreas).toBe(false)
+      expect(result.user.displayName).toBe('test@example.com')
+      expect(result.user.hasAreas).toBe(false)
     })
   })
 })

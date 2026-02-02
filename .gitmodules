@@ -1,0 +1,3 @@
+[submodule "packages/flutter_dual_cache"]
+	path = packages/flutter_dual_cache
+	url = https://github.com/centerseed/flutter_dual_cache.git

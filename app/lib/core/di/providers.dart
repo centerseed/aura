@@ -1,17 +1,19 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dual_cache/flutter_dual_cache.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../config/app_config.dart';
+import '../../domain/entities/task.dart';
+import '../../domain/entities/area.dart';
+import '../../domain/entities/product.dart';
 import '../network/auth_interceptor.dart';
 import '../network/logging_interceptor.dart';
 import '../../data/datasources/remote/api_client.dart';
-import '../../data/repositories/area_repository_impl.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/repositories/brain_dump_repository_impl.dart';
-import '../../data/repositories/product_repository_impl.dart';
-import '../../data/repositories/task_repository_impl.dart';
+import '../../data/repositories/unified/unified_repositories.dart';
 import '../../data/datasources/local/task_local_datasource.dart';
 import '../../data/datasources/local/area_local_datasource.dart';
 import '../../data/datasources/local/product_local_datasource.dart';
@@ -20,13 +22,20 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/brain_dump_repository.dart';
 import '../../domain/repositories/product_repository.dart';
 import '../../domain/repositories/task_repository.dart';
+import '../../application/use_cases/add_product_reference_use_case.dart';
+import '../../application/use_cases/add_sub_item_use_case.dart';
+import '../../application/use_cases/apply_reorganization_use_case.dart';
 import '../../application/use_cases/create_task_use_case.dart';
+import '../../application/use_cases/delete_product_reference_use_case.dart';
+import '../../application/use_cases/delete_sub_item_use_case.dart';
 import '../../application/use_cases/delete_task_use_case.dart';
 import '../../application/use_cases/get_active_tasks_use_case.dart';
 import '../../application/use_cases/get_areas_use_case.dart';
 import '../../application/use_cases/get_completed_today_tasks_use_case.dart';
 import '../../application/use_cases/get_products_use_case.dart';
 import '../../application/use_cases/get_tasks_use_case.dart';
+import '../../application/use_cases/reorder_sub_items_use_case.dart';
+import '../../application/use_cases/reorganize_product_topics_use_case.dart';
 import '../../application/use_cases/submit_brain_dump_use_case.dart';
 import '../../application/use_cases/update_sub_item_use_case.dart';
 import '../../application/use_cases/update_task_details_use_case.dart';
@@ -129,16 +138,18 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepositoryImpl(firebaseAuth, apiClient);
 });
 
-/// Area Repository Provider
+/// Area Repository Provider (統一版本 - 內建快取)
 final areaRepositoryProvider = Provider<AreaRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return AreaRepositoryImpl(apiClient);
+  ref.keepAlive(); // 保持快取存活
+  return AreaUnifiedRepository(apiClient);
 });
 
-/// Task Repository Provider
+/// Task Repository Provider (統一版本 - 內建快取)
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return TaskRepositoryImpl(apiClient);
+  ref.keepAlive(); // 保持快取存活
+  return TaskUnifiedRepository(apiClient);
 });
 
 /// Brain Dump Repository Provider
@@ -147,10 +158,11 @@ final brainDumpRepositoryProvider = Provider<BrainDumpRepository>((ref) {
   return BrainDumpRepositoryImpl(apiClient);
 });
 
-/// Product Repository Provider
+/// Product Repository Provider (統一版本 - 內建快取)
 final productRepositoryProvider = Provider<ProductRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return ProductRepositoryImpl(apiClient);
+  ref.keepAlive(); // 保持快取存活
+  return ProductUnifiedRepository(apiClient);
 });
 
 // ==================== Use Case Providers ====================
@@ -205,6 +217,24 @@ final updateSubItemUseCaseProvider = Provider<UpdateSubItemUseCase>((ref) {
   return UpdateSubItemUseCase(repository);
 });
 
+/// Add Sub Item Use Case Provider
+final addSubItemUseCaseProvider = Provider<AddSubItemUseCase>((ref) {
+  final repository = ref.watch(taskRepositoryProvider);
+  return AddSubItemUseCase(repository);
+});
+
+/// Delete Sub Item Use Case Provider
+final deleteSubItemUseCaseProvider = Provider<DeleteSubItemUseCase>((ref) {
+  final repository = ref.watch(taskRepositoryProvider);
+  return DeleteSubItemUseCase(repository);
+});
+
+/// Reorder Sub Items Use Case Provider
+final reorderSubItemsUseCaseProvider = Provider<ReorderSubItemsUseCase>((ref) {
+  final repository = ref.watch(taskRepositoryProvider);
+  return ReorderSubItemsUseCase(repository);
+});
+
 /// Get Areas Use Case Provider
 final getAreasUseCaseProvider = Provider<GetAreasUseCase>((ref) {
   final repository = ref.watch(areaRepositoryProvider);
@@ -217,11 +247,69 @@ final getProductsUseCaseProvider = Provider<GetProductsUseCase>((ref) {
   return GetProductsUseCase(repository);
 });
 
+/// Reorganize Product Topics Use Case Provider
+final reorganizeProductTopicsUseCaseProvider =
+    Provider<ReorganizeProductTopicsUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return ReorganizeProductTopicsUseCase(productRepository: repository);
+});
+
+/// Apply Reorganization Use Case Provider
+final applyReorganizationUseCaseProvider =
+    Provider<ApplyReorganizationUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return ApplyReorganizationUseCase(productRepository: repository);
+});
+
 /// Submit Brain Dump Use Case Provider
 final submitBrainDumpUseCaseProvider =
     Provider<SubmitBrainDumpUseCase>((ref) {
   final repository = ref.watch(brainDumpRepositoryProvider);
   return SubmitBrainDumpUseCase(repository);
+});
+
+/// Add Product Reference Use Case Provider
+final addProductReferenceUseCaseProvider =
+    Provider<AddProductReferenceUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return AddProductReferenceUseCase(repository);
+});
+
+/// Delete Product Reference Use Case Provider
+final deleteProductReferenceUseCaseProvider =
+    Provider<DeleteProductReferenceUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return DeleteProductReferenceUseCase(repository);
+});
+
+// ==================== Cached Stream Providers ====================
+// 注意: 統一 Repository 已經內建快取功能,直接使用即可
+
+/// Stream of cached tasks state (for UI binding)
+///
+/// 直接從 TaskUnifiedRepository 獲取快取 Stream
+final cachedTasksStreamProvider =
+    StreamProvider<CacheState<List<Task>>>((ref) {
+  final repo = ref.watch(taskRepositoryProvider) as TaskUnifiedRepository;
+  return repo.stream;
+});
+
+/// Stream of cached areas state (for UI binding)
+///
+/// 直接從 AreaUnifiedRepository 獲取快取 Stream
+final cachedAreasStreamProvider =
+    StreamProvider<CacheState<List<Area>>>((ref) {
+  final repo = ref.watch(areaRepositoryProvider) as AreaUnifiedRepository;
+  return repo.stream;
+});
+
+/// Stream of cached products state (for UI binding)
+///
+/// 直接從 ProductUnifiedRepository 獲取快取 Stream
+final cachedProductsStreamProvider =
+    StreamProvider<CacheState<List<Product>>>((ref) {
+  final repo = ref.watch(productRepositoryProvider) as ProductUnifiedRepository;
+  return repo.stream;
 });
 
 // ==================== Initialization ====================

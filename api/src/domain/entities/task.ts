@@ -219,13 +219,6 @@ export class Task {
    * 設定截止日期
    */
   setDueDate(dueDate: Date | null): void {
-    // 業務規則：只有 ACTIVE 任務可以設定截止日期
-    if (dueDate && !this._status.canHaveDueDate()) {
-      throw new ConflictException(
-        `Only ACTIVE tasks can have a due date. Current status: ${this.status}`
-      )
-    }
-
     // 業務規則：截止日期不能早於開始日期
     if (dueDate && this.startDate && dueDate < this.startDate) {
       throw new ValidationException(

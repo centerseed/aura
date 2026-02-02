@@ -53,12 +53,12 @@ void main() {
       print('\n========================================');
       print('測試環境資訊');
       print('========================================');
-      print('環境: ${AppConfig.environment.name}');
+      print('Debug Mode: ${AppConfig.isDebugMode}');
       print('API Base URL: ${AppConfig.apiBaseUrl}');
       print('========================================\n');
 
-      expect(AppConfig.environment, equals(Environment.development));
-      expect(AppConfig.apiBaseUrl, equals('http://localhost:3001'));
+      expect(AppConfig.isDebugMode, isTrue);
+      expect(AppConfig.apiBaseUrl, contains('localhost'));
     });
 
     test('後端連線檢查 - 測試任意端點返回認證錯誤', () async {

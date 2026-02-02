@@ -72,7 +72,7 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
 
   // 初始展開所有 Areas
   useEffect(() => {
-    if (dataHook.areas.length > 0 && expandedAreas.size === 0) {
+    if (Array.isArray(dataHook.areas) && dataHook.areas.length > 0 && expandedAreas.size === 0) {
       setExpandedAreas(new Set(dataHook.areas.map((a) => a.name)))
     }
   }, [dataHook.areas, expandedAreas.size])

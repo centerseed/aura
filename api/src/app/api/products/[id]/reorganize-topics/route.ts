@@ -282,7 +282,7 @@ function buildReorganizePrompt(context: {
 }): string {
   // 精簡 Tasks 列表格式（包含 sub_items 資訊）
   const tasksCompact = context.tasks.map((t, idx) => {
-    let line = `${idx + 1}. [${t.id}] ${t.content}${t.narrative ? ` - ${t.narrative.slice(0, 50)}` : ''} (${t.current_topic})`;
+    let line = `${idx + 1}. [${t.id}] ${t.content}${t.narrative ? ` - ${t.narrative}` : ''} (${t.current_topic})`;
 
     // 如果有 sub_items，顯示摘要
     if (t.has_sub_items) {

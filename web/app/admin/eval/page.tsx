@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,7 +58,7 @@ export default function EvaluationDashboard() {
         // 使用 Firebase ID Token 查詢資料庫中的用戶 ID
         try {
           const token = await user.getIdToken();
-          const meRes = await fetch('/api/me', {
+          const meRes = await fetch(`${API_BASE_URL}/api/me`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -92,7 +93,7 @@ export default function EvaluationDashboard() {
       if (filterAction) params.append("userAction", filterAction);
 
       const authHeaders = await getAuthHeaders();
-      const res = await fetch(`/api/evaluation/logs?${params.toString()}`, {
+      const res = await fetch(`${API_BASE_URL}/api/evaluation/logs?${params.toString()}`, {
         headers: authHeaders
       });
       const data = await res.json();

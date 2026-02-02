@@ -42,7 +42,6 @@ export interface StructuredItem {
   due_date_source?: SourceAttribution
   inferred_from_milestone?: string
   time_confidence?: number
-  time_reasoning?: string
   sub_items?: SubItem[]
 }
 
@@ -54,12 +53,50 @@ export interface BrainDumpDTO {
 }
 
 /**
- * Brain Dump 響應
+ * 追加到現有任務的 sub-item 結構
  */
-export interface BrainDumpResponse {
+export interface AppendedSubItem {
+  id: string
+  content: string
+  completed: boolean
+  created_at: string
+  completed_at: string | null
+  order: number
+}
+
+/**
+ * 目標任務資訊
+ */
+export interface TargetTask {
+  id: string
+  content: string
+  product: string
+}
+
+/**
+ * Brain Dump 響應 - 創建新任務
+ */
+export interface CreateNewTasksResponse {
   success: boolean
+  action: 'create_new_tasks'
   items: StructuredItem[]
 }
+
+/**
+ * Brain Dump 響應 - 追加 sub-item
+ */
+export interface AppendSubItemResponse {
+  success: boolean
+  action: 'append_sub_item'
+  target_task: TargetTask
+  appended_sub_items: AppendedSubItem[]
+  reasoning: string
+}
+
+/**
+ * Brain Dump 響應（判別聯合類型）
+ */
+export type BrainDumpResponse = CreateNewTasksResponse | AppendSubItemResponse
 
 /**
  * Brain Dump API 客戶端

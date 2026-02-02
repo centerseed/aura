@@ -9,7 +9,7 @@ class TaskModel with _$TaskModel {
   const factory TaskModel({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
-    @JsonKey(name: 'product_id') required String productId,
+    @JsonKey(name: 'product_id') String? productId,
     @JsonKey(name: 'topic_id') String? topicId,
     required String content,
     required String status,

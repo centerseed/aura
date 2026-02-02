@@ -31,12 +31,16 @@ class TaskRepositoryImpl implements TaskRepository {
   }
 
   @override
-  Future<Either<Failure, Task>> createTask(String content) async {
+  Future<Either<Failure, Task>> createTask(String content, {String? productId}) async {
     try {
-      final model = await _apiClient.createTask({
+      final body = <String, dynamic>{
         'content': content,
         'status': 'INBOX', // Default status
-      });
+      };
+      if (productId != null) {
+        body['product_id'] = productId;
+      }
+      final model = await _apiClient.createTask(body);
       return Right(model.toEntity());
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -58,23 +62,39 @@ class TaskRepositoryImpl implements TaskRepository {
   @override
   Future<Either<Failure, Task>> updateTaskDetails({
     required String taskId,
+    String? content,
     TaskStatus? status,
+    DateTime? startDate,
     DateTime? dueDate,
     String? productId,
+    String? topicId,
+    double? timeConfidence,
     List<String>? tags,
   }) async {
     try {
       // 構建請求體,只包含非 null 的欄位
       final requestBody = <String, dynamic>{};
 
+      if (content != null) {
+        requestBody['content'] = content;
+      }
       if (status != null) {
         requestBody['status'] = status.name.toUpperCase();
+      }
+      if (startDate != null) {
+        requestBody['start_date'] = startDate.toUtc().toIso8601String();
       }
       if (dueDate != null) {
         requestBody['due_date'] = dueDate.toUtc().toIso8601String();
       }
       if (productId != null) {
         requestBody['product_id'] = productId;
+      }
+      if (topicId != null) {
+        requestBody['topic_id'] = topicId;
+      }
+      if (timeConfidence != null) {
+        requestBody['time_confidence'] = timeConfidence;
       }
       if (tags != null) {
         requestBody['tags'] = tags;
@@ -100,13 +120,59 @@ class TaskRepositoryImpl implements TaskRepository {
   @override
   Future<Either<Failure, void>> updateSubItem(
     String taskId,
-    String subItemId,
-    bool completed,
+    String subItemId, {
+    bool? completed,
+    String? content,
+  }) async {
+    try {
+      final requestBody = <String, dynamic>{};
+      if (completed != null) {
+        requestBody['completed'] = completed;
+      }
+      if (content != null) {
+        requestBody['content'] = content;
+      }
+
+      await _apiClient.updateSubItem(taskId, subItemId, requestBody);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addSubItem(
+    String taskId,
+    String content,
   ) async {
     try {
-      await _apiClient.updateSubItem(taskId, subItemId, {
-        'completed': completed,
-      });
+      await _apiClient.addSubItem(taskId, content);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteSubItem(
+    String taskId,
+    String subItemId,
+  ) async {
+    try {
+      await _apiClient.deleteSubItem(taskId, subItemId);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> reorderSubItems(
+    String taskId,
+    List<String> subItemIds,
+  ) async {
+    try {
+      await _apiClient.reorderSubItems(taskId, subItemIds);
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));

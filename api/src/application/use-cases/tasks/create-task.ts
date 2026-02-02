@@ -19,7 +19,7 @@ import { ValidationException } from '@/lib/api-response'
 
 export interface CreateTaskRequest {
   userId: string
-  productId: string
+  productId?: string | null
   topicId?: string | null
   content: string
   status?: string
@@ -53,7 +53,7 @@ export class CreateTaskUseCase {
     // 3. 準備任務資料
     const taskData: Omit<TaskData, 'id' | 'createdAt' | 'updatedAt'> = {
       userId: request.userId,
-      productId: request.productId,
+      productId: request.productId || null,
       topicId: request.topicId || null,
       content: request.content.trim(),
       status,
@@ -86,15 +86,19 @@ export class CreateTaskUseCase {
       throw new ValidationException('User ID is required', 'userId')
     }
 
-    if (!request.productId) {
-      throw new ValidationException('Product ID is required', 'productId')
-    }
+    // productId 為可選: INBOX 任務可以不指定 product
+    // 但如果提供了,必須是有效的 UUID (不接受空字串)
+    if (request.productId !== undefined && request.productId !== null) {
+      if (!request.productId.trim()) {
+        throw new ValidationException('Product ID cannot be empty', 'productId')
+      }
 
-    // 驗證 UUID 格式
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(request.productId)) {
-      throw new ValidationException('Invalid Product ID format', 'productId')
+      // 驗證 UUID 格式
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(request.productId)) {
+        throw new ValidationException('Invalid Product ID format', 'productId')
+      }
     }
 
     if (!request.content || request.content.trim().length === 0) {

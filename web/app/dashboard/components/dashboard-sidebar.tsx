@@ -98,10 +98,10 @@ export function DashboardSidebar({
           <div className="h-px bg-white/10 my-3" />
 
           {/* Areas */}
-          {areas.map((area) => {
+          {(Array.isArray(areas) ? areas : []).map((area) => {
             const isExpanded = expandedAreas.has(area.name)
-            const taskCount = area.products.reduce(
-              (sum, p) => sum + p.tasks.filter((t) => showArchive || t.drawer !== 'ARCHIVE').length,
+            const taskCount = (Array.isArray(area.products) ? area.products : []).reduce(
+              (sum, p) => sum + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => showArchive || t.drawer !== 'ARCHIVE').length,
               0
             )
 

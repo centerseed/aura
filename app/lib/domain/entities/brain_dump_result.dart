@@ -18,6 +18,8 @@ class BrainDumpResultItem extends Equatable {
   final String areaName;
   final String productName;
   final String? topicName;
+  final String? strategyUsed;
+  final String? reasoning;
   final DateTime? dueDate;
   final double? timeConfidence;
   final String? timeReasoning;
@@ -30,6 +32,8 @@ class BrainDumpResultItem extends Equatable {
     required this.areaName,
     required this.productName,
     this.topicName,
+    this.strategyUsed,
+    this.reasoning,
     this.dueDate,
     this.timeConfidence,
     this.timeReasoning,
@@ -44,6 +48,8 @@ class BrainDumpResultItem extends Equatable {
     areaName,
     productName,
     topicName,
+    strategyUsed,
+    reasoning,
     dueDate,
     timeConfidence,
     timeReasoning,

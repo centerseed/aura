@@ -42,8 +42,9 @@ export function useDashboardData() {
    */
   const loadCompletedToday = useCallback(async () => {
     try {
-      const tasks = await API.tasks.list({ completed_today: 'true' })
-      setCompletedTodayTasks(tasks)
+      // API 回傳格式: { tasks: [...] }
+      const result = await API.tasks.list({ completed_today: 'true' })
+      setCompletedTodayTasks(result.tasks || [])
     } catch (err) {
       console.error('Failed to load completed today tasks:', err)
     }
@@ -59,8 +60,9 @@ export function useDashboardData() {
       const twoWeeksAgo = new Date()
       twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
       const fromDate = twoWeeksAgo.toISOString()
-      const tasks = await API.tasks.list({ status: 'ARCHIVE', from: fromDate })
-      setRecentArchivedTasks(tasks)
+      // API 回傳格式: { tasks: [...] }
+      const result = await API.tasks.list({ status: 'ARCHIVE', from: fromDate })
+      setRecentArchivedTasks(result.tasks || [])
       setArchivedLoaded(true)
     } catch (err) {
       console.error('Failed to load archived tasks:', err)
@@ -74,14 +76,14 @@ export function useDashboardData() {
    */
   const refreshData = useCallback(async () => {
     try {
-      // 並行載入 library 和 milestones
+      // 並行載入 library 和 milestones (API 回傳格式: { areas: [...] }, { milestones: [...] })
       const [libraryData, milestonesData] = await Promise.all([
         API.library(),
         API.milestones.list(),
       ])
 
-      setAreas(libraryData)
-      setMilestones(milestonesData)
+      setAreas(Array.isArray(libraryData?.areas) ? libraryData.areas : [])
+      setMilestones(Array.isArray(milestonesData?.milestones) ? milestonesData.milestones : [])
 
       // 重新載入今日完成
       loadCompletedToday()
@@ -110,19 +112,20 @@ export function useDashboardData() {
           }
 
           try {
-            // 獲取用戶資料
-            const userData = await API.users.me()
+            // 獲取用戶資料 (API 回傳格式: { user: { id, email, displayName, ... } })
+            const meResult = await API.users.me()
+            const user = meResult.user
 
-            setUserId(userData.id)
-            setUserName(userData.displayName || userData.name || userData.email || 'User')
+            setUserId(user.id)
+            setUserName(user.displayName || user.name || user.email || 'User')
 
-            // 獲取 Library
+            // 獲取 Library (API 回傳格式: { areas: [...] })
             const libraryData = await API.library()
-            setAreas(libraryData)
+            setAreas(Array.isArray(libraryData?.areas) ? libraryData.areas : [])
 
-            // 獲取 Milestones
+            // 獲取 Milestones (API 回傳格式: { milestones: [...] })
             const milestonesData = await API.milestones.list()
-            setMilestones(milestonesData)
+            setMilestones(milestonesData.milestones || [])
           } catch (err) {
             setError(err instanceof Error ? err.message : '載入失敗')
           } finally {
@@ -152,16 +155,17 @@ export function useDashboardData() {
    */
   const stats: DashboardStats = {
     total: (() => {
+      if (!Array.isArray(areas)) return 0
       const now = new Date()
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
       return areas.reduce(
         (sum, area) =>
           sum +
-          area.products.reduce(
+          (Array.isArray(area.products) ? area.products : []).reduce(
             (ps, p) =>
               ps +
-              p.tasks.filter((t) => {
+              (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => {
                 if (t.drawer === 'ARCHIVE') return false
                 if (!t.due_date) return false
                 const dueDate = new Date(t.due_date)
@@ -172,33 +176,35 @@ export function useDashboardData() {
         0
       )
     })(),
-    active: areas.reduce(
+    active: Array.isArray(areas) ? areas.reduce(
       (sum, area) =>
         sum +
-        area.products.reduce(
-          (ps, p) => ps + p.tasks.filter((t) => t.drawer === 'ACTIVE').length,
+        (Array.isArray(area.products) ? area.products : []).reduce(
+          (ps, p) => ps + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t.drawer === 'ACTIVE').length,
           0
         ),
       0
-    ),
-    archived: areas.reduce(
+    ) : 0,
+    archived: Array.isArray(areas) ? areas.reduce(
       (sum, area) =>
         sum +
-        area.products.reduce(
-          (ps, p) => ps + p.tasks.filter((t) => t.drawer === 'ARCHIVE').length,
+        (Array.isArray(area.products) ? area.products : []).reduce(
+          (ps, p) => ps + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t.drawer === 'ARCHIVE').length,
           0
         ),
       0
-    ),
-    areas: areas.length,
-    products: areas.reduce((sum, area) => sum + area.products.length, 0),
+    ) : 0,
+    areas: Array.isArray(areas) ? areas.length : 0,
+    products: Array.isArray(areas) ? areas.reduce((sum, area) => sum + (Array.isArray(area.products) ? area.products.length : 0), 0) : 0,
   }
 
   /**
    * 檢查是否有任務（用於歡迎模式判斷）
    */
-  const hasTasks = areas.some((a) =>
-    a.products.some((p) => p.tasks.filter((t) => t.drawer !== 'ARCHIVE').length > 0)
+  const hasTasks = Array.isArray(areas) && areas.some((a) =>
+    Array.isArray(a.products) && a.products.some((p) =>
+      Array.isArray(p.tasks) && p.tasks.filter((t) => t.drawer !== 'ARCHIVE').length > 0
+    )
   )
 
   // 組合資料狀態

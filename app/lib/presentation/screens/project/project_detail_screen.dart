@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../../domain/entities/product.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/reorganize_provider.dart';
-import '../../providers/provider_extensions.dart';
 
 import '../../../domain/entities/reorganize_proposal.dart';
 import '../dashboard/widgets/task_edit_bottom_sheet.dart';
@@ -17,7 +16,7 @@ class ProjectDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tasksAsync = ref.watch(activeTasksProvider).unwrap();
+    final taskState = ref.watch(activeTasksProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -61,36 +60,54 @@ class ProjectDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: tasksAsync.when(
-        data: (tasks) {
-          final projectTasks = tasks
-              .where((t) => t.productId == product.id)
-              .toList();
+      body: _buildBody(context, ref, taskState),
+    );
+  }
 
-          if (projectTasks.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.task_alt_rounded,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "專案內無待辦事項",
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+  Widget _buildBody(BuildContext context, WidgetRef ref, TaskDataState taskState) {
+    // Loading state
+    if (taskState.showLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Error state
+    if (taskState.hasError) {
+      return Center(child: Text("載入錯誤: ${taskState.error}"));
+    }
+
+    // Data state
+    if (!taskState.hasData) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final projectTasks = taskState.tasks!
+        .where((t) => t.productId == product.id)
+        .toList();
+
+    if (projectTasks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.task_alt_rounded,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "專案內無待辦事項",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                fontSize: 16,
               ),
-            );
-          }
+            ),
+          ],
+        ),
+      );
+    }
 
-          return ListView.builder(
+    return ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             itemCount: projectTasks.length,
             itemBuilder: (context, index) {
@@ -271,11 +288,6 @@ class ProjectDetailScreen extends ConsumerWidget {
                       );
             },
           );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text("Load Error")),
-      ),
-    );
   }
 
   void _showAIMagicSheet(BuildContext context) {
@@ -716,9 +728,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text("已套用重組建議")),
                         );
-                        // Refresh tasks
-                        // ignore: unused_result
-                        ref.refresh(activeTasksProvider);
+                        // repository 會自動靜默刷新快取
                       }
                     },
               style: ElevatedButton.styleFrom(

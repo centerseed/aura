@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/api-client";
 
 interface ProcessedItem {
   id: string;
@@ -37,9 +38,41 @@ interface ProcessedItem {
   // 時間推斷資訊
   due_date?: string | null;
   time_confidence?: number | null;
-  time_reasoning?: string | null;
+  due_date_source?: {
+    source_type: 'explicit' | 'inferred_from_context' | 'inferred_from_system';
+    confidence: number;
+    reasoning: string;
+  } | null;
   inferred_from_milestone?: string | null;
 }
+
+// Brain Dump API 回應類型
+interface AppendedSubItem {
+  id: string;
+  content: string;
+  completed: boolean;
+  created_at: string;
+  completed_at: string | null;
+  order: number;
+}
+
+interface BrainDumpCreateNewTasksResponse {
+  action: 'create_new_tasks';
+  items: ProcessedItem[];
+}
+
+interface BrainDumpAppendSubItemResponse {
+  action: 'append_sub_item';
+  target_task: {
+    id: string;
+    content: string;
+    product: string;
+  };
+  appended_sub_items: AppendedSubItem[];
+  reasoning: string;
+}
+
+type BrainDumpResponse = BrainDumpCreateNewTasksResponse | BrainDumpAppendSubItemResponse;
 
 interface AdjustStructuredOperation {
   type: "move" | "change_topic";
@@ -111,6 +144,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [adjustmentResult, setAdjustmentResult] = useState<AdjustmentResult | null>(null);
+  const [appendResult, setAppendResult] = useState<BrainDumpAppendSubItemResponse | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<{
     type: "adjust" | "reorganize";
@@ -130,8 +164,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   const [isComposing, setIsComposing] = useState(false);
 
   // 從 areas 提取所有 products（帶有 area 資訊）
-  const allProducts = areas.flatMap(area =>
-    area.products.map(product => ({
+  const allProducts = (Array.isArray(areas) ? areas : []).flatMap(area =>
+    (Array.isArray(area.products) ? area.products : []).map(product => ({
       id: product.id,
       name: product.name,
       areaName: area.name,
@@ -267,6 +301,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     setShowResults(true);
     setProcessedItems([]);
     setAdjustmentResult(null);
+    setAppendResult(null);
 
     try {
       // 獲取 Firebase token
@@ -276,9 +311,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }
       const token = await user.getIdToken();
 
-      // 純歸檔模式：直接創建新 Task，不做調整判斷
-      // 調整標籤功能已移至「整理標籤」按鈕和 Product 層級的重組功能
-      const res = await fetch("/api/brain-dump", {
+      const res = await fetch(`${API_BASE_URL}/api/brain-dump`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -291,8 +324,15 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         throw new Error("AI 處理失敗");
       }
 
-      const data = await res.json();
-      setProcessedItems(data.items || []);
+      const data: BrainDumpResponse = await res.json();
+
+      // 根據 action 類型處理回應
+      if (data.action === 'create_new_tasks') {
+        setProcessedItems(data.items || []);
+      } else if (data.action === 'append_sub_item') {
+        setAppendResult(data);
+      }
+
       setInput("");
 
       // 通知父組件刷新數據
@@ -302,6 +342,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       setTimeout(() => {
         setShowResults(false);
         setProcessedItems([]);
+        setAppendResult(null);
       }, 5000);
     } catch (err) {
       console.error("Quick capture failed:", err);
@@ -329,7 +370,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
 
       if (pendingOperation.type === "adjust") {
         // 執行調整操作
-        const res = await fetch("/api/adjust-tags", {
+        const res = await fetch(`${API_BASE_URL}/api/adjust-tags`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -448,7 +489,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
               </div>
             </div>
 
-            {/* 處理結果顯示 */}
+            {/* 處理結果顯示 - 創建新任務 */}
             {showResults && processedItems.length > 0 && (
               <div className="max-h-64 overflow-y-auto border-b border-white/10">
                 <div className="p-4 space-y-2">
@@ -463,7 +504,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
                       <h4 className="font-medium text-white text-sm mb-1">{item.title}</h4>
-                      <div className="flex items-center gap-1.5 text-xs text-white/50">
+                      <div className="flex items-center gap-1.5 text-xs text-white/50 mb-2">
                         <FolderOpen className="w-3 h-3" />
                         <span className="text-indigo-400">{item.tag.area}</span>
                         <span className="text-white/30">/</span>
@@ -473,8 +514,58 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                         <Tag className="w-3 h-3" />
                         <span className="text-green-400">{item.tag.topic}</span>
                       </div>
+                      {/* AI 思考過程 */}
+                      {item.reasoning && (
+                        <div className="text-xs text-white/40 bg-white/5 rounded-md p-2">
+                          <span className="text-indigo-400/70">AI 思考：</span> {item.reasoning}
+                        </div>
+                      )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* 處理結果顯示 - 追加 sub-item */}
+            {showResults && appendResult && (
+              <div className="max-h-64 overflow-y-auto border-b border-white/10">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-blue-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>已追加 {appendResult.appended_sub_items.length} 個待辦事項</span>
+                  </div>
+
+                  {/* 目標任務 */}
+                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs text-blue-300 font-medium">追加到任務</span>
+                    </div>
+                    <p className="text-sm text-white">{appendResult.target_task.content}</p>
+                  </div>
+
+                  {/* 新增的 sub-items */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/50 font-medium">新增的待辦事項：</p>
+                    {appendResult.appended_sub_items.map((subItem, index) => (
+                      <div
+                        key={subItem.id}
+                        className="p-2 rounded-lg bg-white/5 border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                        style={{ animationDelay: `${index * 100}ms` }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-white/40">☐</span>
+                          <span className="text-sm text-white">{subItem.content}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* AI 思考 */}
+                  <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                    <p className="text-xs text-white/50 mb-1">AI 思考：</p>
+                    <p className="text-xs text-white/70">{appendResult.reasoning}</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -978,9 +1069,9 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             <button
               onClick={() => setShowResults(!showResults)}
               className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${
-                (processedItems.length > 0 || adjustmentResult) ? 'text-indigo-400' : 'text-white/30'
+                (processedItems.length > 0 || adjustmentResult || appendResult) ? 'text-indigo-400' : 'text-white/30'
               }`}
-              disabled={!processedItems.length && !adjustmentResult}
+              disabled={!processedItems.length && !adjustmentResult && !appendResult}
             >
               <ChevronDown className={`w-4 h-4 transition-transform ${showResults ? 'rotate-180' : ''}`} />
             </button>
@@ -1071,23 +1162,23 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                       <div>
                         <span className="text-indigo-400/70">分類思路：</span> {item.reasoning}
                       </div>
-                      {item.time_reasoning && (
+                      {item.due_date_source?.reasoning && (
                         <div className="border-t border-white/10 pt-1 mt-1">
                           <span className="text-blue-400/70">
                             <Clock className="w-3 h-3 inline mr-1" />
                             時間推斷：
                           </span>{" "}
-                          {item.time_reasoning}
-                          {item.time_confidence !== null && item.time_confidence !== undefined && (
+                          {item.due_date_source.reasoning}
+                          {item.due_date_source.confidence !== null && item.due_date_source.confidence !== undefined && (
                             <span
                               className={`ml-2 cursor-help ${
-                                item.time_confidence >= 0.8 ? "text-green-400/70" :
-                                item.time_confidence >= 0.5 ? "text-blue-400/70" :
+                                item.due_date_source.confidence >= 0.8 ? "text-green-400/70" :
+                                item.due_date_source.confidence >= 0.5 ? "text-blue-400/70" :
                                 "text-orange-400/70"
                               }`}
-                              title={`AI 時間推斷信心度：${Math.round(item.time_confidence * 100)}%\n\n此功能正在開發中\n${item.time_confidence < 0.6 ? '信心度較低，建議手動確認截止日期' : '系統根據 Milestone 與任務語意自動推斷'}`}
+                              title={`AI 時間推斷信心度：${Math.round(item.due_date_source.confidence * 100)}%\n\n此功能正在開發中\n${item.due_date_source.confidence < 0.6 ? '信心度較低，建議手動確認截止日期' : '系統根據 Milestone 與任務語意自動推斷'}`}
                             >
-                              (信心 {Math.round(item.time_confidence * 100)}%)
+                              (信心 {Math.round(item.due_date_source.confidence * 100)}%)
                             </span>
                           )}
                         </div>
@@ -1098,6 +1189,50 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
               })}
             </div>
           </div>
+          )}
+
+          {/* 處理結果顯示 - 追加 sub-item */}
+          {showResults && appendResult && (
+            <div className="max-h-64 overflow-y-auto border-b border-white/10">
+              <div className="p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-blue-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>已追加 {appendResult.appended_sub_items.length} 個待辦事項</span>
+                </div>
+
+                {/* 目標任務 */}
+                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FileText className="w-3 h-3 text-blue-400" />
+                    <span className="text-xs text-blue-300 font-medium">追加到任務</span>
+                  </div>
+                  <p className="text-xs text-white/90">{appendResult.target_task.content}</p>
+                </div>
+
+                {/* 新增的 sub-items */}
+                <div className="space-y-1.5">
+                  <p className="text-xs text-white/50 font-medium">新增的待辦事項：</p>
+                  {appendResult.appended_sub_items.map((subItem, index) => (
+                    <div
+                      key={subItem.id}
+                      className="p-2 rounded-lg bg-white/5 border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-white/40 text-xs">☐</span>
+                        <span className="text-xs text-white/90">{subItem.content}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* AI 思考 */}
+                <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+                  <p className="text-xs text-white/50 mb-1">AI 思考：</p>
+                  <p className="text-xs text-white/70">{appendResult.reasoning}</p>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* 處理結果顯示 - 標籤調整（對話框樣式）*/}

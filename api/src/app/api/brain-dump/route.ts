@@ -17,7 +17,7 @@ import { ApiResponseBuilder, catchDomainException, ValidationException } from "@
 
 // Sub-item 結構
 const SubItemSchema = z.object({
-  content: z.string().describe("Sub-item 內容"),
+  content: z.string().max(100).describe("Sub-item 內容（最多 100 字元）"),
 });
 
 // 來源歸因結構 (Source Attribution)
@@ -25,41 +25,56 @@ const SourceAttributionSchema = z.object({
   source_type: z.enum(["explicit", "inferred_from_context", "inferred_from_system"])
     .describe("explicit=用戶明說, inferred_from_context=從輸入推斷, inferred_from_system=從系統資料推斷"),
   confidence: z.number().min(0).max(1).describe("信心度 0-1"),
-  reasoning: z.string().describe("推斷理由"),
+  reasoning: z.string().max(80).describe("簡要說明推斷理由（最多 80 字元）"),
 });
 
 // AI 輸出結構
 const StructuredItemSchema = z.object({
-  title: z.string().describe("A concise, actionable title (max 50 chars)"),
-  narrative: z.string().describe("Contextual narrative explaining the item - 必須保留用戶提到的所有細節"),
+  title: z.string().max(50).describe("簡潔的任務標題（最多 50 字元）"),
+  narrative: z.string().max(100).describe("任務的簡要背景描述（最多 100 字元）"),
   drawer: z.enum(["INBOX", "ACTIVE", "MAINTAIN", "REFERENCE", "ARCHIVE"])
     .describe("Status drawer based on urgency"),
   lifecycle: z.enum(["FINITE", "PERPETUAL"])
     .describe("finite = project with deadline, perpetual = ongoing maintenance"),
   tag: z.object({
-    area: z.string().describe("L1: Identity/workspace context"),
-    product: z.string().describe("L2: Long-term asset being built"),
-    topic: z.string().describe("L3: Thematic module within the product"),
+    area: z.string().max(30).describe("領域名稱（最多 30 字元）"),
+    product: z.string().max(50).describe("專案名稱（最多 50 字元）"),
+    topic: z.string().max(50).describe("主題名稱（最多 50 字元）"),
   }),
-  strategy_used: z.string().describe("Classification strategy: boundary_match, semantic_anchor, new_structure"),
-  reasoning: z.string().describe("Brief reasoning for the classification"),
+  strategy_used: z.string().max(50).describe("Classification strategy: boundary_match, semantic_anchor, new_structure"),
+  reasoning: z.string().max(100).describe("簡短說明分類理由（1 句話，最多 100 字元）"),
   // 時間推斷欄位 - 加入來源歸因
   due_date: z.string().datetime({ offset: true }).optional().describe("Inferred due date in ISO 8601 format (允許時區偏移)"),
   due_date_source: SourceAttributionSchema.optional().describe("時間來源歸因 - 區分 explicit/inferred"),
   inferred_from_milestone: z.string().optional().describe("Milestone ID if inferred from a milestone (僅當 source_type=inferred_from_system)"),
   time_confidence: z.number().min(0).max(1).optional().describe("Confidence score for time inference (0-1)"),
-  time_reasoning: z.string().optional().describe("Reasoning for the time inference (in Traditional Chinese)"),
   // Sub-items (待辦事項清單)
   sub_items: z.array(SubItemSchema).optional().describe("如果任務包含多個可獨立勾選的步驟/項目，拆成 sub-items - 不可遺漏用戶提到的任何事項"),
 });
 
-const StructureResultSchema = z.object({
+// 追加 sub-item 的 action
+const AppendSubItemActionSchema = z.object({
+  action: z.literal("append_sub_item"),
+  target_task_id: z.string().describe("要追加到的任務 ID"),
+  sub_items: z.array(SubItemSchema).describe("要追加的待辦事項清單"),
+  reasoning: z.string().max(100).describe("簡要說明為什麼判斷這是追加而非新任務（1 句話，最多 100 字元）"),
+});
+
+// 創建新任務的 action
+const CreateNewTasksActionSchema = z.object({
+  action: z.literal("create_new_tasks"),
   items: z.array(StructuredItemSchema),
 });
 
+// 最終的結果 schema（二選一）
+const StructureResultSchema = z.discriminatedUnion("action", [
+  AppendSubItemActionSchema,
+  CreateNewTasksActionSchema,
+]);
+
 // POST /api/brain-dump
 export async function POST(request: NextRequest) {
-  return catchDomainException(async () => {
+  return catchDomainException<any>(async () => {
     const timings: Record<string, number> = {};
     const startTotal = Date.now();
 
@@ -89,7 +104,7 @@ export async function POST(request: NextRequest) {
                 deleted_at: null,
                 status: { not: 'ARCHIVE' }, // 只載入未完成的任務
               },
-              select: { id: true, content: true, created_at: true },
+              select: { id: true, content: true, created_at: true, sub_items: true },
               orderBy: { created_at: 'desc' },
               take: 10, // 每個 Product 最多取 10 個最近任務，提供語意線索
             },
@@ -98,6 +113,25 @@ export async function POST(request: NextRequest) {
       },
     });
     timings["db_structure"] = Date.now() - startDbStructure;
+
+    // ✅ 獲取最近 10 分鐘內創建的任務（用於判斷是否追加 sub-item）
+    const startDbRecentTasks = Date.now();
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const recentTasks = await prisma.task.findMany({
+      where: {
+        deleted_at: null,
+        created_at: { gte: tenMinutesAgo },
+        product: { user_id: userId },
+      },
+      include: {
+        product: {
+          select: { id: true, name: true },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+      take: 10,
+    });
+    timings["db_recent_tasks"] = Date.now() - startDbRecentTasks;
 
     // 載入用戶的 Milestones（未來 90 天內）
     const startDbMilestones = Date.now();
@@ -144,10 +178,53 @@ export async function POST(request: NextRequest) {
           if (product.tasks && product.tasks.length > 0) {
             contextSummary += `     最近任務:\n`;
             for (const task of product.tasks) {
-              contextSummary += `       - ${task.content}\n`;
+              contextSummary += `       - [${task.id}] ${task.content}\n`;
+              // 顯示 sub-items
+              if (task.sub_items) {
+                const subItems = task.sub_items as Array<{
+                  id: string;
+                  content: string;
+                  completed: boolean;
+                }>;
+                if (subItems.length > 0) {
+                  for (const subItem of subItems) {
+                    const checkbox = subItem.completed ? '✅' : '☐';
+                    contextSummary += `         ${checkbox} ${subItem.content}\n`;
+                  }
+                }
+              }
             }
           } else {
             contextSummary += `     最近任務: (無，這是新專案)\n`;
+          }
+        }
+      }
+      contextSummary += "\n";
+    }
+
+    // 添加最近 10 分鐘內創建的任務（重點關注）
+    if (recentTasks.length > 0) {
+      contextSummary += "\n### 🔥 最近 10 分鐘內創建的任務（判斷是否為追加內容）:\n";
+      for (const task of recentTasks) {
+        const timeAgo = Math.floor((Date.now() - new Date(task.created_at).getTime()) / 60000);
+        contextSummary += `\n**[${task.id}] ${task.content}**\n`;
+        contextSummary += `   ⏰ ${timeAgo} 分鐘前創建 | 📦 ${task.product.name}\n`;
+
+        // 顯示 sub-items
+        if (task.sub_items) {
+          const subItems = task.sub_items as Array<{
+            id: string;
+            content: string;
+            completed: boolean;
+          }>;
+          if (subItems.length > 0) {
+            contextSummary += `   已有的待辦項目:\n`;
+            for (const subItem of subItems) {
+              const checkbox = subItem.completed ? '✅' : '☐';
+              contextSummary += `     ${checkbox} ${subItem.content}\n`;
+            }
+          } else {
+            contextSummary += `   (尚無待辦項目)\n`;
           }
         }
       }
@@ -181,7 +258,37 @@ export async function POST(request: NextRequest) {
       schema: StructureResultSchema,
       prompt: `你是任務記錄專家。將用戶輸入轉成結構化的 Task。
 
-# 核心原則
+# 🔥 最優先判斷：是追加還是新任務？
+
+## 判斷邏輯（純語意判斷，不看時間）
+
+### 看「最近創建的任務」（不論時間）
+問自己：**「用戶的新輸入是在補充某個既有任務的待辦步驟嗎？」**
+
+✅ **符合追加條件**（必須同時滿足）：
+- 新輸入是「簡短的執行步驟」或「待辦事項」（不是完整任務描述）
+- 語意上明確是某個既有任務的「子項目」或「執行細節」
+- 輸入格式像「待辦清單項目」而非「新任務說明」
+
+**判斷技巧**：
+- 如果輸入像「整理資料」「發送郵件」→ 可能是追加
+- 如果輸入像「明天要準備週報」→ 是新任務（有完整目標描述）
+- 如果輸入像「準備週報要：整理資料、發送郵件」→ 是新任務（含多個 sub_items）
+
+❌ **不符合追加**（創建新任務）：
+- 新輸入有完整的任務描述（標題 + 目標）
+- 語意上是獨立的新事情
+- 用戶明確提到新的 Product/Area/時間
+
+**如果符合追加條件**：
+→ 回傳 \`action: "append_sub_item"\`，指定 \`target_task_id\` 和新的 \`sub_items\`
+
+**如果是新任務**：
+→ 繼續往下，按照原有規則創建新任務
+
+---
+
+# 核心原則（創建新任務時使用）
 
 ## 1. 完整記錄
 問自己：**「把輸出念給用戶聽，用戶會說『你漏了 X』嗎？」**
@@ -240,17 +347,123 @@ ${text}
 
 ---
 
-# 輸出格式
+# 輸出格式與長度限制（嚴格遵守）
+
+**字元數限制：**
+- title：≤ 50 字元（動詞 + 目標，去掉冗詞）
+- narrative：≤ 100 字元（任務背景描述，精簡重點）
+- reasoning：≤ 100 字元（1 句話說明分類依據）
+- due_date_source.reasoning：≤ 80 字元（1 句話說明時間推斷，使用 due_date_source 結構）
+- sub_item.content：≤ 100 字元（簡短的待辦事項）
+- tag.area/product/topic：≤ 30/50/50 字元
+
+**格式要求：**
 - 使用繁體中文
-- due_date：ISO 8601 格式（例如：2026-01-30T00:00:00+08:00）
+- due_date：ISO 8601 格式（例：2026-01-30T00:00:00+08:00）
 - tag.topic：字串，無法確定則填 ""
-- reasoning：說明選擇這個 Product 的理由`,
+
+**寫作原則：**
+- 精簡優先：每個字都要有意義
+- reasoning 範例：「提到專案名稱，判斷為工作相關」
+- narrative 範例：「整理本週功能，準備週報給主管」（≤ 100 字）
+- 如果用戶提供了大量細節，提煉最重要的資訊`,
     });
     timings["ai_generateObject"] = Date.now() - startAI;
 
-    // 持久化到資料庫（優化：使用記憶體快取減少重複查詢）
+    // ============================================================================
+    // 根據 AI 判斷的 action 執行不同邏輯
+    // ============================================================================
+
     const startDbPersist = Date.now();
 
+    // 情況 1: 追加 sub-item 到既有任務
+    if (result.action === "append_sub_item") {
+      // 驗證 target_task_id
+      const targetTask = await prisma.task.findFirst({
+        where: {
+          id: result.target_task_id,
+          deleted_at: null,
+          product: { user_id: userId },
+        },
+        include: {
+          product: true,
+        },
+      });
+
+      if (!targetTask) {
+        throw new ValidationException(
+          `Target task ${result.target_task_id} not found`,
+          "target_task_id"
+        );
+      }
+
+      // 獲取現有的 sub-items
+      const existingSubItems = (targetTask.sub_items as Array<{
+        id: string;
+        content: string;
+        completed: boolean;
+        created_at: string;
+        completed_at: string | null;
+        order: number;
+      }>) || [];
+
+      // 創建新的 sub-items
+      const now = new Date().toISOString();
+      const newSubItems = result.sub_items.map((sub, idx) => ({
+        id: crypto.randomUUID(),
+        content: sub.content,
+        completed: false,
+        created_at: now,
+        completed_at: null,
+        order: existingSubItems.length + idx,
+      }));
+
+      // 更新任務
+      const updatedSubItems = [...existingSubItems, ...newSubItems];
+      await prisma.task.update({
+        where: { id: result.target_task_id },
+        data: {
+          sub_items: updatedSubItems as any,
+          updated_at: new Date(),
+        },
+      });
+
+      // 記錄評估 Log
+      await prisma.systemEvaluationLog.create({
+        data: {
+          user_id: userId,
+          type: "BRAIN_DUMP",
+          input_content: { text },
+          output_content: {
+            action: "append_sub_item",
+            target_task_id: result.target_task_id,
+            sub_items: result.sub_items,
+            reasoning: result.reasoning,
+          },
+          user_action: "APPLIED",
+          metadata: {
+            appended_sub_items_count: newSubItems.length,
+          },
+        },
+      });
+
+      timings["db_persist"] = Date.now() - startDbPersist;
+      timings["total"] = Date.now() - startTotal;
+      console.log("⏱️ [brain-dump] Timings:", JSON.stringify(timings, null, 2));
+
+      return ApiResponseBuilder.success({
+        action: "append_sub_item",
+        target_task: {
+          id: targetTask.id,
+          content: targetTask.content,
+          product: targetTask.product.name,
+        },
+        appended_sub_items: newSubItems,
+        reasoning: result.reasoning,
+      }, {});
+    }
+
+    // 情況 2: 創建新任務（原有邏輯）
     // 建立快取 Map，避免重複查詢同樣的 Area/Product/Topic
     const areaCache = new Map<string, { id: string }>();
     const productCache = new Map<string, { id: string }>();
@@ -336,9 +549,6 @@ ${text}
       };
 
       // 時間推斷相關欄位（含來源歸因）
-      if (item.time_reasoning) {
-        aiAnalysis.time_reasoning = item.time_reasoning;
-      }
       if (item.due_date_source) {
         aiAnalysis.due_date_source = item.due_date_source;
       }
@@ -396,7 +606,7 @@ ${text}
         // 時間推斷資訊
         due_date: item.due_date || null,
         time_confidence: item.time_confidence || null,
-        time_reasoning: item.time_reasoning || null,
+        due_date_source: item.due_date_source || null,
         inferred_from_milestone: item.inferred_from_milestone || null,
       });
     }
@@ -407,7 +617,7 @@ ${text}
         user_id: userId,
         type: "BRAIN_DUMP",
         input_content: { text },
-        output_content: { items: result.items },
+        output_content: { action: "create_new_tasks", items: result.items },
         user_action: "APPLIED",
         metadata: {
           created_tasks_count: createdTasks.length,
@@ -419,6 +629,7 @@ ${text}
     console.log("⏱️ [brain-dump] Timings:", JSON.stringify(timings, null, 2));
 
     return ApiResponseBuilder.success({
+      action: "create_new_tasks",
       items: createdTasks,
     }, {});
   });

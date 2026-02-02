@@ -79,7 +79,7 @@ export function KanbanColumn({ id, title, color, tasks, onToggleSubItem, onSetDu
             <p className="text-sm">拖放項目到這裡</p>
           </div>
         ) : (
-          tasks.map((task) => (
+          (Array.isArray(tasks) ? tasks : []).map((task) => (
             <TaskCardComponent
               key={task.id}
               task={task}

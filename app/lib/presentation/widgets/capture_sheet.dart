@@ -35,13 +35,17 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
             ).showSnackBar(SnackBar(content: Text('Error: ${fail.message}')));
           }
         },
-        (_) {
+        (_) async {
+          // 觸發靜默刷新以載入新建立的任務
+          await silentRefreshTasks(ref);
+
           if (mounted) {
             Navigator.pop(context); // Close sheet
-            ref.refresh(activeTasksProvider); // Refresh list
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('已透過 AI 建立任務！')));
+            if (mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('已透過 AI 建立任務！')));
+            }
           }
         },
       );

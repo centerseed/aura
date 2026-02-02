@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import 'reference.dart';
+import 'task.dart';
 
 /// Product 實體
 class Product extends Equatable {
@@ -12,6 +14,11 @@ class Product extends Equatable {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  // 關聯資料
+  final List<Reference>? references;
+  final List<Task>? tasks; // 完整的 tasks 列表
+  final List<Task>? recentTasks; // 最近的 3 個 tasks (向後兼容)
+
   const Product({
     required this.id,
     required this.name,
@@ -22,10 +29,19 @@ class Product extends Equatable {
     required this.displayOrder,
     this.createdAt,
     this.updatedAt,
+    this.references,
+    this.tasks,
+    this.recentTasks,
   });
 
   @override
   List<Object?> get props => [id, name, areaId];
+
+  /// 獲取 reference 數量
+  int get referenceCount => references?.length ?? 0;
+
+  /// 獲取任務數量（優先使用完整的 tasks,回退到 recentTasks）
+  int get taskCount => tasks?.length ?? recentTasks?.length ?? 0;
 }
 
 /// Product 狀態

@@ -23,11 +23,11 @@ interface GanttViewProps {
 function getDateRange(tasks: TaskCard[], milestones: Milestone[]) {
   const dates: Date[] = [];
 
-  tasks.forEach((task) => {
+  (Array.isArray(tasks) ? tasks : []).forEach((task) => {
     if (task.due_date) dates.push(new Date(task.due_date));
   });
 
-  milestones.forEach((m) => {
+  (Array.isArray(milestones) ? milestones : []).forEach((m) => {
     dates.push(new Date(m.target_date));
   });
 
@@ -83,13 +83,15 @@ function toLocalMidnight(date: Date | string): Date {
 
 function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps) {
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(
-    new Set(areas.map((a) => a.id))
+    new Set((Array.isArray(areas) ? areas : []).map((a) => a.id))
   );
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
   const allTasks = useMemo(() => {
-    return areas.flatMap((area) =>
-      area.products.flatMap((product) => product.tasks)
+    return (Array.isArray(areas) ? areas : []).flatMap((area) =>
+      (Array.isArray(area.products) ? area.products : []).flatMap((product) =>
+        Array.isArray(product.tasks) ? product.tasks : []
+      )
     );
   }, [areas]);
 
@@ -152,9 +154,9 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
       data: Record<string, unknown>;
     }> = [];
 
-    areas.forEach((area) => {
+    (Array.isArray(areas) ? areas : []).forEach((area) => {
       const isExpanded = expandedAreas.has(area.id);
-      const areaMilestones = milestones.filter(
+      const areaMilestones = (Array.isArray(milestones) ? milestones : []).filter(
         (m) => m.entity_type === "AREA" && m.entity_id === area.id
       );
 
@@ -167,7 +169,7 @@ function GanttViewComponent({ areas, milestones, drawerConfig }: GanttViewProps)
 
       if (isExpanded) {
         area.products.forEach((product) => {
-          const productMilestones = milestones.filter(
+          const productMilestones = (Array.isArray(milestones) ? milestones : []).filter(
             (m) => m.entity_type === "PRODUCT" && m.entity_id === product.id
           );
           const tasksWithDates = product.tasks.filter((t) => t.due_date);

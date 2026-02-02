@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Loader2,
 } from "lucide-react";
+import { API } from "@/lib/api-client";
 
 // 預設身分選項
 const PRESET_AREAS = [
@@ -66,17 +67,11 @@ function OnboardingContent() {
       }
 
       try {
-        const token = await firebaseUser.getIdToken();
-        const userRes = await fetch("/api/me", {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          setUserId(userData.id);
-          setUserName(userData.displayName || userData.name || userData.email || "User");
-        }
+        // API 回傳格式: { user: { id, email, displayName, ... } }
+        const result = await API.users.me();
+        const user = result.user;
+        setUserId(user.id);
+        setUserName(user.displayName || user.name || user.email || "User");
       } catch (error) {
         console.error("載入用戶資訊失敗:", error);
       }
@@ -132,33 +127,13 @@ function OnboardingContent() {
 
       // 創建 Areas
       console.log("正在創建 Areas...");
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error("No authenticated user");
-      }
-      const token = await user.getIdToken();
 
       for (const area of areasToCreate) {
         console.log("創建 Area:", area.name);
-        const areaRes = await fetch("/api/areas", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            name: area.name,
-            scope: area.scope,
-          }),
+        const result = await API.areas.create({
+          name: area.name,
+          scope: area.scope,
         });
-
-        if (!areaRes.ok) {
-          const errorData = await areaRes.json();
-          console.error("創建 Area 失敗:", errorData);
-          throw new Error(`創建 ${area.name} 失敗: ${errorData.error || areaRes.statusText}`);
-        }
-
-        const result = await areaRes.json();
         console.log("Area 創建結果:", result);
       }
 

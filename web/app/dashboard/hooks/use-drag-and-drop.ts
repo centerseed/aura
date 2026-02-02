@@ -138,8 +138,8 @@ export function useDragAndDrop({
           // 拖到 Area（移動 Product）
           if (overId.startsWith('area-')) {
             const newAreaId = overId.replace('area-', '')
-            const currentArea = areas.find((a) =>
-              a.products.some((p) => p.id === productId)
+            const currentArea = (Array.isArray(areas) ? areas : []).find((a) =>
+              (Array.isArray(a.products) ? a.products : []).some((p) => p.id === productId)
             )
             if (currentArea && currentArea.id !== newAreaId) {
               await moveProductToArea(productId, newAreaId)

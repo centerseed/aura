@@ -37,7 +37,11 @@ mixin _$ProductModel {
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'deleted_at')
-  DateTime? get deletedAt => throw _privateConstructorUsedError;
+  DateTime? get deletedAt => throw _privateConstructorUsedError; // 關聯資料
+  List<ReferenceModel>? get references => throw _privateConstructorUsedError;
+  List<TaskModel>? get tasks => throw _privateConstructorUsedError;
+  @JsonKey(name: 'recent_tasks')
+  List<TaskModel>? get recentTasks => throw _privateConstructorUsedError;
 
   /// Serializes this ProductModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -68,6 +72,9 @@ abstract class $ProductModelCopyWith<$Res> {
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+    List<ReferenceModel>? references,
+    List<TaskModel>? tasks,
+    @JsonKey(name: 'recent_tasks') List<TaskModel>? recentTasks,
   });
 }
 
@@ -97,6 +104,9 @@ class _$ProductModelCopyWithImpl<$Res, $Val extends ProductModel>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
     Object? deletedAt = freezed,
+    Object? references = freezed,
+    Object? tasks = freezed,
+    Object? recentTasks = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -144,6 +154,18 @@ class _$ProductModelCopyWithImpl<$Res, $Val extends ProductModel>
                 ? _value.deletedAt
                 : deletedAt // ignore: cast_nullable_to_non_nullable
                       as DateTime?,
+            references: freezed == references
+                ? _value.references
+                : references // ignore: cast_nullable_to_non_nullable
+                      as List<ReferenceModel>?,
+            tasks: freezed == tasks
+                ? _value.tasks
+                : tasks // ignore: cast_nullable_to_non_nullable
+                      as List<TaskModel>?,
+            recentTasks: freezed == recentTasks
+                ? _value.recentTasks
+                : recentTasks // ignore: cast_nullable_to_non_nullable
+                      as List<TaskModel>?,
           )
           as $Val,
     );
@@ -171,6 +193,9 @@ abstract class _$$ProductModelImplCopyWith<$Res>
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+    List<ReferenceModel>? references,
+    List<TaskModel>? tasks,
+    @JsonKey(name: 'recent_tasks') List<TaskModel>? recentTasks,
   });
 }
 
@@ -199,6 +224,9 @@ class __$$ProductModelImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
     Object? deletedAt = freezed,
+    Object? references = freezed,
+    Object? tasks = freezed,
+    Object? recentTasks = freezed,
   }) {
     return _then(
       _$ProductModelImpl(
@@ -246,6 +274,18 @@ class __$$ProductModelImplCopyWithImpl<$Res>
             ? _value.deletedAt
             : deletedAt // ignore: cast_nullable_to_non_nullable
                   as DateTime?,
+        references: freezed == references
+            ? _value._references
+            : references // ignore: cast_nullable_to_non_nullable
+                  as List<ReferenceModel>?,
+        tasks: freezed == tasks
+            ? _value._tasks
+            : tasks // ignore: cast_nullable_to_non_nullable
+                  as List<TaskModel>?,
+        recentTasks: freezed == recentTasks
+            ? _value._recentTasks
+            : recentTasks // ignore: cast_nullable_to_non_nullable
+                  as List<TaskModel>?,
       ),
     );
   }
@@ -266,7 +306,13 @@ class _$ProductModelImpl extends _ProductModel {
     @JsonKey(name: 'created_at') this.createdAt,
     @JsonKey(name: 'updated_at') this.updatedAt,
     @JsonKey(name: 'deleted_at') this.deletedAt,
-  }) : super._();
+    final List<ReferenceModel>? references,
+    final List<TaskModel>? tasks,
+    @JsonKey(name: 'recent_tasks') final List<TaskModel>? recentTasks,
+  }) : _references = references,
+       _tasks = tasks,
+       _recentTasks = recentTasks,
+       super._();
 
   factory _$ProductModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$ProductModelImplFromJson(json);
@@ -299,10 +345,42 @@ class _$ProductModelImpl extends _ProductModel {
   @override
   @JsonKey(name: 'deleted_at')
   final DateTime? deletedAt;
+  // 關聯資料
+  final List<ReferenceModel>? _references;
+  // 關聯資料
+  @override
+  List<ReferenceModel>? get references {
+    final value = _references;
+    if (value == null) return null;
+    if (_references is EqualUnmodifiableListView) return _references;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  final List<TaskModel>? _tasks;
+  @override
+  List<TaskModel>? get tasks {
+    final value = _tasks;
+    if (value == null) return null;
+    if (_tasks is EqualUnmodifiableListView) return _tasks;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  final List<TaskModel>? _recentTasks;
+  @override
+  @JsonKey(name: 'recent_tasks')
+  List<TaskModel>? get recentTasks {
+    final value = _recentTasks;
+    if (value == null) return null;
+    if (_recentTasks is EqualUnmodifiableListView) return _recentTasks;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
 
   @override
   String toString() {
-    return 'ProductModel(id: $id, userId: $userId, areaId: $areaId, name: $name, description: $description, status: $status, lifecycle: $lifecycle, displayOrder: $displayOrder, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt)';
+    return 'ProductModel(id: $id, userId: $userId, areaId: $areaId, name: $name, description: $description, status: $status, lifecycle: $lifecycle, displayOrder: $displayOrder, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, references: $references, tasks: $tasks, recentTasks: $recentTasks)';
   }
 
   @override
@@ -326,7 +404,16 @@ class _$ProductModelImpl extends _ProductModel {
             (identical(other.updatedAt, updatedAt) ||
                 other.updatedAt == updatedAt) &&
             (identical(other.deletedAt, deletedAt) ||
-                other.deletedAt == deletedAt));
+                other.deletedAt == deletedAt) &&
+            const DeepCollectionEquality().equals(
+              other._references,
+              _references,
+            ) &&
+            const DeepCollectionEquality().equals(other._tasks, _tasks) &&
+            const DeepCollectionEquality().equals(
+              other._recentTasks,
+              _recentTasks,
+            ));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -344,6 +431,9 @@ class _$ProductModelImpl extends _ProductModel {
     createdAt,
     updatedAt,
     deletedAt,
+    const DeepCollectionEquality().hash(_references),
+    const DeepCollectionEquality().hash(_tasks),
+    const DeepCollectionEquality().hash(_recentTasks),
   );
 
   /// Create a copy of ProductModel
@@ -374,6 +464,9 @@ abstract class _ProductModel extends ProductModel {
     @JsonKey(name: 'created_at') final DateTime? createdAt,
     @JsonKey(name: 'updated_at') final DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') final DateTime? deletedAt,
+    final List<ReferenceModel>? references,
+    final List<TaskModel>? tasks,
+    @JsonKey(name: 'recent_tasks') final List<TaskModel>? recentTasks,
   }) = _$ProductModelImpl;
   const _ProductModel._() : super._();
 
@@ -407,7 +500,14 @@ abstract class _ProductModel extends ProductModel {
   DateTime? get updatedAt;
   @override
   @JsonKey(name: 'deleted_at')
-  DateTime? get deletedAt;
+  DateTime? get deletedAt; // 關聯資料
+  @override
+  List<ReferenceModel>? get references;
+  @override
+  List<TaskModel>? get tasks;
+  @override
+  @JsonKey(name: 'recent_tasks')
+  List<TaskModel>? get recentTasks;
 
   /// Create a copy of ProductModel
   /// with the given fields replaced by the non-null parameter values.
