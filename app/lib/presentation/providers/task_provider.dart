@@ -4,7 +4,6 @@ import '../../core/di/providers.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/task.dart';
 import '../../application/use_cases/update_sub_item_use_case.dart';
-import '../../data/repositories/unified/unified_repositories.dart';
 
 // ==================== Cache-Based Task Providers ====================
 // 這些 Providers 直接從 dual cache 獲取資料，支援：
@@ -216,13 +215,13 @@ class TaskController extends StateNotifier<TaskControllerState> {
 
   /// 刷新任務快取
   Future<void> refresh() async {
-    final repo = _ref.read(taskRepositoryProvider) as TaskUnifiedRepository;
+    final repo = _ref.read(taskUnifiedRepositoryProvider);
     await repo.refresh();
   }
 
   /// 靜默刷新 (背景刷新，不顯示 loading)
   Future<void> silentRefresh() async {
-    final repo = _ref.read(taskRepositoryProvider) as TaskUnifiedRepository;
+    final repo = _ref.read(taskUnifiedRepositoryProvider);
     await repo.silentRefresh();
   }
 
@@ -267,7 +266,7 @@ final taskControllerProvider =
 ///
 /// 用於 RefreshIndicator.onRefresh
 Future<void> refreshTasks(WidgetRef ref) async {
-  final repo = ref.read(taskRepositoryProvider) as TaskUnifiedRepository;
+  final repo = ref.read(taskUnifiedRepositoryProvider);
   await repo.refresh();
 }
 
@@ -275,6 +274,6 @@ Future<void> refreshTasks(WidgetRef ref) async {
 ///
 /// 用於變更操作後的背景刷新
 Future<void> silentRefreshTasks(WidgetRef ref) async {
-  final repo = ref.read(taskRepositoryProvider) as TaskUnifiedRepository;
+  final repo = ref.read(taskUnifiedRepositoryProvider);
   await repo.silentRefresh();
 }

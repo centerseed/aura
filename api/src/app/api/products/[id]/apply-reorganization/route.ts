@@ -231,9 +231,15 @@ export async function POST(
           }
 
           // 過濾並驗證 sub_task_ids
+          // ✅ 關鍵保護：絕不能刪除 parent task 自己！
           const validSubTaskIds = consolidation.sub_task_ids.filter(id => {
             if (!isValidUUID(id)) {
               console.warn(`Invalid sub_task_id: ${id}, skipping...`);
+              return false;
+            }
+            // 🚨 防護：排除 parent task 自己（防止誤刪）
+            if (id === consolidation.parent_task_id) {
+              console.warn(`⚠️  Prevented deletion of parent task ${id} in consolidation`);
               return false;
             }
             return true;
@@ -249,7 +255,16 @@ export async function POST(
             where: { id: consolidation.parent_task_id },
           });
 
-          if (!parentTask || parentTask.deleted_at) continue;
+          if (!parentTask || parentTask.deleted_at) {
+            console.warn(`Parent task ${consolidation.parent_task_id} not found or deleted, skipping consolidation`);
+            continue;
+          }
+
+          // 🚨 第三層保護：驗證 parent task 確實屬於當前用戶
+          if (parentTask.user_id !== userId) {
+            console.error(`⚠️  SECURITY: Parent task ${consolidation.parent_task_id} does not belong to user ${userId}`);
+            continue;
+          }
 
           // 獲取所有 sub tasks (用於建立 sub_items，包含所有欄位)
           const subTasks = await tx.task.findMany({
@@ -358,14 +373,23 @@ export async function POST(
 
           // ✅ 批次軟刪除所有 sub tasks
           if (validSubTaskIds.length > 0) {
-            await tx.task.updateMany({
-              where: {
-                id: { in: validSubTaskIds },
-              },
-              data: {
-                deleted_at: new Date(),
-              },
-            });
+            // 🚨 第二層保護：再次確認 parent task 不在刪除列表中
+            const safeSubTaskIds = validSubTaskIds.filter(id => id !== consolidation.parent_task_id);
+
+            if (safeSubTaskIds.length !== validSubTaskIds.length) {
+              console.error(`⚠️  CRITICAL: Prevented parent task deletion in updateMany. Parent: ${consolidation.parent_task_id}`);
+            }
+
+            if (safeSubTaskIds.length > 0) {
+              await tx.task.updateMany({
+                where: {
+                  id: { in: safeSubTaskIds },
+                },
+                data: {
+                  deleted_at: new Date(),
+                },
+              });
+            }
           }
 
           consolidatedCount++;

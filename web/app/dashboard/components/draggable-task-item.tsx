@@ -488,12 +488,12 @@ export function DraggableTaskItem({
             <div className="mt-2">
               <div className="flex items-center gap-1.5 text-xs text-white/40 mb-1">
                 <span>參考資料</span>
-                {task.references.some((ref) => ref.type === 'note') && (
+                {task.references.some((ref) => ref && ref.type === 'note') && (
                   <FileText className="w-3 h-3" />
                 )}
               </div>
               <div className="space-y-1">
-                {task.references.filter((ref) => ref.type === 'url').map((ref) => (
+                {task.references.filter((ref) => ref && ref.type === 'url').map((ref) => (
                   <div
                     key={ref.id}
                     className="group/ref flex items-start gap-1.5 text-xs hover:bg-white/5 rounded px-1 py-0.5 -mx-1"

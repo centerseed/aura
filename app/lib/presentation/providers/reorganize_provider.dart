@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/reorganize_proposal.dart';
 import '../../core/di/providers.dart' as di;
-import '../../data/repositories/unified/task_unified_repository.dart';
 
 // State to hold the current proposal for a given product
 final reorganizeProposalProvider =
@@ -47,7 +46,7 @@ class ReorganizeController extends StateNotifier<AsyncValue<void>> {
         state = const AsyncValue.data(null);
 
         // 觸發任務快取的靜默刷新
-        final taskRepo = ref.read(di.taskRepositoryProvider) as TaskUnifiedRepository;
+        final taskRepo = ref.read(di.taskUnifiedRepositoryProvider);
         await taskRepo.silentRefresh();
       },
     );

@@ -82,7 +82,7 @@ describe('DeleteProductUseCase', () => {
           productId: 'product-123',
           userId: 'user-123',
         })
-      ).rejects.toThrow('Cannot delete product with active tasks')
+      ).rejects.toThrow('無法刪除此專案，因為還有 1 個進行中的任務')
     })
   })
 

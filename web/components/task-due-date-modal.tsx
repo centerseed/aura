@@ -75,7 +75,7 @@ export function TaskDueDateModal({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "更新失敗");
+        throw new Error(data.error?.message || "更新失敗");
       }
 
       onSuccess();

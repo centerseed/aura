@@ -6,7 +6,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import {
   verifyIdToken,
-  getUserIdFromFirebaseUid,
   authenticateRequest,
 } from '@/lib/auth-middleware'
 import * as firebaseAdmin from '@/lib/firebase-admin'
@@ -96,43 +95,6 @@ describe('auth-middleware', () => {
     })
   })
 
-  describe('getUserIdFromFirebaseUid', () => {
-    it('應該返回對應的 user ID', async () => {
-      const mockPrisma = {
-        user: {
-          findFirst: vi.fn().mockResolvedValue({
-            id: 'user-123',
-            auth_provider_id: 'firebase-uid-123',
-          }),
-        },
-      }
-
-      const userId = await getUserIdFromFirebaseUid(
-        'firebase-uid-123',
-        mockPrisma
-      )
-      expect(userId).toBe('user-123')
-      expect(mockPrisma.user.findFirst).toHaveBeenCalledWith({
-        where: {
-          auth_provider_id: 'firebase-uid-123',
-        },
-      })
-    })
-
-    it('應該返回 null 當找不到對應的 user', async () => {
-      const mockPrisma = {
-        user: {
-          findFirst: vi.fn().mockResolvedValue(null),
-        },
-      }
-
-      const userId = await getUserIdFromFirebaseUid(
-        'non-existent-uid',
-        mockPrisma
-      )
-      expect(userId).toBeNull()
-    })
-  })
 
   describe('authenticateRequest', () => {
     it('應該成功驗證請求並返回 user ID', async () => {
@@ -181,15 +143,26 @@ describe('auth-middleware', () => {
       await expect(authenticateRequest(request, mockPrisma)).rejects.toThrow()
     })
 
-    it('應該拋出錯誤當 user 不存在於資料庫', async () => {
+    it('應該自動創建用戶當用戶不存在於資料庫', async () => {
       const mockAuth = {
-        verifyIdToken: vi.fn().mockResolvedValue({ uid: 'firebase-uid-999' }),
+        verifyIdToken: vi.fn().mockResolvedValue({
+          uid: 'firebase-uid-999',
+          email: 'newuser@example.com',
+          name: 'New User',
+        }),
       }
       vi.mocked(firebaseAdmin.getAuth).mockReturnValue(mockAuth as any)
 
       const mockPrisma = {
         user: {
           findFirst: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({
+            id: 'new-user-123',
+            email: 'newuser@example.com',
+            name: 'New User',
+            auth_provider: 'GOOGLE',
+            auth_provider_id: 'firebase-uid-999',
+          }),
         },
       }
 
@@ -199,9 +172,17 @@ describe('auth-middleware', () => {
         },
       })
 
-      await expect(authenticateRequest(request, mockPrisma)).rejects.toThrow(
-        'Invalid token: User not found in database'
-      )
+      const userId = await authenticateRequest(request, mockPrisma)
+
+      expect(userId).toBe('new-user-123')
+      expect(mockPrisma.user.create).toHaveBeenCalledWith({
+        data: {
+          email: 'newuser@example.com',
+          name: 'New User',
+          auth_provider: 'GOOGLE',
+          auth_provider_id: 'firebase-uid-999',
+        },
+      })
     })
   })
 })

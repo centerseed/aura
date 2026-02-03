@@ -41,7 +41,7 @@ Future<void> setupDependencyInjection() async {
     ),
   );
 
-  // 添加攔截器
+  // 添加攔截器（順序重要：Auth → Logging）
   dio.interceptors.add(AuthInterceptor(getIt<FirebaseAuth>()));
 
   if (AppConfig.isDebugMode) {

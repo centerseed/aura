@@ -109,6 +109,65 @@ interface ApiProduct {
   tasks: TaskCard[];
 }
 
+/**
+ * 資料清理層 - 類似 Flutter 的 transformForDisplay
+ * 過濾所有可能的 null/undefined，確保資料完整性
+ */
+function cleanLibraryData(areas: any[]): ApiArea[] {
+  if (!Array.isArray(areas)) return [];
+
+  return areas
+    .filter((area) => area != null && area.id && area.name)
+    .map((area) => ({
+      id: area.id,
+      name: area.name,
+      description: area.description || null,
+      scope: area.scope || null,
+      products: (Array.isArray(area.products) ? area.products : [])
+        .filter((p: any) => p != null && p.id && p.name)
+        .map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          description: product.description || null,
+          status: product.status || 'ACTIVE',
+          lifecycle: product.lifecycle || 'FINITE',
+          referenceCount: Number(product.referenceCount) || 0,
+          tasks: (Array.isArray(product.tasks) ? product.tasks : [])
+            .filter((t: any) => t != null && t.id && t.title)
+            .map((task: any) => ({
+              ...task,
+              sub_items: (Array.isArray(task.sub_items) ? task.sub_items : [])
+                .filter((s: any) => s != null && s.id && s.content),
+              references: (Array.isArray(task.references) ? task.references : [])
+                .filter((r: any) => r != null && r.id && r.content && r.type),
+            })),
+        })),
+    }));
+}
+
+/**
+ * 統一的狀態更新 Helper - 確保所有更新都經過清理
+ *
+ * 用法：
+ * setAreas((prev) => updateAreasState(prev, (areas) => {
+ *   // 任意的狀態更新邏輯
+ *   return areas.map(area => ...)
+ * }))
+ */
+function updateAreasState(
+  prevAreas: ApiArea[],
+  updater: (areas: ApiArea[]) => ApiArea[]
+): ApiArea[] {
+  try {
+    const updated = updater(prevAreas);
+    return cleanLibraryData(updated);
+  } catch (error) {
+    console.error('❌ updateAreasState failed:', error);
+    // 發生錯誤時返回清理過的原始資料
+    return cleanLibraryData(prevAreas);
+  }
+}
+
 // 計算相對時間描述
 function getRelativeTimeDesc(dueDate: Date): { text: string; isOverdue: boolean; isUrgent: boolean } {
   const now = new Date();
@@ -365,7 +424,7 @@ function DraggableTaskItem({
           {/* Sub-items 簡化顯示 - Hidden when completed */}
           {!isCompleted && task.sub_items && task.sub_items.length > 0 && (
             <div className="mt-2 space-y-1">
-              {(showAllSubItems ? task.sub_items : task.sub_items.slice(0, 3)).map((subItem) => (
+              {(showAllSubItems ? task.sub_items : task.sub_items.slice(0, 3)).filter(subItem => subItem != null).map((subItem) => (
                 <div
                   key={subItem.id}
                   className="group/subitem flex items-center gap-1.5 text-xs hover:bg-white/5 rounded px-1 py-0.5 -mx-1"
@@ -575,12 +634,12 @@ function DraggableTaskItem({
             <div className="mt-2">
               <div className="flex items-center gap-1.5 text-xs text-white/40 mb-1">
                 <span>參考資料</span>
-                {task.references.some(ref => ref.type === "note") && (
+                {task.references.some(ref => ref && ref.type === "note") && (
                   <FileText className="w-3 h-3" />
                 )}
               </div>
               <div className="space-y-1">
-                {task.references.filter(ref => ref.type === "url").map((ref) => (
+                {task.references.filter(ref => ref && ref.type === "url").map((ref) => (
                   <div
                     key={ref.id}
                     className="group/ref flex items-start gap-1.5 text-xs hover:bg-white/5 rounded px-1 py-0.5 -mx-1"
@@ -1173,17 +1232,20 @@ function DashboardContent() {
         setUserName(actualUser.displayName || actualUser.name || actualUser.email || "User");
 
         // 3. 獲取用戶的 Library (Areas → Products → Tasks)
-        const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers });
+        // ⚠️ 重要：必須傳遞 include_archived=true 才能看到所有任務（包括 ARCHIVE 狀態）
+        const libraryRes = await fetch(`${API_BASE_URL}/api/library?include_archived=true`, { headers });
         if (!libraryRes.ok) throw new Error("無法獲取資料庫內容");
         const libraryData = await libraryRes.json();
-        const areas = libraryData.data?.areas || [];
+        const rawAreas = libraryData.data?.areas || [];
+        // 🔒 資料清理層：過濾所有 null/undefined，確保資料完整性
+        const areas = cleanLibraryData(rawAreas);
         setAreas(areas);
 
         // 4. 獲取用戶的 Milestones
         const milestonesRes = await fetch(`${API_BASE_URL}/api/milestones`, { headers });
         if (milestonesRes.ok) {
           const milestonesData = await milestonesRes.json();
-          setMilestones(milestonesData);
+          setMilestones(milestonesData.data?.milestones || []);
         }
 
         // 預設展開所有 Areas
@@ -1228,6 +1290,8 @@ function DashboardContent() {
       return areas.reduce((sum, area) =>
         sum + (Array.isArray(area.products) ? area.products : []).reduce((ps, p) =>
           ps + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => {
+            // 檢查任務是否存在
+            if (!t) return false;
             // 未完成的任務
             if (t.drawer === "ARCHIVE") return false;
             // 必須有 due_date 且在今天
@@ -1238,12 +1302,12 @@ function DashboardContent() {
     })(),
     active: Array.isArray(areas) ? areas.reduce(
       (sum, area) =>
-        sum + (Array.isArray(area.products) ? area.products : []).reduce((ps, p) => ps + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t.drawer === "ACTIVE").length, 0),
+        sum + (Array.isArray(area.products) ? area.products : []).reduce((ps, p) => ps + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t && t.drawer === "ACTIVE").length, 0),
       0
     ) : 0,
     archived: Array.isArray(areas) ? areas.reduce(
       (sum, area) =>
-        sum + (Array.isArray(area.products) ? area.products : []).reduce((ps, p) => ps + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t.drawer === "ARCHIVE").length, 0),
+        sum + (Array.isArray(area.products) ? area.products : []).reduce((ps, p) => ps + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t && t.drawer === "ARCHIVE").length, 0),
       0
     ) : 0,
     areas: Array.isArray(areas) ? areas.length : 0,
@@ -1348,7 +1412,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
       return;
@@ -1364,11 +1428,11 @@ function DashboardContent() {
       if (currentAreaId === newAreaId) return;
 
       // 樂觀更新 UI
-      setAreas((prevAreas) => {
+      setAreas((prevAreas) => updateAreasState(prevAreas, (areas) => {
         let movedProduct: ApiProduct | null = null;
 
         // 從原 Area 移除 Product
-        const updatedAreas = prevAreas.map((area) => {
+        const updatedAreas = areas.map((area) => {
           if (area.id === currentAreaId) {
             const product = area.products.find((p) => p.id === productId);
             if (product) {
@@ -1396,7 +1460,7 @@ function DashboardContent() {
         }
 
         return updatedAreas;
-      });
+      }));
 
       // 調用 API 更新
       try {
@@ -1419,7 +1483,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
       return;
@@ -1450,8 +1514,8 @@ function DashboardContent() {
       if (!currentTask || currentProductId === newProductId) return;
 
       // 樂觀更新 UI
-      setAreas((prevAreas) => {
-        return prevAreas.map((area) => ({
+      setAreas((prevAreas) => updateAreasState(prevAreas, (areas) => {
+        return areas.map((area) => ({
           ...area,
           products: area.products.map((product) => {
             // 從原 product 移除
@@ -1475,7 +1539,7 @@ function DashboardContent() {
             return product;
           }),
         }));
-      });
+      }));
 
       // 調用 API 更新
       try {
@@ -1498,7 +1562,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
       return;
@@ -1623,7 +1687,7 @@ function DashboardContent() {
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
-        setAreas(libraryData.data?.areas || []);
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
       }
     } catch (err) {
       console.error("Failed to merge task:", err);
@@ -1696,7 +1760,7 @@ function DashboardContent() {
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
-        setAreas(libraryData.data?.areas || []);
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
       }
     } catch (err) {
       console.error("Failed to create product and move task:", err);
@@ -1717,7 +1781,7 @@ function DashboardContent() {
       const milestonesRes = await fetch(`${API_BASE_URL}/api/milestones`, { headers: await getAuthHeaders() });
       if (milestonesRes.ok) {
         const milestonesData = await milestonesRes.json();
-        setMilestones(milestonesData);
+        setMilestones(milestonesData.data?.milestones || []);
       }
     } catch (err) {
       console.error("Failed to reload milestones:", err);
@@ -1731,6 +1795,7 @@ function DashboardContent() {
       let task = areas
         .flatMap((area) => area.products)
         .flatMap((product) => product.tasks)
+        .filter((t) => t != null)  // 過濾掉 null/undefined
         .find((t) => t.id === taskId);
 
       // 如果在 areas 中找不到，嘗試從已歸檔任務中尋找
@@ -1776,14 +1841,14 @@ function DashboardContent() {
       const { task: updatedTask } = await res.json();
 
       // 直接使用返回的完整任務資料更新 state（不重新查詢所有卡片）
-      setAreas(prevAreas => {
-        const taskExistsInAreas = prevAreas.some(area =>
+      setAreas(prevAreas => updateAreasState(prevAreas, (areas) => {
+        const taskExistsInAreas = areas.some(area =>
           area.products.some(product => product.tasks.some(t => t.id === taskId))
         );
 
         if (taskExistsInAreas) {
           // 任務已在 areas 中，直接更新
-          return prevAreas.map(area => ({
+          return areas.map(area => ({
             ...area,
             products: area.products.map(product => ({
               ...product,
@@ -1794,7 +1859,7 @@ function DashboardContent() {
           }));
         } else if (!isCompleting) {
           // 任務不在 areas 中，且正在取消完成 → 加入對應的 product
-          return prevAreas.map(area => ({
+          return areas.map(area => ({
             ...area,
             products: area.products.map(product => {
               if (product.id === updatedTask.product_id) {
@@ -1807,8 +1872,8 @@ function DashboardContent() {
             }),
           }));
         }
-        return prevAreas;
-      });
+        return areas;
+      }));
 
       // 更新 completedTodayTasks
       if (isCompleting) {
@@ -1837,15 +1902,15 @@ function DashboardContent() {
   const handleDeleteTask = async (taskId: string) => {
     try {
       // Optimistic update: 先從 UI 移除任務
-      setAreas(prevAreas => {
-        return prevAreas.map(area => ({
+      setAreas(prevAreas => updateAreasState(prevAreas, (areas) => {
+        return areas.map(area => ({
           ...area,
-          products: area.products?.map(product => ({
+          products: area.products.map(product => ({
             ...product,
-            tasks: product.tasks?.filter((task: TaskCard) => task.id !== taskId) || []
-          })) || []
+            tasks: product.tasks.filter((task: TaskCard) => task.id !== taskId)
+          }))
         }));
-      });
+      }));
 
       // 關閉 Task Detail Modal
       setIsTaskDetailModalOpen(false);
@@ -1867,7 +1932,7 @@ function DashboardContent() {
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
-        setAreas(libraryData.data?.areas || []);
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
       }
     }
   };
@@ -1877,8 +1942,8 @@ function DashboardContent() {
     if (!userId || !newTitle.trim()) return;
 
     // Optimistic update
-    setAreas((prevAreas) =>
-      prevAreas.map((area) => ({
+    setAreas((prevAreas) => updateAreasState(prevAreas, (areas) =>
+      areas.map((area) => ({
         ...area,
         products: area.products.map((product) => ({
           ...product,
@@ -1887,7 +1952,7 @@ function DashboardContent() {
           ),
         })),
       }))
-    );
+    ));
 
     // 同時更新 selectedTask
     if (selectedTask?.id === taskId) {
@@ -1914,12 +1979,14 @@ function DashboardContent() {
       // Revert on error
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
-        const data = await libraryRes.json();
-        setAreas(data);
+        const libraryData = await libraryRes.json();
+        const cleanedAreas = cleanLibraryData(libraryData.data?.areas || []);
+        setAreas(cleanedAreas);
         // 同時 revert selectedTask
         if (selectedTask?.id === taskId) {
-          const task = data
+          const task = cleanedAreas
             .flatMap((a: ApiArea) => a.products.flatMap((p: ApiProduct) => p.tasks))
+            .filter((t: TaskCard) => t != null)
             .find((t: TaskCard) => t.id === taskId);
           if (task) {
             setSelectedTask(task);
@@ -1934,8 +2001,8 @@ function DashboardContent() {
     if (!userId) return;
 
     // Optimistic update
-    setAreas((prevAreas) =>
-      prevAreas.map((area) => ({
+    setAreas((prevAreas) => updateAreasState(prevAreas, (areas) =>
+      areas.map((area) => ({
         ...area,
         products: area.products.map((product) => ({
           ...product,
@@ -1944,7 +2011,7 @@ function DashboardContent() {
           ),
         })),
       }))
-    );
+    ));
 
     // 同時更新 selectedTask
     if (selectedTask?.id === taskId) {
@@ -1971,12 +2038,14 @@ function DashboardContent() {
       // Revert on error
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
-        const data = await libraryRes.json();
-        setAreas(data);
+        const libraryData = await libraryRes.json();
+        const cleanedAreas = cleanLibraryData(libraryData.data?.areas || []);
+        setAreas(cleanedAreas);
         // 同時 revert selectedTask
         if (selectedTask?.id === taskId) {
-          const task = data
+          const task = cleanedAreas
             .flatMap((a: ApiArea) => a.products.flatMap((p: ApiProduct) => p.tasks))
+            .filter((t: TaskCard) => t != null)
             .find((t: TaskCard) => t.id === taskId);
           if (task) {
             setSelectedTask(task);
@@ -1990,6 +2059,7 @@ function DashboardContent() {
   const handleSetStartDate = async (taskId: string) => {
     const task = areas
       .flatMap((a) => a.products.flatMap((p) => p.tasks))
+      .filter((t) => t != null)
       .find((t) => t.id === taskId);
     if (task) {
       setEditingTaskForDueDate(task);
@@ -2008,9 +2078,9 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: TaskCard) => {
+            tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId && task.sub_items) {
-                const updatedSubItems = task.sub_items.map((item: SubItem) =>
+                const updatedSubItems = task.sub_items.filter((item: SubItem) => item != null).map((item: SubItem) =>
                   item.id === subItemId ? { ...item, completed } : item
                 );
                 const completedCount = updatedSubItems.filter((item: SubItem) => item && item.completed === true).length;
@@ -2062,7 +2132,7 @@ function DashboardContent() {
           const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
           if (libraryRes.ok) {
             const libraryData = await libraryRes.json();
-            setAreas(libraryData.data?.areas || []);
+            setAreas(cleanLibraryData(libraryData.data?.areas || []));
           }
         }
       }
@@ -2073,7 +2143,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
     }
@@ -2088,7 +2158,7 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: TaskCard) => {
+            tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId && task.sub_items) {
                 const updatedSubItems = task.sub_items.filter((item: SubItem) => item.id !== subItemId);
                 const completedCount = updatedSubItems.filter((item: SubItem) => item && item.completed === true).length;
@@ -2134,7 +2204,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
     }
@@ -2149,9 +2219,9 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: TaskCard) => {
+            tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId && task.sub_items) {
-                const updatedSubItems = task.sub_items.map((item: SubItem) =>
+                const updatedSubItems = task.sub_items.filter((item: SubItem) => item != null).map((item: SubItem) =>
                   item.id === subItemId ? { ...item, content: newContent } : item
                 );
 
@@ -2194,7 +2264,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
     }
@@ -2227,7 +2297,7 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: TaskCard) => {
+            tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId) {
                 const updatedSubItems = [...(task.sub_items || []), newSubItem];
                 const completedCount = updatedSubItems.filter((item: SubItem) => item && item.completed === true).length;
@@ -2262,7 +2332,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
     }
@@ -2294,7 +2364,7 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: TaskCard) => {
+            tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId) {
                 const updatedTask = {
                   ...task,
@@ -2346,22 +2416,28 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: TaskCard) => {
+            tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId) {
-                const updatedTask = {
+                return {
                   ...task,
                   references: [...(task.references || []), newReference]
                 };
-                // 同時更新 selectedTask
-                if (selectedTask?.id === taskId) {
-                  setSelectedTask(updatedTask);
-                }
-                return updatedTask;
               }
               return task;
             }) || []
           })) || []
         }));
+      });
+
+      // 同時更新 selectedTask（使用函數式更新避免 stale closure）
+      setSelectedTask(prev => {
+        if (prev?.id === taskId) {
+          return {
+            ...prev,
+            references: [...(prev.references || []), newReference]
+          };
+        }
+        return prev;
       });
     } catch (err) {
       console.error("Failed to add reference:", err);
@@ -2371,7 +2447,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
       throw err; // 重新拋出錯誤以便 modal 知道失敗了
@@ -2387,22 +2463,28 @@ function DashboardContent() {
           ...area,
           products: area.products?.map(product => ({
             ...product,
-            tasks: product.tasks?.map((task: TaskCard) => {
+            tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId) {
-                const updatedTask = {
+                return {
                   ...task,
                   references: (task.references || []).filter((ref: Reference) => ref.id !== referenceId)
                 };
-                // 同時更新 selectedTask
-                if (selectedTask?.id === taskId) {
-                  setSelectedTask(updatedTask);
-                }
-                return updatedTask;
               }
               return task;
             }) || []
           })) || []
         }));
+      });
+
+      // 同時更新 selectedTask（使用函數式更新避免 stale closure）
+      setSelectedTask(prev => {
+        if (prev?.id === taskId) {
+          return {
+            ...prev,
+            references: (prev.references || []).filter((ref: Reference) => ref.id !== referenceId)
+          };
+        }
+        return prev;
       });
 
       // API call
@@ -2423,7 +2505,7 @@ function DashboardContent() {
         const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
         if (libraryRes.ok) {
           const libraryData = await libraryRes.json();
-          setAreas(libraryData.data?.areas || []);
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
         }
       }
     }
@@ -2434,8 +2516,8 @@ function DashboardContent() {
     if (!userId || !newName.trim()) return;
 
     // Optimistic update
-    setAreas((prevAreas) =>
-      prevAreas.map((area) => ({
+    setAreas((prevAreas) => updateAreasState(prevAreas, (areas) =>
+      areas.map((area) => ({
         ...area,
         products: area.products.map((product) =>
           product.id === productId
@@ -2443,7 +2525,7 @@ function DashboardContent() {
             : product
         ),
       }))
-    );
+    ));
 
     try {
       const authHeaders = await getAuthHeaders();
@@ -2466,8 +2548,8 @@ function DashboardContent() {
       // Revert on error
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
-        const data = await libraryRes.json();
-        setAreas(data);
+        const libraryData = await libraryRes.json();
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
       }
     }
   };
@@ -2548,7 +2630,7 @@ function DashboardContent() {
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
-        setAreas(libraryData.data?.areas || []);
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
       }
 
       setIsReorganizeModalOpen(false);
@@ -2595,7 +2677,7 @@ function DashboardContent() {
       const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
       if (libraryRes.ok) {
         const libraryData = await libraryRes.json();
-        setAreas(libraryData.data?.areas || []);
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
       }
 
       // 清除記錄
@@ -2724,7 +2806,7 @@ function DashboardContent() {
                   const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: authHeaders });
                   if (libraryRes.ok) {
                     const libraryData = await libraryRes.json();
-                    const areas = libraryData.data?.areas || [];
+                    const areas = cleanLibraryData(libraryData.data?.areas || []);
                     setAreas(areas);
                     setExpandedAreas(new Set((Array.isArray(areas) ? areas : []).map((a: ApiArea) => a.name)));
                     // 離開歡迎模式，先顯示快速輸入引導
@@ -2945,7 +3027,7 @@ function DashboardContent() {
                   {(Array.isArray(areas) ? areas : []).map((area) => {
                     const isExpanded = expandedAreas.has(area.name);
                     const taskCount = (Array.isArray(area.products) ? area.products : []).reduce(
-                      (sum, p) => sum + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => showArchive || t.drawer !== "ARCHIVE").length,
+                      (sum, p) => sum + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t && (showArchive || t.drawer !== "ARCHIVE")).length,
                       0
                     );
 
@@ -2995,7 +3077,7 @@ function DashboardContent() {
                             {area.products.length > 0 ? (
                               area.products.map((product) => {
                                 const productTaskCount = product.tasks.filter(
-                                  (t) => showArchive || t.drawer !== "ARCHIVE"
+                                  (t) => t && (showArchive || t.drawer !== "ARCHIVE")
                                 ).length;
                                 return (
                                   <div
@@ -3107,7 +3189,7 @@ function DashboardContent() {
                         areaName={area.name}
                         productCount={area.products.length}
                         taskCount={area.products.reduce(
-                          (sum, p) => sum + p.tasks.filter((t) => showArchive || t.drawer !== "ARCHIVE").length,
+                          (sum, p) => sum + p.tasks.filter((t) => t && (showArchive || t.drawer !== "ARCHIVE")).length,
                           0
                         )}
                         isOver={overDropId === `area-${area.id}`}
@@ -3129,7 +3211,7 @@ function DashboardContent() {
                               productLifecycle={product.lifecycle}
                               productStatus={product.status}
                               referenceCount={product.referenceCount}
-                              tasks={showArchive ? product.tasks : product.tasks.filter((t) => t.drawer !== "ARCHIVE")}
+                              tasks={showArchive ? product.tasks : product.tasks.filter((t) => t && t.drawer !== "ARCHIVE")}
                               isOver={overDropId === `product-${product.id}`}
                               milestones={milestones}
                               areaId={area.id}
@@ -3224,7 +3306,7 @@ function DashboardContent() {
                 <TimelineView
                   tasks={areas
                     .flatMap((a) => a.products.flatMap((p) => p.tasks))
-                    .filter((t) => showArchive || t.drawer !== "ARCHIVE")}
+                    .filter((t) => t && (showArchive || t.drawer !== "ARCHIVE"))}
                   drawerConfig={DRAWER_CONFIG}
                   milestones={milestones}
                   onSetDueDate={(task) => {
@@ -3240,7 +3322,7 @@ function DashboardContent() {
                     ...area,
                     products: (Array.isArray(area.products) ? area.products : []).map((product) => ({
                       ...product,
-                      tasks: product.tasks.filter((t) => showArchive || t.drawer !== "ARCHIVE"),
+                      tasks: product.tasks.filter((t) => t && (showArchive || t.drawer !== "ARCHIVE")),
                     })),
                   }))}
                   milestones={milestones}
@@ -3288,7 +3370,7 @@ function DashboardContent() {
               const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
               if (libraryRes.ok) {
                 const libraryData = await libraryRes.json();
-                setAreas(libraryData.data?.areas || []);
+                setAreas(cleanLibraryData(libraryData.data?.areas || []));
               }
             }
           }}
@@ -3312,7 +3394,7 @@ function DashboardContent() {
               const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
               if (libraryRes.ok) {
                 const libraryData = await libraryRes.json();
-                setAreas(libraryData.data?.areas || []);
+                setAreas(cleanLibraryData(libraryData.data?.areas || []));
               }
             }
           }}
@@ -3334,7 +3416,7 @@ function DashboardContent() {
               const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
               if (libraryRes.ok) {
                 const libraryData = await libraryRes.json();
-                const areas = libraryData.data?.areas || [];
+                const areas = cleanLibraryData(libraryData.data?.areas || []);
                 setAreas(areas);
                 setExpandedAreas(new Set((Array.isArray(areas) ? areas : []).map((a: ApiArea) => a.name)));
               }
@@ -3366,6 +3448,7 @@ function DashboardContent() {
                   if (selectedTask) {
                     const updatedTask = (Array.isArray(areas) ? areas : [])
                       .flatMap((a: ApiArea) => (Array.isArray(a.products) ? a.products : []).flatMap((p: ApiProduct) => Array.isArray(p.tasks) ? p.tasks : []))
+                      .filter((t: TaskCard) => t != null)
                       .find((t: TaskCard) => t.id === selectedTask.id);
                     if (updatedTask) {
                       setSelectedTask(updatedTask);
@@ -3409,6 +3492,7 @@ function DashboardContent() {
             onSetDueDate={(taskId) => {
               const task = areas
                 .flatMap((a) => a.products.flatMap((p) => p.tasks))
+                .filter((t) => t != null)
                 .find((t) => t.id === taskId);
               if (task) {
                 setEditingTaskForDueDate(task);
@@ -3753,7 +3837,7 @@ function DashboardContent() {
               const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
               if (libraryRes.ok) {
                 const libraryData = await libraryRes.json();
-                const areas = libraryData.data?.areas || [];
+                const areas = cleanLibraryData(libraryData.data?.areas || []);
                 setAreas(areas);
                 setExpandedAreas(new Set((Array.isArray(areas) ? areas : []).map((a: ApiArea) => a.name)));
               }

@@ -88,7 +88,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (context) => TaskEditBottomSheet(task: widget.task),
+        builder: (context) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: TaskEditBottomSheet(task: widget.task),
+        ),
       );
     }
   }
@@ -172,8 +177,6 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildContentSection(),
-                      const SizedBox(height: 16),
                       _buildDatesSection(),
                       const SizedBox(height: 16),
                       _buildTagsSection(),
@@ -234,45 +237,6 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           IconButton(
             icon: const Icon(Icons.close, color: Colors.white70),
             onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContentSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.notes, size: 18, color: Color(0xFF6C63FF)),
-              const SizedBox(width: 8),
-              const Text(
-                "任務內容",
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            widget.task.content,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              height: 1.5,
-            ),
           ),
         ],
       ),
@@ -387,13 +351,11 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          // 橫向排列的標籤
-          Wrap(
-            spacing: 8,
-            runSpacing: 0,
+          // 單行排列的標籤
+          Row(
             children: [
               // Area
-              if (widget.task.areaName != null)
+              if (widget.task.areaName != null) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
@@ -402,26 +364,20 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                     border: Border.all(
                         color: const Color(0xFF6C63FF).withValues(alpha: 0.4)),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.category,
-                          size: 14, color: Color(0xFF6C63FF)),
-                      const SizedBox(width: 6),
-                      Text(
-                        widget.task.areaName!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  child: Text(
+                    widget.task.areaName!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const SizedBox(width: 8),
+              ],
               // Product
-              if (widget.task.productName != null)
+              if (widget.task.productName != null) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
@@ -430,50 +386,38 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                     border: Border.all(
                         color: Colors.green.withValues(alpha: 0.4)),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.work_outline,
-                          size: 14, color: Colors.green),
-                      const SizedBox(width: 6),
-                      Text(
-                        widget.task.productName!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  child: Text(
+                    widget.task.productName!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              // Topic
+                const SizedBox(width: 8),
+              ],
+              // Topic - 使用 Expanded 讓它佔據剩餘空間並可截斷
               if (widget.task.topicName != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border:
-                        Border.all(color: Colors.purple.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.label_outline,
-                          size: 14, color: Colors.purple),
-                      const SizedBox(width: 6),
-                      Text(
-                        widget.task.topicName!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border:
+                          Border.all(color: Colors.purple.withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      widget.task.topicName!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
                       ),
-                    ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
             ],

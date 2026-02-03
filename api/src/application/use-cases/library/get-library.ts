@@ -118,41 +118,52 @@ export class GetLibraryUseCase {
       orderBy: { name: 'asc' },
     })
 
-    // 4. 轉換為前端格式
-    const formattedAreas: AreaData[] = areas.map((area) => ({
+    // 4. 轉換為前端格式（加入嚴格的 null 過濾）
+    const formattedAreas: AreaData[] = areas
+      .filter((area) => area != null)
+      .map((area) => ({
       id: area.id,
       name: area.name,
       description: area.description,
       scope: area.scope,
-      products: area.products.map((product) => {
-        // 計算 product 層級的 references 數量
-        const productRefs = (product.references as Array<unknown>) || []
-        // 計算所有 task 層級的 references 數量
-        const taskRefsCount = product.tasks.reduce((sum, task) => {
-          const taskRefs = (task.references as Array<unknown>) || []
-          return sum + taskRefs.length
-        }, 0)
-        const totalReferenceCount = productRefs.length + taskRefsCount
+      products: area.products
+        .filter((product) => product != null)
+        .map((product) => {
+          // 計算 product 層級的 references 數量
+          const productRefs = (product.references as Array<unknown>) || []
+          // 計算所有 task 層級的 references 數量（過濾 null tasks）
+          const taskRefsCount = product.tasks
+            .filter((task) => task != null)
+            .reduce((sum, task) => {
+              const taskRefs = (task.references as Array<unknown>) || []
+              return sum + taskRefs.length
+            }, 0)
+          const totalReferenceCount = productRefs.length + taskRefsCount
 
-        return {
-          id: product.id,
-          name: product.name,
-          description: product.description,
-          status: product.status,
-          lifecycle: product.lifecycle,
-          referenceCount: totalReferenceCount,
-          tasks: product.tasks.map((task) => {
+          return {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            status: product.status,
+            lifecycle: product.lifecycle,
+            referenceCount: totalReferenceCount,
+            tasks: product.tasks
+              .filter((task) => task != null)
+              .map((task) => {
             const analysis = task.ai_analysis as Record<string, unknown> | null
 
-            // 提取 sub_items
-            const subItems = (task.sub_items as Array<{
-              id: string
-              content: string
-              completed: boolean
-              created_at: string
-              completed_at: string | null
-              order: number
-            }>) || []
+            // 提取並清理 sub_items（過濾 null 和驗證必要欄位）
+            const rawSubItems = (task.sub_items as Array<any>) || []
+            const subItems = rawSubItems
+              .filter((item) => item != null && item.id && item.content)
+              .map((item) => ({
+                id: item.id,
+                content: item.content,
+                completed: Boolean(item.completed),
+                created_at: item.created_at || new Date().toISOString(),
+                completed_at: item.completed_at || null,
+                order: Number(item.order) || 0,
+              }))
 
             const subItemsMeta =
               subItems.length > 0
@@ -165,14 +176,17 @@ export class GetLibraryUseCase {
                   }
                 : { total: 0, completed: 0, completion_rate: 0 }
 
-            // 提取 references
-            const references = (task.references as Array<{
-              id: string
-              type: 'url' | 'note'
-              content: string
-              title?: string | null
-              created_at: string
-            }>) || []
+            // 提取並清理 references（過濾 null 和驗證必要欄位）
+            const rawReferences = (task.references as Array<any>) || []
+            const references = rawReferences
+              .filter((ref) => ref != null && ref.id && ref.type && ref.content)
+              .map((ref) => ({
+                id: ref.id,
+                type: ref.type as 'url' | 'note',
+                content: ref.content,
+                title: ref.title || null,
+                created_at: ref.created_at || new Date().toISOString(),
+              }))
 
             return {
               id: task.id,

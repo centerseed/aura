@@ -68,6 +68,7 @@ describe('GetProductsUseCase', () => {
         created_at: now,
         updated_at: now,
         references: [],
+        total_reference_count: 0,
         tasks: [],
         area: {
           id: 'area-123',

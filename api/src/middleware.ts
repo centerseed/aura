@@ -12,6 +12,10 @@ export function middleware(request: NextRequest) {
   const allowedOrigins = [
     'http://localhost:3001', // 本地開發 Web
     'http://localhost:3000', // 備用端口
+    'https://zentropy-4f7a5.web.app', // Firebase Hosting
+    'https://zentropy-4f7a5.firebaseapp.com', // Firebase 備用域名
+    'https://zentropy.cc', // 自訂網域
+    'https://www.zentropy.cc', // 自訂網域 (www)
   ]
 
   // 如果有設定生產環境的前端 URL，也加入允許清單

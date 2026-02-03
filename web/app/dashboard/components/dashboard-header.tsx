@@ -21,9 +21,9 @@ interface DashboardHeaderProps {
  * 視圖模式配置
  */
 const VIEW_MODES: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
-  { mode: 'structure', icon: LayoutGrid, label: '結構' },
-  { mode: 'timeline', icon: Clock, label: '時間軸' },
-  { mode: 'gantt', icon: Target, label: '甘特圖' },
+  { mode: 'structure', icon: LayoutGrid, label: '結構視圖' },
+  { mode: 'timeline', icon: Clock, label: '時間視圖' },
+  { mode: 'load', icon: Target, label: '負載視圖' },
 ]
 
 export function DashboardHeader({ userName, viewMode, onViewModeChange }: DashboardHeaderProps) {

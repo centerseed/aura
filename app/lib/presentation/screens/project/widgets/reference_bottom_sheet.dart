@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../domain/entities/reference.dart';
+import '../../../providers/product_reference_provider.dart';
 
 /// Reference BottomSheet - 顯示和管理 Product 的參考資料
 ///
@@ -12,10 +13,10 @@ import '../../../../domain/entities/reference.dart';
 /// - 新增 reference
 /// - 刪除 reference
 /// - URL 類型可以點擊打開
+/// - 自動監聽 provider 並刷新列表
 class ReferenceBottomSheet extends ConsumerStatefulWidget {
   final String productId;
   final String productName;
-  final List<Reference> references;
   final Future<void> Function(String type, String content, String? title) onAddReference;
   final Future<void> Function(String referenceId) onDeleteReference;
 
@@ -23,7 +24,6 @@ class ReferenceBottomSheet extends ConsumerStatefulWidget {
     super.key,
     required this.productId,
     required this.productName,
-    required this.references,
     required this.onAddReference,
     required this.onDeleteReference,
   });
@@ -89,6 +89,9 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // 監聽 reference provider
+    final referencesAsync = ref.watch(productReferencesUnwrappedProvider(widget.productId));
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
@@ -100,20 +103,48 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         child: BackdropFilter(
           filter: dart_ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: _buildContent(),
-              ),
-            ],
+          child: referencesAsync.when(
+            data: (references) => Column(
+              children: [
+                _buildHeader(references.length),
+                Expanded(
+                  child: _buildReferenceList(references),
+                ),
+                _buildAddReferenceForm(),
+              ],
+            ),
+            loading: () => Column(
+              children: [
+                _buildHeader(0),
+                const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C63FF)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            error: (error, stack) => Column(
+              children: [
+                _buildHeader(0),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      '載入失敗: $error',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(int referenceCount) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -153,7 +184,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '相關資料 (${widget.references.length})',
+                      '相關資料 ($referenceCount)',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 14,
@@ -173,20 +204,15 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildReferenceList(List<Reference> references) {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       children: [
         // Reference List
-        if (widget.references.isEmpty)
+        if (references.isEmpty)
           _buildEmptyState()
         else
-          ...widget.references.map((ref) => _buildReferenceItem(ref)),
-
-        const SizedBox(height: 24),
-
-        // Add Reference Form
-        _buildAddReferenceForm(),
+          ...references.map((ref) => _buildReferenceItem(ref)),
       ],
     );
   }

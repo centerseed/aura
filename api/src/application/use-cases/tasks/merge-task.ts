@@ -86,8 +86,8 @@ export class MergeTaskUseCase {
       id: item.id,
       content: item.content,
       completed: item.completed,
-      created_at: item.createdAt.toISOString(),
-      completed_at: item.completedAt?.toISOString() || null,
+      created_at: this.safeToISOString(item.createdAt) || new Date().toISOString(),
+      completed_at: this.safeToISOString(item.completedAt),
       order: item.order,
     }))
 
@@ -184,5 +184,16 @@ export class MergeTaskUseCase {
         'targetTaskId'
       )
     }
+  }
+
+  /**
+   * 安全的日期轉換為 ISO 字串
+   * 處理 Invalid Date 或 null/undefined 的情況
+   */
+  private safeToISOString(date: Date | null | undefined): string | null {
+    if (!date) return null
+    if (!(date instanceof Date)) return null
+    if (isNaN(date.getTime())) return null
+    return date.toISOString()
   }
 }

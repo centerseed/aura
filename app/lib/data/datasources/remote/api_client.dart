@@ -187,4 +187,22 @@ class ApiClient {
     final response = await _dio.post('/auth/signin', data: body);
     return response.data;
   }
+
+  // ==================== User ====================
+
+  Future<Map<String, dynamic>> getCurrentUser() async {
+    final response = await _dio.get('/me');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> getUserStatistics() async {
+    final response = await _dio.get('/me/statistics');
+    // API 返回格式: {data: {statistics: {...}}, meta: {...}}
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateCurrentUser(Map<String, dynamic> body) async {
+    final response = await _dio.patch('/me', data: body);
+    return response.data;
+  }
 }

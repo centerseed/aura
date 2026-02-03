@@ -1,12 +1,28 @@
 import { defineConfig } from 'vitest/config'
 import path from 'path'
+import dotenv from 'dotenv'
+
+// 載入 .env.test
+dotenv.config({ path: '.env.test' })
+
+// 設定 DATABASE_URL
+if (process.env.DATABASE_URL_TEST) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL_TEST
+}
+
+// 🛡️ 阻斷生產資料庫
+if (process.env.DATABASE_URL?.includes('supabase')) {
+  console.error('🚨 DATABASE_URL 指向 Supabase，測試終止')
+  process.exit(1)
+}
 
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
     setupFiles: ['./tests/setup.ts'],
-    fileParallelism: false, // 整合測試需要順序執行避免資料衝突
+    fileParallelism: false,
+    testTimeout: 30000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -24,7 +40,7 @@ export default defineConfig({
         '.next/',
         'dist/',
         'coverage/',
-        'src/app/**/*.ts', // Exclude API routes - interface layer
+        'src/app/**/*.ts',
       ],
     },
   },

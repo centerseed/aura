@@ -28,6 +28,7 @@ _$ProductModelImpl _$$ProductModelImplFromJson(Map<String, dynamic> json) =>
       references: (json['references'] as List<dynamic>?)
           ?.map((e) => ReferenceModel.fromJson(e as Map<String, dynamic>))
           .toList(),
+      totalReferenceCount: (json['total_reference_count'] as num?)?.toInt(),
       tasks: (json['tasks'] as List<dynamic>?)
           ?.map((e) => TaskModel.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -55,6 +56,8 @@ Map<String, dynamic> _$$ProductModelImplToJson(
     'deleted_at': value,
   if (instance.references?.map((e) => e.toJson()).toList() case final value?)
     'references': value,
+  if (instance.totalReferenceCount case final value?)
+    'total_reference_count': value,
   if (instance.tasks?.map((e) => e.toJson()).toList() case final value?)
     'tasks': value,
   if (instance.recentTasks?.map((e) => e.toJson()).toList() case final value?)

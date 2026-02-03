@@ -102,7 +102,7 @@ export function AreaModal({
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || "更新失敗");
+          throw new Error(data.error?.message || "更新失敗");
         }
       } else {
         // 創建新 Area
@@ -123,7 +123,7 @@ export function AreaModal({
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || "創建失敗");
+          throw new Error(data.error?.message || "創建失敗");
         }
       }
 
@@ -164,7 +164,7 @@ export function AreaModal({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.details || data.error || "刪除失敗");
+        throw new Error(data.error?.message || "刪除失敗");
       }
 
       onSuccess();

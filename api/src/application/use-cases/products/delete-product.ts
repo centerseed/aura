@@ -57,7 +57,7 @@ export class DeleteProductUseCase {
     // 3. 檢查是否有關聯的未完成 Tasks
     if (existing.tasks.length > 0) {
       throw new ConflictException(
-        `Cannot delete product with active tasks. This product has ${existing.tasks.length} active task(s). Please complete, delete, or move them first.`
+        `無法刪除此專案，因為還有 ${existing.tasks.length} 個進行中的任務。請先完成、刪除或移動這些任務。`
       )
     }
 

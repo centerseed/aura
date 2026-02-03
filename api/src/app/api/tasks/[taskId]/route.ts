@@ -10,6 +10,7 @@ import { prisma } from '@/lib/db'
 import {
   ApiResponseBuilder,
   catchDomainException, ValidationException } from '@/lib/api-response'
+import { safeToISOString, safeToISOStringRequired } from '@/lib/date-utils'
 import { GetTaskByIdUseCase } from '@/application/use-cases/tasks/get-task-by-id'
 import { DeleteTaskUseCase } from '@/application/use-cases/tasks/delete-task'
 import { UpdateTaskUseCase } from '@/application/use-cases/tasks/update-task'
@@ -65,24 +66,24 @@ export async function GET(
         id: s.id,
         content: s.content,
         completed: s.completed,
-        created_at: s.createdAt.toISOString(),
-        completed_at: s.completedAt?.toISOString() || null,
+        created_at: safeToISOStringRequired(s.createdAt),
+        completed_at: safeToISOString(s.completedAt),
         order: s.order,
       })),
       strategy_used: analysis.strategyUsed || null,
       reasoning: analysis.reasoning || null,
-      start_date: task.startDate?.toISOString() || null,
-      due_date: task.dueDate?.toISOString() || null,
+      start_date: safeToISOString(task.startDate),
+      due_date: safeToISOString(task.dueDate),
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
-      updated_at: task.updatedAt.toISOString(),
-      created_at: task.createdAt.toISOString(),
+      updated_at: safeToISOStringRequired(task.updatedAt),
+      created_at: safeToISOStringRequired(task.createdAt),
       references: task.references.map((r) => ({
         id: r.id,
         type: r.type,
         content: r.content,
         title: r.title || null,
-        created_at: r.createdAt.toISOString(),
+        created_at: safeToISOStringRequired(r.createdAt),
       })),
     }
 
@@ -165,24 +166,24 @@ export async function PATCH(
         id: s.id,
         content: s.content,
         completed: s.completed,
-        created_at: s.createdAt.toISOString(),
-        completed_at: s.completedAt?.toISOString() || null,
+        created_at: safeToISOStringRequired(s.createdAt),
+        completed_at: safeToISOString(s.completedAt),
         order: s.order,
       })),
       strategy_used: analysis.strategyUsed || null,
       reasoning: analysis.reasoning || null,
-      start_date: task.startDate?.toISOString() || null,
-      due_date: task.dueDate?.toISOString() || null,
+      start_date: safeToISOString(task.startDate),
+      due_date: safeToISOString(task.dueDate),
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
-      updated_at: task.updatedAt.toISOString(),
-      created_at: task.createdAt.toISOString(),
+      updated_at: safeToISOStringRequired(task.updatedAt),
+      created_at: safeToISOStringRequired(task.createdAt),
       references: task.references.map((r) => ({
         id: r.id,
         type: r.type,
         content: r.content,
         title: r.title || null,
-        created_at: r.createdAt.toISOString(),
+        created_at: safeToISOStringRequired(r.createdAt),
       })),
     }
 

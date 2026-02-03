@@ -705,19 +705,14 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.5)),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.category, size: 14, color: Color(0xFF6C63FF)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  selectedArea.name,
-                                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                            child: Center(
+                              child: Text(
+                                selectedArea.name,
+                                style: const TextStyle(color: Colors.white, fontSize: 11),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
                         );
@@ -791,19 +786,14 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.work_outline, size: 14, color: Colors.green),
-                                const SizedBox(height: 4),
-                                Text(
-                                  selectedProduct.name,
-                                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                            child: Center(
+                              child: Text(
+                                selectedProduct.name,
+                                style: const TextStyle(color: Colors.white, fontSize: 11),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
                         );
@@ -830,19 +820,14 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.purple.withValues(alpha: 0.5)),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.label_outline, size: 14, color: Colors.purple),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.task.topicName ?? '未分類',
-                          style: const TextStyle(color: Colors.white, fontSize: 11),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                    child: Center(
+                      child: Text(
+                        widget.task.topicName ?? '未分類',
+                        style: const TextStyle(color: Colors.white, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
                 ),

@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { ApiResponseBuilder, catchDomainException, NotFoundException, ValidationException } from "@/lib/api-response";
 
 interface Reference {
   id: string;
@@ -25,7 +26,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
-  try {
+  return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma);
 
     // 查詢 product 並驗證屬於當前用戶
@@ -44,7 +45,7 @@ export async function GET(
     });
 
     if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      throw new NotFoundException("Product");
     }
 
     const allReferences: ReferenceWithSource[] = [];
@@ -52,6 +53,11 @@ export async function GET(
     // 1. 加入 product 層級的 references
     const productReferences = (product.references as unknown as Reference[]) || [];
     for (const ref of productReferences) {
+      // 過濾掉格式不完整的 reference（必須有 id, type, content）
+      if (!ref?.id || !ref?.type || !ref?.content) {
+        console.warn(`⚠️ Skipping invalid product reference:`, ref);
+        continue;
+      }
       allReferences.push({
         ...ref,
         source: "product",
@@ -65,6 +71,11 @@ export async function GET(
     for (const task of product.tasks) {
       const taskReferences = (task.references as unknown as Reference[]) || [];
       for (const ref of taskReferences) {
+        // 過濾掉格式不完整的 reference（必須有 id, type, content）
+        if (!ref?.id || !ref?.type || !ref?.content) {
+          console.warn(`⚠️ Skipping invalid task reference in task ${task.id}:`, ref);
+          continue;
+        }
         allReferences.push({
           ...ref,
           source: "task",
@@ -80,29 +91,17 @@ export async function GET(
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
-    return NextResponse.json({
-      success: true,
-      productId: product.id,
-      productName: product.name,
-      references: allReferences,
-      total: allReferences.length,
-    });
-  } catch (error) {
-    console.error("Get product references failed:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    if (errorMessage.includes("token")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    return NextResponse.json(
+    return ApiResponseBuilder.success(
       {
-        error: "Failed to get product references",
-        details: errorMessage,
+        productId: product.id,
+        productName: product.name,
+        references: allReferences,
       },
-      { status: 500 }
+      {
+        total: allReferences.length,
+      }
     );
-  }
+  });
 }
 
 // POST /api/products/[id]/references - 新增 product 層級的 reference
@@ -111,24 +110,18 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
-  try {
+  return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma);
     const body = await request.json() as any;
     const { type, content, title } = body;
 
     // 驗證必填欄位
     if (!type || !["url", "note"].includes(type)) {
-      return NextResponse.json(
-        { error: "'type' must be 'url' or 'note'" },
-        { status: 400 }
-      );
+      throw new ValidationException("'type' must be 'url' or 'note'");
     }
 
     if (!content || typeof content !== "string" || !content.trim()) {
-      return NextResponse.json(
-        { error: "'content' is required and cannot be empty" },
-        { status: 400 }
-      );
+      throw new ValidationException("'content' is required and cannot be empty");
     }
 
     // 查詢 product 並驗證屬於當前用戶
@@ -137,7 +130,7 @@ export async function POST(
     });
 
     if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      throw new NotFoundException("Product");
     }
 
     // 獲取現有的 references
@@ -164,27 +157,15 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      reference: newReference,
-      total: updatedReferences.length,
-    });
-  } catch (error) {
-    console.error("Add product reference failed:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    if (errorMessage.includes("token")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    return NextResponse.json(
+    return ApiResponseBuilder.success(
       {
-        error: "Failed to add reference",
-        details: errorMessage,
+        reference: newReference,
       },
-      { status: 500 }
+      {
+        total: updatedReferences.length,
+      }
     );
-  }
+  });
 }
 
 // PATCH /api/products/[id]/references - 更新 reference（標題和內容）
@@ -193,23 +174,17 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
-  try {
+  return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma);
     const body = await request.json() as any;
     const { referenceId, taskId, title, content } = body;
 
     if (!referenceId) {
-      return NextResponse.json(
-        { error: "'referenceId' is required" },
-        { status: 400 }
-      );
+      throw new ValidationException("'referenceId' is required");
     }
 
     if (!content || typeof content !== "string" || !content.trim()) {
-      return NextResponse.json(
-        { error: "'content' is required and cannot be empty" },
-        { status: 400 }
-      );
+      throw new ValidationException("'content' is required and cannot be empty");
     }
 
     // 查詢 product 並驗證屬於當前用戶
@@ -227,7 +202,7 @@ export async function PATCH(
     });
 
     if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      throw new NotFoundException("Product");
     }
 
     let updated = false;
@@ -314,31 +289,13 @@ export async function PATCH(
     }
 
     if (!updated) {
-      return NextResponse.json(
-        { error: "Reference not found" },
-        { status: 404 }
-      );
+      throw new NotFoundException("Reference");
     }
 
-    return NextResponse.json({
-      success: true,
+    return ApiResponseBuilder.success({
+      message: "Reference updated successfully",
     });
-  } catch (error) {
-    console.error("Update reference failed:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    if (errorMessage.includes("token")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    return NextResponse.json(
-      {
-        error: "Failed to update reference",
-        details: errorMessage,
-      },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 // DELETE /api/products/[id]/references?referenceId=xxx - 刪除 reference（不論是 product 或 task 的）
@@ -347,17 +304,14 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
-  try {
+  return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma);
     const { searchParams } = new URL(request.url);
     const referenceId = searchParams.get("referenceId");
     const taskId = searchParams.get("taskId"); // 可選，如果提供則從特定 task 刪除
 
     if (!referenceId) {
-      return NextResponse.json(
-        { error: "'referenceId' query parameter is required" },
-        { status: 400 }
-      );
+      throw new ValidationException("'referenceId' query parameter is required");
     }
 
     // 查詢 product 並驗證屬於當前用戶
@@ -375,7 +329,7 @@ export async function DELETE(
     });
 
     if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      throw new NotFoundException("Product");
     }
 
     let deleted = false;
@@ -441,29 +395,11 @@ export async function DELETE(
     }
 
     if (!deleted) {
-      return NextResponse.json(
-        { error: "Reference not found" },
-        { status: 404 }
-      );
+      throw new NotFoundException("Reference");
     }
 
-    return NextResponse.json({
-      success: true,
+    return ApiResponseBuilder.success({
+      message: "Reference deleted successfully",
     });
-  } catch (error) {
-    console.error("Delete reference failed:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    if (errorMessage.includes("token")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    return NextResponse.json(
-      {
-        error: "Failed to delete reference",
-        details: errorMessage,
-      },
-      { status: 500 }
-    );
-  }
+  });
 }

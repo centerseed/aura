@@ -22,6 +22,7 @@ class ProductModel with _$ProductModel {
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
     // 關聯資料
     List<ReferenceModel>? references,
+    @JsonKey(name: 'total_reference_count') int? totalReferenceCount,
     List<TaskModel>? tasks,
     @JsonKey(name: 'recent_tasks') List<TaskModel>? recentTasks,
   }) = _ProductModel;
@@ -42,6 +43,7 @@ class ProductModel with _$ProductModel {
     createdAt: createdAt,
     updatedAt: updatedAt,
     references: references?.map((r) => r.toEntity()).toList(),
+    totalReferenceCount: totalReferenceCount,
     tasks: tasks?.map((t) => t.toEntity()).toList(),
     recentTasks: recentTasks?.map((t) => t.toEntity()).toList(),
   );

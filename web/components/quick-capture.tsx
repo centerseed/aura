@@ -16,8 +16,6 @@ import {
   ArrowRight,
   Merge,
   FileText,
-  Calendar,
-  AlertCircle,
   Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -130,6 +128,21 @@ interface AreaWithProducts {
   }>;
 }
 
+// 聊天訊息類型
+interface ChatMessage {
+  id: string;
+  type: 'user' | 'ai';
+  timestamp: Date;
+  content: string; // 用戶的原始輸入或 AI 的文字回應
+  data?: {
+    // AI 回應的數據
+    action: 'create_new_tasks' | 'append_sub_item' | 'adjust_tags';
+    items?: ProcessedItem[]; // 創建新任務
+    appendResult?: BrainDumpAppendSubItemResponse; // 追加 sub-item
+    adjustmentResult?: AdjustmentResult; // 標籤調整
+  };
+}
+
 interface QuickCaptureProps {
   userId: string | null;
   onItemsCreated: () => void;
@@ -153,6 +166,10 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   } | null>(null);
   const [selectedOperationIds, setSelectedOperationIds] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // 聊天訊息歷史
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // @ mention 相關狀態
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
@@ -198,6 +215,13 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   useEffect(() => {
     setSelectedMentionIndex(0);
   }, [filteredProducts.length]);
+
+  // 自動滾動到最新訊息
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   // 處理輸入變化，偵測 @ mention
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -294,14 +318,172 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     }
   };
 
+  // 渲染單個聊天訊息
+  const renderChatMessage = (message: ChatMessage) => {
+    const isUser = message.type === 'user';
+
+    return (
+      <div
+        key={message.id}
+        className={`flex gap-2 mb-3 animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+          isUser ? 'justify-end' : 'justify-start'
+        }`}
+      >
+        {/* AI 頭像 */}
+        {!isUser && (
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+        )}
+
+        {/* 訊息氣泡 */}
+        <div className={`flex-1 max-w-[85%] ${isUser ? 'ml-auto' : ''}`}>
+          {/* 用戶訊息 */}
+          {isUser && (
+            <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5">
+              <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+            </div>
+          )}
+
+          {/* AI 訊息 */}
+          {!isUser && (
+            <div className="bg-white/10 border border-white/10 text-white rounded-2xl rounded-tl-sm px-4 py-3">
+              <p className="text-sm mb-2">{message.content}</p>
+
+              {/* AI 回應的具體內容 */}
+              {message.data && (
+                <div className="mt-3 space-y-2">
+                  {/* 創建新任務 */}
+                  {message.data.action === 'create_new_tasks' && message.data.items && (
+                    <div className="space-y-2">
+                      {message.data.items.map((item, index) => (
+                        <div
+                          key={item.id || index}
+                          className="p-2.5 rounded-lg bg-white/5 border border-white/10"
+                        >
+                          <h4 className="font-medium text-white text-sm mb-1">{item.title}</h4>
+
+                          {/* 標籤路徑 */}
+                          <div className="flex items-center gap-1.5 text-xs text-white/50 mb-2 flex-wrap">
+                            <FolderOpen className="w-3 h-3" />
+                            <span className="text-indigo-400">{item.tag.area}</span>
+                            <span className="text-white/30">/</span>
+                            <Package className="w-3 h-3" />
+                            <span className="text-blue-400">{item.tag.product}</span>
+                            <span className="text-white/30">/</span>
+                            <Tag className="w-3 h-3" />
+                            <span className="text-green-400">{item.tag.topic}</span>
+                          </div>
+
+                          {/* AI 思考過程 */}
+                          <div className="text-xs text-white/40 bg-white/5 rounded-md p-2 space-y-1">
+                            <div>
+                              <span className="text-indigo-400/70">分類思路：</span> {item.reasoning}
+                            </div>
+                            {item.due_date_source?.reasoning && (
+                              <div className="border-t border-white/10 pt-1 mt-1">
+                                <span className="text-blue-400/70">
+                                  <Clock className="w-3 h-3 inline mr-1" />
+                                  時間推斷：
+                                </span>{" "}
+                                {item.due_date_source.reasoning}
+                                {item.due_date_source.confidence !== null && item.due_date_source.confidence !== undefined && (
+                                  <span
+                                    className={`ml-2 ${
+                                      item.due_date_source.confidence >= 0.8 ? "text-green-400/70" :
+                                      item.due_date_source.confidence >= 0.5 ? "text-blue-400/70" :
+                                      "text-orange-400/70"
+                                    }`}
+                                  >
+                                    (信心 {Math.round(item.due_date_source.confidence * 100)}%)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 追加 sub-item */}
+                  {message.data.action === 'append_sub_item' && message.data.appendResult && (
+                    <div className="space-y-2">
+                      {/* 目標任務 */}
+                      {message.data.appendResult.target_task?.content && (
+                        <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                          <div className="flex items-center gap-2 mb-1">
+                            <FileText className="w-3 h-3 text-blue-400" />
+                            <span className="text-xs text-blue-300 font-medium">追加到任務</span>
+                          </div>
+                          <p className="text-xs text-white/90">{message.data.appendResult.target_task.content}</p>
+                        </div>
+                      )}
+
+                      {/* 新增的 sub-items */}
+                      {message.data.appendResult.appended_sub_items && message.data.appendResult.appended_sub_items.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs text-white/50 font-medium">新增的待辦事項：</p>
+                          {message.data.appendResult.appended_sub_items.map((subItem, index) => (
+                            <div
+                              key={subItem.id || index}
+                              className="p-2 rounded-lg bg-white/5 border border-white/10"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-white/40 text-xs">☐</span>
+                                <span className="text-xs text-white/90">{subItem.content}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* AI 思考 */}
+                      {message.data.appendResult.reasoning && (
+                        <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+                          <p className="text-xs text-white/50 mb-1">AI 思考：</p>
+                          <p className="text-xs text-white/70">{message.data.appendResult.reasoning}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 時間戳記 */}
+          <p className={`text-xs text-white/30 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
+            {message.timestamp.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+
+        {/* 用戶頭像（可選） */}
+        {isUser && (
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-xs font-medium">我</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleSubmit = async () => {
     if (!userId || !input.trim() || isProcessing) return;
 
+    const userInput = input.trim();
+
+    // 添加用戶訊息到聊天記錄
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      timestamp: new Date(),
+      content: userInput,
+    };
+    setMessages(prev => [...prev, userMessage]);
+
     setIsProcessing(true);
-    setShowResults(true);
-    setProcessedItems([]);
-    setAdjustmentResult(null);
-    setAppendResult(null);
+    setInput("");
 
     try {
       // 獲取 Firebase token
@@ -317,28 +499,44 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ text: input, userId }),
+        body: JSON.stringify({ text: userInput, userId }),
       });
 
       if (!res.ok) {
         throw new Error("AI 處理失敗");
       }
 
-      const data: BrainDumpResponse = await res.json();
+      const response = await res.json();
+      const data: BrainDumpResponse = response.data; // 從 API 回應中提取 data 欄位
 
-      // 根據 action 類型處理回應
+      // 添加 AI 回應到聊天記錄
+      const aiMessage: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        type: 'ai',
+        timestamp: new Date(),
+        content: data.action === 'create_new_tasks'
+          ? `已為你整理 ${data.items?.length || 0} 個任務`
+          : `已追加 ${data.appended_sub_items?.length || 0} 個待辦事項${data.target_task?.content ? `到「${data.target_task.content}」` : ''}`,
+        data: {
+          action: data.action,
+          ...(data.action === 'create_new_tasks' && { items: data.items }),
+          ...(data.action === 'append_sub_item' && { appendResult: data }),
+        },
+      };
+      setMessages(prev => [...prev, aiMessage]);
+
+      // 兼容現有代碼，設置舊的狀態
       if (data.action === 'create_new_tasks') {
         setProcessedItems(data.items || []);
       } else if (data.action === 'append_sub_item') {
         setAppendResult(data);
       }
-
-      setInput("");
+      setShowResults(true);
 
       // 通知父組件刷新數據
       onItemsCreated();
 
-      // 5 秒後自動隱藏結果
+      // 5 秒後自動隱藏結果（保留舊行為）
       setTimeout(() => {
         setShowResults(false);
         setProcessedItems([]);
@@ -346,6 +544,14 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }, 5000);
     } catch (err) {
       console.error("Quick capture failed:", err);
+      // 添加錯誤訊息到聊天記錄
+      const errorMessage: ChatMessage = {
+        id: `error-${Date.now()}`,
+        type: 'ai',
+        timestamp: new Date(),
+        content: '抱歉，處理失敗了。請稍後再試。',
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsProcessing(false);
     }
@@ -489,83 +695,13 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
               </div>
             </div>
 
-            {/* 處理結果顯示 - 創建新任務 */}
-            {showResults && processedItems.length > 0 && (
-              <div className="max-h-64 overflow-y-auto border-b border-white/10">
-                <div className="p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-green-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>AI 已整理 {processedItems.length} 個項目</span>
-                  </div>
-                  {processedItems.map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      className="p-3 rounded-lg bg-white/5 border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <h4 className="font-medium text-white text-sm mb-1">{item.title}</h4>
-                      <div className="flex items-center gap-1.5 text-xs text-white/50 mb-2">
-                        <FolderOpen className="w-3 h-3" />
-                        <span className="text-indigo-400">{item.tag.area}</span>
-                        <span className="text-white/30">/</span>
-                        <Package className="w-3 h-3" />
-                        <span className="text-blue-400">{item.tag.product}</span>
-                        <span className="text-white/30">/</span>
-                        <Tag className="w-3 h-3" />
-                        <span className="text-green-400">{item.tag.topic}</span>
-                      </div>
-                      {/* AI 思考過程 */}
-                      {item.reasoning && (
-                        <div className="text-xs text-white/40 bg-white/5 rounded-md p-2">
-                          <span className="text-indigo-400/70">AI 思考：</span> {item.reasoning}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 處理結果顯示 - 追加 sub-item */}
-            {showResults && appendResult && (
-              <div className="max-h-64 overflow-y-auto border-b border-white/10">
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-blue-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>已追加 {appendResult.appended_sub_items.length} 個待辦事項</span>
-                  </div>
-
-                  {/* 目標任務 */}
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText className="w-4 h-4 text-blue-400" />
-                      <span className="text-xs text-blue-300 font-medium">追加到任務</span>
-                    </div>
-                    <p className="text-sm text-white">{appendResult.target_task.content}</p>
-                  </div>
-
-                  {/* 新增的 sub-items */}
-                  <div className="space-y-2">
-                    <p className="text-xs text-white/50 font-medium">新增的待辦事項：</p>
-                    {appendResult.appended_sub_items.map((subItem, index) => (
-                      <div
-                        key={subItem.id}
-                        className="p-2 rounded-lg bg-white/5 border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300"
-                        style={{ animationDelay: `${index * 100}ms` }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-white/40">☐</span>
-                          <span className="text-sm text-white">{subItem.content}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* AI 思考 */}
-                  <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                    <p className="text-xs text-white/50 mb-1">AI 思考：</p>
-                    <p className="text-xs text-white/70">{appendResult.reasoning}</p>
-                  </div>
+            {/* 聊天訊息區域 */}
+            {messages.length > 0 && (
+              <div className="max-h-96 overflow-y-auto border-b border-white/10 px-4 py-3">
+                <div className="space-y-1">
+                  {messages.map(renderChatMessage)}
+                  {/* 自動滾動錨點 */}
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
             )}
@@ -1067,173 +1203,39 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setShowResults(!showResults)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${
-                (processedItems.length > 0 || adjustmentResult || appendResult) ? 'text-indigo-400' : 'text-white/30'
-              }`}
-              disabled={!processedItems.length && !adjustmentResult && !appendResult}
+              onClick={() => setIsExpanded(false)}
+              className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+              title="縮小面板"
             >
-              <ChevronDown className={`w-4 h-4 transition-transform ${showResults ? 'rotate-180' : ''}`} />
+              <ChevronDown className="w-4 h-4" />
             </button>
             <button
               onClick={() => {
                 setIsExpanded(false);
                 setShowResults(false);
+                setMessages([]);
+                setProcessedItems([]);
+                setAppendResult(null);
+                setAdjustmentResult(null);
               }}
               className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+              title="關閉並清空對話"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-            {/* 處理結果顯示 - 快速記錄 */}
-          {showResults && processedItems.length > 0 && (
-            <div className="max-h-64 overflow-y-auto border-b border-white/10">
-            <div className="p-3 space-y-2">
-              <div className="flex items-center gap-2 text-xs text-green-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>AI 已整理 {processedItems.length} 個項目</span>
-              </div>
-
-              {processedItems.map((item, index) => {
-                // 計算相對時間
-                const getRelativeTimeDesc = (dueDate: string) => {
-                  const now = new Date();
-                  now.setHours(0, 0, 0, 0);
-                  const due = new Date(dueDate);
-                  due.setHours(0, 0, 0, 0);
-                  const diffMs = due.getTime() - now.getTime();
-                  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-                  if (diffDays < 0) return { text: `逾期 ${Math.abs(diffDays)} 天`, isOverdue: true };
-                  if (diffDays === 0) return { text: "今天", isOverdue: false };
-                  if (diffDays === 1) return { text: "明天", isOverdue: false };
-                  if (diffDays <= 7) return { text: `${diffDays} 天後`, isOverdue: false };
-                  return { text: `${Math.floor(diffDays / 7)} 週後`, isOverdue: false };
-                };
-
-                const timeInfo = item.due_date ? getRelativeTimeDesc(item.due_date) : null;
-                const isLowConfidence = item.time_confidence !== null && item.time_confidence !== undefined && item.time_confidence < 0.6;
-
-                return (
-                  <div
-                    key={item.id || index}
-                    className="p-3 rounded-lg bg-white/5 border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <h4 className="font-medium text-white text-sm mb-1">{item.title}</h4>
-
-                    {/* 標籤路徑 + 時間標籤 */}
-                    <div className="flex items-center gap-1.5 text-xs text-white/50 mb-2 flex-wrap">
-                      <FolderOpen className="w-3 h-3" />
-                      <span className="text-indigo-400">{item.tag.area}</span>
-                      <span className="text-white/30">/</span>
-                      <Package className="w-3 h-3" />
-                      <span className="text-blue-400">{item.tag.product}</span>
-                      <span className="text-white/30">/</span>
-                      <Tag className="w-3 h-3" />
-                      <span className="text-green-400">{item.tag.topic}</span>
-
-                      {/* 時間標籤 */}
-                      {timeInfo && (
-                        <>
-                          <span className="text-white/20 mx-1">|</span>
-                          <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${
-                            timeInfo.isOverdue
-                              ? "bg-red-500/20 text-red-400"
-                              : "bg-blue-500/20 text-blue-400"
-                          }`}>
-                            {timeInfo.isOverdue ? (
-                              <AlertCircle className="w-3 h-3" />
-                            ) : (
-                              <Calendar className="w-3 h-3" />
-                            )}
-                            {timeInfo.text}
-                            {isLowConfidence && (
-                              <span className="text-orange-400 ml-0.5" title="AI 信心較低，建議手動確認">⚠</span>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* AI 思考過程 */}
-                    <div className="text-xs text-white/40 bg-white/5 rounded-md p-2 space-y-1">
-                      <div>
-                        <span className="text-indigo-400/70">分類思路：</span> {item.reasoning}
-                      </div>
-                      {item.due_date_source?.reasoning && (
-                        <div className="border-t border-white/10 pt-1 mt-1">
-                          <span className="text-blue-400/70">
-                            <Clock className="w-3 h-3 inline mr-1" />
-                            時間推斷：
-                          </span>{" "}
-                          {item.due_date_source.reasoning}
-                          {item.due_date_source.confidence !== null && item.due_date_source.confidence !== undefined && (
-                            <span
-                              className={`ml-2 cursor-help ${
-                                item.due_date_source.confidence >= 0.8 ? "text-green-400/70" :
-                                item.due_date_source.confidence >= 0.5 ? "text-blue-400/70" :
-                                "text-orange-400/70"
-                              }`}
-                              title={`AI 時間推斷信心度：${Math.round(item.due_date_source.confidence * 100)}%\n\n此功能正在開發中\n${item.due_date_source.confidence < 0.6 ? '信心度較低，建議手動確認截止日期' : '系統根據 Milestone 與任務語意自動推斷'}`}
-                            >
-                              (信心 {Math.round(item.due_date_source.confidence * 100)}%)
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          )}
-
-          {/* 處理結果顯示 - 追加 sub-item */}
-          {showResults && appendResult && (
-            <div className="max-h-64 overflow-y-auto border-b border-white/10">
-              <div className="p-3 space-y-2">
-                <div className="flex items-center gap-2 text-xs text-blue-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>已追加 {appendResult.appended_sub_items.length} 個待辦事項</span>
-                </div>
-
-                {/* 目標任務 */}
-                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileText className="w-3 h-3 text-blue-400" />
-                    <span className="text-xs text-blue-300 font-medium">追加到任務</span>
-                  </div>
-                  <p className="text-xs text-white/90">{appendResult.target_task.content}</p>
-                </div>
-
-                {/* 新增的 sub-items */}
-                <div className="space-y-1.5">
-                  <p className="text-xs text-white/50 font-medium">新增的待辦事項：</p>
-                  {appendResult.appended_sub_items.map((subItem, index) => (
-                    <div
-                      key={subItem.id}
-                      className="p-2 rounded-lg bg-white/5 border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/40 text-xs">☐</span>
-                        <span className="text-xs text-white/90">{subItem.content}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* AI 思考 */}
-                <div className="p-2 rounded-lg bg-white/5 border border-white/10">
-                  <p className="text-xs text-white/50 mb-1">AI 思考：</p>
-                  <p className="text-xs text-white/70">{appendResult.reasoning}</p>
+            {/* 聊天訊息區域 - 浮動面板 */}
+            {messages.length > 0 && (
+              <div className="max-h-80 overflow-y-auto border-b border-white/10 px-3 py-2">
+                <div className="space-y-1">
+                  {messages.map(renderChatMessage)}
+                  {/* 自動滾動錨點 */}
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* 處理結果顯示 - 標籤調整（對話框樣式）*/}
           {showResults && adjustmentResult && (

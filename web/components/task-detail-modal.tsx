@@ -483,7 +483,7 @@ export function TaskDetailModal({
             <h3 className="text-lg font-semibold text-white mb-4">參考資料</h3>
             <div className="space-y-3">
               {task.references && task.references.length > 0 ? (
-                task.references.map((ref) => (
+                task.references.filter(ref => ref && ref.type).map((ref) => (
                   <div
                     key={ref.id}
                     className="group p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-colors"
@@ -555,15 +555,13 @@ export function TaskDetailModal({
                       註記
                     </button>
                   </div>
-                  {newRefType === "url" && (
-                    <input
-                      type="text"
-                      placeholder="標題 (選填)"
-                      value={newRefTitle}
-                      onChange={(e) => setNewRefTitle(e.target.value)}
-                      className="w-full px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50"
-                    />
-                  )}
+                  <input
+                    type="text"
+                    placeholder="標題 (選填)"
+                    value={newRefTitle}
+                    onChange={(e) => setNewRefTitle(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50"
+                  />
                   <textarea
                     placeholder={newRefType === "url" ? "https://example.com" : "輸入註記內容..."}
                     value={newRefContent}

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { isValidUUID } from "@/domain/constants/validation";
 import { ApiResponseBuilder, catchDomainException, ValidationException } from "@/lib/api-response";
+import { findRelevantProducts } from "@/lib/embedding";
 
 // Sub-item 結構
 const SubItemSchema = z.object({
@@ -86,52 +87,137 @@ export async function POST(request: NextRequest) {
       throw new ValidationException("text is required", "text");
     }
 
-    // ✅ 獲取用戶現有結構作為上下文（包含每個 Product 的最近任務，用於語意關聯）
-    // 使用單一 query 避免 N+1 問題
+    // ============================================================================
+    // 階段 0: 解析用戶是否明確指定了 Product (@Product 標記)
+    // ============================================================================
+    const productMentionRegex = /@(\S+)/g;
+    const matches = Array.from(text.matchAll(productMentionRegex));
+    const mentionedProductNames = matches.map(m => m[1]);
+
+    let explicitProductId: string | null = null;
+    let cleanedText = text;
+
+    if (mentionedProductNames.length > 0) {
+      // 用戶明確提到了 Product，嘗試匹配
+      const matchedProduct = await prisma.product.findFirst({
+        where: {
+          user_id: userId,
+          deleted_at: null,
+          name: { in: mentionedProductNames, mode: 'insensitive' }
+        }
+      });
+
+      if (matchedProduct) {
+        explicitProductId = matchedProduct.id;
+        // 移除 @Product 標記，保留實際內容
+        cleanedText = text.replace(productMentionRegex, '').trim();
+        console.log(`🎯 [brain-dump] User explicitly mentioned Product: ${matchedProduct.name}`);
+      }
+    }
+
+    // ============================================================================
+    // 階段 1: 確定相關 Products（用戶明確指定時跳過 Embedding）
+    // ============================================================================
+    const startEmbedding = Date.now();
+    let relevantProductIds: string[];
+
+    if (explicitProductId) {
+      // 🚀 用戶明確指定了 Product，完全跳過 Embedding 和全量載入
+      relevantProductIds = [explicitProductId];
+      console.log("🎯 [brain-dump] User explicitly specified Product, skipping embedding entirely");
+      timings["embedding"] = Date.now() - startEmbedding;
+    } else {
+      // 沒有明確指定，執行 Embedding 語意篩選
+      // 1.1 載入所有 Products（輕量級，只取必要欄位）
+      const allProducts = await prisma.product.findMany({
+        where: { user_id: userId, deleted_at: null },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          area: {
+            select: { id: true, name: true, scope: true }
+          },
+          tasks: {
+            where: {
+              deleted_at: null,
+              status: { not: 'ARCHIVE' }
+            },
+            select: { content: true, sub_items: true },
+            orderBy: { updated_at: 'desc' }
+            // 載入所有未完成任務（含 sub_items）用於增強語意匹配
+          }
+        }
+      });
+
+      // 1.2 使用 Embedding 找出最相關的 Products
+      if (allProducts.length === 0) {
+        // 新用戶無 Product，跳過篩選
+        relevantProductIds = [];
+      } else {
+        const productSimilarities = await findRelevantProducts(
+          cleanedText,  // 使用清理後的文字（移除 @Product 標記）
+          allProducts.map(p => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            tasks: p.tasks.map(t => ({
+              content: t.content,
+              subItems: Array.isArray(t.sub_items)
+                ? (t.sub_items as Array<{ content?: string }>).map(si => si.content).filter(Boolean) as string[]
+                : []
+            }))
+          })),
+          4  // Top 4 最相關的 Products
+        );
+
+        relevantProductIds = productSimilarities.map(ps => ps.productId);
+
+        // 記錄語意匹配結果（用於 debug 和優化）
+        console.log("🔍 [Embedding] Product similarities:",
+          productSimilarities.map(ps => `${ps.productName}: ${ps.similarity.toFixed(3)}`).join(", ")
+        );
+      }
+
+      timings["embedding"] = Date.now() - startEmbedding;
+    }
+
+    // ============================================================================
+    // 階段 2: 只載入相關 Products 的完整資料（大幅縮減 context）
+    // ============================================================================
     const startDbStructure = Date.now();
+
+    // 2.1 載入篩選後的 Products 及其未完成任務
     const existingAreas = await prisma.area.findMany({
       where: { user_id: userId, deleted_at: null },
       include: {
         products: {
-          where: { deleted_at: null },
+          where: {
+            deleted_at: null,
+            ...(relevantProductIds.length > 0
+              ? { id: { in: relevantProductIds } }  // 只載入相關 Products
+              : {}  // 新用戶：載入所有（通常很少）
+            )
+          },
           include: {
             topics: {
               where: { deleted_at: null },
-              select: { id: true, name: true }  // 只選擇必要欄位
+              select: { id: true, name: true }
             },
             tasks: {
               where: {
                 deleted_at: null,
-                status: { not: 'ARCHIVE' }, // 只載入未完成的任務
+                status: { not: 'ARCHIVE' }
               },
-              select: { id: true, content: true, created_at: true, sub_items: true },
-              orderBy: { created_at: 'desc' },
-              take: 10, // 每個 Product 最多取 10 個最近任務，提供語意線索
+              select: { id: true, content: true, created_at: true, sub_items: true, status: true, updated_at: true },
+              orderBy: { updated_at: 'desc' },
+              take: 15  // 每個 Product 最多 15 個任務（3 個 Products × 15 = 45 個任務）
             },
           },
         },
       },
     });
     timings["db_structure"] = Date.now() - startDbStructure;
-
-    // ✅ 獲取最近 10 分鐘內創建的任務（用於判斷是否追加 sub-item）
-    const startDbRecentTasks = Date.now();
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    const recentTasks = await prisma.task.findMany({
-      where: {
-        deleted_at: null,
-        created_at: { gte: tenMinutesAgo },
-        product: { user_id: userId },
-      },
-      include: {
-        product: {
-          select: { id: true, name: true },
-        },
-      },
-      orderBy: { created_at: 'desc' },
-      take: 10,
-    });
-    timings["db_recent_tasks"] = Date.now() - startDbRecentTasks;
 
     // 載入用戶的 Milestones（未來 90 天內）
     const startDbMilestones = Date.now();
@@ -160,12 +246,23 @@ export async function POST(request: NextRequest) {
     }
     timings["db_milestones"] = Date.now() - startDbMilestones;
 
-    // 構建完整的上下文摘要（包含任務內容，用於語意匹配）
+    // 構建精簡的上下文摘要（只包含語意相關的 Products 及其任務）
     let contextSummary = "";
     if (existingAreas.length > 0) {
-      contextSummary = "\n### 用戶現有結構（請根據任務內容判斷語意匹配）:\n";
+      const hasRelevantProducts = existingAreas.some(a => a.products.length > 0);
+
+      if (hasRelevantProducts) {
+        contextSummary = "\n### 語意相關的 Products（Embedding 篩選後的結果）:\n";
+        contextSummary += "系統已使用語意向量分析，以下是與您輸入最相關的專案及其未完成任務。\n\n";
+      } else {
+        contextSummary = "\n### 用戶尚無相關專案，以下為所有現有結構:\n";
+      }
+
       for (const area of existingAreas) {
+        if (area.products.length === 0) continue;
+
         contextSummary += `\n**Area: ${area.name}** (範圍: ${area.scope || "未定義"})\n`;
+
         for (const product of area.products) {
           contextSummary += `  📦 Product: ${product.name}\n`;
 
@@ -174,11 +271,20 @@ export async function POST(request: NextRequest) {
             contextSummary += `     Topics: ${product.topics.map(t => t.name).join(", ")}\n`;
           }
 
-          // 顯示最近任務（提供語意線索）
+          // 顯示未完成任務（按更新時間排序，最近活躍的優先）
           if (product.tasks && product.tasks.length > 0) {
-            contextSummary += `     最近任務:\n`;
+            contextSummary += `     未完成任務 (可追加 sub-item 的候選):\n`;
             for (const task of product.tasks) {
+              const updatedAgo = Math.floor((Date.now() - new Date(task.updated_at).getTime()) / 60000);
+              const timeDisplay = updatedAgo < 60
+                ? `${updatedAgo} 分鐘前更新`
+                : updatedAgo < 1440
+                  ? `${Math.floor(updatedAgo / 60)} 小時前更新`
+                  : `${Math.floor(updatedAgo / 1440)} 天前更新`;
+
               contextSummary += `       - [${task.id}] ${task.content}\n`;
+              contextSummary += `         ⏰ ${timeDisplay} | 狀態: ${task.status}\n`;
+
               // 顯示 sub-items
               if (task.sub_items) {
                 const subItems = task.sub_items as Array<{
@@ -187,44 +293,20 @@ export async function POST(request: NextRequest) {
                   completed: boolean;
                 }>;
                 if (subItems.length > 0) {
+                  contextSummary += `         已有的待辦項目:\n`;
                   for (const subItem of subItems) {
                     const checkbox = subItem.completed ? '✅' : '☐';
-                    contextSummary += `         ${checkbox} ${subItem.content}\n`;
+                    contextSummary += `           ${checkbox} ${subItem.content}\n`;
                   }
+                } else {
+                  contextSummary += `         (尚無待辦項目)\n`;
                 }
+              } else {
+                contextSummary += `         (尚無待辦項目)\n`;
               }
             }
           } else {
-            contextSummary += `     最近任務: (無，這是新專案)\n`;
-          }
-        }
-      }
-      contextSummary += "\n";
-    }
-
-    // 添加最近 10 分鐘內創建的任務（重點關注）
-    if (recentTasks.length > 0) {
-      contextSummary += "\n### 🔥 最近 10 分鐘內創建的任務（判斷是否為追加內容）:\n";
-      for (const task of recentTasks) {
-        const timeAgo = Math.floor((Date.now() - new Date(task.created_at).getTime()) / 60000);
-        contextSummary += `\n**[${task.id}] ${task.content}**\n`;
-        contextSummary += `   ⏰ ${timeAgo} 分鐘前創建 | 📦 ${task.product.name}\n`;
-
-        // 顯示 sub-items
-        if (task.sub_items) {
-          const subItems = task.sub_items as Array<{
-            id: string;
-            content: string;
-            completed: boolean;
-          }>;
-          if (subItems.length > 0) {
-            contextSummary += `   已有的待辦項目:\n`;
-            for (const subItem of subItems) {
-              const checkbox = subItem.completed ? '✅' : '☐';
-              contextSummary += `     ${checkbox} ${subItem.content}\n`;
-            }
-          } else {
-            contextSummary += `   (尚無待辦項目)\n`;
+            contextSummary += `     未完成任務: (無，這是新專案)\n`;
           }
         }
       }
@@ -260,25 +342,48 @@ export async function POST(request: NextRequest) {
 
 # 🔥 最優先判斷：是追加還是新任務？
 
-## 判斷邏輯（純語意判斷，不看時間）
+## 核心判斷原則：因果關係測試
 
-### 看「最近創建的任務」（不論時間）
-問自己：**「用戶的新輸入是在補充某個既有任務的待辦步驟嗎？」**
+**唯一判斷標準**：問自己這個問題——
 
-✅ **符合追加條件**（必須同時滿足）：
-- 新輸入是「簡短的執行步驟」或「待辦事項」（不是完整任務描述）
-- 語意上明確是某個既有任務的「子項目」或「執行細節」
-- 輸入格式像「待辦清單項目」而非「新任務說明」
+> 「完成【用戶輸入】是否是達成【既有任務】的必要手段？」
 
-**判斷技巧**：
-- 如果輸入像「整理資料」「發送郵件」→ 可能是追加
-- 如果輸入像「明天要準備週報」→ 是新任務（有完整目標描述）
-- 如果輸入像「準備週報要：整理資料、發送郵件」→ 是新任務（含多個 sub_items）
+- 如果答案是「是」→ 追加
+- 如果答案是「否」或「不確定」→ 新任務
 
-❌ **不符合追加**（創建新任務）：
-- 新輸入有完整的任務描述（標題 + 目標）
-- 語意上是獨立的新事情
-- 用戶明確提到新的 Product/Area/時間
+### 因果關係測試範例
+
+| 用戶輸入 | 既有任務 | 測試問題 | 答案 | 結果 |
+|---------|---------|---------|------|------|
+| 買菜 | 準備晚餐 | 「買菜」是達成「準備晚餐」的手段嗎？ | ✅ 是 | 追加 |
+| 發郵件 | 週報：整理資料、發郵件 | 「發郵件」是達成「週報」的手段嗎？ | ✅ 是 | 追加 |
+| 封存專案 | 封版與測試 | 「封存專案」是達成「封版與測試」的手段嗎？ | ❌ 否 | 新任務 |
+| 修 bug | 開發新功能 | 「修 bug」是達成「開發新功能」的手段嗎？ | ❌ 否 | 新任務 |
+| 優化效能 | 修復登入問題 | 「優化效能」是達成「修復登入問題」的手段嗎？ | ❌ 否 | 新任務 |
+
+### 追加的必要條件（全部滿足才追加）
+
+1. **因果關係成立**：輸入是既有任務的「達成手段」
+2. **粒度更細**：輸入的範圍比既有任務更小、更具體
+3. **同一目標**：輸入和既有任務服務於同一個最終目標
+
+### 常見誤判情況（這些都是新任務）
+
+- 「語意相關」≠「是子步驟」（封存 vs 封版，都有「封」字但無因果關係）
+- 「同一專案」≠「是子步驟」（同一個 Product 下的兩件不同的事）
+- 「時間相近」≠「是子步驟」（今天要做的兩件獨立的事）
+
+### 判斷流程
+
+\`\`\`
+1. 找出最相關的既有任務
+2. 執行因果關係測試：「完成 X 是達成 Y 的手段嗎？」
+3. 如果測試失敗 → 創建新任務
+4. 如果測試通過 → 再確認粒度是否更細
+5. 兩個都通過 → 追加
+\`\`\`
+
+**預設行為**：有任何疑慮，創建新任務。追加是例外，不是常態。
 
 **如果符合追加條件**：
 → 回傳 \`action: "append_sub_item"\`，指定 \`target_task_id\` 和新的 \`sub_items\`
@@ -288,6 +393,21 @@ export async function POST(request: NextRequest) {
 
 ---
 
+${explicitProductId ? `# 🚨 用戶明確指定了 Product
+
+用戶在輸入中使用了 @Product 標記，系統已識別並**強制鎖定**到該專案。
+
+**絕對規則**：
+- 只能追加到該 Product 下的任務
+- 創建新任務時，必須使用該 Product
+- 不可將任務歸類到其他 Product，即使語意上更相似
+- 這是用戶的明確指令，優先級最高
+
+系統已自動篩選，你看到的任務列表**只包含該 Product 的任務**。
+
+---
+
+` : ''}
 # 核心原則（創建新任務時使用）
 
 ## 1. 完整記錄
@@ -482,6 +602,22 @@ ${text}
 
     const createdTasks = [];
     for (const item of result.items) {
+      // 0. 防重複檢查：檢查是否已存在相同標題的任務（最近 24 小時內）
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const duplicateTask = await prisma.task.findFirst({
+        where: {
+          user_id: userId,
+          content: item.title,
+          deleted_at: null,
+          created_at: { gte: twentyFourHoursAgo },
+        }
+      });
+
+      if (duplicateTask) {
+        console.warn(`⚠️ [brain-dump] Duplicate task detected, skipping: "${item.title}"`);
+        continue; // 跳過重複任務
+      }
+
       // 1. 確保 Area 存在（優先使用快取，避免重複查詢）
       let areaId: string;
       const cachedArea = areaCache.get(item.tag.area);

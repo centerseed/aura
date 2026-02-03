@@ -47,10 +47,13 @@ export class CreateTaskUseCase {
     // 1. 驗證輸入
     this.validateRequest(request)
 
-    // 2. 解析狀態
+    // 2. 檢查重複（防止創建相同標題的任務）
+    await this.checkDuplicates(request)
+
+    // 3. 解析狀態
     const status = this.parseStatus(request.status)
 
-    // 3. 準備任務資料
+    // 4. 準備任務資料
     const taskData: Omit<TaskData, 'id' | 'createdAt' | 'updatedAt'> = {
       userId: request.userId,
       productId: request.productId || null,
@@ -75,6 +78,32 @@ export class CreateTaskUseCase {
     return {
       task,
       message: `Task created successfully with status ${status}`,
+    }
+  }
+
+  /**
+   * 檢查是否已存在相同標題的任務（最近 24 小時內）
+   */
+  private async checkDuplicates(request: CreateTaskRequest): Promise<void> {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+    // 使用 findMany 查詢最近的任務
+    const existingTasks = await this.taskRepository.findMany({
+      userId: request.userId,
+      updatedAtFrom: twentyFourHoursAgo,
+      includeDeleted: false,
+    })
+
+    // 檢查是否有相同內容的任務
+    const duplicateTask = existingTasks.find(
+      task => task.content.trim() === request.content.trim()
+    )
+
+    if (duplicateTask) {
+      throw new ValidationException(
+        `已存在相同標題的任務: "${request.content.trim()}"`,
+        'content'
+      )
     }
   }
 

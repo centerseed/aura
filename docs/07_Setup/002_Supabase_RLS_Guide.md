@@ -1,12 +1,12 @@
 # Supabase Row Level Security (RLS) 設定指南
 
-## 🔍 RLS 警告的原因
+## 🚨 重要：必須啟用 RLS
 
-Supabase Dashboard 顯示 RLS 警告是因為：
+**歷史教訓**：因為關閉 RLS，測試程式碼意外連接到生產資料庫時，所有資料被 `deleteMany` 刪除。這已經發生過多次。
 
-1. **預設行為**：Supabase 建議所有資料表都啟用 RLS
-2. **安全考量**：防止前端直接存取資料庫時的未授權存取
-3. **最佳實踐**：Supabase 的設計理念是前端直接連資料庫
+**RLS 是最後一道防線**，即使前面的防護機制失效，RLS 仍然可以防止災難性的資料損失。
+
+## 🔍 RLS 的必要性
 
 ## 🏗️ 我們的架構 vs Supabase 典型架構
 
@@ -137,20 +137,39 @@ CREATE POLICY "Users can update own data" ON users
 
 ## 🚀 推薦做法（立即執行）
 
-### 步驟 1：關閉 RLS 警告
+### 步驟 1：啟用 RLS 並設定 Policy
 
 在 Supabase Dashboard → SQL Editor 執行：
 
 ```sql
--- 禁用所有資料表的 RLS
-ALTER TABLE users DISABLE ROW LEVEL SECURITY;
-ALTER TABLE areas DISABLE ROW LEVEL SECURITY;
-ALTER TABLE products DISABLE ROW LEVEL SECURITY;
-ALTER TABLE topics DISABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE milestones DISABLE ROW LEVEL SECURITY;
-ALTER TABLE governance_proposals DISABLE ROW LEVEL SECURITY;
-ALTER TABLE alembic_version DISABLE ROW LEVEL SECURITY;
+-- ============================================================================
+-- 🛡️ 啟用 RLS 保護（必須執行）
+-- ============================================================================
+
+-- 啟用所有資料表的 RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE areas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE topics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE milestones ENABLE ROW LEVEL SECURITY;
+
+-- 建立 Service Role 繞過 Policy（讓後端 API 正常運作）
+-- 這些 Policy 允許 service_role 完全存取，但阻止其他角色
+CREATE POLICY "Service role full access" ON users FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access" ON areas FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access" ON products FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access" ON topics FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access" ON tasks FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access" ON milestones FOR ALL USING (auth.role() = 'service_role');
+
+-- 使用者只能存取自己的資料（額外安全層）
+CREATE POLICY "Users access own data" ON users FOR ALL USING (id::text = auth.uid()::text);
+CREATE POLICY "Users access own areas" ON areas FOR ALL USING (user_id::text = auth.uid()::text);
+CREATE POLICY "Users access own products" ON products FOR ALL USING (user_id::text = auth.uid()::text);
+CREATE POLICY "Users access own topics" ON topics FOR ALL USING (user_id::text = auth.uid()::text);
+CREATE POLICY "Users access own tasks" ON tasks FOR ALL USING (user_id::text = auth.uid()::text);
+CREATE POLICY "Users access own milestones" ON milestones FOR ALL USING (user_id::text = auth.uid()::text);
 ```
 
 ### 步驟 2：確認安全配置
@@ -269,21 +288,14 @@ Supabase PostgreSQL
 3. **使用 Service Role** - 後端使用完全權限的連接
 4. **Firebase Auth 處理認證** - 不使用 Supabase Auth
 
-### 快速解決 RLS 警告
+### ⚠️ 警告：絕對不要關閉 RLS
 
-執行這個腳本：
+~~以下腳本已被廢棄，請勿執行~~
 
 ```sql
--- 一次關閉所有 RLS 警告
-DO $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public')
-    LOOP
-        EXECUTE 'ALTER TABLE ' || quote_ident(r.tablename) || ' DISABLE ROW LEVEL SECURITY';
-    END LOOP;
-END $$;
+-- ❌ 危險！這個腳本會導致資料被測試程式碼刪除
+-- ❌ 絕對不要執行
+-- DO $$ ... DISABLE ROW LEVEL SECURITY ... $$;
 ```
 
-執行後，Supabase Dashboard 的 RLS 警告就會消失！✨
+**正確做法**：使用上面的「啟用 RLS + Service Role Policy」腳本。

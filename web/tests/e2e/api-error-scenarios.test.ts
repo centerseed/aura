@@ -67,6 +67,7 @@ async function authFetch(
 
 describe('API Error Scenarios - 錯誤情境測試', () => {
   let idToken: string | null = null
+  let testProductId: string | null = null
 
   beforeAll(async () => {
     if (!API_BASE_URL) {
@@ -76,6 +77,27 @@ describe('API Error Scenarios - 錯誤情境測試', () => {
     idToken = await getFirebaseIdToken()
     if (!idToken) {
       console.warn('跳過：無法取得 Firebase ID Token')
+      return
+    }
+
+    // 獲取一個有效的 product_id 用於測試
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/library`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const firstArea = data.data?.areas?.[0]
+        const firstProduct = firstArea?.products?.[0]
+        testProductId = firstProduct?.id || null
+        if (testProductId) {
+          console.log(`✅ 取得測試用 product_id: ${testProductId}`)
+        }
+      }
+    } catch (error) {
+      console.warn('無法取得測試用 product_id')
     }
   })
 
@@ -317,17 +339,20 @@ describe('API Error Scenarios - 錯誤情境測試', () => {
   // ============================================
   describe('邊界情況', () => {
     it('超長的 title 應該被處理（不崩潰）', async () => {
-      if (!idToken) {
-        console.log('跳過：無有效 token')
+      if (!idToken || !testProductId) {
+        console.log('跳過：無有效 token 或 product_id')
         return
       }
 
       const veryLongTitle = 'A'.repeat(10000) // 10000 字元
 
-      // Tasks API 需要 content 欄位
+      // Tasks API 需要 content 和 product_id 欄位
       const res = await authFetch('/api/tasks', idToken, {
         method: 'POST',
-        body: JSON.stringify({ content: veryLongTitle }),
+        body: JSON.stringify({
+          content: veryLongTitle,
+          product_id: testProductId
+        }),
       })
 
       console.log(`📡 超長 title 回應狀態: ${res.status}`)
@@ -336,18 +361,19 @@ describe('API Error Scenarios - 錯誤情境測試', () => {
     })
 
     it('特殊字元應該被正確處理', async () => {
-      if (!idToken) {
-        console.log('跳過：無有效 token')
+      if (!idToken || !testProductId) {
+        console.log('跳過：無有效 token 或 product_id')
         return
       }
 
       const specialChars = '測試 🎉 <script>alert("xss")</script> & "quotes" \'single\''
 
-      // Tasks API 需要 content 欄位
+      // Tasks API 需要 content 和 product_id 欄位
       const res = await authFetch('/api/tasks', idToken, {
         method: 'POST',
         body: JSON.stringify({
           content: `Test ${specialChars}`,
+          product_id: testProductId,
         }),
       })
 

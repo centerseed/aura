@@ -144,4 +144,21 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(AuthFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> ensureBackendSync() async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        return Left(AuthFailure('No user logged in'));
+      }
+
+      print('🔄 Ensuring backend sync for user: ${user.uid}');
+      await _syncWithBackend(user);
+      return const Right(null);
+    } catch (e) {
+      print('❌ Backend sync failed in ensureBackendSync: $e');
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }

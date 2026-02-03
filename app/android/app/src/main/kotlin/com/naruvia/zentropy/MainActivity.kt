@@ -1,4 +1,4 @@
-package com.zentropy.app
+package com.naruvia.zentropy
 
 import io.flutter.embedding.android.FlutterActivity
 

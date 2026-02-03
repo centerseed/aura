@@ -908,7 +908,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 100), // Padding to clear Floating Nav Bar
+            SizedBox(height: 100 + MediaQuery.of(context).viewInsets.bottom), // Padding to clear Floating Nav Bar and keyboard
           ],
         ),
       ),

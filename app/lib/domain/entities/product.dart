@@ -16,6 +16,7 @@ class Product extends Equatable {
 
   // 關聯資料
   final List<Reference>? references;
+  final int? totalReferenceCount; // product + task 層級的總數
   final List<Task>? tasks; // 完整的 tasks 列表
   final List<Task>? recentTasks; // 最近的 3 個 tasks (向後兼容)
 
@@ -30,6 +31,7 @@ class Product extends Equatable {
     this.createdAt,
     this.updatedAt,
     this.references,
+    this.totalReferenceCount,
     this.tasks,
     this.recentTasks,
   });
@@ -37,8 +39,8 @@ class Product extends Equatable {
   @override
   List<Object?> get props => [id, name, areaId];
 
-  /// 獲取 reference 數量
-  int get referenceCount => references?.length ?? 0;
+  /// 獲取 reference 數量（優先使用 API 提供的總數，回退到本地計算）
+  int get referenceCount => totalReferenceCount ?? references?.length ?? 0;
 
   /// 獲取任務數量（優先使用完整的 tasks,回退到 recentTasks）
   int get taskCount => tasks?.length ?? recentTasks?.length ?? 0;

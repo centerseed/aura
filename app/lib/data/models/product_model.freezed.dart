@@ -39,6 +39,8 @@ mixin _$ProductModel {
   @JsonKey(name: 'deleted_at')
   DateTime? get deletedAt => throw _privateConstructorUsedError; // 關聯資料
   List<ReferenceModel>? get references => throw _privateConstructorUsedError;
+  @JsonKey(name: 'total_reference_count')
+  int? get totalReferenceCount => throw _privateConstructorUsedError;
   List<TaskModel>? get tasks => throw _privateConstructorUsedError;
   @JsonKey(name: 'recent_tasks')
   List<TaskModel>? get recentTasks => throw _privateConstructorUsedError;
@@ -73,6 +75,7 @@ abstract class $ProductModelCopyWith<$Res> {
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
     List<ReferenceModel>? references,
+    @JsonKey(name: 'total_reference_count') int? totalReferenceCount,
     List<TaskModel>? tasks,
     @JsonKey(name: 'recent_tasks') List<TaskModel>? recentTasks,
   });
@@ -105,6 +108,7 @@ class _$ProductModelCopyWithImpl<$Res, $Val extends ProductModel>
     Object? updatedAt = freezed,
     Object? deletedAt = freezed,
     Object? references = freezed,
+    Object? totalReferenceCount = freezed,
     Object? tasks = freezed,
     Object? recentTasks = freezed,
   }) {
@@ -158,6 +162,10 @@ class _$ProductModelCopyWithImpl<$Res, $Val extends ProductModel>
                 ? _value.references
                 : references // ignore: cast_nullable_to_non_nullable
                       as List<ReferenceModel>?,
+            totalReferenceCount: freezed == totalReferenceCount
+                ? _value.totalReferenceCount
+                : totalReferenceCount // ignore: cast_nullable_to_non_nullable
+                      as int?,
             tasks: freezed == tasks
                 ? _value.tasks
                 : tasks // ignore: cast_nullable_to_non_nullable
@@ -194,6 +202,7 @@ abstract class _$$ProductModelImplCopyWith<$Res>
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
     List<ReferenceModel>? references,
+    @JsonKey(name: 'total_reference_count') int? totalReferenceCount,
     List<TaskModel>? tasks,
     @JsonKey(name: 'recent_tasks') List<TaskModel>? recentTasks,
   });
@@ -225,6 +234,7 @@ class __$$ProductModelImplCopyWithImpl<$Res>
     Object? updatedAt = freezed,
     Object? deletedAt = freezed,
     Object? references = freezed,
+    Object? totalReferenceCount = freezed,
     Object? tasks = freezed,
     Object? recentTasks = freezed,
   }) {
@@ -278,6 +288,10 @@ class __$$ProductModelImplCopyWithImpl<$Res>
             ? _value._references
             : references // ignore: cast_nullable_to_non_nullable
                   as List<ReferenceModel>?,
+        totalReferenceCount: freezed == totalReferenceCount
+            ? _value.totalReferenceCount
+            : totalReferenceCount // ignore: cast_nullable_to_non_nullable
+                  as int?,
         tasks: freezed == tasks
             ? _value._tasks
             : tasks // ignore: cast_nullable_to_non_nullable
@@ -307,6 +321,7 @@ class _$ProductModelImpl extends _ProductModel {
     @JsonKey(name: 'updated_at') this.updatedAt,
     @JsonKey(name: 'deleted_at') this.deletedAt,
     final List<ReferenceModel>? references,
+    @JsonKey(name: 'total_reference_count') this.totalReferenceCount,
     final List<TaskModel>? tasks,
     @JsonKey(name: 'recent_tasks') final List<TaskModel>? recentTasks,
   }) : _references = references,
@@ -357,6 +372,9 @@ class _$ProductModelImpl extends _ProductModel {
     return EqualUnmodifiableListView(value);
   }
 
+  @override
+  @JsonKey(name: 'total_reference_count')
+  final int? totalReferenceCount;
   final List<TaskModel>? _tasks;
   @override
   List<TaskModel>? get tasks {
@@ -380,7 +398,7 @@ class _$ProductModelImpl extends _ProductModel {
 
   @override
   String toString() {
-    return 'ProductModel(id: $id, userId: $userId, areaId: $areaId, name: $name, description: $description, status: $status, lifecycle: $lifecycle, displayOrder: $displayOrder, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, references: $references, tasks: $tasks, recentTasks: $recentTasks)';
+    return 'ProductModel(id: $id, userId: $userId, areaId: $areaId, name: $name, description: $description, status: $status, lifecycle: $lifecycle, displayOrder: $displayOrder, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, references: $references, totalReferenceCount: $totalReferenceCount, tasks: $tasks, recentTasks: $recentTasks)';
   }
 
   @override
@@ -409,6 +427,8 @@ class _$ProductModelImpl extends _ProductModel {
               other._references,
               _references,
             ) &&
+            (identical(other.totalReferenceCount, totalReferenceCount) ||
+                other.totalReferenceCount == totalReferenceCount) &&
             const DeepCollectionEquality().equals(other._tasks, _tasks) &&
             const DeepCollectionEquality().equals(
               other._recentTasks,
@@ -432,6 +452,7 @@ class _$ProductModelImpl extends _ProductModel {
     updatedAt,
     deletedAt,
     const DeepCollectionEquality().hash(_references),
+    totalReferenceCount,
     const DeepCollectionEquality().hash(_tasks),
     const DeepCollectionEquality().hash(_recentTasks),
   );
@@ -465,6 +486,7 @@ abstract class _ProductModel extends ProductModel {
     @JsonKey(name: 'updated_at') final DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') final DateTime? deletedAt,
     final List<ReferenceModel>? references,
+    @JsonKey(name: 'total_reference_count') final int? totalReferenceCount,
     final List<TaskModel>? tasks,
     @JsonKey(name: 'recent_tasks') final List<TaskModel>? recentTasks,
   }) = _$ProductModelImpl;
@@ -503,6 +525,9 @@ abstract class _ProductModel extends ProductModel {
   DateTime? get deletedAt; // 關聯資料
   @override
   List<ReferenceModel>? get references;
+  @override
+  @JsonKey(name: 'total_reference_count')
+  int? get totalReferenceCount;
   @override
   List<TaskModel>? get tasks;
   @override

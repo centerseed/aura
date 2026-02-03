@@ -3,6 +3,7 @@ import 'package:flutter_dual_cache/flutter_dual_cache.dart';
 import '../../../domain/entities/task.dart';
 import '../../datasources/remote/api_client.dart';
 import '../../models/task_model.dart';
+import '../mixins/task_json_converter.dart';
 
 /// Task Repository with dual-track caching.
 ///
@@ -10,7 +11,8 @@ import '../../models/task_model.dart';
 /// 1. Instantly display cached tasks
 /// 2. Fetch fresh data from API in background
 /// 3. Update UI when new data arrives
-class TaskCachedRepository extends CachedRepository<Task, String> {
+class TaskCachedRepository extends CachedRepository<Task, String>
+    with TaskJsonConverter {
   final ApiClient _apiClient;
 
   TaskCachedRepository(this._apiClient)
@@ -29,37 +31,7 @@ class TaskCachedRepository extends CachedRepository<Task, String> {
   }
 
   @override
-  Map<String, dynamic> toJson(Task item) {
-    // Convert Task entity back to TaskModel JSON format
-    return {
-      'id': item.id,
-      'user_id': '', // Not needed for cache
-      'product_id': item.productId,
-      'topic_id': item.topicId,
-      'content': item.content,
-      'status': item.status.name.toUpperCase(),
-      'due_date': item.dueDate?.toIso8601String(),
-      'start_date': item.startDate?.toIso8601String(),
-      'time_confidence': item.timeConfidence,
-      'sub_items': item.subItems
-          ?.map((s) => {
-                'id': s.id,
-                'content': s.content,
-                'completed': s.completed,
-                'completed_at': s.completedAt?.toIso8601String(),
-              })
-          .toList(),
-      'tag': {
-        'area': item.areaName,
-        'product': item.productName,
-        'topic': item.topicName,
-      },
-      'tags': item.tags,
-      'created_at': item.createdAt?.toIso8601String(),
-      'updated_at': item.updatedAt?.toIso8601String(),
-      'deleted_at': item.deletedAt?.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toJson(Task item) => taskToJson(item);
 
   @override
   Task fromJson(Map<String, dynamic> json) {

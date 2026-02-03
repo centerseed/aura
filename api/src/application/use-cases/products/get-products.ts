@@ -34,6 +34,7 @@ export interface ProductData {
     title?: string | null
     created_at: string
   }>
+  total_reference_count: number // product 層級 + 所有 task 層級的 references 總數
   tasks: Array<{
     id: string
     user_id: string
@@ -183,6 +184,12 @@ export class GetProductsUseCase {
         }
       })
 
+      // 計算 task 層級的 references 總數
+      const taskReferencesCount = tasks.reduce(
+        (sum, task) => sum + task.references.length,
+        0
+      )
+
       return {
         id: product.id,
         user_id: product.user_id,
@@ -195,6 +202,7 @@ export class GetProductsUseCase {
         created_at: product.created_at,
         updated_at: product.updated_at,
         references: productReferences,
+        total_reference_count: productReferences.length + taskReferencesCount,
         tasks: tasks,
         area: product.area,
       }

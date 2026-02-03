@@ -38,9 +38,10 @@ class ProjectDetailScreen extends ConsumerWidget {
           // AI Magic Sparkle Button
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton(
-              onPressed: () => _showAIMagicSheet(context),
-              icon: Container(
+            child: InkWell(
+              onTap: () => _showAIMagicSheet(context),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF6C63FF).withValues(alpha: 0.2),

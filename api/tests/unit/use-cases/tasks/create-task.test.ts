@@ -10,11 +10,13 @@ import { VALID_USER_ID, VALID_PRODUCT_ID, VALID_TOPIC_ID, VALID_TASK_ID } from '
 
 // Mock TaskRepository
 const mockCreate = vi.fn()
+const mockFindMany = vi.fn()
 
 const mockRepository = {
   create: mockCreate,
   findById: vi.fn(),
   findByUserId: vi.fn(),
+  findMany: mockFindMany,
   update: vi.fn(),
   delete: vi.fn(),
 }
@@ -25,6 +27,8 @@ describe('CreateTaskUseCase', () => {
   beforeEach(() => {
     useCase = new CreateTaskUseCase(mockRepository as any)
     vi.clearAllMocks()
+    // 預設 findMany 返回空陣列（無重複任務）
+    mockFindMany.mockResolvedValue([])
   })
 
   describe('驗證邏輯', () => {

@@ -1,8 +1,10 @@
 import 'package:dartz/dartz.dart' hide Task;
+import '../../core/errors/dio_error_handler.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../datasources/remote/api_client.dart';
+import 'utils/task_request_builder.dart';
 
 class TaskRepositoryImpl implements TaskRepository {
   final ApiClient _apiClient;
@@ -26,7 +28,7 @@ class TaskRepositoryImpl implements TaskRepository {
       final tasks = taskModels.map((model) => model.toEntity()).toList();
       return Right(tasks);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -43,7 +45,7 @@ class TaskRepositoryImpl implements TaskRepository {
       final model = await _apiClient.createTask(body);
       return Right(model.toEntity());
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -72,38 +74,21 @@ class TaskRepositoryImpl implements TaskRepository {
     List<String>? tags,
   }) async {
     try {
-      // 構建請求體,只包含非 null 的欄位
-      final requestBody = <String, dynamic>{};
-
-      if (content != null) {
-        requestBody['content'] = content;
-      }
-      if (status != null) {
-        requestBody['status'] = status.name.toUpperCase();
-      }
-      if (startDate != null) {
-        requestBody['start_date'] = startDate.toUtc().toIso8601String();
-      }
-      if (dueDate != null) {
-        requestBody['due_date'] = dueDate.toUtc().toIso8601String();
-      }
-      if (productId != null) {
-        requestBody['product_id'] = productId;
-      }
-      if (topicId != null) {
-        requestBody['topic_id'] = topicId;
-      }
-      if (timeConfidence != null) {
-        requestBody['time_confidence'] = timeConfidence;
-      }
-      if (tags != null) {
-        requestBody['tags'] = tags;
-      }
+      final requestBody = TaskRequestBuilder.buildUpdateRequestBody(
+        content: content,
+        status: status,
+        startDate: startDate,
+        dueDate: dueDate,
+        productId: productId,
+        topicId: topicId,
+        timeConfidence: timeConfidence,
+        tags: tags,
+      );
 
       final model = await _apiClient.updateTask(taskId, requestBody);
       return Right(model.toEntity());
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -113,7 +98,7 @@ class TaskRepositoryImpl implements TaskRepository {
       await _apiClient.deleteTask(taskId);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -136,7 +121,7 @@ class TaskRepositoryImpl implements TaskRepository {
       await _apiClient.updateSubItem(taskId, subItemId, requestBody);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -149,7 +134,7 @@ class TaskRepositoryImpl implements TaskRepository {
       await _apiClient.addSubItem(taskId, content);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -162,7 +147,7 @@ class TaskRepositoryImpl implements TaskRepository {
       await _apiClient.deleteSubItem(taskId, subItemId);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -175,7 +160,7 @@ class TaskRepositoryImpl implements TaskRepository {
       await _apiClient.reorderSubItems(taskId, subItemIds);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 }

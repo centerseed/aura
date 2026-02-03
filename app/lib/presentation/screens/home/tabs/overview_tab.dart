@@ -13,6 +13,7 @@ import '../../../../application/use_cases/reorganize_product_topics_use_case.dar
 import '../../../../application/use_cases/apply_reorganization_use_case.dart';
 import '../../../providers/area_provider.dart';
 import '../../../providers/product_provider.dart';
+import '../../../providers/product_reference_provider.dart';
 import '../widgets/task_detail_bottom_sheet.dart';
 import '../widgets/reorganize_bottom_sheet.dart';
 import '../../project/widgets/reference_bottom_sheet.dart';
@@ -594,88 +595,92 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   }
 
   void _showReferences(Product product) {
-    final references = product.references ?? [];
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ReferenceBottomSheet(
-        productId: product.id,
-        productName: product.name,
-        references: references,
-        onAddReference: (type, content, title) async {
-          final addUseCase = ref.read(addProductReferenceUseCaseProvider);
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: ReferenceBottomSheet(
+          productId: product.id,
+          productName: product.name,
+          onAddReference: (type, content, title) async {
+            final addUseCase = ref.read(addProductReferenceUseCaseProvider);
 
-          // 將 String 轉換為 ReferenceType enum
-          final referenceType = type.toLowerCase() == 'url'
-              ? ReferenceType.url
-              : ReferenceType.note;
+            // 將 String 轉換為 ReferenceType enum
+            final referenceType = type.toLowerCase() == 'url'
+                ? ReferenceType.url
+                : ReferenceType.note;
 
-          final result = await addUseCase(
-            AddProductReferenceParams(
-              productId: product.id,
-              type: referenceType,
-              content: content,
-              title: title,
-            ),
-          );
+            final result = await addUseCase(
+              AddProductReferenceParams(
+                productId: product.id,
+                type: referenceType,
+                content: content,
+                title: title,
+              ),
+            );
 
-          if (!mounted) return;
+            if (!mounted) return;
 
-          result.fold(
-            (failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('新增失敗：${failure.message}'),
-                  backgroundColor: const Color(0xFFEF4444),
-                ),
-              );
-            },
-            (_) {
-              // 新增成功，刷新產品列表
-              ref.invalidate(productsProvider);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已新增 Reference'),
-                  backgroundColor: Color(0xFF4ADE80),
-                ),
-              );
-            },
-          );
-        },
-        onDeleteReference: (referenceId) async {
-          final deleteUseCase = ref.read(deleteProductReferenceUseCaseProvider);
-          final result = await deleteUseCase(
-            DeleteProductReferenceParams(
-              productId: product.id,
-              referenceId: referenceId,
-            ),
-          );
+            result.fold(
+              (failure) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('新增失敗：${failure.message}'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              },
+              (_) {
+                // 新增成功，刷新 reference provider 和產品列表
+                ref.invalidate(productReferencesProvider(product.id));
+                ref.invalidate(productsProvider);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已新增 Reference'),
+                    backgroundColor: Color(0xFF4ADE80),
+                  ),
+                );
+              },
+            );
+          },
+          onDeleteReference: (referenceId) async {
+            final deleteUseCase = ref.read(deleteProductReferenceUseCaseProvider);
+            final result = await deleteUseCase(
+              DeleteProductReferenceParams(
+                productId: product.id,
+                referenceId: referenceId,
+              ),
+            );
 
-          if (!mounted) return;
+            if (!mounted) return;
 
-          result.fold(
-            (failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('刪除失敗：${failure.message}'),
-                  backgroundColor: const Color(0xFFEF4444),
-                ),
-              );
-            },
-            (_) {
-              // 刪除成功，刷新產品列表
-              ref.invalidate(productsProvider);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已刪除 Reference'),
-                  backgroundColor: Color(0xFF4ADE80),
-                ),
-              );
-            },
-          );
-        },
+            result.fold(
+              (failure) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('刪除失敗：${failure.message}'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              },
+              (_) {
+                // 刪除成功，刷新 reference provider 和產品列表
+                ref.invalidate(productReferencesProvider(product.id));
+                ref.invalidate(productsProvider);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已刪除 Reference'),
+                    backgroundColor: Color(0xFF4ADE80),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

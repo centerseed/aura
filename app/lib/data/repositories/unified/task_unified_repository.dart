@@ -7,6 +7,8 @@ import '../../../domain/entities/task.dart';
 import '../../../domain/repositories/task_repository.dart';
 import '../../datasources/remote/api_client.dart';
 import '../../models/task_model.dart';
+import '../mixins/task_json_converter.dart';
+import '../utils/task_request_builder.dart';
 
 /// Unified Task Repository combining caching and Either-based error handling.
 ///
@@ -40,6 +42,7 @@ import '../../models/task_model.dart';
 /// );
 /// ```
 class TaskUnifiedRepository extends CachedRepository<Task, String>
+    with TaskJsonConverter
     implements TaskRepository {
   final ApiClient _apiClient;
 
@@ -56,43 +59,17 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
 
   @override
   Future<List<Task>> fetchFromRemote() async {
-    final taskModels = await _apiClient.getTasks();
-    return taskModels.map((model) => model.toEntity()).toList();
+    try {
+      final taskModels = await _apiClient.getTasks();
+      return taskModels.map((model) => model.toEntity()).toList();
+    } catch (e) {
+      // 讓 CachedRepository 處理錯誤並使用舊快取
+      rethrow;
+    }
   }
 
   @override
-  Map<String, dynamic> toJson(Task item) {
-    return {
-      'id': item.id,
-      'user_id': '',
-      'product_id': item.productId,
-      'topic_id': item.topicId,
-      'content': item.content,
-      'status': item.status.name.toUpperCase(),
-      'due_date': item.dueDate?.toIso8601String(),
-      'start_date': item.startDate?.toIso8601String(),
-      'time_confidence': item.timeConfidence,
-      'sub_items': item.subItems?.map(_subItemToJson).toList(),
-      'tag': {
-        'area': item.areaName,
-        'product': item.productName,
-        'topic': item.topicName,
-      },
-      'tags': item.tags,
-      'created_at': item.createdAt?.toIso8601String(),
-      'updated_at': item.updatedAt?.toIso8601String(),
-      'deleted_at': item.deletedAt?.toIso8601String(),
-    };
-  }
-
-  Map<String, dynamic> _subItemToJson(SubItem subItem) {
-    return {
-      'id': subItem.id,
-      'content': subItem.content,
-      'completed': subItem.completed,
-      'completed_at': subItem.completedAt?.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toJson(Task item) => taskToJson(item);
 
   @override
   Task fromJson(Map<String, dynamic> json) {
@@ -179,7 +156,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
     List<String>? tags,
   }) async {
     try {
-      final requestBody = _buildUpdateRequestBody(
+      final requestBody = TaskRequestBuilder.buildUpdateRequestBody(
         content: content,
         status: status,
         startDate: startDate,
@@ -199,44 +176,6 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
     } catch (e) {
       return Left(handleDioError(e));
     }
-  }
-
-  Map<String, dynamic> _buildUpdateRequestBody({
-    String? content,
-    TaskStatus? status,
-    DateTime? startDate,
-    DateTime? dueDate,
-    String? productId,
-    String? topicId,
-    double? timeConfidence,
-    List<String>? tags,
-  }) {
-    final body = <String, dynamic>{};
-    if (content != null) {
-      body['content'] = content;
-    }
-    if (status != null) {
-      body['status'] = status.name.toUpperCase();
-    }
-    if (startDate != null) {
-      body['start_date'] = startDate.toUtc().toIso8601String();
-    }
-    if (dueDate != null) {
-      body['due_date'] = dueDate.toUtc().toIso8601String();
-    }
-    if (productId != null) {
-      body['product_id'] = productId;
-    }
-    if (topicId != null) {
-      body['topic_id'] = topicId;
-    }
-    if (timeConfidence != null) {
-      body['time_confidence'] = timeConfidence;
-    }
-    if (tags != null) {
-      body['tags'] = tags;
-    }
-    return body;
   }
 
   @override

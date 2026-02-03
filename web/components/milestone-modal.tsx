@@ -156,7 +156,7 @@ export function MilestoneModal({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "操作失敗");
+        throw new Error(data.error?.message || "操作失敗");
       }
 
       onSuccess();
@@ -192,7 +192,7 @@ export function MilestoneModal({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "刪除失敗");
+        throw new Error(data.error?.message || "刪除失敗");
       }
 
       onSuccess();

@@ -366,10 +366,12 @@ export class PrismaTaskRepository implements ITaskRepository {
             id: prismaTask.product.id,
             name: prismaTask.product.name,
             areaId: prismaTask.product.area_id,
-            area: {
-              id: prismaTask.product.area.id,
-              name: prismaTask.product.area.name,
-            },
+            area: prismaTask.product.area
+              ? {
+                  id: prismaTask.product.area.id,
+                  name: prismaTask.product.area.name,
+                }
+              : undefined,
           }
         : undefined,
       topic: prismaTask.topic

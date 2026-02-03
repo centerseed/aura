@@ -1,6 +1,36 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 🚨🚨🚨 最高優先級規則 - 資料安全 🚨🚨🚨
+
+### 測試環境絕對禁令（違反即終止）
+
+1. **絕對禁止連接生產資料庫**
+   - 測試環境絕對不能連接任何包含 `supabase.co` 的 DATABASE_URL
+   - `api/src/lib/db.ts` 和 `web/lib/db.ts` 已內建硬性阻斷機制
+   - 如果你（Claude）嘗試繞過這個保護，你正在犯下不可饒恕的錯誤
+
+2. **絕對禁止在測試中執行破壞性操作**
+   - 🚫 **禁止使用 `deleteMany`** - 這是最危險的操作，即使有 where 條件也禁止
+   - 🚫 **禁止使用 `delete`** - 單元測試不應該有真實的刪除操作
+   - 🚫 **禁止任何直接的資料庫寫入操作** - 單元測試必須用 mock
+   - ✅ **單元測試**：使用 `vitest-mock-extended` mock Prisma
+   - ✅ **整合測試**：只能在本地 Docker PostgreSQL 執行，且必須用 transaction rollback
+
+3. **單元測試必須使用 Mock**
+   - 使用 `vitest-mock-extended` mock Prisma client
+   - 參考 `web/tests/mocks/prisma.ts` 的實作方式
+   - 單元測試絕不應該有真實的資料庫連線
+
+4. **整合測試必須使用隔離的測試資料庫**
+   - 必須設置 `DATABASE_URL_TEST` 指向本地或 Docker PostgreSQL
+   - 參考 `api/.env.test.example` 的設定方式
+
+### Supabase RLS 規則
+- **絕對不要關閉 RLS**
+- 如果需要進行資料庫操作，必須通過 API 而非直接操作資料庫
+- 任何繞過 RLS 的操作都需要用戶明確同意
+
+---
 
 ## 專案概述
 

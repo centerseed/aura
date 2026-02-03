@@ -32,7 +32,7 @@ class AuthInterceptor extends Interceptor {
 
       handler.next(options);
     } catch (e) {
-      print('❌ Auth error: $e');
+      print('❌ Auth interceptor error: $e');
       handler.reject(
         DioException(
           requestOptions: options,
@@ -47,6 +47,7 @@ class AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) {
     // 401 錯誤：Token 過期或無效，自動登出
     if (err.response?.statusCode == 401) {
+      print('❌ 401 Unauthorized - Signing out');
       _firebaseAuth.signOut();
     }
 

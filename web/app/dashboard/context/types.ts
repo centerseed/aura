@@ -14,7 +14,7 @@ import type {
 /**
  * 視圖模式
  */
-export type ViewMode = 'structure' | 'timeline' | 'gantt'
+export type ViewMode = 'structure' | 'timeline' | 'load'
 
 /**
  * API 返回的 Area 結構

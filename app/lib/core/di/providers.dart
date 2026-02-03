@@ -14,6 +14,7 @@ import '../../data/datasources/remote/api_client.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/repositories/brain_dump_repository_impl.dart';
 import '../../data/repositories/unified/unified_repositories.dart';
+import '../../data/repositories/user_repository_impl.dart';
 import '../../data/datasources/local/task_local_datasource.dart';
 import '../../data/datasources/local/area_local_datasource.dart';
 import '../../data/datasources/local/product_local_datasource.dart';
@@ -22,6 +23,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/brain_dump_repository.dart';
 import '../../domain/repositories/product_repository.dart';
 import '../../domain/repositories/task_repository.dart';
+import '../../domain/repositories/user_repository.dart';
 import '../../application/use_cases/add_product_reference_use_case.dart';
 import '../../application/use_cases/add_sub_item_use_case.dart';
 import '../../application/use_cases/apply_reorganization_use_case.dart';
@@ -32,6 +34,7 @@ import '../../application/use_cases/delete_task_use_case.dart';
 import '../../application/use_cases/get_active_tasks_use_case.dart';
 import '../../application/use_cases/get_areas_use_case.dart';
 import '../../application/use_cases/get_completed_today_tasks_use_case.dart';
+import '../../application/use_cases/get_product_references_use_case.dart';
 import '../../application/use_cases/get_products_use_case.dart';
 import '../../application/use_cases/get_tasks_use_case.dart';
 import '../../application/use_cases/reorder_sub_items_use_case.dart';
@@ -152,6 +155,13 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   return TaskUnifiedRepository(apiClient);
 });
 
+/// Task Unified Repository Provider (暴露 CachedRepository 方法)
+///
+/// 用於需要訪問 refresh() / silentRefresh() 等快取方法的場景
+final taskUnifiedRepositoryProvider = Provider<TaskUnifiedRepository>((ref) {
+  return ref.watch(taskRepositoryProvider) as TaskUnifiedRepository;
+});
+
 /// Brain Dump Repository Provider
 final brainDumpRepositoryProvider = Provider<BrainDumpRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
@@ -163,6 +173,12 @@ final productRepositoryProvider = Provider<ProductRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   ref.keepAlive(); // 保持快取存活
   return ProductUnifiedRepository(apiClient);
+});
+
+/// User Repository Provider
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return UserRepositoryImpl(apiClient);
 });
 
 // ==================== Use Case Providers ====================
@@ -245,6 +261,13 @@ final getAreasUseCaseProvider = Provider<GetAreasUseCase>((ref) {
 final getProductsUseCaseProvider = Provider<GetProductsUseCase>((ref) {
   final repository = ref.watch(productRepositoryProvider);
   return GetProductsUseCase(repository);
+});
+
+/// Get Product References Use Case Provider
+final getProductReferencesUseCaseProvider =
+    Provider<GetProductReferencesUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return GetProductReferencesUseCase(repository);
 });
 
 /// Reorganize Product Topics Use Case Provider

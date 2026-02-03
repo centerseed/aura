@@ -238,7 +238,7 @@ export function ProductDetailModal({
 
       if (res.ok) {
         const data = await res.json();
-        setReferences(data.references || []);
+        setReferences(data.data?.references || []);
       }
     } catch (err) {
       console.error("Failed to load references:", err);
@@ -296,7 +296,7 @@ export function ProductDetailModal({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "更新失敗");
+        throw new Error(data.error?.message || "更新失敗");
       }
 
       onSuccess();
@@ -339,7 +339,7 @@ export function ProductDetailModal({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.details || data.error || "刪除失敗");
+        throw new Error(data.error?.message || "刪除失敗");
       }
 
       onSuccess();
@@ -376,7 +376,7 @@ export function ProductDetailModal({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "新增失敗");
+        throw new Error(data.error?.message || "新增失敗");
       }
 
       // 重新載入 references
@@ -421,7 +421,7 @@ export function ProductDetailModal({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "更新失敗");
+        throw new Error(data.error?.message || "更新失敗");
       }
 
       // 重新載入 references
@@ -483,8 +483,8 @@ export function ProductDetailModal({
       const token = await user.getIdToken();
 
       const url = taskId
-        ? `/api/products/${product.id}/references?referenceId=${refId}&taskId=${taskId}`
-        : `/api/products/${product.id}/references?referenceId=${refId}`;
+        ? `${API_BASE_URL}/api/products/${product.id}/references?referenceId=${refId}&taskId=${taskId}`
+        : `${API_BASE_URL}/api/products/${product.id}/references?referenceId=${refId}`;
 
       const res = await fetch(url, {
         method: "DELETE",
@@ -495,7 +495,7 @@ export function ProductDetailModal({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "刪除失敗");
+        throw new Error(data.error?.message || "刪除失敗");
       }
 
       // 重新載入 references
@@ -511,8 +511,8 @@ export function ProductDetailModal({
   if (!isOpen || !product) return null;
 
   // 分組 references by type
-  const urlReferences = references.filter((r) => r.type === "url");
-  const noteReferences = references.filter((r) => r.type === "note");
+  const urlReferences = references.filter((r) => r && r.type === "url");
+  const noteReferences = references.filter((r) => r && r.type === "note");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -982,7 +982,7 @@ export function ProductDetailModal({
                 </div>
               ) : (
                 <div className="divide-y divide-white/5">
-                  {references.map((ref) => (
+                  {references.filter(ref => ref && ref.type).map((ref) => (
                     <button
                       key={ref.id}
                       onClick={() => {
@@ -1023,7 +1023,8 @@ export function ProductDetailModal({
             </div>
 
             {/* Right Column - Selected Reference Content or Add Form */}
-            <div className="w-3/5 p-6 overflow-y-auto bg-slate-950/50">
+            <div className="w-3/5 flex flex-col bg-slate-950/50">
+              <div className="flex-1 p-6 overflow-y-auto">
               {showAddForm ? (
                 /* 新增表單 */
                 <div className="space-y-4">
@@ -1243,6 +1244,7 @@ export function ProductDetailModal({
                   <p className="text-white/30 text-sm mt-1">或點擊「新增資料」按鈕</p>
                 </div>
               )}
+              </div>
             </div>
           </div>
         )}
