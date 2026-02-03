@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dual_cache/flutter_dual_cache.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../config/app_config.dart';
+import '../services/analytics_service.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/entities/area.dart';
 import '../../domain/entities/product.dart';
@@ -24,6 +26,8 @@ import '../../domain/repositories/brain_dump_repository.dart';
 import '../../domain/repositories/product_repository.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../../domain/repositories/user_repository.dart';
+import '../../domain/repositories/milestone_repository.dart';
+import '../../data/repositories/milestone_repository_impl.dart';
 import '../../application/use_cases/add_product_reference_use_case.dart';
 import '../../application/use_cases/add_sub_item_use_case.dart';
 import '../../application/use_cases/apply_reorganization_use_case.dart';
@@ -31,6 +35,7 @@ import '../../application/use_cases/create_task_use_case.dart';
 import '../../application/use_cases/delete_product_reference_use_case.dart';
 import '../../application/use_cases/delete_sub_item_use_case.dart';
 import '../../application/use_cases/delete_task_use_case.dart';
+import '../../application/use_cases/promote_sub_item_use_case.dart';
 import '../../application/use_cases/get_active_tasks_use_case.dart';
 import '../../application/use_cases/get_areas_use_case.dart';
 import '../../application/use_cases/get_completed_today_tasks_use_case.dart';
@@ -49,6 +54,17 @@ import '../../application/use_cases/update_task_use_case.dart';
 /// Firebase Auth Provider
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
+});
+
+/// Firebase Analytics Provider
+final firebaseAnalyticsProvider = Provider<FirebaseAnalytics>((ref) {
+  return FirebaseAnalytics.instance;
+});
+
+/// Analytics Service Provider
+final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
+  final analytics = ref.watch(firebaseAnalyticsProvider);
+  return AnalyticsService(analytics: analytics);
 });
 
 /// Dio HTTP Client Provider
@@ -181,6 +197,12 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
   return UserRepositoryImpl(apiClient);
 });
 
+/// Milestone Repository Provider
+final milestoneRepositoryProvider = Provider<MilestoneRepository>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return MilestoneRepositoryImpl(apiClient);
+});
+
 // ==================== Use Case Providers ====================
 
 /// Get Tasks Use Case Provider
@@ -243,6 +265,12 @@ final addSubItemUseCaseProvider = Provider<AddSubItemUseCase>((ref) {
 final deleteSubItemUseCaseProvider = Provider<DeleteSubItemUseCase>((ref) {
   final repository = ref.watch(taskRepositoryProvider);
   return DeleteSubItemUseCase(repository);
+});
+
+/// Promote Sub Item Use Case Provider
+final promoteSubItemUseCaseProvider = Provider<PromoteSubItemUseCase>((ref) {
+  final repository = ref.watch(taskRepositoryProvider);
+  return PromoteSubItemUseCase(repository);
 });
 
 /// Reorder Sub Items Use Case Provider

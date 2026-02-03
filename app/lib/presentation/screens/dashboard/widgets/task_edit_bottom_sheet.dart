@@ -11,6 +11,7 @@ import '../../../../application/use_cases/update_task_details_use_case.dart';
 import '../../../../application/use_cases/update_sub_item_use_case.dart';
 import '../../../../application/use_cases/add_sub_item_use_case.dart';
 import '../../../../application/use_cases/delete_sub_item_use_case.dart';
+import '../../../../application/use_cases/promote_sub_item_use_case.dart';
 import '../../../../application/use_cases/reorder_sub_items_use_case.dart';
 import '../../../providers/area_provider.dart';
 import '../../../providers/product_provider.dart';
@@ -304,6 +305,76 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
       (_) {
         // 觸發靜默刷新
         silentRefreshTasks(ref);
+      },
+    );
+  }
+
+  /// 升級 sub-item 為獨立任務
+  Future<void> _handlePromoteSubItem(String subItemId) async {
+    // 確認對話框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2c2c2e),
+        title: const Text('升級為獨立任務', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          '確定要將此待辦項目升級為獨立任務嗎？',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('確定', style: TextStyle(color: Color(0xFF6C63FF))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // 樂觀更新：先移除
+    final index = _subItems.indexWhere((s) => s.id == subItemId);
+    if (index == -1) return;
+
+    final removedItem = _subItems[index];
+    setState(() {
+      _subItems.removeAt(index);
+    });
+
+    final useCase = ref.read(promoteSubItemUseCaseProvider);
+    final result = await useCase(PromoteSubItemParams(
+      taskId: widget.task.id,
+      subItemId: subItemId,
+    ));
+
+    result.fold(
+      (failure) {
+        // 回滾：恢復被移除的項目
+        if (mounted) {
+          setState(() {
+            _subItems.insert(index, removedItem);
+            _errorMessage = '升級失敗: ${failure.message}';
+          });
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) setState(() => _errorMessage = null);
+          });
+        }
+      },
+      (newTask) {
+        // 觸發靜默刷新
+        silentRefreshTasks(ref);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('已升級為獨立任務: ${newTask.content}'),
+              backgroundColor: const Color(0xFF6C63FF),
+            ),
+          );
+        }
       },
     );
   }
@@ -948,6 +1019,12 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                           ),
                         ),
                       ),
+                      // 升級按鈕
+                      IconButton(
+                        icon: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 18),
+                        onPressed: () => _handlePromoteSubItem(sub.id),
+                        tooltip: '升級為獨立任務',
+                      ),
                       // 刪除按鈕
                       IconButton(
                         icon: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 18),
@@ -994,6 +1071,12 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                           ),
                           child: Text(sub.content),
                         ),
+                      ),
+                      // 升級按鈕
+                      IconButton(
+                        icon: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 18),
+                        onPressed: () => _handlePromoteSubItem(sub.id),
+                        tooltip: '升級為獨立任務',
                       ),
                       IconButton(
                         icon: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 18),

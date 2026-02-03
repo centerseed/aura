@@ -49,6 +49,12 @@ abstract class TaskRepository {
     String subItemId,
   );
 
+  /// 升級 sub-item 為獨立任務
+  Future<Either<Failure, Task>> promoteSubItem(
+    String taskId,
+    String subItemId,
+  );
+
   /// 重新排序 sub-items
   Future<Either<Failure, void>> reorderSubItems(
     String taskId,

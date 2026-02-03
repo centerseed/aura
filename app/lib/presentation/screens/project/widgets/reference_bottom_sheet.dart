@@ -123,6 +123,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     ),
                   ),
                 ),
+                _buildAddReferenceForm(),
               ],
             ),
             error: (error, stack) => Column(
@@ -136,6 +137,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     ),
                   ),
                 ),
+                _buildAddReferenceForm(),
               ],
             ),
           ),
@@ -311,11 +313,12 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
 
   Widget _buildAddReferenceForm() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        color: const Color(0xFF1c1c1e),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

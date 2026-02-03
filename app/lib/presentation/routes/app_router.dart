@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/di/providers.dart' show analyticsServiceProvider;
 import '../providers/auth_provider.dart';
 import '../screens/auth/signin_screen.dart';
 import '../screens/home/home_screen.dart';
@@ -12,9 +13,11 @@ import '../../domain/entities/task.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
+  final analyticsService = ref.watch(analyticsServiceProvider);
 
   return GoRouter(
     initialLocation: '/splash',
+    observers: [analyticsService.observer],
     refreshListenable: GoRouterRefreshStream(authRepository.authStateChanges),
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);

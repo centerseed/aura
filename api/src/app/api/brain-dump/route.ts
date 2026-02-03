@@ -29,6 +29,10 @@ const SourceAttributionSchema = z.object({
   reasoning: z.string().max(80).describe("簡要說明推斷理由（最多 80 字元）"),
 });
 
+// 任務類型（用於時間推斷）
+const TaskTypeSchema = z.enum(["waiting", "booking", "preparation", "execution"])
+  .describe("waiting=需等待處理(7-14天), booking=需預約(5-7天), preparation=資料準備(3-5天), execution=簡單執行(1-2天)");
+
 // AI 輸出結構
 const StructuredItemSchema = z.object({
   title: z.string().max(50).describe("簡潔的任務標題（最多 50 字元）"),
@@ -45,9 +49,12 @@ const StructuredItemSchema = z.object({
   strategy_used: z.string().max(50).describe("Classification strategy: boundary_match, semantic_anchor, new_structure"),
   reasoning: z.string().max(100).describe("簡短說明分類理由（1 句話，最多 100 字元）"),
   // 時間推斷欄位 - 加入來源歸因
-  due_date: z.string().datetime({ offset: true }).optional().describe("Inferred due date in ISO 8601 format (允許時區偏移)"),
+  due_date: z.string().datetime({ offset: true }).optional().describe("推斷的截止日期（ISO 8601 格式）- 只要能推斷出時間就必須填寫"),
   due_date_source: SourceAttributionSchema.optional().describe("時間來源歸因 - 區分 explicit/inferred"),
-  inferred_from_milestone: z.string().optional().describe("Milestone ID if inferred from a milestone (僅當 source_type=inferred_from_system)"),
+  inferred_from_milestone: z.string().optional().describe("關聯的 Milestone ID（僅當任務與某里程碑相關時填寫）"),
+  task_type: TaskTypeSchema.optional().describe("任務類型 - 用於計算需要提前多少天完成"),
+  estimated_days_needed: z.number().min(1).max(30).optional().describe("AI 估算完成此任務需要的天數（包含等待時間）"),
+  depends_on_task: z.string().max(50).optional().describe("如果此任務依賴同批次的其他任務，填入該任務的 title"),
   time_confidence: z.number().min(0).max(1).optional().describe("Confidence score for time inference (0-1)"),
   // Sub-items (待辦事項清單)
   sub_items: z.array(SubItemSchema).optional().describe("如果任務包含多個可獨立勾選的步驟/項目，拆成 sub-items - 不可遺漏用戶提到的任何事項"),
@@ -72,6 +79,125 @@ const StructureResultSchema = z.discriminatedUnion("action", [
   AppendSubItemActionSchema,
   CreateNewTasksActionSchema,
 ]);
+
+// 類型定義
+type StructuredItem = z.infer<typeof StructuredItemSchema>;
+type Milestone = {
+  id: string;
+  name: string;
+  target_date: Date;
+  [key: string]: any;
+};
+
+/**
+ * 計算任務的截止日期
+ *
+ * 邏輯優先級：
+ * 1. 用戶明確指定的日期 (due_date)
+ * 2. 從里程碑推斷（根據 task_type 和 estimated_days_needed 計算）
+ * 3. 無法推斷則返回 null
+ */
+function calculateDueDate(
+  item: StructuredItem,
+  milestones: Milestone[],
+  siblingItems: StructuredItem[]
+): { dueDate: Date | null; inferredFromMilestone: string | null; timeConfidence: number | null } {
+
+  // 層級 1: 用戶明確指定的日期
+  if (item.due_date) {
+    return {
+      dueDate: new Date(item.due_date),
+      inferredFromMilestone: null,
+      timeConfidence: item.time_confidence ?? 1.0,
+    };
+  }
+
+  // 層級 2: 從里程碑推斷
+  if (item.inferred_from_milestone && isValidUUID(item.inferred_from_milestone)) {
+    const milestone = milestones.find(m => m.id === item.inferred_from_milestone);
+
+    if (milestone?.target_date) {
+      // 基礎天數：使用 AI 估算的天數，或根據 task_type 提供預設值
+      let daysBeforeMilestone = item.estimated_days_needed ?? getDefaultDays(item.task_type);
+
+      // 考慮依賴關係：如果依賴其他任務，需要額外加上那個任務的天數
+      if (item.depends_on_task) {
+        const dependentItem = siblingItems.find(
+          si => si.title === item.depends_on_task
+        );
+        if (dependentItem) {
+          const dependentDays = dependentItem.estimated_days_needed ??
+            getDefaultDays(dependentItem.task_type);
+          daysBeforeMilestone += dependentDays;
+        }
+      }
+
+      // 複雜度加成：每個 sub_item +0.5 天
+      if (item.sub_items && item.sub_items.length > 0) {
+        daysBeforeMilestone += Math.ceil(item.sub_items.length * 0.5);
+      }
+
+      // 確保不會排到過去（至少留 1 天）
+      const now = new Date();
+      const daysUntilMilestone = Math.ceil(
+        (new Date(milestone.target_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      // 如果里程碑已經很近，最多只能提前到明天
+      if (daysBeforeMilestone >= daysUntilMilestone) {
+        daysBeforeMilestone = Math.max(1, daysUntilMilestone - 1);
+      }
+
+      // 計算最終日期
+      const dueDate = new Date(milestone.target_date);
+      dueDate.setDate(dueDate.getDate() - daysBeforeMilestone);
+
+      // 確保日期至少是明天
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+
+      if (dueDate < tomorrow) {
+        dueDate.setTime(tomorrow.getTime());
+      }
+
+      console.log(`📅 [calculateDueDate] Task: "${item.title}" -> ${daysBeforeMilestone} days before milestone "${milestone.name}" = ${dueDate.toISOString().split('T')[0]}`);
+
+      return {
+        dueDate,
+        inferredFromMilestone: milestone.id,
+        timeConfidence: item.time_confidence ?? 0.5,
+      };
+    }
+  }
+
+  // 無法推斷
+  return {
+    dueDate: null,
+    inferredFromMilestone: item.inferred_from_milestone && isValidUUID(item.inferred_from_milestone)
+      ? item.inferred_from_milestone
+      : null,
+    timeConfidence: null,
+  };
+}
+
+/**
+ * 根據任務類型返回預設天數
+ */
+function getDefaultDays(taskType: string | undefined): number {
+  switch (taskType) {
+    case 'waiting':
+      return 10; // 需等待處理：7-14 天，取中間值
+    case 'booking':
+      return 6;  // 需預約：5-7 天
+    case 'preparation':
+      return 4;  // 資料準備：3-5 天
+    case 'execution':
+      return 2;  // 簡單執行：1-2 天
+    default:
+      return 3;  // 預設 3 天
+  }
+}
 
 // POST /api/brain-dump
 export async function POST(request: NextRequest) {
@@ -322,10 +448,8 @@ export async function POST(request: NextRequest) {
         const targetDate = new Date(milestone.target_date);
         const daysUntil = Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-        contextSummary += `🎯 **${milestone.name}**\n`;
+        contextSummary += `🎯 **${milestone.name}** [ID: ${milestone.id}]\n`;
         contextSummary += `   - 目標日期：${targetDate.toLocaleDateString("zh-TW")} (${daysUntil} 天後)\n`;
-        contextSummary += `   - 層級：${milestone.entity_type}\n`;
-        contextSummary += `   - 優先級：${milestone.priority}/10\n`;
         if (milestone.description) {
           contextSummary += `   - 描述：${milestone.description}\n`;
         }
@@ -434,22 +558,25 @@ ${explicitProductId ? `# 🚨 用戶明確指定了 Product
 Topic：優先使用該 Product 已有的 Topics，無法確定則填 ""
 
 ## 4. 時間推斷
-問自己：**「用戶有明確說時間嗎？」**
 
-| 優先級 | 情況 | source_type | confidence |
-|--------|------|-------------|------------|
-| 最高 | 用戶說「今天」「明天」「週五」「1/30」 | explicit | 1.0 |
-| 次高 | 用戶說「盡快」「有空時」 | inferred_from_context | 0.7-0.9 |
-| 最低 | 從 Milestone 推斷 | inferred_from_system | 0.3-0.7 |
+**規則：只要你能推斷出時間，就必須填 due_date**
 
-用戶明確說的時間，絕對優先於系統推斷。
+- 用戶說「今天」「明天」「週五」「1/30」→ 填 due_date
+- 從上下文推斷出時間（如「週報通常週五發」）→ 填 due_date
+- 任務與里程碑相關 → 填 due_date + inferred_from_milestone + task_type + estimated_days_needed
 
-## 5. Drawer 狀態
-- INBOX: 未處理，需要關注
-- ACTIVE: 正在進行中
-- MAINTAIN: 穩定維護中
-- REFERENCE: 參考資料
-- ARCHIVE: 已完成
+due_date 格式：ISO 8601，如 2026-02-07T00:00:00+08:00
+
+**task_type**（當任務與里程碑相關時填寫）：
+- waiting：需等待結果
+- booking：需預約
+- preparation：需準備
+- execution：可立即執行
+
+## 5. Drawer 狀態（與 due_date 連動）
+- **有填 due_date → 必須是 ACTIVE**（有明確期限，需要追蹤進度）
+- **沒有 due_date → 必須是 INBOX**（還沒決定什麼時候做）
+- **例行性/週期性任務 → MAINTAIN**（穩定運作中，異常時才需關注）
 
 ---
 
@@ -710,10 +837,12 @@ ${text}
         }));
       }
 
-      // 驗證 inferred_from_milestone 是否為有效 UUID
-      const validMilestoneId = item.inferred_from_milestone && isValidUUID(item.inferred_from_milestone)
-        ? item.inferred_from_milestone
-        : null;
+      // 計算截止日期（使用智能推斷邏輯）
+      const { dueDate, inferredFromMilestone, timeConfidence } = calculateDueDate(
+        item,
+        milestones,
+        result.items // 同批次的其他任務，用於處理依賴關係
+      );
 
       const task = await prisma.task.create({
         data: {
@@ -722,13 +851,16 @@ ${text}
           topic_id: topicId,
           content: item.title,
           status: item.drawer as any,
-          due_date: item.due_date ? new Date(item.due_date) : null,
-          inferred_from_milestone: validMilestoneId,
-          time_confidence: item.time_confidence !== undefined ? item.time_confidence : null,
+          due_date: dueDate,
+          inferred_from_milestone: inferredFromMilestone,
+          time_confidence: timeConfidence,
           sub_items: taskSubItems as any, // Json 類型需要 type assertion
           ai_analysis: aiAnalysis,
         },
       });
+
+      // 格式化日期用於回傳
+      const formattedDueDate = dueDate ? dueDate.toISOString() : null;
 
       createdTasks.push({
         id: task.id,
@@ -740,10 +872,13 @@ ${text}
         strategy_used: item.strategy_used,
         reasoning: item.reasoning,
         // 時間推斷資訊
-        due_date: item.due_date || null,
-        time_confidence: item.time_confidence || null,
+        due_date: formattedDueDate,
+        time_confidence: timeConfidence,
         due_date_source: item.due_date_source || null,
-        inferred_from_milestone: item.inferred_from_milestone || null,
+        inferred_from_milestone: inferredFromMilestone,
+        // 新增：AI 推斷的原始數據（用於 debug）
+        task_type: item.task_type || null,
+        estimated_days_needed: item.estimated_days_needed || null,
       });
     }
 

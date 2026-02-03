@@ -8,6 +8,7 @@ import '../../providers/reorganize_provider.dart';
 
 import '../../../domain/entities/reorganize_proposal.dart';
 import '../dashboard/widgets/task_edit_bottom_sheet.dart';
+import 'widgets/milestone_section.dart';
 
 class ProjectDetailScreen extends ConsumerWidget {
   final Product product;
@@ -85,35 +86,89 @@ class ProjectDetailScreen extends ConsumerWidget {
         .where((t) => t.productId == product.id)
         .toList();
 
-    if (projectTasks.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.task_alt_rounded,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      children: [
+        // 里程碑區塊
+        MilestoneSection(
+          productId: product.id,
+          productName: product.name,
+        ),
+
+        // 任務區塊標題
+        if (projectTasks.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.task_alt_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '任務',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${projectTasks.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              "專案內無待辦事項",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                fontSize: 16,
+          ),
+
+        // 空白狀態（無任務）
+        if (projectTasks.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.task_alt_rounded,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    "專案內無待辦事項",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      );
-    }
+          ),
 
-    return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-            itemCount: projectTasks.length,
-            itemBuilder: (context, index) {
-                      final task = projectTasks[index];
-                      // Use Material Design style matching Focus list
+        // 任務列表
+        ...projectTasks.asMap().entries.map((entry) {
+          final index = entry.key;
+          final task = entry.value;
+          // Use Material Design style matching Focus list
                       final contextParts = [
                         task.topicName,
                       ].whereType<String>().where((s) => s.trim().isNotEmpty).toList();
@@ -287,8 +342,9 @@ class ProjectDetailScreen extends ConsumerWidget {
                           ),
                         ),
                       );
-            },
-          );
+        }),
+      ],
+    );
   }
 
   void _showAIMagicSheet(BuildContext context) {

@@ -36,6 +36,7 @@ export interface DroppableProductProps {
   onReorganize?: (productId: string, productName: string) => void
   onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void
   onDeleteSubItem?: (taskId: string, subItemId: string) => void
+  onPromoteSubItem?: (taskId: string, subItemId: string) => void
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void
   onAddSubItem?: (taskId: string, content: string) => void
   onDeleteReference?: (taskId: string, referenceId: string) => void
@@ -65,6 +66,7 @@ export function DroppableProduct({
   onReorganize,
   onToggleSubItem,
   onDeleteSubItem,
+  onPromoteSubItem,
   onEditSubItem,
   onAddSubItem,
   onDeleteReference,
@@ -287,6 +289,7 @@ export function DroppableProduct({
                 onComplete={onComplete}
                 onToggleSubItem={onToggleSubItem}
                 onDeleteSubItem={onDeleteSubItem}
+                onPromoteSubItem={onPromoteSubItem}
                 onEditTitle={onEditTaskTitle}
                 onEditSubItem={onEditSubItem}
                 onAddSubItem={onAddSubItem}

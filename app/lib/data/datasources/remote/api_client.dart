@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../models/area_model.dart';
 import '../../models/brain_dump_models.dart';
+import '../../models/milestone_model.dart';
 import '../../models/product_model.dart';
 import '../../models/reference_model.dart';
 import '../../models/task_model.dart';
@@ -65,6 +66,11 @@ class ApiClient {
 
   Future<void> deleteSubItem(String taskId, String subItemId) async {
     await _dio.delete('/tasks/$taskId/sub-items/$subItemId');
+  }
+
+  Future<Map<String, dynamic>> promoteSubItem(String taskId, String subItemId) async {
+    final response = await _dio.post('/tasks/$taskId/sub-items/$subItemId/promote');
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   Future<void> reorderSubItems(String taskId, List<String> subItemIds) async {
@@ -204,5 +210,43 @@ class ApiClient {
   Future<Map<String, dynamic>> updateCurrentUser(Map<String, dynamic> body) async {
     final response = await _dio.patch('/me', data: body);
     return response.data;
+  }
+
+  // ==================== Milestones ====================
+
+  /// 取得所有里程碑
+  Future<List<MilestoneModel>> getMilestones() async {
+    final response = await _dio.get('/milestones');
+    // API 返回格式: {data: {milestones: [...]}, meta: {...}}
+    final dataWrapper = response.data['data'];
+    final List<dynamic> milestones =
+        dataWrapper is Map ? (dataWrapper['milestones'] ?? []) : dataWrapper;
+    return milestones.map((json) => MilestoneModel.fromJson(json)).toList();
+  }
+
+  /// 建立里程碑
+  Future<MilestoneModel> createMilestone(Map<String, dynamic> body) async {
+    final response = await _dio.post('/milestones', data: body);
+    final data = response.data['data'] ?? response.data;
+    // API 返回 { data: { milestone: {...} } }
+    final milestoneData = data['milestone'] ?? data;
+    return MilestoneModel.fromJson(milestoneData);
+  }
+
+  /// 更新里程碑
+  Future<MilestoneModel> updateMilestone(
+    String milestoneId,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _dio.put('/milestones/$milestoneId', data: body);
+    final data = response.data['data'] ?? response.data;
+    // API 返回 { data: { milestone: {...} } }
+    final milestoneData = data['milestone'] ?? data;
+    return MilestoneModel.fromJson(milestoneData);
+  }
+
+  /// 刪除里程碑
+  Future<void> deleteMilestone(String milestoneId) async {
+    await _dio.delete('/milestones/$milestoneId');
   }
 }

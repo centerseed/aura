@@ -242,6 +242,21 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
   }
 
   @override
+  Future<Either<Failure, Task>> promoteSubItem(
+    String taskId,
+    String subItemId,
+  ) async {
+    try {
+      final response = await _apiClient.promoteSubItem(taskId, subItemId);
+      await silentRefresh();
+      final newTaskData = response['newTask'] as Map<String, dynamic>;
+      return Right(TaskModel.fromJson(newTaskData).toEntity());
+    } catch (e) {
+      return Left(handleDioError(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> reorderSubItems(
     String taskId,
     List<String> subItemIds,

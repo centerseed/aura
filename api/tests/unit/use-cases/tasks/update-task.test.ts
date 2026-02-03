@@ -321,4 +321,234 @@ describe('UpdateTaskUseCase', () => {
       expect(result.task.timeConfidence).toBe(0.8)
     })
   })
+
+  describe('due_date 與 status 連動邏輯', () => {
+    it('設定 due_date 且目前是 INBOX → 自動改成 ACTIVE', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'INBOX',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        status: 'ACTIVE',
+        dueDate: new Date('2024-12-31'),
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        dueDate: '2024-12-31',
+      })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          status: TaskStatus.ACTIVE,
+          dueDate: expect.any(Date),
+        })
+      )
+      expect(result.message).toBe('已設定截止日期，狀態自動變更為進行中')
+    })
+
+    it('清除 due_date 且目前是 ACTIVE → 自動改回 INBOX', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: new Date('2024-12-31'),
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        status: 'INBOX',
+        dueDate: null,
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        dueDate: null,
+      })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          status: TaskStatus.INBOX,
+          dueDate: null,
+        })
+      )
+      expect(result.message).toBe('已清除截止日期，狀態自動變更為收件匣')
+    })
+
+    it('設定 due_date 但目前是 MAINTAIN → 不改變狀態', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'MAINTAIN',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        dueDate: new Date('2024-12-31'),
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        dueDate: '2024-12-31',
+      })
+
+      // 不應該更新 status
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.not.objectContaining({
+          status: expect.anything(),
+        })
+      )
+    })
+
+    it('清除 due_date 但目前是 INBOX → 不改變狀態', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'INBOX',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: new Date('2024-12-31'),
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        dueDate: null,
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        dueDate: null,
+      })
+
+      // 不應該更新 status
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.not.objectContaining({
+          status: expect.anything(),
+        })
+      )
+    })
+
+    it('明確指定 status 時，連動邏輯不觸發', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'INBOX',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        status: 'MAINTAIN',
+        dueDate: new Date('2024-12-31'),
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        dueDate: '2024-12-31',
+        status: 'MAINTAIN', // 明確指定 status
+      })
+
+      // 應該使用明確指定的 status，而不是自動變成 ACTIVE
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          status: TaskStatus.MAINTAIN,
+        })
+      )
+      // message 應該是狀態轉換的提示，而不是連動邏輯的提示
+      expect(result.message).not.toBe('已設定截止日期，狀態自動變更為進行中')
+    })
+  })
 })

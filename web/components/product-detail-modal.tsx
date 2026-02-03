@@ -20,7 +20,16 @@ import {
   Archive,
   Pencil,
   Check,
+  Target,
+  Calendar,
+  ArrowRight,
 } from "lucide-react";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import type { Milestone } from "@/types";
 import { auth } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
 
@@ -47,7 +56,9 @@ interface ProductDetailModalProps {
     lifecycle: "FINITE" | "PERPETUAL";
     status: string;
   } | null;
-  initialTab?: "edit" | "references";
+  initialTab?: "edit" | "milestones" | "references";
+  milestones?: Milestone[];
+  onMilestoneChange?: () => void;
 }
 
 // 簡單的 Markdown 渲染器
@@ -183,6 +194,8 @@ function processInlineFormatting(text: string, baseKey: number): React.ReactNode
   return parts.length === 1 ? parts[0] : <>{parts}</>;
 }
 
+type TabType = "edit" | "milestones" | "references";
+
 export function ProductDetailModal({
   isOpen,
   onClose,
@@ -190,8 +203,10 @@ export function ProductDetailModal({
   onSuccess,
   product,
   initialTab = "edit",
+  milestones = [],
+  onMilestoneChange,
 }: ProductDetailModalProps) {
-  const [activeTab, setActiveTab] = useState<"edit" | "references">(initialTab);
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -210,6 +225,20 @@ export function ProductDetailModal({
   const [newRefContent, setNewRefContent] = useState("");
   const [isAddingRef, setIsAddingRef] = useState(false);
   const [deletingRefId, setDeletingRefId] = useState<string | null>(null);
+
+  // 里程碑相關狀態
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [milestoneName, setMilestoneName] = useState("");
+  const [milestoneDate, setMilestoneDate] = useState<Date | undefined>();
+  const [milestoneDescription, setMilestoneDescription] = useState("");
+  const [isSavingMilestone, setIsSavingMilestone] = useState(false);
+  const [deletingMilestoneId, setDeletingMilestoneId] = useState<string | null>(null);
+
+  // 篩選此產品的里程碑，按日期排序
+  const productMilestones = (Array.isArray(milestones) ? milestones : [])
+    .filter((m) => m.entity_type === "PRODUCT" && m.entity_id === product?.id)
+    .sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime());
 
   // 筆記收折/展開狀態 (key: refId, value: true=展開)
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
@@ -508,6 +537,124 @@ export function ProductDetailModal({
     }
   };
 
+  // 開始編輯里程碑
+  const startEditMilestone = (milestone: Milestone) => {
+    setEditingMilestone(milestone);
+    setMilestoneName(milestone.name);
+    setMilestoneDate(new Date(milestone.target_date));
+    setMilestoneDescription(milestone.description || "");
+    setShowMilestoneForm(true);
+  };
+
+  // 開始新增里程碑
+  const startAddMilestone = () => {
+    setEditingMilestone(null);
+    setMilestoneName("");
+    setMilestoneDate(undefined);
+    setMilestoneDescription("");
+    setShowMilestoneForm(true);
+  };
+
+  // 取消編輯/新增里程碑
+  const cancelMilestoneForm = () => {
+    setShowMilestoneForm(false);
+    setEditingMilestone(null);
+    setMilestoneName("");
+    setMilestoneDate(undefined);
+    setMilestoneDescription("");
+  };
+
+  // 儲存里程碑
+  const handleSaveMilestone = async () => {
+    if (!product || !milestoneName.trim() || !milestoneDate) return;
+
+    setIsSavingMilestone(true);
+    setError(null);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("未登入");
+      const token = await user.getIdToken();
+
+      const payload = {
+        name: milestoneName.trim(),
+        target_date: milestoneDate.toISOString(),
+        status: "planned",
+        entity_type: "PRODUCT",
+        entity_id: product.id,
+        priority: 5,
+        description: milestoneDescription.trim() || undefined,
+      };
+
+      const url = editingMilestone?.id
+        ? `${API_BASE_URL}/api/milestones/${editingMilestone.id}`
+        : `${API_BASE_URL}/api/milestones`;
+      const method = editingMilestone?.id ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || "操作失敗");
+      }
+
+      cancelMilestoneForm();
+      onMilestoneChange?.();
+    } catch (err) {
+      console.error("Failed to save milestone:", err);
+      setError(err instanceof Error ? err.message : "儲存失敗");
+    } finally {
+      setIsSavingMilestone(false);
+    }
+  };
+
+  // 刪除里程碑
+  const handleDeleteMilestone = async (milestoneId: string) => {
+    if (!confirm("確定要刪除這個里程碑嗎？")) return;
+
+    setDeletingMilestoneId(milestoneId);
+    setError(null);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("未登入");
+      const token = await user.getIdToken();
+
+      const res = await fetch(`${API_BASE_URL}/api/milestones/${milestoneId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || "刪除失敗");
+      }
+
+      onMilestoneChange?.();
+    } catch (err) {
+      console.error("Failed to delete milestone:", err);
+      setError(err instanceof Error ? err.message : "刪除失敗");
+    } finally {
+      setDeletingMilestoneId(null);
+    }
+  };
+
+  // 計算里程碑剩餘天數
+  const getDaysRemaining = (targetDate: string) => {
+    return Math.ceil(
+      (new Date(targetDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+    );
+  };
+
   if (!isOpen || !product) return null;
 
   // 分組 references by type
@@ -533,7 +680,7 @@ export function ProductDetailModal({
             <div>
               <h2 className="text-lg font-semibold text-white">{product.name}</h2>
               <p className="text-sm text-white/50">
-                {activeTab === "edit" ? "編輯專案資訊" : "相關資料"}
+                {activeTab === "edit" ? "編輯專案資訊" : activeTab === "milestones" ? "里程碑管理" : "相關資料"}
               </p>
             </div>
           </div>
@@ -550,6 +697,22 @@ export function ProductDetailModal({
               >
                 <Pencil className="w-4 h-4 inline-block mr-1.5" />
                 編輯
+              </button>
+              <button
+                onClick={() => setActiveTab("milestones")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  activeTab === "milestones"
+                    ? "bg-blue-500 text-white"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                <Target className="w-4 h-4 inline-block mr-1.5" />
+                里程碑
+                {productMilestones.length > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-white/20 text-xs">
+                    {productMilestones.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setActiveTab("references")}
@@ -950,6 +1113,277 @@ export function ProductDetailModal({
             </div>
           </div>
         </div>
+        ) : activeTab === "milestones" ? (
+          /* Milestones Mode - Timeline View */
+          <div className="flex-1 overflow-hidden flex flex-col p-6">
+            {/* Error Message */}
+            {error && (
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 mb-4">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-red-400">操作失敗</p>
+                  <p className="text-sm text-red-300/70 mt-1">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Header with Add Button */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-white">專案里程碑</h3>
+                <p className="text-sm text-white/50 mt-1">
+                  設定專案的關鍵時間節點，追蹤進度
+                </p>
+              </div>
+              <Button
+                onClick={startAddMilestone}
+                size="sm"
+                className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                新增里程碑
+              </Button>
+            </div>
+
+            {/* Milestone Form */}
+            {showMilestoneForm && (
+              <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10 space-y-4">
+                <h4 className="text-sm font-medium text-white/90">
+                  {editingMilestone ? "編輯里程碑" : "新增里程碑"}
+                </h4>
+
+                {/* Name */}
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">
+                    名稱 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={milestoneName}
+                    onChange={(e) => setMilestoneName(e.target.value)}
+                    placeholder="例如：MVP Release、Beta 測試完成"
+                    className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">
+                    目標日期 <span className="text-red-400">*</span>
+                  </label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white text-sm",
+                          !milestoneDate && "text-white/50"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {milestoneDate ? (
+                          format(milestoneDate, "PPP", { locale: zhTW })
+                        ) : (
+                          <span>選擇日期</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-[70]" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={milestoneDate}
+                        onSelect={setMilestoneDate}
+                        locale={zhTW}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">
+                    描述（選填）
+                  </label>
+                  <textarea
+                    value={milestoneDescription}
+                    onChange={(e) => setMilestoneDescription(e.target.value)}
+                    placeholder="說明這個里程碑的具體目標..."
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                  />
+                </div>
+
+                {/* Buttons */}
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    onClick={cancelMilestoneForm}
+                    variant="outline"
+                    size="sm"
+                    className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
+                    disabled={isSavingMilestone}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    onClick={handleSaveMilestone}
+                    disabled={!milestoneName.trim() || !milestoneDate || isSavingMilestone}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    {isSavingMilestone ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      editingMilestone ? "更新" : "新增"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div className="flex-1 overflow-y-auto">
+              {productMilestones.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Target className="w-16 h-16 text-white/10 mb-4" />
+                  <p className="text-white/50">尚無里程碑</p>
+                  <p className="text-white/30 text-sm mt-1">
+                    點擊「新增里程碑」來設定專案目標
+                  </p>
+                </div>
+              ) : (
+                <div className="relative">
+                  {/* Timeline connector line */}
+                  <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-gradient-to-b from-blue-500/50 via-indigo-500/50 to-purple-500/50" />
+
+                  {/* Milestone items */}
+                  <div className="space-y-4">
+                    {productMilestones.map((milestone, index) => {
+                      const daysRemaining = getDaysRemaining(milestone.target_date);
+                      const isOverdue = daysRemaining < 0;
+                      const isUrgent = daysRemaining >= 0 && daysRemaining <= 7;
+                      const isCompleted = milestone.status === "completed";
+
+                      return (
+                        <div
+                          key={milestone.id}
+                          className="relative flex items-start gap-4 pl-10 group"
+                        >
+                          {/* Timeline dot */}
+                          <div
+                            className={cn(
+                              "absolute left-2 top-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                              isCompleted
+                                ? "bg-green-500 border-green-400"
+                                : isOverdue
+                                ? "bg-red-500/20 border-red-400"
+                                : isUrgent
+                                ? "bg-orange-500/20 border-orange-400"
+                                : "bg-blue-500/20 border-blue-400"
+                            )}
+                          >
+                            {isCompleted && (
+                              <Check className="w-3 h-3 text-white" />
+                            )}
+                          </div>
+
+                          {/* Arrow between items */}
+                          {index < productMilestones.length - 1 && (
+                            <div className="absolute left-[14px] top-8 text-white/20">
+                              <ArrowRight className="w-3 h-3 rotate-90" />
+                            </div>
+                          )}
+
+                          {/* Milestone card */}
+                          <div
+                            className={cn(
+                              "flex-1 p-4 rounded-lg border transition-all cursor-pointer hover:bg-white/5",
+                              isCompleted
+                                ? "bg-green-500/5 border-green-500/20"
+                                : isOverdue
+                                ? "bg-red-500/5 border-red-500/20"
+                                : isUrgent
+                                ? "bg-orange-500/5 border-orange-500/20"
+                                : "bg-white/5 border-white/10"
+                            )}
+                            onClick={() => startEditMilestone(milestone)}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium text-white">
+                                    {milestone.name}
+                                  </h4>
+                                  <span
+                                    className={cn(
+                                      "px-2 py-0.5 rounded-full text-xs font-medium",
+                                      isCompleted
+                                        ? "bg-green-500/20 text-green-300"
+                                        : isOverdue
+                                        ? "bg-red-500/20 text-red-300"
+                                        : isUrgent
+                                        ? "bg-orange-500/20 text-orange-300"
+                                        : "bg-blue-500/20 text-blue-300"
+                                    )}
+                                  >
+                                    {isCompleted
+                                      ? "已完成"
+                                      : isOverdue
+                                      ? `逾期 ${Math.abs(daysRemaining)} 天`
+                                      : daysRemaining === 0
+                                      ? "今天"
+                                      : `${daysRemaining} 天後`}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-white/50 mt-1 flex items-center gap-1.5">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  {format(new Date(milestone.target_date), "yyyy/MM/dd (EEEE)", { locale: zhTW })}
+                                </p>
+                                {milestone.description && (
+                                  <p className="text-sm text-white/40 mt-2">
+                                    {milestone.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEditMilestone(milestone);
+                                  }}
+                                  className="p-1.5 rounded-md hover:bg-blue-500/20 text-blue-400 transition-all"
+                                  title="編輯"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMilestone(milestone.id);
+                                  }}
+                                  disabled={deletingMilestoneId === milestone.id}
+                                  className="p-1.5 rounded-md hover:bg-red-500/20 text-red-400 transition-all"
+                                  title="刪除"
+                                >
+                                  {deletingMilestoneId === milestone.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         ) : (
           /* References Mode - Two Column Layout (List | Content) */
           <div className="flex-1 overflow-hidden flex">
@@ -1278,25 +1712,27 @@ export function ProductDetailModal({
               className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
               disabled={isSubmitting || isDeleting}
             >
-              取消
+              {activeTab === "edit" ? "取消" : "關閉"}
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={!name.trim() || isSubmitting || isDeleting}
-              className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  更新中...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  更新專案
-                </>
-              )}
-            </Button>
+            {activeTab === "edit" && (
+              <Button
+                onClick={handleSubmit}
+                disabled={!name.trim() || isSubmitting || isDeleting}
+                className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    更新中...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    更新專案
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </Card>

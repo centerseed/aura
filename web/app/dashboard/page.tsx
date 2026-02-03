@@ -195,6 +195,7 @@ function DraggableTaskItem({
   onComplete,
   onToggleSubItem,
   onDeleteSubItem,
+  onPromoteSubItem,
   onEditTitle,
   onEditSubItem,
   onAddSubItem,
@@ -207,6 +208,7 @@ function DraggableTaskItem({
   onComplete?: (taskId: string) => void;
   onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void;
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
+  onPromoteSubItem?: (taskId: string, subItemId: string) => void;
   onEditTitle?: (taskId: string, newTitle: string) => void;
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
   onAddSubItem?: (taskId: string, content: string) => void;
@@ -764,6 +766,7 @@ function DroppableProduct({
   onReorganize,
   onToggleSubItem,
   onDeleteSubItem,
+  onPromoteSubItem,
   onEditSubItem,
   onAddSubItem,
   onDeleteReference,
@@ -790,6 +793,7 @@ function DroppableProduct({
   onReorganize?: (productId: string, productName: string) => void;
   onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void;
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
+  onPromoteSubItem?: (taskId: string, subItemId: string) => void;
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
   onAddSubItem?: (taskId: string, content: string) => void;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
@@ -1007,7 +1011,7 @@ function DroppableProduct({
               // 兩個都有 due_date，按日期排序（早的在前）
               return new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime();
             })
-            .map((task) => <DraggableTaskItem key={task.id} task={task} onSetDueDate={onSetDueDate} onComplete={onComplete} onToggleSubItem={onToggleSubItem} onDeleteSubItem={onDeleteSubItem} onEditTitle={onEditTaskTitle} onEditSubItem={onEditSubItem} onAddSubItem={onAddSubItem} onDeleteReference={onDeleteReference} onOpenDetail={() => onOpenTaskDetail?.(task)} />)
+            .map((task) => <DraggableTaskItem key={task.id} task={task} onSetDueDate={onSetDueDate} onComplete={onComplete} onToggleSubItem={onToggleSubItem} onDeleteSubItem={onDeleteSubItem} onPromoteSubItem={onPromoteSubItem} onEditTitle={onEditTaskTitle} onEditSubItem={onEditSubItem} onAddSubItem={onAddSubItem} onDeleteReference={onDeleteReference} onOpenDetail={() => onOpenTaskDetail?.(task)} />)
         )}
       </div>
     </div>
@@ -1088,7 +1092,7 @@ function DashboardContent() {
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
-  const [productDetailInitialTab, setProductDetailInitialTab] = useState<"edit" | "references">("edit");
+  const [productDetailInitialTab, setProductDetailInitialTab] = useState<"edit" | "milestones" | "references">("edit");
   const [selectedAreaForProduct, setSelectedAreaForProduct] = useState<{ id: string; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<{ id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string } | null>(null);
   const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
@@ -2210,6 +2214,95 @@ function DashboardContent() {
     }
   };
 
+  // 升級 sub-item 為獨立 Task
+  const handlePromoteSubItem = async (taskId: string, subItemId: string) => {
+    try {
+      // API call
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/sub-items/${subItemId}/promote`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error("升級失敗");
+      }
+
+      const result = await res.json();
+      const { newTask, removedSubItemId, meta } = result.data;
+
+      // 更新 UI：移除 sub-item 並加入新 Task
+      setAreas(prevAreas => {
+        return prevAreas.map(area => ({
+          ...area,
+          products: area.products?.map(product => {
+            // 更新 parent task（移除 sub-item）
+            let updatedTasks = product.tasks?.filter(task => task != null).map((task: TaskCard) => {
+              if (task.id === taskId) {
+                const updatedSubItems = task.sub_items?.filter(
+                  (item: SubItem) => item.id !== removedSubItemId
+                ) || [];
+
+                const updatedTask = {
+                  ...task,
+                  sub_items: updatedSubItems,
+                  sub_items_meta: meta,
+                };
+
+                // 同時更新 selectedTask
+                if (selectedTask?.id === taskId) {
+                  setSelectedTask(updatedTask);
+                }
+
+                return updatedTask;
+              }
+              return task;
+            }) || [];
+
+            // 如果新 Task 屬於這個 product，加入到 tasks 列表
+            if (newTask.product_id === product.id) {
+              const newTaskCard: TaskCard = {
+                id: newTask.id,
+                title: newTask.content,
+                drawer: newTask.status,
+                tag: {
+                  area: area.name,
+                  product: product.name,
+                  topic: '',
+                },
+                sub_items: [],
+                sub_items_meta: { total: 0, completed: 0, completion_rate: 0 },
+                references: [],
+                narrative: null,
+                lifecycle: 'embryo',
+                strategy_used: null,
+                reasoning: null,
+              };
+              updatedTasks = [...updatedTasks, newTaskCard];
+            }
+
+            return { ...product, tasks: updatedTasks };
+          }) || []
+        }));
+      });
+
+      console.log(`Sub-item 已升級為獨立任務: ${newTask.content}`);
+    } catch (err) {
+      console.error("Failed to promote sub-item:", err);
+      // 錯誤時重新載入數據
+      if (userId) {
+        const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
+        }
+      }
+    }
+  };
+
   // 編輯 sub-item 內容
   const handleEditSubItem = async (taskId: string, subItemId: string, newContent: string) => {
     try {
@@ -3239,6 +3332,7 @@ function DashboardContent() {
                               onReorganize={handleReorganize}
                               onToggleSubItem={handleToggleSubItem}
                               onDeleteSubItem={handleDeleteSubItem}
+                              onPromoteSubItem={handlePromoteSubItem}
                               onEditSubItem={handleEditSubItem}
                               onAddSubItem={handleAddSubItem}
                               onDeleteReference={handleDeleteReference}
@@ -3401,6 +3495,8 @@ function DashboardContent() {
           userId={userId || ""}
           product={editingProduct}
           initialTab={productDetailInitialTab}
+          milestones={milestones}
+          onMilestoneChange={reloadMilestones}
         />
 
         {/* Area Modal */}
@@ -3504,6 +3600,7 @@ function DashboardContent() {
             onToggleSubItem={handleToggleSubItem}
             onAddSubItem={handleAddSubItem}
             onDeleteSubItem={handleDeleteSubItem}
+            onPromoteSubItem={handlePromoteSubItem}
             onEditSubItem={handleEditSubItem}
             onReorderSubItems={handleReorderSubItems}
             onAddReference={handleAddReference}

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../../providers/auth_provider.dart';
-
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/di/providers.dart' show analyticsServiceProvider;
+import '../../providers/auth_provider.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -50,7 +50,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           );
         },
         (user) {
-          // Success!
+          // Success! 記錄登入事件
+          final analytics = ref.read(analyticsServiceProvider);
+          analytics.setUserId(user.uid);
+          analytics.logLogin(method: 'google');
+
           if (mounted) {
             context.go('/dashboard');
           }

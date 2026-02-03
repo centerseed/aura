@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical } from "lucide-react";
+import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -36,6 +36,7 @@ interface TaskDetailModalProps {
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
   onReorderSubItems?: (taskId: string, subItemIds: string[]) => Promise<void>;
+  onPromoteSubItem?: (taskId: string, subItemId: string) => Promise<void>;
   onAddReference?: (taskId: string, type: "url" | "note", content: string, title?: string) => Promise<void>;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onComplete?: (taskId: string) => void;
@@ -48,6 +49,7 @@ function SortableSubItem({
   onToggle,
   onEdit,
   onDelete,
+  onPromote,
   isEditing,
   onStartEdit,
 }: {
@@ -55,6 +57,7 @@ function SortableSubItem({
   onToggle: (id: string, completed: boolean) => void;
   onEdit: (id: string, content: string) => void;
   onDelete: (id: string) => void;
+  onPromote?: (id: string) => void;
   isEditing: boolean;
   onStartEdit: (id: string, content: string) => void;
 }) {
@@ -123,12 +126,23 @@ function SortableSubItem({
               onStartEdit(item.id, item.content);
             }}
             className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-white/10 text-white/60 hover:text-indigo-300 transition-all"
+            title="編輯"
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          {onPromote && (
+            <button
+              onClick={() => onPromote(item.id)}
+              className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-blue-500/20 text-white/60 hover:text-blue-400 transition-all"
+              title="升級為獨立任務"
+            >
+              <ArrowUpCircle className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={() => onDelete(item.id)}
             className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all"
+            title="刪除"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -151,6 +165,7 @@ export function TaskDetailModal({
   onDeleteSubItem,
   onEditSubItem,
   onReorderSubItems,
+  onPromoteSubItem,
   onAddReference,
   onDeleteReference,
   onComplete,
@@ -418,6 +433,7 @@ export function TaskDetailModal({
                             setEditSubItemContent("");
                           }}
                           onDelete={(id) => onDeleteSubItem?.(task.id, id)}
+                          onPromote={onPromoteSubItem ? (id) => onPromoteSubItem(task.id, id) : undefined}
                           onStartEdit={(id, content) => {
                             setEditingSubItemId(id);
                             setEditSubItemContent(content);

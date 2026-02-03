@@ -20,6 +20,7 @@ import {
   X,
   GripVertical,
   Package,
+  ArrowUpCircle,
 } from 'lucide-react'
 import type { TaskCard } from '@/types'
 import { DRAWER_CONFIG } from '@/domain/constants/drawer-config'
@@ -50,6 +51,7 @@ export interface DraggableTaskItemProps {
   onComplete?: (taskId: string) => void
   onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void
   onDeleteSubItem?: (taskId: string, subItemId: string) => void
+  onPromoteSubItem?: (taskId: string, subItemId: string) => void
   onEditTitle?: (taskId: string, newTitle: string) => void
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void
   onAddSubItem?: (taskId: string, content: string) => void
@@ -65,6 +67,7 @@ export function DraggableTaskItem({
   onComplete,
   onToggleSubItem,
   onDeleteSubItem,
+  onPromoteSubItem,
   onEditTitle,
   onEditSubItem,
   onAddSubItem,
@@ -367,6 +370,21 @@ export function DraggableTaskItem({
                           {subItem.content}
                         </span>
                       </button>
+                      {onPromoteSubItem && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            onPromoteSubItem(task.id, subItem.id)
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="opacity-0 group-hover/subitem:opacity-100 p-0.5 rounded hover:bg-blue-500/20 text-white/30 hover:text-blue-400 transition-all shrink-0"
+                          title="升級為獨立任務"
+                        >
+                          <ArrowUpCircle className="w-3 h-3" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={(e) => {

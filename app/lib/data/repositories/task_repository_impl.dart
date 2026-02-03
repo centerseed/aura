@@ -4,6 +4,7 @@ import '../../core/errors/failures.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../datasources/remote/api_client.dart';
+import '../models/task_model.dart';
 import 'utils/task_request_builder.dart';
 
 class TaskRepositoryImpl implements TaskRepository {
@@ -146,6 +147,20 @@ class TaskRepositoryImpl implements TaskRepository {
     try {
       await _apiClient.deleteSubItem(taskId, subItemId);
       return const Right(null);
+    } catch (e) {
+      return Left(handleDioError(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Task>> promoteSubItem(
+    String taskId,
+    String subItemId,
+  ) async {
+    try {
+      final response = await _apiClient.promoteSubItem(taskId, subItemId);
+      final newTaskData = response['newTask'] as Map<String, dynamic>;
+      return Right(TaskModel.fromJson(newTaskData).toEntity());
     } catch (e) {
       return Left(handleDioError(e));
     }

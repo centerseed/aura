@@ -17,6 +17,7 @@ import '../../../providers/product_reference_provider.dart';
 import '../widgets/task_detail_bottom_sheet.dart';
 import '../widgets/reorganize_bottom_sheet.dart';
 import '../../project/widgets/reference_bottom_sheet.dart';
+import '../../project/project_detail_screen.dart';
 
 /// 全視圖分頁 - 顯示 Area-Product 層級結構
 class OverviewTab extends ConsumerStatefulWidget {
@@ -230,27 +231,38 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product Header - 可點擊以展開/折疊
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (isExpanded) {
-                    _expandedProducts.remove(product.id);
-                  } else {
-                    _expandedProducts.add(product.id);
-                  }
-                });
-              },
-              child: Row(
-                children: [
-                  // 展開/折疊圖示
-                  Icon(
+            // Product Header
+            Row(
+              children: [
+                // 展開/折疊圖示 - 點擊展開/折疊任務
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isExpanded) {
+                        _expandedProducts.remove(product.id);
+                      } else {
+                        _expandedProducts.add(product.id);
+                      }
+                    });
+                  },
+                  child: Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
                     color: Colors.white.withValues(alpha: 0.5),
                     size: 24,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
+                ),
+                const SizedBox(width: 8),
+                // Product 名稱 - 點擊進入詳情頁
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProjectDetailScreen(product: product),
+                        ),
+                      );
+                    },
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -278,25 +290,25 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // References Button
-                  if (hasReferences)
-                    _buildActionButton(
-                      icon: Icons.library_books,
-                      label: '${product.referenceCount}',
-                      color: const Color(0xFFF59E0B),
-                      onTap: () => _showReferences(product),
-                    ),
-                  const SizedBox(width: 8),
-                  // AI Reorganize Button
+                ),
+                const SizedBox(width: 12),
+                // References Button
+                if (hasReferences)
                   _buildActionButton(
-                    icon: Icons.auto_awesome,
-                    label: 'AI',
-                    color: const Color(0xFF6C63FF),
-                    onTap: () => _handleReorganize(product),
+                    icon: Icons.library_books,
+                    label: '${product.referenceCount}',
+                    color: const Color(0xFFF59E0B),
+                    onTap: () => _showReferences(product),
                   ),
-                ],
-              ),
+                const SizedBox(width: 8),
+                // AI Reorganize Button
+                _buildActionButton(
+                  icon: Icons.auto_awesome,
+                  label: 'AI',
+                  color: const Color(0xFF6C63FF),
+                  onTap: () => _handleReorganize(product),
+                ),
+              ],
             ),
             // 縮略模式：顯示最近3個任務
             if (!isExpanded && displayTasks.isNotEmpty) ...[

@@ -108,10 +108,30 @@ export class UpdateTaskUseCase {
       task.setStartDate(request.startDate ? new Date(request.startDate) : null)
     }
 
+    // 4.5 due_date 與 status 連動邏輯（僅在未明確指定 status 時觸發）
+    let statusChangedByDueDate = false
+    if (request.dueDate !== undefined && !request.status) {
+      const currentStatus = task.status
+
+      // 設定 due_date 且目前是 INBOX → 自動改成 ACTIVE
+      if (request.dueDate && currentStatus === TaskStatus.INBOX) {
+        task.changeStatus(TaskStatus.ACTIVE)
+        statusMessage = '已設定截止日期，狀態自動變更為進行中'
+        statusChangedByDueDate = true
+      }
+
+      // 清除 due_date 且目前是 ACTIVE → 自動改回 INBOX
+      if (!request.dueDate && currentStatus === TaskStatus.ACTIVE) {
+        task.changeStatus(TaskStatus.INBOX)
+        statusMessage = '已清除截止日期，狀態自動變更為收件匣'
+        statusChangedByDueDate = true
+      }
+    }
+
     // 5. 準備更新資料
     const updateData: TaskUpdateData = {}
 
-    if (request.status) {
+    if (request.status || statusChangedByDueDate) {
       updateData.status = task.status
     }
     if (request.productId) {

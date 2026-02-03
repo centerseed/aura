@@ -53,6 +53,7 @@ dependencies:
   # Firebase
   firebase_core: ^3.8.1
   firebase_auth: ^5.3.3
+  firebase_analytics: ^11.3.6
   
   # UI
   flutter_svg: ^2.0.10
