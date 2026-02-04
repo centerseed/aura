@@ -33,7 +33,13 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline';",
+            value: [
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "https://*.googleapis.com",
+              "https://*.google.com",
+              "https://*.firebaseapp.com",
+              "https://*.googletagmanager.com",
+            ].join(' ') + ';',
           },
         ],
       },

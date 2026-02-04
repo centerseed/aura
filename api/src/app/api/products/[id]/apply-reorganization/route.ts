@@ -11,33 +11,14 @@ interface ReorganizeProposal {
   current_topics: string[];
   proposed_clusters: Array<{
     topic_name: string;
-    description: string;
     task_ids: string[];
-    confidence: number;
-  }>;
-  time_inferences: Array<{
-    task_id: string;
-    suggested_due_date: string | null;
-    inferred_from_milestone_id: string | null;
-    time_confidence: number;
-    urgency_level: string;
-    reasoning: string;
   }>;
   task_consolidations?: Array<{
     parent_task_id: string;
     sub_task_ids: string[];
     consolidated_title: string;
-    consolidated_narrative: string;
     reasoning: string;
-    confidence: number;
-    // 語意守恆映射表
-    semantic_preservation?: Array<{
-      original_task_id: string;
-      preserved_in: "title" | "narrative" | "sub_item";
-      key_intent: string;
-    }>;
   }>;
-  reasoning: string;
   logId?: string;
 }
 
@@ -74,6 +55,7 @@ export async function POST(
 
       // 1. 根據 proposed_clusters 創建或查找 Topics
       const topicMapping: Map<string, string> = new Map(); // cluster.topic_name -> topic.id
+      let updatedTasksCount = 0; // 追蹤實際更新的 tasks 數量
 
       for (const cluster of proposal.proposed_clusters) {
         // 查找現有 Topic
@@ -112,7 +94,7 @@ export async function POST(
         // ✅ 批次更新：一次 UPDATE 整個 cluster 的所有 tasks
         // ✅ 只更新未刪除且未完成的 tasks，節省 DB 操作
         if (validTaskIds.length > 0) {
-          await tx.task.updateMany({
+          const updateResult = await tx.task.updateMany({
             where: {
               id: { in: validTaskIds },
               deleted_at: null,
@@ -122,105 +104,11 @@ export async function POST(
               topic_id: topic.id,
             },
           });
+          updatedTasksCount += updateResult.count;
         }
       }
 
-      // 3. 根據 time_inferences 更新 Tasks 的時間相關欄位
-      // ✅ Phase 2 優化：使用批次操作 + 獨立的 AI metadata 表
-      const validInferenceTaskIds = proposal.time_inferences
-        .filter(inf => isValidUUID(inf.task_id))
-        .map(inf => inf.task_id);
-
-      if (validInferenceTaskIds.length > 0) {
-        // 3.1 批次查詢所有需要更新的 tasks（用於讀取現有 ai_analysis）
-        // ✅ 只查詢未刪除且未完成的 tasks，節省查詢成本
-        const tasksToUpdate = await tx.task.findMany({
-          where: {
-            id: { in: validInferenceTaskIds },
-            deleted_at: null,
-            status: { not: "ARCHIVE" },
-          },
-        });
-
-        const taskMap = new Map(tasksToUpdate.map(t => [t.id, t]));
-
-        // 3.2 批次更新時間欄位（每個 inference 單獨更新，因為值不同）
-        // 但不再更新 ai_analysis JSON（改用獨立表）
-        for (const inference of proposal.time_inferences) {
-          if (!isValidUUID(inference.task_id)) {
-            console.warn(`Invalid task_id format: ${inference.task_id}, skipping...`);
-            continue;
-          }
-
-          const task = taskMap.get(inference.task_id);
-          if (!task) continue;
-
-          // 只更新時間相關欄位
-          const updateData: {
-            due_date?: Date | null;
-            inferred_from_milestone?: string | null;
-            time_confidence?: number;
-            ai_analysis?: any; // ✅ 雙寫模式：保持向後相容
-          } = {};
-
-          if (inference.suggested_due_date) {
-            updateData.due_date = new Date(inference.suggested_due_date);
-          }
-
-          if (inference.inferred_from_milestone_id && isValidUUID(inference.inferred_from_milestone_id)) {
-            updateData.inferred_from_milestone = inference.inferred_from_milestone_id;
-          } else {
-            updateData.inferred_from_milestone = null;
-          }
-          updateData.time_confidence = inference.time_confidence;
-
-          // ✅ 雙寫：同時更新 JSON（向後相容，可在 Phase 3 移除）
-          const currentAnalysis = (task.ai_analysis as Record<string, unknown>) || {};
-          updateData.ai_analysis = {
-            ...currentAnalysis,
-            time_inference_reasoning: inference.reasoning,
-            urgency_level: inference.urgency_level,
-            reorganized_at: new Date().toISOString(),
-          };
-
-          await tx.task.update({
-            where: { id: inference.task_id },
-            data: updateData,
-          });
-        }
-
-        // 3.3 ✅ 批次 UPSERT AI metadata 到獨立表（關鍵優化）
-        // 使用原生 SQL 的 ON CONFLICT 實現真正的批次操作
-        const now = new Date();
-        const metadataValues = proposal.time_inferences
-          .filter(inf => isValidUUID(inf.task_id) && taskMap.has(inf.task_id))
-          .map(inf => {
-            return `(
-              gen_random_uuid(),
-              '${inf.task_id}',
-              ${inf.reasoning ? `'${inf.reasoning.replace(/'/g, "''")}'` : 'NULL'},
-              ${inf.urgency_level ? `'${inf.urgency_level}'` : 'NULL'},
-              '${now.toISOString()}',
-              '${now.toISOString()}',
-              '${now.toISOString()}'
-            )`;
-          })
-          .join(',');
-
-        if (metadataValues) {
-          await tx.$executeRawUnsafe(`
-            INSERT INTO task_ai_metadata (id, task_id, time_inference_reasoning, urgency_level, reorganized_at, created_at, updated_at)
-            VALUES ${metadataValues}
-            ON CONFLICT (task_id) DO UPDATE SET
-              time_inference_reasoning = EXCLUDED.time_inference_reasoning,
-              urgency_level = EXCLUDED.urgency_level,
-              reorganized_at = EXCLUDED.reorganized_at,
-              updated_at = EXCLUDED.updated_at
-          `);
-        }
-      }
-
-      // 4. 處理 Task 整合 (將細碎 Tasks 合併為 todo-list)
+      // 3. 處理 Task 整合 (將細碎 Tasks 合併為 todo-list)
       let consolidatedCount = 0;
       if (proposal.task_consolidations && proposal.task_consolidations.length > 0) {
         for (const consolidation of proposal.task_consolidations) {
@@ -302,9 +190,6 @@ export async function POST(
             order: startOrder + idx,
           }));
 
-          // 合併：原有的 sub_items + 新整合的 sub_items
-          const subItems = [...existingSubItems, ...newSubItems];
-
           // ✅ 合併所有 sub tasks 的 references 到 parent task（使用統一去重函數）
           const parentReferences = ((parentTask as any).references as Reference[]) || [];
 
@@ -325,30 +210,8 @@ export async function POST(
             ? new Date(Math.max(...allDueDates.map(d => d.getTime())))
             : null;
 
-          // 建立語意映射表（用於追溯）
-          const semanticMap = new Map(
-            (consolidation.semantic_preservation || []).map(sp => [sp.original_task_id, sp])
-          );
-
-          // ✅ 只對「新加入的 sub_items」增強語意資訊（原有的保持不變）
-          const enrichedNewSubItems = newSubItems.map(item => {
-            const semanticInfo = semanticMap.get(item.id);
-            const originalTask = subTasks.find(t => t.id === item.id);
-            const originalAnalysis = (originalTask?.ai_analysis as Record<string, unknown>) || {};
-
-            return {
-              ...item,
-              // 語意守恆欄位
-              key_intent: semanticInfo?.key_intent || null,
-              preserved_in: semanticInfo?.preserved_in || "sub_item",
-              // 保留原始上下文（可追溯）
-              original_narrative: originalAnalysis.narrative || null,
-              original_due_date: originalTask?.due_date?.toISOString() || null,
-            };
-          });
-
-          // ✅ 合併：原有的 sub_items（包含已完成狀態）+ 新增強的 sub_items
-          const enrichedSubItems = [...existingSubItems, ...enrichedNewSubItems];
+          // ✅ 合併：原有的 sub_items（包含已完成狀態）+ 新的 sub_items
+          const enrichedSubItems = [...existingSubItems, ...newSubItems];
 
           // 更新 parent task
           const parentAnalysis = (parentTask.ai_analysis as Record<string, unknown>) || {};
@@ -361,11 +224,8 @@ export async function POST(
               references: mergedReferences as any,
               ai_analysis: {
                 ...parentAnalysis,
-                narrative: consolidation.consolidated_narrative,
                 consolidation_reasoning: consolidation.reasoning,
                 consolidated_at: new Date().toISOString(),
-                // ✅ 語意守恆追溯資訊
-                semantic_preservation: consolidation.semantic_preservation || [],
                 consolidated_task_count: validSubTaskIds.length + 1, // parent + subs
               },
             },
@@ -398,7 +258,7 @@ export async function POST(
 
       return {
         updated_topics: proposal.proposed_clusters.length,
-        updated_tasks: proposal.time_inferences.length,
+        updated_tasks: updatedTasksCount,
         consolidated_tasks: consolidatedCount,
       };
     }, {

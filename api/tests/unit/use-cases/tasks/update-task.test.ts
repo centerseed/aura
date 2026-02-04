@@ -551,4 +551,308 @@ describe('UpdateTaskUseCase', () => {
       expect(result.message).not.toBe('已設定截止日期，狀態自動變更為進行中')
     })
   })
+
+  describe('提醒欄位更新', () => {
+    it('應該成功更新 Task 的提醒時間 (remindAt)', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        remindAt: null,
+        reminderEnabled: false,
+        reminderTimezone: null,
+        notificationId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const remindAt = new Date('2024-12-25T09:00:00Z')
+      const updatedTask = {
+        ...existingTask,
+        remindAt,
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        remindAt: '2024-12-25T09:00:00Z',
+      })
+
+      expect(result.task.remindAt).toEqual(remindAt)
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          remindAt: expect.any(Date),
+        })
+      )
+    })
+
+    it('應該成功更新 Task 的提醒開關 (reminderEnabled)', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        remindAt: new Date(),
+        reminderEnabled: false,
+        reminderTimezone: null,
+        notificationId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        reminderEnabled: true,
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        reminderEnabled: true,
+      })
+
+      expect(result.task.reminderEnabled).toBe(true)
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          reminderEnabled: true,
+        })
+      )
+    })
+
+    it('應該成功更新 Task 的時區 (reminderTimezone)', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        remindAt: new Date(),
+        reminderEnabled: true,
+        reminderTimezone: null,
+        notificationId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        reminderTimezone: 'Asia/Taipei',
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        reminderTimezone: 'Asia/Taipei',
+      })
+
+      expect(result.task.reminderTimezone).toBe('Asia/Taipei')
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          reminderTimezone: 'Asia/Taipei',
+        })
+      )
+    })
+
+    it('應該成功更新 Task 的通知 ID (notificationId)', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        remindAt: new Date(),
+        reminderEnabled: true,
+        reminderTimezone: 'Asia/Taipei',
+        notificationId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        notificationId: 1001,
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        notificationId: 1001,
+      })
+
+      expect(result.task.notificationId).toBe(1001)
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          notificationId: 1001,
+        })
+      )
+    })
+
+    it('應該成功清除提醒時間 (設為 null)', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        remindAt: new Date(),
+        reminderEnabled: true,
+        reminderTimezone: 'Asia/Taipei',
+        notificationId: 1001,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        remindAt: null,
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        remindAt: null,
+      })
+
+      expect(result.task.remindAt).toBeNull()
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          remindAt: null,
+        })
+      )
+    })
+
+    it('應該成功同時更新多個提醒欄位', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        remindAt: null,
+        reminderEnabled: false,
+        reminderTimezone: null,
+        notificationId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const remindAt = new Date('2024-12-25T09:00:00Z')
+      const updatedTask = {
+        ...existingTask,
+        remindAt,
+        reminderEnabled: true,
+        reminderTimezone: 'Asia/Taipei',
+        notificationId: 1001,
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      const result = await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        remindAt: '2024-12-25T09:00:00Z',
+        reminderEnabled: true,
+        reminderTimezone: 'Asia/Taipei',
+        notificationId: 1001,
+      })
+
+      expect(result.task.remindAt).toEqual(remindAt)
+      expect(result.task.reminderEnabled).toBe(true)
+      expect(result.task.reminderTimezone).toBe('Asia/Taipei')
+      expect(result.task.notificationId).toBe(1001)
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          remindAt: expect.any(Date),
+          reminderEnabled: true,
+          reminderTimezone: 'Asia/Taipei',
+          notificationId: 1001,
+        })
+      )
+    })
+  })
 })

@@ -6,11 +6,11 @@ class ReorganizeProposal extends Equatable {
   final List<String> currentTopics;
   final int? currentTopicCount;
   final List<TopicCluster> proposedClusters;
-  final List<TaskTimeInference> timeInferences;
   final List<TaskConsolidation> taskConsolidations;
   final List<TaskContext> tasksContext;
-  final String reasoning;
   final String? logId;
+  final String reasoning;
+  final List<TimeInference> timeInferences;
 
   const ReorganizeProposal({
     required this.productId,
@@ -18,11 +18,11 @@ class ReorganizeProposal extends Equatable {
     required this.currentTopics,
     this.currentTopicCount,
     required this.proposedClusters,
-    required this.timeInferences,
     required this.taskConsolidations,
     required this.tasksContext,
-    required this.reasoning,
     this.logId,
+    this.reasoning = '',
+    this.timeInferences = const [],
   });
 
   factory ReorganizeProposal.fromJson(Map<String, dynamic> json) {
@@ -36,11 +36,6 @@ class ReorganizeProposal extends Equatable {
               ?.map((e) => TopicCluster.fromJson(e))
               .toList() ??
           [],
-      timeInferences:
-          (json['time_inferences'] as List<dynamic>?)
-              ?.map((e) => TaskTimeInference.fromJson(e))
-              .toList() ??
-          [],
       taskConsolidations:
           (json['task_consolidations'] as List<dynamic>?)
               ?.map((e) => TaskConsolidation.fromJson(e))
@@ -51,8 +46,13 @@ class ReorganizeProposal extends Equatable {
               ?.map((e) => TaskContext.fromJson(e))
               .toList() ??
           [],
-      reasoning: json['reasoning'] ?? '',
       logId: json['logId'],
+      reasoning: json['reasoning'] ?? '',
+      timeInferences:
+          (json['time_inferences'] as List<dynamic>?)
+              ?.map((e) => TimeInference.fromJson(e))
+              .toList() ??
+          [],
     );
   }
 
@@ -63,12 +63,11 @@ class ReorganizeProposal extends Equatable {
       'current_topics': currentTopics,
       'current_topic_count': currentTopicCount,
       'proposed_clusters': proposedClusters.map((e) => e.toJson()).toList(),
-      'time_inferences': timeInferences.map((e) => e.toJson()).toList(),
       'task_consolidations': taskConsolidations.map((e) => e.toJson()).toList(),
       'tasks_context': tasksContext.map((e) => e.toJson()).toList(),
+      'logId': logId,
       'reasoning': reasoning,
-      'logId':
-          logId, // Keep camelCase as per API response? Or snake_case? API returns 'logId'.
+      'time_inferences': timeInferences.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -79,114 +78,64 @@ class ReorganizeProposal extends Equatable {
     currentTopics,
     currentTopicCount,
     proposedClusters,
-    timeInferences,
     taskConsolidations,
     tasksContext,
-    reasoning,
     logId,
+    reasoning,
+    timeInferences,
   ];
 }
 
 class TopicCluster extends Equatable {
   final String topicName;
-  final String? description;
   final List<String> taskIds;
+  final String? description;
   final double confidence;
 
   const TopicCluster({
     required this.topicName,
-    this.description,
     required this.taskIds,
+    this.description,
     this.confidence = 0.0,
   });
 
   factory TopicCluster.fromJson(Map<String, dynamic> json) {
     return TopicCluster(
       topicName: json['topic_name'] ?? '',
-      description: json['description'],
       taskIds: List<String>.from(json['task_ids'] ?? []),
-      confidence: (json['confidence'] ?? 0).toDouble(),
+      description: json['description'],
+      confidence: (json['confidence'] ?? 0.0).toDouble(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'topic_name': topicName,
-      'description': description,
       'task_ids': taskIds,
+      'description': description,
       'confidence': confidence,
     };
   }
 
   @override
-  List<Object?> get props => [topicName, description, taskIds, confidence];
-}
-
-class TaskTimeInference extends Equatable {
-  final String taskId;
-  final String? suggestedDueDate;
-  final String? inferredFromMilestoneId;
-  final double timeConfidence;
-  final String urgencyLevel;
-  final String reasoning;
-
-  const TaskTimeInference({
-    required this.taskId,
-    this.suggestedDueDate,
-    this.inferredFromMilestoneId,
-    required this.timeConfidence,
-    required this.urgencyLevel,
-    required this.reasoning,
-  });
-
-  factory TaskTimeInference.fromJson(Map<String, dynamic> json) {
-    return TaskTimeInference(
-      taskId: json['task_id'] ?? '',
-      suggestedDueDate: json['suggested_due_date'],
-      inferredFromMilestoneId: json['inferred_from_milestone_id'],
-      timeConfidence: (json['time_confidence'] ?? 0).toDouble(),
-      urgencyLevel: json['urgency_level'] ?? 'medium',
-      reasoning: json['reasoning'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'task_id': taskId,
-      'suggested_due_date': suggestedDueDate,
-      'inferred_from_milestone_id': inferredFromMilestoneId,
-      'time_confidence': timeConfidence,
-      'urgency_level': urgencyLevel,
-      'reasoning': reasoning,
-    };
-  }
-
-  @override
-  List<Object?> get props => [
-    taskId,
-    suggestedDueDate,
-    inferredFromMilestoneId,
-    timeConfidence,
-    urgencyLevel,
-    reasoning,
-  ];
+  List<Object?> get props => [topicName, taskIds, description, confidence];
 }
 
 class TaskConsolidation extends Equatable {
   final String parentTaskId;
   final List<String> subTaskIds;
   final String consolidatedTitle;
-  final String consolidatedNarrative;
   final String reasoning;
+  final String consolidatedNarrative;
   final double confidence;
 
   const TaskConsolidation({
     required this.parentTaskId,
     required this.subTaskIds,
     required this.consolidatedTitle,
-    required this.consolidatedNarrative,
     required this.reasoning,
-    required this.confidence,
+    this.consolidatedNarrative = '',
+    this.confidence = 0.0,
   });
 
   factory TaskConsolidation.fromJson(Map<String, dynamic> json) {
@@ -194,9 +143,9 @@ class TaskConsolidation extends Equatable {
       parentTaskId: json['parent_task_id'] ?? '',
       subTaskIds: List<String>.from(json['sub_task_ids'] ?? []),
       consolidatedTitle: json['consolidated_title'] ?? '',
-      consolidatedNarrative: json['consolidated_narrative'] ?? '',
       reasoning: json['reasoning'] ?? '',
-      confidence: (json['confidence'] ?? 0).toDouble(),
+      consolidatedNarrative: json['consolidated_narrative'] ?? '',
+      confidence: (json['confidence'] ?? 0.0).toDouble(),
     );
   }
 
@@ -205,8 +154,8 @@ class TaskConsolidation extends Equatable {
       'parent_task_id': parentTaskId,
       'sub_task_ids': subTaskIds,
       'consolidated_title': consolidatedTitle,
-      'consolidated_narrative': consolidatedNarrative,
       'reasoning': reasoning,
+      'consolidated_narrative': consolidatedNarrative,
       'confidence': confidence,
     };
   }
@@ -216,8 +165,8 @@ class TaskConsolidation extends Equatable {
     parentTaskId,
     subTaskIds,
     consolidatedTitle,
-    consolidatedNarrative,
     reasoning,
+    consolidatedNarrative,
     confidence,
   ];
 }
@@ -227,12 +176,14 @@ class TaskContext extends Equatable {
   final String title;
   final String currentTopic;
   final String? currentDueDate;
+  final String? cRole; // 'p' = parent, 's' = sub
 
   const TaskContext({
     required this.id,
     required this.title,
     required this.currentTopic,
     this.currentDueDate,
+    this.cRole,
   });
 
   factory TaskContext.fromJson(Map<String, dynamic> json) {
@@ -241,6 +192,7 @@ class TaskContext extends Equatable {
       title: json['title'] ?? '',
       currentTopic: json['current_topic'] ?? '未分類',
       currentDueDate: json['current_due_date'],
+      cRole: json['c_role'],
     );
   }
 
@@ -250,9 +202,49 @@ class TaskContext extends Equatable {
       'title': title,
       'current_topic': currentTopic,
       'current_due_date': currentDueDate,
+      'c_role': cRole,
     };
   }
 
   @override
-  List<Object?> get props => [id, title, currentTopic, currentDueDate];
+  List<Object?> get props => [id, title, currentTopic, currentDueDate, cRole];
+}
+
+class TimeInference extends Equatable {
+  final String taskId;
+  final String? suggestedDueDate;
+  final String reasoning;
+  final double confidence;
+  final String urgencyLevel;
+
+  const TimeInference({
+    required this.taskId,
+    this.suggestedDueDate,
+    required this.reasoning,
+    this.confidence = 0.0,
+    this.urgencyLevel = 'normal',
+  });
+
+  factory TimeInference.fromJson(Map<String, dynamic> json) {
+    return TimeInference(
+      taskId: json['task_id'] ?? '',
+      suggestedDueDate: json['suggested_due_date'],
+      reasoning: json['reasoning'] ?? '',
+      confidence: (json['confidence'] ?? 0.0).toDouble(),
+      urgencyLevel: json['urgency_level'] ?? 'normal',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'task_id': taskId,
+      'suggested_due_date': suggestedDueDate,
+      'reasoning': reasoning,
+      'confidence': confidence,
+      'urgency_level': urgencyLevel,
+    };
+  }
+
+  @override
+  List<Object?> get props => [taskId, suggestedDueDate, reasoning, confidence, urgencyLevel];
 }

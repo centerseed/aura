@@ -97,6 +97,67 @@ gcloud config set project "$PROJECT_ID"
 # 切換到 api 目錄
 cd "$API_DIR"
 
+# 0. 同步 Secrets 到 Secret Manager
+log_info "同步 Secrets 到 Secret Manager..."
+
+ENV_FILE="$API_DIR/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    log_error "找不到 $ENV_FILE"
+    exit 1
+fi
+
+# 從 .env 讀取值的函數
+get_env_value() {
+    local key=$1
+    grep "^${key}=" "$ENV_FILE" | cut -d '=' -f 2- | sed "s/^[\"']//;s/[\"']$//"
+}
+
+# 更新 Secret（只在值有變時更新）
+sync_secret() {
+    local secret_name=$1
+    local env_key=$2
+    local new_value
+    new_value=$(get_env_value "$env_key")
+
+    if [ -z "$new_value" ]; then
+        log_warning "跳過 $secret_name: $env_key 未設定"
+        return
+    fi
+
+    # 檢查 secret 是否存在
+    if ! gcloud secrets describe "$secret_name" --project "$PROJECT_ID" &>/dev/null; then
+        log_info "建立新 secret: $secret_name"
+        echo -n "$new_value" | gcloud secrets create "$secret_name" \
+            --data-file=- \
+            --project "$PROJECT_ID" \
+            --replication-policy="automatic"
+        log_success "$secret_name 已建立"
+        return
+    fi
+
+    # 取得目前 Secret Manager 的值
+    local current_value
+    current_value=$(gcloud secrets versions access latest --secret="$secret_name" --project="$PROJECT_ID" 2>/dev/null || echo "")
+
+    # 比較並更新
+    if [ "$new_value" != "$current_value" ]; then
+        log_info "更新 $secret_name (值已變更)"
+        echo -n "$new_value" | gcloud secrets versions add "$secret_name" \
+            --data-file=- \
+            --project "$PROJECT_ID"
+        log_success "$secret_name 已更新"
+    else
+        log_info "$secret_name 無變更，跳過"
+    fi
+}
+
+sync_secret "database-url" "DATABASE_URL"
+sync_secret "gemini-api-key" "GOOGLE_GENERATIVE_AI_API_KEY"
+sync_secret "firebase-admin-key" "FIREBASE_ADMIN_KEY"
+
+log_success "Secrets 同步完成"
+echo ""
+
 # 1. 執行 TypeScript 檢查
 log_info "執行 TypeScript 檢查..."
 npx tsc --noEmit || log_warning "TypeScript 檢查發現問題，繼續部署..."

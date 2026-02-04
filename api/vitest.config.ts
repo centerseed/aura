@@ -2,12 +2,14 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 import dotenv from 'dotenv'
 
-// 載入 .env.test
-dotenv.config({ path: '.env.test' })
+// 載入 .env.test（override: true 強制覆蓋已存在的環境變數）
+dotenv.config({ path: '.env.test', override: true })
 
-// 設定 DATABASE_URL
+// 強制設定 DATABASE_URL 為測試資料庫
 if (process.env.DATABASE_URL_TEST) {
   process.env.DATABASE_URL = process.env.DATABASE_URL_TEST
+} else {
+  throw new Error('❌ .env.test 中缺少 DATABASE_URL_TEST')
 }
 
 // 🛡️ 阻斷生產資料庫

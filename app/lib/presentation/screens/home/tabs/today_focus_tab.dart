@@ -22,6 +22,9 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   // 追蹤樂觀更新的 subitem 狀態 (taskId:subItemId -> completed)
   final Map<String, bool> _optimisticSubItemStates = {};
 
+  // 追蹤已完成的任務 ID（樂觀更新）
+  final Set<String> _completedTaskIds = {};
+
   @override
   Widget build(BuildContext context) {
     final taskState = ref.watch(activeTasksProvider);
@@ -243,14 +246,17 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildRecentTasks(List<Task> tasks) {
-    if (tasks.isEmpty) {
+    // 樂觀更新：過濾掉已完成的任務
+    final activeTasks = tasks.where((t) => !_completedTaskIds.contains(t.id)).toList();
+
+    if (activeTasks.isEmpty) {
       return SliverToBoxAdapter(
         child: _buildEmptyState(),
       );
     }
 
     // 按 due date 排序，取最近 10 個
-    final sortedTasks = List<Task>.from(tasks)
+    final sortedTasks = List<Task>.from(activeTasks)
       ..sort((a, b) {
         if (a.dueDate == null && b.dueDate == null) return 0;
         if (a.dueDate == null) return 1;
@@ -483,30 +489,30 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22).withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFF4ADE80).withValues(alpha: 0.2),
-          ),
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.check_circle,
-              color: Color(0xFF4ADE80),
-              size: 20,
+              color: const Color(0xFF4ADE80).withValues(alpha: 0.6),
+              size: 18,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 task.content,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Colors.white.withValues(alpha: 0.4),
                   fontSize: 14,
                   decoration: TextDecoration.lineThrough,
+                  decorationColor: Colors.white.withValues(alpha: 0.3),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -598,23 +604,137 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Future<void> _completeTask(Task task) async {
+    // 顯示確認對話框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2c2c2e),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          '完成任務',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          '確定要完成「${task.content}」嗎？',
+          style: const TextStyle(color: Colors.white70, fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              '取消',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              '完成',
+              style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // 如果用戶取消，直接返回
+    if (confirmed != true) return;
+
+    // 觸覺回饋
     HapticFeedback.mediumImpact();
 
+    // 【樂觀更新】立即從 UI 移除任務
+    setState(() {
+      _completedTaskIds.add(task.id);
+    });
+
+    // 顯示成功動畫（立即反饋）
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4ADE80),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, size: 16, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              const Text('🎉 任務已完成！'),
+            ],
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      HapticFeedback.heavyImpact();
+    }
+
+    // 背景執行 API 請求
     final useCase = ref.read(updateTaskDetailsUseCaseProvider);
-    await useCase(UpdateTaskDetailsParams(
+    final result = await useCase(UpdateTaskDetailsParams(
       taskId: task.id,
       status: TaskStatus.archive,
     ));
 
-    // 變更後 repository 會自動靜默刷新
-    // 同時刷新今日完成 (獨立的 API 請求)
-    ref.invalidate(completedTodayTasksProvider);
+    // 檢查結果
+    result.fold(
+      // 失敗：回滾樂觀更新
+      (failure) {
+        if (mounted) {
+          setState(() {
+            _completedTaskIds.remove(task.id);
+          });
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('任務已完成！')),
-      );
-    }
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('完成失敗：${failure.message}'),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.red.shade700,
+              action: SnackBarAction(
+                label: '重試',
+                textColor: Colors.white,
+                onPressed: () => _completeTask(task),
+              ),
+            ),
+          );
+        }
+      },
+      // 成功：背景刷新快取
+      (_) async {
+        // 刷新今日完成列表
+        ref.invalidate(completedTodayTasksProvider);
+
+        // 延遲 2 秒後背景刷新快取（避免 30 秒節流問題）
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            silentRefreshTasks(ref);
+          }
+        });
+      },
+    );
   }
 
   Future<void> _toggleSubItem(Task task, SubItem subItem) async {

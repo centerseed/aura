@@ -17,6 +17,7 @@ interface AreaModalProps {
     name: string;
     scope?: string | null;
     description?: string | null;
+    productCount?: number;
   } | null;
 }
 
@@ -170,7 +171,16 @@ export function AreaModal({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "刪除失敗");
+      // 將英文錯誤訊息轉換為中文
+      const message = err instanceof Error ? err.message : "刪除失敗";
+      if (message.includes('existing products')) {
+        // 從錯誤訊息中提取專案數量
+        const match = message.match(/(\d+) product/);
+        const count = match ? match[1] : '數個';
+        setError(`此身分下還有 ${count} 個專案，請先刪除所有專案後再刪除此身分。`);
+      } else {
+        setError(message);
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -288,24 +298,31 @@ export function AreaModal({
         <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
           {/* Delete Button (僅在編輯模式顯示) */}
           {editingArea && (
-            <Button
-              onClick={handleDelete}
-              disabled={isDeleting || isSubmitting}
-              variant="outline"
-              className="border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  刪除中...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  刪除身分
-                </>
+            <div className="flex flex-col gap-1">
+              <Button
+                onClick={handleDelete}
+                disabled={isDeleting || isSubmitting}
+                variant="outline"
+                className="border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    刪除中...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    刪除身分
+                  </>
+                )}
+              </Button>
+              {editingArea.productCount && editingArea.productCount > 0 && (
+                <p className="text-xs text-amber-400/80">
+                  此身分下有 {editingArea.productCount} 個專案
+                </p>
               )}
-            </Button>
+            </div>
           )}
 
           <div className={`flex items-center gap-3 ${editingArea ? "" : "ml-auto"}`}>

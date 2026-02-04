@@ -8,6 +8,9 @@ import '../../../../core/di/providers.dart';
 import '../../../../domain/entities/task.dart';
 import '../../../../application/use_cases/update_task_details_use_case.dart';
 import '../../../../application/use_cases/update_sub_item_use_case.dart';
+import '../../../../application/use_cases/schedule_task_reminder_use_case.dart';
+import '../../../../application/use_cases/cancel_task_reminder_use_case.dart';
+import '../../../providers/task_provider.dart';
 import '../../dashboard/widgets/task_edit_bottom_sheet.dart';
 
 /// Task 細節畫面 (BottomSheet) - 唯讀展示 + 輕量操作
@@ -34,6 +37,179 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   final Map<String, bool> _optimisticSubItemStates = {};
   // 錯誤訊息
   String? _errorMessage;
+
+  // 提醒設定本地狀態
+  late DateTime? _selectedRemindAt;
+  late bool _reminderEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedRemindAt = widget.task.remindAt;
+    _reminderEnabled = widget.task.reminderEnabled;
+  }
+
+  /// 處理提醒開關切換
+  Future<void> _handleReminderToggle(bool enabled) async {
+    if (enabled) {
+      // 啟用提醒 - 顯示時間選擇器
+      await _showReminderTimePicker();
+    } else {
+      // 停用提醒 - 直接取消
+      setState(() {
+        _isLoading = true;
+        _reminderEnabled = false;
+        _selectedRemindAt = null;
+      });
+
+      final cancelUseCase = ref.read(cancelTaskReminderUseCaseProvider);
+      final result = await cancelUseCase(widget.task.id);
+
+      result.fold(
+        (failure) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _reminderEnabled = true;
+              _selectedRemindAt = widget.task.remindAt;
+              _errorMessage = '取消提醒失敗: ${failure.message}';
+            });
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) setState(() => _errorMessage = null);
+            });
+          }
+        },
+        (_) async {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            // 觸發靜默刷新
+            await silentRefreshTasks(ref);
+            HapticFeedback.lightImpact();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已取消提醒')),
+            );
+          }
+        },
+      );
+    }
+  }
+
+  /// 顯示提醒時間選擇器
+  Future<void> _showReminderTimePicker() async {
+    // 1. 先選日期
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedRemindAt ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFFFFB020),
+              surface: Color(0xFF1c1c1e),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null && mounted) {
+      // 2. 再選時間
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: _selectedRemindAt != null
+            ? TimeOfDay.fromDateTime(_selectedRemindAt!)
+            : TimeOfDay.now(),
+        builder: (context, child) {
+          return Theme(
+            data: ThemeData.dark().copyWith(
+              colorScheme: const ColorScheme.dark(
+                primary: Color(0xFFFFB020),
+                surface: Color(0xFF1c1c1e),
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (pickedTime != null && mounted) {
+        final remindAt = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+
+        // 驗證提醒時間不能在過去
+        if (remindAt.isBefore(DateTime.now())) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('提醒時間不能設定在過去')),
+          );
+          return;
+        }
+
+        // 設定提醒
+        await _scheduleReminder(remindAt);
+      }
+    }
+  }
+
+  /// 設定或更新提醒
+  Future<void> _scheduleReminder(DateTime remindAt) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // 如果之前有提醒，先取消
+    if (widget.task.reminderEnabled) {
+      final cancelUseCase = ref.read(cancelTaskReminderUseCaseProvider);
+      await cancelUseCase(widget.task.id);
+    }
+
+    // 設定新提醒
+    final scheduleUseCase = ref.read(scheduleTaskReminderUseCaseProvider);
+    final result = await scheduleUseCase(ScheduleReminderParams(
+      taskId: widget.task.id,
+      taskContent: widget.task.content,
+      remindAt: remindAt,
+      productName: widget.task.productName,
+    ));
+
+    result.fold(
+      (failure) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = '設定提醒失敗: ${failure.message}';
+          });
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) setState(() => _errorMessage = null);
+          });
+        }
+      },
+      (_) async {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _reminderEnabled = true;
+            _selectedRemindAt = remindAt;
+          });
+          // 觸發靜默刷新
+          await silentRefreshTasks(ref);
+          HapticFeedback.lightImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('已設定提醒：${DateFormat('yyyy/MM/dd HH:mm').format(remindAt)}'),
+            ),
+          );
+        }
+      },
+    );
+  }
 
   /// 處理 sub-item 勾選切換
   Future<void> _handleSubItemToggle(String subItemId, bool completed) async {
@@ -178,6 +354,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildDatesSection(),
+                      const SizedBox(height: 16),
+                      _buildReminderSection(),
                       const SizedBox(height: 16),
                       _buildTagsSection(),
                       if (widget.task.subItems != null &&
@@ -326,6 +504,117 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                 fontSize: 14,
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReminderSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                "提醒設定",
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              Switch(
+                value: _reminderEnabled,
+                onChanged: _isLoading ? null : _handleReminderToggle,
+                activeTrackColor: const Color(0xFFFFB020),
+                activeThumbColor: Colors.white,
+              ),
+            ],
+          ),
+          if (_reminderEnabled) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.notifications_active, size: 18, color: Color(0xFFFFB020)),
+                const SizedBox(width: 8),
+                const Text(
+                  "提醒時間",
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                const Spacer(),
+                if (_selectedRemindAt != null) ...[
+                  Text(
+                    DateFormat('yyyy/MM/dd HH:mm').format(_selectedRemindAt!),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFFFB020),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                IconButton(
+                  icon: Icon(
+                    _selectedRemindAt == null ? Icons.add_circle_outline : Icons.edit_calendar,
+                    color: const Color(0xFF6C63FF),
+                    size: 20,
+                  ),
+                  onPressed: _isLoading ? null : _showReminderTimePicker,
+                ),
+                if (_selectedRemindAt != null)
+                  IconButton(
+                    icon: Icon(Icons.clear, color: Colors.white.withValues(alpha: 0.5), size: 20),
+                    onPressed: _isLoading ? null : () async {
+                      setState(() {
+                        _isLoading = true;
+                        _selectedRemindAt = null;
+                      });
+
+                      final cancelUseCase = ref.read(cancelTaskReminderUseCaseProvider);
+                      final result = await cancelUseCase(widget.task.id);
+
+                      result.fold(
+                        (failure) {
+                          if (mounted) {
+                            setState(() {
+                              _isLoading = false;
+                              _selectedRemindAt = widget.task.remindAt;
+                              _errorMessage = '取消提醒失敗: ${failure.message}';
+                            });
+                            Future.delayed(const Duration(seconds: 3), () {
+                              if (mounted) setState(() => _errorMessage = null);
+                            });
+                          }
+                        },
+                        (_) async {
+                          if (mounted) {
+                            setState(() {
+                              _isLoading = false;
+                              _reminderEnabled = false;
+                            });
+                            await silentRefreshTasks(ref);
+                            HapticFeedback.lightImpact();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已取消提醒')),
+                              );
+                            }
+                          }
+                        },
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );

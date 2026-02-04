@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/di/providers.dart' show analyticsServiceProvider;
+import '../../../core/di/providers.dart' show analyticsServiceProvider, taskUnifiedRepositoryProvider, areaRepositoryProvider, productRepositoryProvider;
+import '../../../data/repositories/unified/unified_repositories.dart';
 import '../../providers/auth_provider.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -20,6 +21,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   void dispose() {
     super.dispose();
+  }
+
+  /// 刷新所有快取，清除之前可能的錯誤狀態
+  void _refreshAllCaches() {
+    // Task cache
+    final taskRepo = ref.read(taskUnifiedRepositoryProvider);
+    taskRepo.refresh();
+
+    // Area cache
+    final areaRepo = ref.read(areaRepositoryProvider) as AreaUnifiedRepository;
+    areaRepo.refresh();
+
+    // Product cache
+    final productRepo = ref.read(productRepositoryProvider) as ProductUnifiedRepository;
+    productRepo.refresh();
   }
 
   Future<void> _signInWithGoogle() async {
@@ -54,6 +70,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           final analytics = ref.read(analyticsServiceProvider);
           analytics.setUserId(user.uid);
           analytics.logLogin(method: 'google');
+
+          // 刷新所有快取，清除之前可能的 401 錯誤狀態
+          _refreshAllCaches();
 
           if (mounted) {
             context.go('/dashboard');

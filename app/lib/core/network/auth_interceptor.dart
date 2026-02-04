@@ -45,10 +45,18 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // 401 錯誤：Token 過期或無效，自動登出
+    // 401 錯誤：只有在用戶已登入狀態下才登出
+    // 避免在認證初始化階段（token 還沒準備好）收到 401 就誤登出
     if (err.response?.statusCode == 401) {
-      print('❌ 401 Unauthorized - Signing out');
-      _firebaseAuth.signOut();
+      final user = _firebaseAuth.currentUser;
+      if (user != null) {
+        // 用戶已登入但收到 401，表示 token 真的過期或無效
+        print('❌ 401 Unauthorized - User was logged in, signing out');
+        _firebaseAuth.signOut();
+      } else {
+        // 用戶未登入就收到 401，這是正常的（認證尚未完成）
+        print('⚠️ 401 Unauthorized - User not logged in, ignoring');
+      }
     }
 
     handler.next(err);

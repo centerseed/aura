@@ -19,25 +19,20 @@ export const TEST_FIREBASE_UID = 'test-firebase-uid-12345'
  * 整合測試前置作業
  */
 export async function setupIntegrationTests() {
-  // 先清理所有測試資料
+  // 先清理所有測試資料（包括其他可能使用相同 email 的用戶）
   await cleanupIntegrationTests()
 
-  // 建立測試用戶（使用 upsert 避免重複建立）
-  await prisma.user.upsert({
-    where: { id: TEST_USER_ID },
-    update: {
-      email: 'test@example.com',
-      name: 'Test User',
-    },
-    create: {
+  // 建立測試用戶（直接 create，因為已經清理乾淨）
+  await prisma.user.create({
+    data: {
       id: TEST_USER_ID,
       email: 'test@example.com',
       name: 'Test User',
-      auth_provider: 'GOOGLE', // Must match AuthProvider enum
+      auth_provider: 'GOOGLE',
       auth_provider_id: TEST_FIREBASE_UID,
     },
   }).catch((error) => {
-    console.error('Failed to upsert test user:', error)
+    console.error('Failed to create test user:', error)
     throw error
   })
 }
@@ -48,36 +43,57 @@ export async function setupIntegrationTests() {
 export async function cleanupIntegrationTests() {
   try {
     // 清理測試資料（按照依賴順序）
-    // 注意：這會刪除所有測試用戶的資料
+    // 找出所有測試相關用戶（包括可能使用相同 email 的用戶）
+    const testUsers = await prisma.user.findMany({
+      where: {
+        OR: [
+          { id: TEST_USER_ID },
+          { email: 'test@example.com' },
+          { auth_provider_id: TEST_FIREBASE_UID },
+        ],
+      },
+      select: { id: true },
+    })
 
-    // 1. 刪除測試用戶的所有任務（包含關聯的 sub-items 和 references）
+    const testUserIds = testUsers.map(u => u.id)
+
+    if (testUserIds.length === 0) {
+      return // 沒有需要清理的資料
+    }
+
+    // 1. 刪除所有測試用戶的任務（包含關聯的 sub-items 和 references）
     await prisma.task.deleteMany({
-      where: { user_id: TEST_USER_ID },
+      where: { user_id: { in: testUserIds } },
     })
 
-    // 2. 刪除測試用戶的所有 topics
+    // 2. 刪除所有測試用戶的 topics
     await prisma.topic.deleteMany({
-      where: { user_id: TEST_USER_ID },
+      where: { user_id: { in: testUserIds } },
     })
 
-    // 3. 刪除測試用戶的所有產品
+    // 3. 刪除所有測試用戶的產品
     await prisma.product.deleteMany({
-      where: { user_id: TEST_USER_ID },
+      where: { user_id: { in: testUserIds } },
     })
 
-    // 4. 刪除測試用戶的所有 milestones
+    // 4. 刪除所有測試用戶的 milestones
     await prisma.milestone.deleteMany({
-      where: { user_id: TEST_USER_ID },
+      where: { user_id: { in: testUserIds } },
     })
 
-    // 5. 刪除測試用戶的所有領域
+    // 5. 刪除所有測試用戶的領域
     await prisma.area.deleteMany({
-      where: { user_id: TEST_USER_ID },
+      where: { user_id: { in: testUserIds } },
     })
 
-    // 6. 最後刪除測試用戶
+    // 6. 刪除所有測試用戶的 system_evaluation_logs
+    await prisma.systemEvaluationLog.deleteMany({
+      where: { user_id: { in: testUserIds } },
+    })
+
+    // 7. 最後刪除所有測試用戶
     await prisma.user.deleteMany({
-      where: { id: TEST_USER_ID },
+      where: { id: { in: testUserIds } },
     })
   } catch (error) {
     // Ignore cleanup errors (資料可能不存在)

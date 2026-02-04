@@ -103,6 +103,10 @@ export class PrismaTaskRepository implements ITaskRepository {
         due_date: data.dueDate,
         time_confidence: data.timeConfidence,
         inferred_from_milestone: data.inferredFromMilestone,
+        remind_at: data.remindAt,
+        reminder_enabled: data.reminderEnabled,
+        reminder_timezone: data.reminderTimezone,
+        notification_id: data.notificationId,
       },
       include: {
         product: {
@@ -160,6 +164,16 @@ export class PrismaTaskRepository implements ITaskRepository {
         }),
         ...(data.inferredFromMilestone !== undefined && {
           inferred_from_milestone: data.inferredFromMilestone,
+        }),
+        ...(data.remindAt !== undefined && { remind_at: data.remindAt }),
+        ...(data.reminderEnabled !== undefined && {
+          reminder_enabled: data.reminderEnabled,
+        }),
+        ...(data.reminderTimezone !== undefined && {
+          reminder_timezone: data.reminderTimezone,
+        }),
+        ...(data.notificationId !== undefined && {
+          notification_id: data.notificationId,
         }),
       } as any,
       include: {
@@ -344,13 +358,13 @@ export class PrismaTaskRepository implements ITaskRepository {
         type: r.type,
         content: r.content,
         title: r.title,
-        createdAt: new Date(r.created_at),
+        createdAt: r.created_at ? new Date(r.created_at) : prismaTask.created_at,
       })),
       subItems: subItems.map((s) => ({
         id: s.id,
         content: s.content,
         completed: s.completed,
-        createdAt: new Date(s.created_at),
+        createdAt: s.created_at ? new Date(s.created_at) : prismaTask.created_at,
         completedAt: s.completed_at ? new Date(s.completed_at) : null,
         order: s.order,
       })),
@@ -358,6 +372,10 @@ export class PrismaTaskRepository implements ITaskRepository {
       dueDate: prismaTask.due_date,
       timeConfidence: prismaTask.time_confidence,
       inferredFromMilestone: prismaTask.inferred_from_milestone,
+      remindAt: prismaTask.remind_at,
+      reminderEnabled: prismaTask.reminder_enabled || false,
+      reminderTimezone: prismaTask.reminder_timezone,
+      notificationId: prismaTask.notification_id,
       createdAt: prismaTask.created_at,
       updatedAt: prismaTask.updated_at,
       // Relations

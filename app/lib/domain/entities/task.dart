@@ -23,6 +23,12 @@ class Task extends Equatable {
   // Custom tags (User-defined labels)
   final List<String>? tags;
 
+  // Reminder fields (Task notification)
+  final DateTime? remindAt;         // 提醒時間（本地時區）
+  final bool reminderEnabled;        // 提醒開關
+  final String? reminderTimezone;    // IANA 時區（如 "Asia/Taipei"）
+  final int? notificationId;         // 本地通知 ID
+
   const Task({
     required this.id,
     required this.content,
@@ -40,6 +46,10 @@ class Task extends Equatable {
     this.productName,
     this.topicName,
     this.tags,
+    this.remindAt,
+    this.reminderEnabled = false,
+    this.reminderTimezone,
+    this.notificationId,
   });
 
   /// 是否逾期 (截止日 < 今天)
@@ -87,6 +97,10 @@ class Task extends Equatable {
     productId,
     topicId,
     tags,
+    remindAt,
+    reminderEnabled,
+    reminderTimezone,
+    notificationId,
   ];
 
   Task copyWith({
@@ -102,6 +116,10 @@ class Task extends Equatable {
     String? productName,
     String? topicName,
     List<String>? tags,
+    DateTime? remindAt,
+    bool? reminderEnabled,
+    String? reminderTimezone,
+    int? notificationId,
   }) {
     return Task(
       id: this.id,
@@ -120,6 +138,10 @@ class Task extends Equatable {
       productName: productName ?? this.productName,
       topicName: topicName ?? this.topicName,
       tags: tags ?? this.tags,
+      remindAt: remindAt ?? this.remindAt,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderTimezone: reminderTimezone ?? this.reminderTimezone,
+      notificationId: notificationId ?? this.notificationId,
     );
   }
 }

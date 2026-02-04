@@ -188,7 +188,7 @@ export function DashboardSidebar({
           <p className="text-xs text-white/40 mb-2 font-medium">狀態圖例</p>
           <div className="grid grid-cols-2 gap-1 mb-3">
             {Object.entries(DRAWER_CONFIG)
-              .slice(0, 4)
+              .filter(([key]) => key === 'INBOX' || key === 'ACTIVE')
               .map(([key, config]) => (
                 <div key={key} className="flex items-center gap-1.5 text-xs text-white/50">
                   <div className={`w-2 h-2 rounded-full ${config.dotColor}`} />

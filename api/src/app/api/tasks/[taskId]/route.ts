@@ -76,6 +76,10 @@ export async function GET(
       due_date: safeToISOString(task.dueDate),
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
+      remind_at: safeToISOString(task.remindAt),
+      reminder_enabled: task.reminderEnabled || false,
+      reminder_timezone: task.reminderTimezone || null,
+      notification_id: task.notificationId || null,
       updated_at: safeToISOStringRequired(task.updatedAt),
       created_at: safeToISOStringRequired(task.createdAt),
       references: task.references.map((r) => ({
@@ -123,6 +127,10 @@ export async function PATCH(
       due_date,
       time_confidence,
       inferred_from_milestone,
+      remind_at,
+      reminder_enabled,
+      reminder_timezone,
+      notification_id,
     } = body
 
     // 4. 執行 Use Case
@@ -139,6 +147,10 @@ export async function PATCH(
       dueDate: due_date,
       timeConfidence: time_confidence,
       inferredFromMilestone: inferred_from_milestone,
+      remindAt: remind_at,
+      reminderEnabled: reminder_enabled,
+      reminderTimezone: reminder_timezone,
+      notificationId: notification_id,
     })
 
     // 5. 格式化任務資料
@@ -176,6 +188,10 @@ export async function PATCH(
       due_date: safeToISOString(task.dueDate),
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
+      remind_at: safeToISOString(task.remindAt),
+      reminder_enabled: task.reminderEnabled || false,
+      reminder_timezone: task.reminderTimezone || null,
+      notification_id: task.notificationId || null,
       updated_at: safeToISOStringRequired(task.updatedAt),
       created_at: safeToISOStringRequired(task.createdAt),
       references: task.references.map((r) => ({

@@ -65,7 +65,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'REDACTED_FIREBASE_API_KEY',
+    apiKey: 'AIzaSyAJYyZ1wfUHyxaCpI11Z2c3SH44Qi7lg-E',
     appId: '1:894512935237:web:2533f9a2e7d09321f88e2c',
     messagingSenderId: '894512935237',
     projectId: 'zentropy-4f7a5',

@@ -35,6 +35,10 @@ export interface UpdateTaskRequest {
   dueDate?: string | null
   timeConfidence?: number | null
   inferredFromMilestone?: string | null
+  remindAt?: string | null
+  reminderEnabled?: boolean
+  reminderTimezone?: string | null
+  notificationId?: number | null
 }
 
 export interface UpdateTaskResponse {
@@ -158,6 +162,18 @@ export class UpdateTaskUseCase {
     if (request.inferredFromMilestone !== undefined) {
       updateData.inferredFromMilestone = request.inferredFromMilestone
     }
+    if (request.remindAt !== undefined) {
+      updateData.remindAt = request.remindAt ? new Date(request.remindAt) : null
+    }
+    if (request.reminderEnabled !== undefined) {
+      updateData.reminderEnabled = request.reminderEnabled
+    }
+    if (request.reminderTimezone !== undefined) {
+      updateData.reminderTimezone = request.reminderTimezone
+    }
+    if (request.notificationId !== undefined) {
+      updateData.notificationId = request.notificationId
+    }
 
     // 6. 透過 Repository 更新
     const updatedTask = await this.taskRepository.update(
@@ -195,7 +211,11 @@ export class UpdateTaskUseCase {
       request.startDate !== undefined ||
       request.dueDate !== undefined ||
       request.timeConfidence !== undefined ||
-      request.inferredFromMilestone !== undefined
+      request.inferredFromMilestone !== undefined ||
+      request.remindAt !== undefined ||
+      request.reminderEnabled !== undefined ||
+      request.reminderTimezone !== undefined ||
+      request.notificationId !== undefined
 
     if (!hasUpdate) {
       throw new ValidationException('No update data provided', 'data')

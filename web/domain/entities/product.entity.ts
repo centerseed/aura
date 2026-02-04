@@ -40,27 +40,14 @@ export interface Product {
  */
 export interface TopicCluster {
   topic_name: string
-  description: string
   task_ids: string[]
-  confidence: number
-}
-
-export interface TaskTimeInference {
-  task_id: string
-  suggested_due_date: string | null
-  inferred_from_milestone_id: string | null
-  time_confidence: number
-  urgency_level: 'critical' | 'high' | 'medium' | 'low'
-  reasoning: string
 }
 
 export interface TaskConsolidation {
   parent_task_id: string
   sub_task_ids: string[]
   consolidated_title: string
-  consolidated_narrative: string
   reasoning: string
-  confidence: number
 }
 
 export interface TaskContext {
@@ -68,6 +55,7 @@ export interface TaskContext {
   title: string
   current_topic: string
   current_due_date: string | null
+  c_role?: 'p' | 's' // p=parent, s=sub
 }
 
 export interface ReorganizeProposal {
@@ -76,10 +64,9 @@ export interface ReorganizeProposal {
   current_topics: string[]
   current_topic_count?: number
   proposed_clusters: TopicCluster[]
-  time_inferences: TaskTimeInference[]
   task_consolidations?: TaskConsolidation[]
   tasks_context?: TaskContext[]
-  reasoning: string
+  logId?: string
 }
 
 /**

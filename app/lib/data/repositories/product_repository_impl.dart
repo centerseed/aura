@@ -53,6 +53,14 @@ class ProductRepositoryImpl implements ProductRepository {
   ) async {
     try {
       final json = await _apiClient.reorganizeProductTopics(productId);
+
+      // 🔍 調試：打印 API 返回的原始數據
+      print('🔍 [API Response] task_consolidations: ${json['task_consolidations']}');
+      print('🔍 [API Response] task_consolidations type: ${json['task_consolidations'].runtimeType}');
+      if (json['task_consolidations'] is List) {
+        print('🔍 [API Response] task_consolidations length: ${(json['task_consolidations'] as List).length}');
+      }
+
       return Right(ReorganizeProposal.fromJson(json));
     } catch (e) {
       if (e is DioException) {

@@ -24,6 +24,11 @@ class TaskModel with _$TaskModel {
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+    // Reminder fields
+    @JsonKey(name: 'remind_at') DateTime? remindAt,
+    @JsonKey(name: 'reminder_enabled') @Default(false) bool reminderEnabled,
+    @JsonKey(name: 'reminder_timezone') String? reminderTimezone,
+    @JsonKey(name: 'notification_id') int? notificationId,
   }) = _TaskModel;
 
   factory TaskModel.fromJson(Map<String, dynamic> json) =>
@@ -49,6 +54,10 @@ class TaskModel with _$TaskModel {
     productName: tag?['product'] as String?,
     topicName: tag?['topic'] as String?,
     tags: tags,
+    remindAt: remindAt?.toLocal(),
+    reminderEnabled: reminderEnabled,
+    reminderTimezone: reminderTimezone,
+    notificationId: notificationId,
   );
 
   TaskStatus _parseStatus(String status) {

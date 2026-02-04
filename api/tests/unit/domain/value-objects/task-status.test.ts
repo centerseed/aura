@@ -116,12 +116,12 @@ describe('TaskStatusVO', () => {
         expect(active.canTransitionTo(TaskStatusVO.archive())).toBe(true)
       })
 
-      it('ARCHIVE 只能轉換回 INBOX', () => {
+      it('ARCHIVE 可以轉換到其他非歸檔狀態', () => {
         const archive = TaskStatusVO.archive()
         expect(archive.canTransitionTo(TaskStatusVO.inbox())).toBe(true)
-        expect(archive.canTransitionTo(TaskStatusVO.active())).toBe(false)
-        expect(archive.canTransitionTo(TaskStatusVO.maintain())).toBe(false)
-        expect(archive.canTransitionTo(TaskStatusVO.reference())).toBe(false)
+        expect(archive.canTransitionTo(TaskStatusVO.active())).toBe(true)
+        expect(archive.canTransitionTo(TaskStatusVO.maintain())).toBe(true)
+        expect(archive.canTransitionTo(TaskStatusVO.reference())).toBe(true)
       })
 
       it('不應該轉換到相同狀態（雖然技術上允許）', () => {
@@ -140,8 +140,8 @@ describe('TaskStatusVO', () => {
 
       it('應該返回不允許轉換的提示', () => {
         const archive = TaskStatusVO.archive()
-        const hint = archive.getTransitionHint(TaskStatusVO.active())
-        expect(hint).toContain('Cannot transition')
+        const hint = archive.getTransitionHint(TaskStatusVO.archive())
+        expect(hint).toContain('already in this status')
       })
 
       it('應該返回特定轉換的提示訊息', () => {

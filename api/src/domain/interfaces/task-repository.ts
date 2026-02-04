@@ -44,6 +44,10 @@ export interface TaskData {
   dueDate: Date | null
   timeConfidence: number | null
   inferredFromMilestone: string | null
+  remindAt: Date | null
+  reminderEnabled: boolean
+  reminderTimezone: string | null
+  notificationId: number | null
   createdAt: Date
   updatedAt: Date
 
@@ -92,6 +96,10 @@ export interface TaskUpdateData {
   dueDate?: Date | null
   timeConfidence?: number | null
   inferredFromMilestone?: string | null
+  remindAt?: Date | null
+  reminderEnabled?: boolean
+  reminderTimezone?: string | null
+  notificationId?: number | null
 }
 
 // ============================================================================

@@ -29,6 +29,10 @@ class TaskRequestBuilder {
     String? topicId,
     double? timeConfidence,
     List<String>? tags,
+    DateTime? remindAt,
+    bool? reminderEnabled,
+    String? reminderTimezone,
+    int? notificationId,
   }) {
     final body = <String, dynamic>{};
 
@@ -55,6 +59,18 @@ class TaskRequestBuilder {
     }
     if (tags != null) {
       body['tags'] = tags;
+    }
+    if (remindAt != null) {
+      body['remind_at'] = remindAt.toUtc().toIso8601String();
+    }
+    if (reminderEnabled != null) {
+      body['reminder_enabled'] = reminderEnabled;
+    }
+    if (reminderTimezone != null) {
+      body['reminder_timezone'] = reminderTimezone;
+    }
+    if (notificationId != null) {
+      body['notification_id'] = notificationId;
     }
 
     return body;

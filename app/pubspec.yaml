@@ -74,6 +74,12 @@ dependencies:
   intl: ^0.20.2
   rxdart: ^0.28.0
 
+  # 通知系統
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+  flutter_timezone: ^3.0.1
+  workmanager: ^0.5.2
+
   # 雙軌緩存 Repository 模組
   flutter_dual_cache:
     path: ../packages/flutter_dual_cache

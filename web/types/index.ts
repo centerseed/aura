@@ -33,7 +33,6 @@ export type {
   Area,
   Product,
   TopicCluster,
-  TaskTimeInference,
   TaskConsolidation,
   TaskContext,
   ReorganizeProposal,

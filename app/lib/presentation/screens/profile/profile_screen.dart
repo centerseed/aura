@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../../../core/di/providers.dart' show analyticsServiceProvider;
+import '../../providers/app_lifecycle_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import 'widgets/statistics_card.dart';
@@ -129,6 +131,13 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 24),
 
             _buildSection(context, '系統', [
+              _buildTile(
+                context,
+                icon: Icons.public_rounded,
+                title: '時區設定',
+                subtitle: tz.local.name,
+                onTap: () => _showTimezoneSettings(context, ref),
+              ),
               _buildTile(
                 context,
                 icon: Icons.logout_rounded,
@@ -488,6 +497,104 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  void _showTimezoneSettings(BuildContext context, WidgetRef ref) {
+    final lifecycleData = ref.read(appLifecycleProvider);
+    final currentTimezone = tz.local.name;
+    final now = DateTime.now();
+    final utcNow = now.toUtc();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1c1c1e),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6C63FF), Color(0xFF5E9FFF)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.public, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 16),
+                const Text(
+                  '時區設定',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _buildTimezoneInfoRow('當前時區', currentTimezone, Icons.location_on),
+            _buildTimezoneInfoRow(
+              '上次已知',
+              lifecycleData.lastKnownTimezone ?? '未設定',
+              Icons.history,
+            ),
+            const Divider(height: 32, color: Color(0xFF2c2c2e)),
+            _buildTimezoneInfoRow(
+              '本地時間',
+              _formatDetailedDateTime(now),
+              Icons.access_time,
+            ),
+            _buildTimezoneInfoRow(
+              'UTC 時間',
+              _formatDetailedDateTime(utcNow),
+              Icons.public,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C63FF).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF6C63FF).withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: Color(0xFF6C63FF),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '時區會自動偵測並同步到所有提醒',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    ),
+    );
+  }
+
   void _showAboutDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -640,6 +747,56 @@ class ProfileScreen extends ConsumerWidget {
     if (date == null) return '未知';
     return '${date.year}/${date.month}/${date.day}';
   }
+
+  Widget _buildTimezoneInfoRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: const Color(0xFF6C63FF),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDetailedDateTime(DateTime dateTime) {
+    final weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+    final weekday = weekdays[dateTime.weekday - 1];
+
+    return '${dateTime.year}/${_pad(dateTime.month)}/${_pad(dateTime.day)} '
+        '週$weekday '
+        '${_pad(dateTime.hour)}:${_pad(dateTime.minute)}:${_pad(dateTime.second)}';
+  }
+
+  String _pad(int value) => value.toString().padLeft(2, '0');
 
   Widget _buildTile(
     BuildContext context, {

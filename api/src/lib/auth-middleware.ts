@@ -67,12 +67,28 @@ export async function getOrCreateUser(
  * 驗證 API 請求並返回 user ID
  * 使用 Firebase ID Token 認證
  * 如果用戶不存在於資料庫，會自動創建
+ *
+ * 測試模式：當 NODE_ENV === 'test' 或 DATABASE_URL 指向本地資料庫時，
+ * 可以使用 X-Test-User-Id header 繞過認證
  */
 export async function authenticateRequest(
   request: NextRequest,
   prisma: any
 ): Promise<string> {
   try {
+    // 測試模式：允許使用 X-Test-User-Id header（僅限本地環境）
+    const isLocalDb = process.env.DATABASE_URL?.includes('localhost') ||
+                      process.env.DATABASE_URL?.includes('127.0.0.1');
+    const isTest = process.env.NODE_ENV === 'test';
+
+    if ((isLocalDb || isTest)) {
+      const testUserId = request.headers.get("x-test-user-id");
+      if (testUserId) {
+        console.log(`🧪 Test mode: Using test user ID: ${testUserId}`);
+        return testUserId;
+      }
+    }
+
     const authHeader = request.headers.get("authorization");
 
     if (!authHeader?.startsWith("Bearer ")) {

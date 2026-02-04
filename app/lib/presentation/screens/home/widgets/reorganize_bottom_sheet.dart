@@ -15,622 +15,547 @@ class ReorganizeBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final taskContextMap = {for (var task in proposal.tasksContext) task.id: task};
+
+    // 計算變化
+    final currentTopicCount = proposal.currentTopicCount ?? proposal.currentTopics.length;
+    final newTopicCount = proposal.proposedClusters.length;
+    final hasConsolidations = proposal.taskConsolidations.isNotEmpty;
+    final topicDiff = newTopicCount - currentTopicCount;
+
+    // 建立 consolidation map (用於顯示「主」「子」標記)
+    final consolidationMap = <String, String>{};
+    for (var consolidation in proposal.taskConsolidations) {
+      consolidationMap[consolidation.parentTaskId] = 'p';
+      for (var subId in consolidation.subTaskIds) {
+        consolidationMap[subId] = 's';
+      }
+    }
+
+    // 計算每個分類的任務資訊
+    final topicChanges = <_TopicChange>[];
+    for (var cluster in proposal.proposedClusters) {
+      final isNew = !proposal.currentTopics.contains(cluster.topicName);
+      final taskInfos = cluster.taskIds.map((id) {
+        final context = taskContextMap[id];
+        if (context == null) return null;
+
+        final currentTopic = context.currentTopic;
+        final isMoved = currentTopic != cluster.topicName;
+        final isFromUncategorized = currentTopic == '未分類';
+
+        return _TaskInfo(
+          id: id,
+          title: context.title,
+          fromTopic: currentTopic,
+          isMoved: isMoved,
+          isFromUncategorized: isFromUncategorized,
+          cRole: consolidationMap[id],
+        );
+      }).where((t) => t != null).cast<_TaskInfo>().toList();
+
+      topicChanges.add(_TopicChange(
+        topicName: cluster.topicName,
+        isNew: isNew,
+        tasks: taskInfos,
+      ));
+    }
+
+    // 計算有多少任務被移動（排除從「未分類」來的）
+    final movedTasksCount = topicChanges
+        .expand((change) => change.tasks)
+        .where((task) => task.isMoved && !task.isFromUncategorized)
+        .length;
+
+    // 判斷是否有實質性變化
+    final hasNoChanges = topicDiff == 0 && !hasConsolidations && movedTasksCount == 0;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0D1117),
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(24),
-        ),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
       ),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) {
-          return Column(
-            children: [
-              // Handle Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+      child: Column(
+        children: [
+          // Handle Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
               ),
-              // Content
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+            ),
+          ),
+
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 標題
+                  const Row(
+                    children: [
+                      Icon(Icons.auto_awesome, color: Color(0xFF6C63FF), size: 24),
+                      SizedBox(width: 12),
+                      Text(
+                        'AI 整理建議',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Before & After 對比
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header
+                        // Before
                         Row(
                           children: [
-                            const Icon(
-                              Icons.auto_awesome,
-                              color: Color(0xFF6C63FF),
-                              size: 28,
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.6),
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'AI 智慧整理',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  Text(
-                                    proposal.productName,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(width: 8),
+                            Text(
+                              '現在：$currentTopicCount 個分類',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 15,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        // Stats
-                        _buildStatsRow(context),
-                        const SizedBox(height: 24),
-                        // Reasoning
-                        _buildSection(
-                          context,
-                          '整理思路',
-                          proposal.reasoning,
+                        const SizedBox(height: 12),
+
+                        // Arrow
+                        Icon(
+                          Icons.arrow_downward,
+                          color: Colors.white.withValues(alpha: 0.3),
+                          size: 20,
                         ),
-                        const SizedBox(height: 24),
-                        // Proposed Clusters
-                        if (proposal.proposedClusters.isNotEmpty)
-                          _buildClustersSection(context),
-                        const SizedBox(height: 24),
-                        // Time Inferences
-                        if (proposal.timeInferences.isNotEmpty)
-                          _buildTimeInferencesSection(context),
-                        const SizedBox(height: 24),
-                        // Task Consolidations
-                        if (proposal.taskConsolidations.isNotEmpty)
-                          _buildConsolidationSection(context),
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 12),
+
+                        // After
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF6C63FF),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '整理後：$newTopicCount 個分類',
+                              style: const TextStyle(
+                                color: Color(0xFF6C63FF),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                ),
-              ),
-              // Action Buttons
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isApplying ? null : () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.3),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+                  const SizedBox(height: 24),
+
+                  // 當 AI 判定不需要調整時的訊息
+                  if (hasNoChanges) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF064E3B),
+                            Color(0xFF0D1117),
+                          ],
                         ),
-                        child: const Text('取消'),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: isApplying ? null : onApply,
-                        icon: isApplying
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check_circle,
+                              color: Color(0xFF10B981),
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '✅ 目前的分類組織已經很合理',
+                                  style: TextStyle(
+                                    color: Color(0xFF6EE7B7),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              )
-                            : const Icon(Icons.check_circle_outline),
-                        label: Text(isApplying ? '應用中...' : '應用建議'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF6C63FF),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'AI 分析後認為現有的 $currentTopicCount 個分類和任務分布都很清晰，不需要進行調整。',
+                                  style: TextStyle(
+                                    color: const Color(0xFF6EE7B7).withValues(alpha: 0.7),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          elevation: 4,
-                          shadowColor:
-                              const Color(0xFF6C63FF).withValues(alpha: 0.5),
-                        ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 20),
                   ],
-                ),
+
+                  // 任務整合說明（如果有）
+                  if (hasConsolidations) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.merge_type, color: Color(0xFF6C63FF), size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '「主」任務保留，「子」任務變成待辦事項',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // 分類列表標題
+                  Row(
+                    children: [
+                      const Text(
+                        '重組後的分類',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '($newTopicCount 個)',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 每個分類的任務列表
+                  ...topicChanges.map((change) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: change.isNew
+                              ? const Color(0xFF6C63FF).withValues(alpha: 0.4)
+                              : Colors.white.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 分類標題
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: change.isNew
+                                  ? const Color(0xFF6C63FF).withValues(alpha: 0.12)
+                                  : const Color(0xFF334155).withValues(alpha: 0.25),
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.folder_outlined,
+                                  size: 16,
+                                  color: change.isNew ? const Color(0xFF8B85FF) : Colors.white60,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    change.topicName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                if (change.isNew)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      '新',
+                                      style: TextStyle(
+                                        color: Color(0xFF8B85FF),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                Text(
+                                  '${change.totalTasks}',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // 任務列表
+                          Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: change.tasks.map((task) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Bullet point
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Container(
+                                          width: 4,
+                                          height: 4,
+                                          decoration: BoxDecoration(
+                                            color: task.isMoved && !task.isFromUncategorized
+                                                ? const Color(0xFFF59E0B)
+                                                : Colors.white.withValues(alpha: 0.4),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // 任務內容
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    task.title,
+                                                    style: TextStyle(
+                                                      color: task.isMoved && !task.isFromUncategorized
+                                                          ? const Color(0xFFF59E0B)
+                                                          : Colors.white.withValues(alpha: 0.85),
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ),
+                                                // 「主」「子」標記
+                                                if (task.cRole != null) ...[
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: task.cRole == 'p'
+                                                          ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
+                                                          : const Color(0xFF6C63FF).withValues(alpha: 0.1),
+                                                      borderRadius: BorderRadius.circular(3),
+                                                    ),
+                                                    child: Text(
+                                                      task.cRole == 'p' ? '主' : '子',
+                                                      style: TextStyle(
+                                                        color: task.cRole == 'p'
+                                                            ? const Color(0xFF8B85FF)
+                                                            : const Color(0xFF8B85FF).withValues(alpha: 0.6),
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            // 只在真的從其他 topic 移動過來時才顯示來源（排除「未分類」）
+                                            if (task.isMoved && !task.isFromUncategorized) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '← ${task.fromTopic}',
+                                                style: TextStyle(
+                                                  color: Colors.white.withValues(alpha: 0.35),
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+
+                  const SizedBox(height: 30),
+                ],
               ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatsRow(BuildContext context) {
-    final currentCount = proposal.currentTopicCount ?? proposal.currentTopics.length;
-    final newCount = proposal.proposedClusters.length;
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard(
-            context,
-            '目前主題',
-            currentCount.toString(),
-            const Color(0xFFF59E0B),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            context,
-            '建議主題',
-            newCount.toString(),
-            const Color(0xFF6C63FF),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context,
-    String label,
-    String value,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+
+          // 底部按鈕
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isApplying ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(hasNoChanges ? '關閉' : '取消', style: const TextStyle(fontSize: 16)),
+                  ),
+                ),
+                if (!hasNoChanges) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: isApplying ? null : onApply,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF6C63FF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: isApplying
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              '套用',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildSection(BuildContext context, String title, String content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: Text(
-            content,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+class _TopicChange {
+  final String topicName;
+  final bool isNew;
+  final List<_TaskInfo> tasks;
 
-  Widget _buildClustersSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '建議的主題分組',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Column(
-          children: proposal.proposedClusters.map((cluster) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            cluster.topicName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '${cluster.taskIds.length} 項',
-                            style: const TextStyle(
-                              color: Color(0xFF6C63FF),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (cluster.description != null &&
-                        cluster.description!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        cluster.description!,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (cluster.confidence > 0) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text(
-                            '信心度: ',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: 11,
-                            ),
-                          ),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(2),
-                              child: LinearProgressIndicator(
-                                value: cluster.confidence,
-                                minHeight: 4,
-                                backgroundColor:
-                                    Colors.white.withValues(alpha: 0.1),
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  cluster.confidence > 0.8
-                                      ? const Color(0xFF4ADE80)
-                                      : cluster.confidence > 0.6
-                                          ? const Color(0xFFF59E0B)
-                                          : const Color(0xFFEF4444),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Text(
-                              '${(cluster.confidence * 100).toStringAsFixed(0)}%',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
+  _TopicChange({
+    required this.topicName,
+    required this.isNew,
+    required this.tasks,
+  });
 
-  Widget _buildTimeInferencesSection(BuildContext context) {
-    // 只顯示有建議截止日期的推理
-    final inferencesWithDueDate = proposal.timeInferences
-        .where((t) => t.suggestedDueDate != null)
-        .take(3)
-        .toList();
+  int get totalTasks => tasks.length;
+  List<_TaskInfo> get movedTasks => tasks.where((t) => t.isMoved && !t.isFromUncategorized).toList();
+}
 
-    if (inferencesWithDueDate.isEmpty) return const SizedBox.shrink();
+class _TaskInfo {
+  final String id;
+  final String title;
+  final String fromTopic;
+  final bool isMoved;
+  final bool isFromUncategorized;
+  final String? cRole; // 'p' = parent, 's' = sub
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '時間建議 (${inferencesWithDueDate.length})',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Column(
-          children: inferencesWithDueDate.map((inference) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today_outlined,
-                          size: 16,
-                          color: Colors.blue.withValues(alpha: 0.7),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            inference.suggestedDueDate ?? 'N/A',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getUrgencyColor(inference.urgencyLevel)
-                                .withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            inference.urgencyLevel,
-                            style: TextStyle(
-                              color: _getUrgencyColor(inference.urgencyLevel),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (inference.reasoning.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        inference.reasoning,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConsolidationSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '任務整合 (${proposal.taskConsolidations.length})',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Column(
-          children: proposal.taskConsolidations.map((consolidation) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.green.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            consolidation.consolidatedTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '整合 ${consolidation.subTaskIds.length} 項',
-                            style: const TextStyle(
-                              color: Colors.green,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (consolidation.consolidatedNarrative.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        consolidation.consolidatedNarrative,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 12,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (consolidation.confidence > 0) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text(
-                            '信心度: ',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: 11,
-                            ),
-                          ),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(2),
-                              child: LinearProgressIndicator(
-                                value: consolidation.confidence,
-                                minHeight: 4,
-                                backgroundColor:
-                                    Colors.white.withValues(alpha: 0.1),
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  consolidation.confidence > 0.8
-                                      ? const Color(0xFF4ADE80)
-                                      : consolidation.confidence > 0.6
-                                          ? const Color(0xFFF59E0B)
-                                          : const Color(0xFFEF4444),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Text(
-                              '${(consolidation.confidence * 100).toStringAsFixed(0)}%',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Color _getUrgencyColor(String urgency) {
-    switch (urgency.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFEF4444);
-      case 'medium':
-        return const Color(0xFFF59E0B);
-      case 'low':
-        return const Color(0xFF4ADE80);
-      default:
-        return Colors.white;
-    }
-  }
+  _TaskInfo({
+    required this.id,
+    required this.title,
+    required this.fromTopic,
+    required this.isMoved,
+    required this.isFromUncategorized,
+    this.cRole,
+  });
 }

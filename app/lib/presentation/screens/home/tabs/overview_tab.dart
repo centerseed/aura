@@ -383,63 +383,67 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Task Header
-            Row(
-              children: [
-                // 完成按鈕
-                GestureDetector(
-                  onTap: () {
-                    // TODO: 實作完成/未完成邏輯
-                  },
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _showTaskDetails(task),
-                    child: Text(
-                      task.content,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                // 日期標籤
-                if (task.dueDate != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: task.isOverdue
-                          ? const Color(0xFFEF4444).withValues(alpha: 0.2)
-                          : const Color(0xFF3B82F6).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _formatDueDate(task.dueDate!),
-                      style: TextStyle(
+            InkWell(
+              onTap: () => _showTaskDetails(task),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    // 移除誤導性的完成按鈕圓圈，改用更簡潔的樣式
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
                         color: task.isOverdue
                             ? const Color(0xFFEF4444)
                             : const Color(0xFF3B82F6),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                  ),
-              ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        task.content,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 日期標籤
+                    if (task.dueDate != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: task.isOverdue
+                              ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                              : const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: task.isOverdue
+                                ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                                : const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _formatDueDate(task.dueDate!),
+                          style: TextStyle(
+                            color: task.isOverdue
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF3B82F6),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
             // Sub-items (如果有)
             if (task.subItems != null && task.subItems!.isNotEmpty) ...[
@@ -551,12 +555,16 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           padding: const EdgeInsets.all(8),
           child: Row(
             children: [
-              Icon(
-                Icons.circle_outlined,
-                size: 16,
-                color: Colors.white.withValues(alpha: 0.3),
+              // 移除誤導性的圓圈圖標，改用小點指示
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   task.content,
@@ -647,9 +655,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 );
               },
               (_) {
-                // 新增成功，刷新 reference provider 和產品列表
-                ref.invalidate(productReferencesProvider(product.id));
-                ref.invalidate(productsProvider);
+                // 新增成功，刷新 reference 快取
+                ref.read(referenceCachedRepositoryProvider(product.id)).silentRefresh();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('已新增 Reference'),
@@ -680,9 +687,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 );
               },
               (_) {
-                // 刪除成功，刷新 reference provider 和產品列表
-                ref.invalidate(productReferencesProvider(product.id));
-                ref.invalidate(productsProvider);
+                // 刪除成功，刷新 reference 快取
+                ref.read(referenceCachedRepositoryProvider(product.id)).silentRefresh();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('已刪除 Reference'),

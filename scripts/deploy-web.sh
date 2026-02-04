@@ -124,12 +124,57 @@ npx tsc --noEmit || log_warning "TypeScript 檢查發現問題，繼續部署...
 
 # 5. 執行測試 (可選，如果測試失敗則中止)
 if [ "$ENVIRONMENT" = "production" ]; then
-    log_info "執行測試..."
-    npm run test || {
-        log_error "測試失敗，中止部署"
+    # 5a. 執行單元測試和組件測試
+    log_info "執行單元測試..."
+    npm run test:unit || {
+        log_error "單元測試失敗，中止部署"
         exit 1
     }
-    log_success "測試通過"
+    log_success "單元測試通過"
+
+    # 5b. 執行 E2E 測試（需要啟動本地 API）
+    log_info "啟動本地 API Server 進行 E2E 測試..."
+
+    API_DIR="$PROJECT_ROOT/api"
+
+    # 在背景啟動 API server
+    cd "$API_DIR"
+    npm run dev &
+    API_PID=$!
+    cd "$WEB_DIR"
+
+    # 等待 API server 準備好 (最多 60 秒)
+    log_info "等待 API Server 啟動..."
+    for i in {1..60}; do
+        # 檢查任何 HTTP 回應 (包括 401)，表示 server 已啟動
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3002/api/me 2>/dev/null || echo "000")
+        if [ "$HTTP_CODE" != "000" ]; then
+            log_success "API Server 已啟動 (HTTP $HTTP_CODE)"
+            break
+        fi
+        if [ $i -eq 60 ]; then
+            log_error "API Server 啟動超時"
+            kill $API_PID 2>/dev/null
+            exit 1
+        fi
+        sleep 1
+    done
+
+    # 執行 E2E 測試
+    log_info "執行 E2E 測試..."
+    npm run test:e2e:local
+    E2E_EXIT_CODE=$?
+
+    # 關閉 API server
+    log_info "關閉 API Server..."
+    kill $API_PID 2>/dev/null || true
+    wait $API_PID 2>/dev/null || true
+
+    if [ $E2E_EXIT_CODE -ne 0 ]; then
+        log_error "E2E 測試失敗，中止部署"
+        exit 1
+    fi
+    log_success "E2E 測試通過"
 fi
 
 # 6. 建置 (靜態導出模式)

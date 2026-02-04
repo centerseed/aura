@@ -549,11 +549,20 @@ ${explicitProductId ? `# 🚨 用戶明確指定了 Product
 - 可以分別勾掉 → 拆成 sub_items
 - 不能分別勾掉 → 放在 narrative
 
-## 3. Product 選擇
+## 3. Area 選擇（🚨 絕對禁止創建新 Area）
+**規則：只能從既有 Areas 中選擇，絕對不能創建新的 Area**
+
+問自己：**「這個任務屬於哪個既有的 Area？」**
+- 查看上下文中列出的所有 Areas
+- 選擇最相關的既有 Area
+- 如果不確定，選擇最通用的那個 Area
+- **絕對禁止**填入不存在的 Area 名稱
+
+## 4. Product 選擇
 問自己：**「這個新任務和哪個 Product 的現有任務最像？」**
 - 看每個 Product 下的「最近任務」
 - 選擇任務類型最相似的 Product
-- 只有完全無關時才創建新 Product
+- 可以在既有 Area 下創建新 Product（如果沒有匹配的）
 
 Topic：優先使用該 Product 已有的 Topics，無法確定則填 ""
 
@@ -745,21 +754,30 @@ ${text}
         continue; // 跳過重複任務
       }
 
-      // 1. 確保 Area 存在（優先使用快取，避免重複查詢）
+      // 1. 確保 Area 存在（🚨 絕對禁止自動創建 Area）
       let areaId: string;
       const cachedArea = areaCache.get(item.tag.area);
       if (cachedArea) {
         areaId = cachedArea.id;
       } else {
-        const area = await prisma.area.create({
-          data: {
-            user_id: userId,
-            name: item.tag.area,
-            is_custom: true,
-          },
-        });
-        areaId = area.id;
-        areaCache.set(area.name, { id: area.id });
+        // Area 不存在 - 嘗試模糊匹配（忽略大小寫）
+        const existingAreaNames = Array.from(areaCache.keys());
+        const fuzzyMatch = existingAreaNames.find(
+          name => name.toLowerCase() === item.tag.area.toLowerCase()
+        );
+
+        if (fuzzyMatch) {
+          areaId = areaCache.get(fuzzyMatch)!.id;
+          console.log(`🔄 [brain-dump] Area fuzzy match: "${item.tag.area}" → "${fuzzyMatch}"`);
+        } else {
+          // 完全沒有匹配 - 拋出錯誤，禁止創建新 Area
+          const availableAreas = existingAreaNames.join(", ") || "(無)";
+          console.error(`🚨 [brain-dump] AI attempted to create non-existent Area: "${item.tag.area}". Available: ${availableAreas}`);
+          throw new ValidationException(
+            `Area "${item.tag.area}" 不存在。Brain Dump 不允許自動創建 Area，請先手動創建或選擇既有的 Area: [${availableAreas}]`,
+            "tag.area"
+          );
+        }
       }
 
       // 2. 確保 Product 存在（優先使用快取，避免重複查詢）

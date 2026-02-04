@@ -49,6 +49,8 @@
 	<string>我們需要您的麥克風權限來進行語音輸入任務。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>我們需要您的語音識別權限來將您的語音轉換為文字任務。</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>我們需要發送通知來提醒您的任務到期時間。</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

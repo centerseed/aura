@@ -1096,7 +1096,7 @@ function DashboardContent() {
   const [selectedAreaForProduct, setSelectedAreaForProduct] = useState<{ id: string; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<{ id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string } | null>(null);
   const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
-  const [editingArea, setEditingArea] = useState<{ id: string; name: string; scope?: string | null; description?: string | null } | null>(null);
+  const [editingArea, setEditingArea] = useState<{ id: string; name: string; scope?: string | null; description?: string | null; productCount?: number } | null>(null);
   const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
   const [editingTaskForDueDate, setEditingTaskForDueDate] = useState<TaskCard | null>(null);
   const [dateModalType, setDateModalType] = useState<"due" | "start">("due");
@@ -1146,22 +1146,6 @@ function DashboardContent() {
   const [archivedLoaded, setArchivedLoaded] = useState(false);
 
   // 載入今日完成的任務
-  const loadCompletedToday = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/tasks?completed_today=true`, {
-        headers: await getAuthHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // 解析統一 API 格式: { success: true, data: { tasks: [...] } }
-        const tasks = data.data?.tasks || data.tasks || [];
-        setCompletedTodayTasks(Array.isArray(tasks) ? tasks : []);
-      }
-    } catch (err) {
-      console.error("Failed to load completed today tasks:", err);
-    }
-  }, []);
-
   // 載入最近兩週的已歸檔任務
   const loadRecentArchived = useCallback(async () => {
     if (archivedLoaded || isLoadingArchived) return;
@@ -1187,12 +1171,7 @@ function DashboardContent() {
     }
   }, [archivedLoaded, isLoadingArchived]);
 
-  // 初始載入今日完成任務（在用戶登入後）
-  useEffect(() => {
-    if (userId) {
-      loadCompletedToday();
-    }
-  }, [userId, loadCompletedToday]);
+  // ✅ 已移至初始載入並行處理，不再需要單獨的 useEffect
 
   // DnD Sensors
   const sensors = useSensors(
@@ -1235,21 +1214,31 @@ function DashboardContent() {
         setUserId(actualUser.id);
         setUserName(actualUser.displayName || actualUser.name || actualUser.email || "User");
 
-        // 3. 獲取用戶的 Library (Areas → Products → Tasks)
-        // ⚠️ 重要：必須傳遞 include_archived=true 才能看到所有任務（包括 ARCHIVE 狀態）
-        const libraryRes = await fetch(`${API_BASE_URL}/api/library?include_archived=true`, { headers });
+        // 3-5. 🚀 並行載入所有資料（library, milestones, completed_today）
+        const [libraryRes, milestonesRes, completedTodayRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/library`, { headers }),
+          fetch(`${API_BASE_URL}/api/milestones`, { headers }),
+          fetch(`${API_BASE_URL}/api/tasks?completed_today=true`, { headers }),
+        ]);
+
+        // 處理 library
         if (!libraryRes.ok) throw new Error("無法獲取資料庫內容");
         const libraryData = await libraryRes.json();
         const rawAreas = libraryData.data?.areas || [];
-        // 🔒 資料清理層：過濾所有 null/undefined，確保資料完整性
         const areas = cleanLibraryData(rawAreas);
         setAreas(areas);
 
-        // 4. 獲取用戶的 Milestones
-        const milestonesRes = await fetch(`${API_BASE_URL}/api/milestones`, { headers });
+        // 處理 milestones
         if (milestonesRes.ok) {
           const milestonesData = await milestonesRes.json();
           setMilestones(milestonesData.data?.milestones || []);
+        }
+
+        // 處理 completed_today
+        if (completedTodayRes.ok) {
+          const completedData = await completedTodayRes.json();
+          const tasks = completedData.data?.tasks || completedData.tasks || [];
+          setCompletedTodayTasks(Array.isArray(tasks) ? tasks : []);
         }
 
         // 預設展開所有 Areas
@@ -1839,10 +1828,18 @@ function DashboardContent() {
       });
 
       if (!res.ok) {
-        throw new Error("更新失敗");
+        const errorData = await res.json();
+        console.error("API error:", errorData);
+        throw new Error(errorData.error?.message || "更新失敗");
       }
 
-      const { task: updatedTask } = await res.json();
+      const responseData = await res.json();
+      const { task: updatedTask } = responseData.data;
+
+      if (!updatedTask) {
+        console.error("API response missing task:", responseData);
+        throw new Error("API 回應格式錯誤");
+      }
 
       // 直接使用返回的完整任務資料更新 state（不重新查詢所有卡片）
       setAreas(prevAreas => updateAreasState(prevAreas, (areas) => {
@@ -2676,7 +2673,11 @@ function DashboardContent() {
       }
 
       const proposal = await res.json();
-      
+
+      // 🔍 調試：打印 Web 端收到的數據
+      console.log('🔍 [Web] task_consolidations:', proposal.task_consolidations);
+      console.log('🔍 [Web] task_consolidations length:', proposal.task_consolidations?.length || 0);
+
       const fullProposal = { ...proposal, productId, productName };
 
       // ✅ 快取 proposal（只在成功時快取）
@@ -3155,6 +3156,7 @@ function DashboardContent() {
                                 name: area.name,
                                 scope: area.scope,
                                 description: area.description,
+                                productCount: area.products?.length || 0,
                               });
                               setIsAreaModalOpen(true);
                             }}

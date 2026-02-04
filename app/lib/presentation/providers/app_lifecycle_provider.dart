@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 import '../../core/di/providers.dart';
 import '../../data/repositories/unified/unified_repositories.dart';
@@ -8,10 +9,12 @@ import '../../data/repositories/unified/unified_repositories.dart';
 class AppLifecycleData {
   final DateTime? lastResumeTime;
   final DateTime? lastRefreshTime;
+  final String? lastKnownTimezone;
 
   const AppLifecycleData({
     this.lastResumeTime,
     this.lastRefreshTime,
+    this.lastKnownTimezone,
   });
 
   /// 是否應該刷新 (節流檢查 - 30秒)
@@ -24,10 +27,12 @@ class AppLifecycleData {
   AppLifecycleData copyWith({
     DateTime? lastResumeTime,
     DateTime? lastRefreshTime,
+    String? lastKnownTimezone,
   }) {
     return AppLifecycleData(
       lastResumeTime: lastResumeTime ?? this.lastResumeTime,
       lastRefreshTime: lastRefreshTime ?? this.lastRefreshTime,
+      lastKnownTimezone: lastKnownTimezone ?? this.lastKnownTimezone,
     );
   }
 }
@@ -57,8 +62,41 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
   void _onAppResumed() {
     state = state.copyWith(lastResumeTime: DateTime.now());
 
+    // 檢查時區變更
+    _checkTimezoneChange();
+
     if (state.shouldRefresh) {
       _triggerSilentRefresh();
+    }
+  }
+
+  /// 檢查時區是否變更,若變更則重新排程所有提醒
+  Future<void> _checkTimezoneChange() async {
+    try {
+      final currentTimezone = await FlutterTimezone.getLocalTimezone();
+
+      // 首次運行,儲存當前時區
+      if (state.lastKnownTimezone == null) {
+        state = state.copyWith(lastKnownTimezone: currentTimezone);
+        debugPrint('[AppLifecycle] 初始時區: $currentTimezone');
+        return;
+      }
+
+      // 檢查時區是否變更
+      if (currentTimezone != state.lastKnownTimezone) {
+        debugPrint('[AppLifecycle] 🌍 時區變更偵測: ${state.lastKnownTimezone} → $currentTimezone');
+
+        // 執行重新排程所有提醒
+        final rescheduleUseCase = _ref.read(rescheduleAllRemindersUseCaseProvider);
+        await rescheduleUseCase();
+
+        // 更新儲存的時區
+        state = state.copyWith(lastKnownTimezone: currentTimezone);
+
+        debugPrint('[AppLifecycle] ✅ 所有提醒已根據新時區重新排程');
+      }
+    } catch (e) {
+      debugPrint('[AppLifecycle] ⚠️ 時區變更檢查失敗: $e');
     }
   }
 

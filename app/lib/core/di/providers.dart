@@ -16,6 +16,7 @@ import '../../data/datasources/remote/api_client.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/repositories/brain_dump_repository_impl.dart';
 import '../../data/repositories/unified/unified_repositories.dart';
+import '../../data/repositories/cached/cached_repositories.dart';
 import '../../data/repositories/user_repository_impl.dart';
 import '../../data/datasources/local/task_local_datasource.dart';
 import '../../data/datasources/local/area_local_datasource.dart';
@@ -48,6 +49,14 @@ import '../../application/use_cases/submit_brain_dump_use_case.dart';
 import '../../application/use_cases/update_sub_item_use_case.dart';
 import '../../application/use_cases/update_task_details_use_case.dart';
 import '../../application/use_cases/update_task_use_case.dart';
+import '../../application/use_cases/schedule_task_reminder_use_case.dart';
+import '../../application/use_cases/cancel_task_reminder_use_case.dart';
+import '../../application/use_cases/reschedule_all_reminders_use_case.dart';
+import '../../core/services/notification_service.dart';
+import '../../core/services/local_notification_service.dart';
+import '../../domain/repositories/notification_repository.dart';
+import '../../data/repositories/notification_repository_impl.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // ==================== Core Providers ====================
 
@@ -120,6 +129,30 @@ final userBoxProvider = Provider<Box<Map>>((ref) {
   throw UnimplementedError('userBoxProvider must be overridden');
 });
 
+/// Notification Reminders Box Provider
+final remindersBoxProvider = Provider<Box<Map>>((ref) {
+  throw UnimplementedError('remindersBoxProvider must be overridden');
+});
+
+// ==================== Notification Service Providers ====================
+
+/// Flutter Local Notifications Plugin Provider
+final flutterLocalNotificationsPluginProvider = Provider<FlutterLocalNotificationsPlugin>((ref) {
+  return FlutterLocalNotificationsPlugin();
+});
+
+/// Notification Service Provider
+final notificationServiceProvider = Provider<NotificationService>((ref) {
+  final plugin = ref.watch(flutterLocalNotificationsPluginProvider);
+  return LocalNotificationService(plugin);
+});
+
+/// Notification Repository Provider
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
+  final remindersBox = ref.watch(remindersBoxProvider);
+  return NotificationRepositoryImpl(remindersBox);
+});
+
 // ==================== Local DataSource Providers ====================
 
 /// Task Local DataSource Provider
@@ -189,6 +222,16 @@ final productRepositoryProvider = Provider<ProductRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   ref.keepAlive(); // 保持快取存活
   return ProductUnifiedRepository(apiClient);
+});
+
+/// Reference Cached Repository Provider (按 productId 分組快取)
+final referenceCachedRepositoryProvider = Provider.family<ReferenceCachedRepository, String>((ref, productId) {
+  final apiClient = ref.watch(apiClientProvider);
+  ref.keepAlive(); // 保持快取存活
+  return ReferenceCachedRepository(
+    apiClient: apiClient,
+    productId: productId,
+  );
 });
 
 /// User Repository Provider
@@ -333,6 +376,42 @@ final deleteProductReferenceUseCaseProvider =
   return DeleteProductReferenceUseCase(repository);
 });
 
+/// Schedule Task Reminder Use Case Provider
+final scheduleTaskReminderUseCaseProvider = Provider<ScheduleTaskReminderUseCase>((ref) {
+  final notificationService = ref.watch(notificationServiceProvider);
+  final notificationRepository = ref.watch(notificationRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  return ScheduleTaskReminderUseCase(
+    notificationService: notificationService,
+    notificationRepository: notificationRepository,
+    taskRepository: taskRepository,
+  );
+});
+
+/// Cancel Task Reminder Use Case Provider
+final cancelTaskReminderUseCaseProvider = Provider<CancelTaskReminderUseCase>((ref) {
+  final notificationService = ref.watch(notificationServiceProvider);
+  final notificationRepository = ref.watch(notificationRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  return CancelTaskReminderUseCase(
+    notificationService: notificationService,
+    notificationRepository: notificationRepository,
+    taskRepository: taskRepository,
+  );
+});
+
+/// Reschedule All Reminders Use Case Provider
+final rescheduleAllRemindersUseCaseProvider = Provider<RescheduleAllRemindersUseCase>((ref) {
+  final notificationService = ref.watch(notificationServiceProvider);
+  final notificationRepository = ref.watch(notificationRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  return RescheduleAllRemindersUseCase(
+    notificationService: notificationService,
+    notificationRepository: notificationRepository,
+    taskRepository: taskRepository,
+  );
+});
+
 // ==================== Cached Stream Providers ====================
 // 注意: 統一 Repository 已經內建快取功能,直接使用即可
 
@@ -365,7 +444,7 @@ final cachedProductsStreamProvider =
 
 // ==================== Initialization ====================
 
-/// 初始化 Hive 並返回 ProviderScope 的 overrides
+/// 初始化 Hive、通知服務、時區,並返回 ProviderScope 的 overrides
 Future<List<Override>> initializeDependencies() async {
   await Hive.initFlutter();
 
@@ -375,6 +454,13 @@ Future<List<Override>> initializeDependencies() async {
   final productsBox = await Hive.openBox<Map>('products');
   final syncQueueBox = await Hive.openBox<Map>('sync_queue');
   final userBox = await Hive.openBox<Map>('user');
+  final remindersBox = await Hive.openBox<Map>('reminders');
+
+  // 初始化通知服務（包含時區設置）
+  final notificationPlugin = FlutterLocalNotificationsPlugin();
+  final notificationService = LocalNotificationService(notificationPlugin);
+  await notificationService.initialize(); // 這裡會初始化時區
+  await notificationService.requestPermission();
 
   return [
     tasksBoxProvider.overrideWithValue(tasksBox),
@@ -382,5 +468,6 @@ Future<List<Override>> initializeDependencies() async {
     productsBoxProvider.overrideWithValue(productsBox),
     syncQueueBoxProvider.overrideWithValue(syncQueueBox),
     userBoxProvider.overrideWithValue(userBox),
+    remindersBoxProvider.overrideWithValue(remindersBox),
   ];
 }

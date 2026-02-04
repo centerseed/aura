@@ -37,6 +37,12 @@ _$TaskModelImpl _$$TaskModelImplFromJson(Map<String, dynamic> json) =>
       deletedAt: json['deleted_at'] == null
           ? null
           : DateTime.parse(json['deleted_at'] as String),
+      remindAt: json['remind_at'] == null
+          ? null
+          : DateTime.parse(json['remind_at'] as String),
+      reminderEnabled: json['reminder_enabled'] as bool? ?? false,
+      reminderTimezone: json['reminder_timezone'] as String?,
+      notificationId: (json['notification_id'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$TaskModelImplToJson(
@@ -65,6 +71,11 @@ Map<String, dynamic> _$$TaskModelImplToJson(
     'updated_at': value,
   if (instance.deletedAt?.toIso8601String() case final value?)
     'deleted_at': value,
+  if (instance.remindAt?.toIso8601String() case final value?)
+    'remind_at': value,
+  'reminder_enabled': instance.reminderEnabled,
+  if (instance.reminderTimezone case final value?) 'reminder_timezone': value,
+  if (instance.notificationId case final value?) 'notification_id': value,
 };
 
 _$SubItemModelImpl _$$SubItemModelImplFromJson(Map<String, dynamic> json) =>

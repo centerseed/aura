@@ -8,6 +8,18 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+
+// 載入 .env.test（override: true 強制覆蓋）
+dotenv.config({ path: '.env.test', override: true });
+
+// 強制使用 DATABASE_URL_TEST
+if (process.env.DATABASE_URL_TEST) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL_TEST;
+} else {
+  console.error('❌ .env.test 中缺少 DATABASE_URL_TEST');
+  process.exit(1);
+}
 
 async function checkTestDatabase() {
   const databaseUrl = process.env.DATABASE_URL;

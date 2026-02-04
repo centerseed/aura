@@ -106,6 +106,10 @@ model Task {
   due_date                DateTime?              @db.Timestamp(6)
   inferred_from_milestone String?                @db.Uuid
   time_confidence         Float?
+  remind_at               DateTime?              @db.Timestamp(6)
+  reminder_enabled        Boolean                @default(false)
+  reminder_timezone       String?                @db.VarChar(50)
+  notification_id         Int?
   product                 Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   topic                   Topic?                 @relation(fields: [topic_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -114,6 +118,9 @@ model Task {
   @@index([product_id, deleted_at, status])
   @@index([user_id, deleted_at, status])
   @@index([created_at])
+  @@index([user_id, status, updated_at])
+  @@index([user_id, deleted_at, updated_at])
+  @@index([user_id, reminder_enabled, remind_at])
   @@map("tasks")
 }
 

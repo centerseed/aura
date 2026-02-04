@@ -17,6 +17,9 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  // 追蹤已完成的任務 ID（樂觀更新）
+  final Set<String> _completedTaskIds = {};
+
   @override
   Widget build(BuildContext context) {
     final taskState = ref.watch(activeTasksProvider);
@@ -106,15 +109,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF6C63FF).withOpacity(0.3),
-                  const Color(0xFF6C63FF).withOpacity(0.1),
+                  const Color(0xFF6C63FF).withValues(alpha: 0.3),
+                  const Color(0xFF6C63FF).withValues(alpha: 0.1),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFF6C63FF).withOpacity(0.3),
+                color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
               ),
             ),
             child: Row(
@@ -152,7 +155,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ? progress.completed / progress.total
                             : 0,
                         strokeWidth: 6,
-                        backgroundColor: Colors.white.withOpacity(0.1),
+                        backgroundColor: Colors.white.withValues(alpha: 0.1),
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           Color(0xFF4ADE80),
                         ),
@@ -190,7 +193,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildTaskList(List<Task> tasks) {
-    if (tasks.isEmpty) {
+    // 樂觀更新：過濾掉已完成的任務
+    final activeTasks = tasks.where((t) => !_completedTaskIds.contains(t.id)).toList();
+
+    if (activeTasks.isEmpty) {
       return SliverToBoxAdapter(
         child: Center(
           child: Padding(
@@ -200,13 +206,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Icon(
                   Icons.check_circle_outline,
                   size: 64,
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   '太棒了！沒有待辦事項',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     fontSize: 16,
                   ),
                 ),
@@ -218,12 +224,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     // Group tasks by due date
-    final overdueTasks = tasks.where((t) => t.isOverdue).toList();
-    final todayTasks = tasks.where((t) => t.isToday).toList();
-    final upcomingTasks = tasks
+    final overdueTasks = activeTasks.where((t) => t.isOverdue).toList();
+    final todayTasks = activeTasks.where((t) => t.isToday).toList();
+    final upcomingTasks = activeTasks
         .where((t) => !t.isOverdue && !t.isToday && t.dueDate != null)
         .toList();
-    final noDueTasks = tasks.where((t) => t.dueDate == null).toList();
+    final noDueTasks = activeTasks.where((t) => t.dueDate == null).toList();
 
     return SliverList(
       delegate: SliverChildListDelegate([
@@ -288,27 +294,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFF1c1c1e),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
             child: Row(
               children: [
-                // Complete Button
+                // Complete Button - 改用更明顯的按鈕樣式
                 GestureDetector(
                   onTap: () => _completeTask(task),
                   child: Container(
-                    width: 24,
-                    height: 24,
+                    width: 28,
+                    height: 28,
                     decoration: BoxDecoration(
+                      color: const Color(0xFF4ADE80).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
+                        color: const Color(0xFF4ADE80).withValues(alpha: 0.4),
                         width: 2,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.check,
-                      size: 14,
-                      color: Colors.transparent,
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: const Color(0xFF4ADE80).withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -335,7 +342,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 .whereType<String>()
                                 .join(' > '),
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withValues(alpha: 0.4),
                               fontSize: 12,
                             ),
                           ),
@@ -347,7 +354,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 IconButton(
                   icon: Icon(
                     Icons.play_circle_outline,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                   ),
                   onPressed: () =>
                       context.push('/focus/${task.id}', extra: task),
@@ -403,23 +410,137 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Future<void> _completeTask(Task task) async {
+    // 顯示確認對話框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2c2c2e),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          '完成任務',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          '確定要完成「${task.content}」嗎？',
+          style: const TextStyle(color: Colors.white70, fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              '取消',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              '完成',
+              style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // 如果用戶取消，直接返回
+    if (confirmed != true) return;
+
+    // 觸覺回饋
     HapticFeedback.mediumImpact();
 
+    // 【樂觀更新】立即從 UI 移除任務
+    setState(() {
+      _completedTaskIds.add(task.id);
+    });
+
+    // 顯示成功動畫（立即反饋）
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4ADE80),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, size: 16, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              const Text('🎉 任務已完成！'),
+            ],
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      HapticFeedback.heavyImpact();
+    }
+
+    // 背景執行 API 請求
     final useCase = ref.read(updateTaskDetailsUseCaseProvider);
-    await useCase(UpdateTaskDetailsParams(
+    final result = await useCase(UpdateTaskDetailsParams(
       taskId: task.id,
       status: TaskStatus.archive,
     ));
 
-    // 變更後靜默刷新快取 (repository 會自動處理)
-    // 同時刷新今日完成 (這是獨立的 API 請求)
-    ref.invalidate(completedTodayTasksProvider);
+    // 檢查結果
+    result.fold(
+      // 失敗：回滾樂觀更新
+      (failure) {
+        if (mounted) {
+          setState(() {
+            _completedTaskIds.remove(task.id);
+          });
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('任務已完成！')),
-      );
-    }
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('完成失敗：${failure.message}'),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.red.shade700,
+              action: SnackBarAction(
+                label: '重試',
+                textColor: Colors.white,
+                onPressed: () => _completeTask(task),
+              ),
+            ),
+          );
+        }
+      },
+      // 成功：背景刷新快取
+      (_) async {
+        // 刷新今日完成列表
+        ref.invalidate(completedTodayTasksProvider);
+
+        // 延遲 2 秒後背景刷新快取（避免 30 秒節流問題）
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            silentRefreshTasks(ref);
+          }
+        });
+      },
+    );
   }
 
   void _showQuickCapture(BuildContext context) {
@@ -467,9 +588,11 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
           );
         }
       },
-      (task) {
+      (task) async {
+        // 觸發靜默刷新以載入新建立的任務
+        await silentRefreshTasks(ref);
+
         if (mounted) {
-          // 任務建立後 repository 會自動靜默刷新
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('任務已新增！')),
@@ -498,7 +621,7 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -509,13 +632,13 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
               style: const TextStyle(color: Colors.white, fontSize: 16),
               decoration: InputDecoration(
                 hintText: '輸入新任務...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
               ),
               onSubmitted: (_) => _submit(),
             ),

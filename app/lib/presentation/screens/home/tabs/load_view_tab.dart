@@ -128,10 +128,11 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
         : 0.0;
     final overloadedWeeks =
         weeklyLoads.where((w) => w.taskCount >= _LoadThresholds.warning).length;
+    final maxLoad = weeklyLoads.map((w) => w.taskCount).reduce((a, b) => a > b ? a : b);
 
     return SliverList(
       delegate: SliverChildListDelegate([
-        // 統計資訊
+        // 緊湊的統計摘要
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
           child: Row(
@@ -140,36 +141,71 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 '共 ${weeklyLoads.length} 週',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 4),
               Text(
-                '平均負載: ${avgLoad.toStringAsFixed(1)}',
+                '•',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '平均 ${avgLoad.toStringAsFixed(1)}',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
+              if (maxLoad > 0) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '•',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '最高 $maxLoad',
+                  style: const TextStyle(
+                    color: Color(0xFFF59E0B),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               if (overloadedWeeks > 0) ...[
-                const SizedBox(width: 16),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Color(0xFFEF4444),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$overloadedWeeks 週超載',
-                      style: const TextStyle(
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.warning_rounded,
                         color: Color(0xFFEF4444),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        size: 12,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        '$overloadedWeeks 週超載',
+                        style: const TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -187,9 +223,10 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
   Widget _buildWeekCard(_WeekLoad week) {
     final isExpanded = _expandedWeeks.contains(week.key);
     final isCurrent = _isCurrentWeek(week.weekStart);
+    final loadColor = _getLoadColor(week.taskCount);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF161B22),
@@ -197,7 +234,8 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
           border: Border.all(
             color: isCurrent
                 ? const Color(0xFF3B82F6).withValues(alpha: 0.5)
-                : _getLoadBorderColor(week.taskCount),
+                : loadColor.withValues(alpha: 0.2),
+            width: 1,
           ),
         ),
         child: Column(
@@ -215,103 +253,75 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
               },
               borderRadius: BorderRadius.circular(16),
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
+                padding: const EdgeInsets.all(14),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        // 展開/收合圖標
-                        Icon(
-                          isExpanded
-                              ? Icons.keyboard_arrow_down
-                              : Icons.keyboard_arrow_right,
-                          color: Colors.white.withValues(alpha: 0.4),
-                          size: 20,
+                    // 展開圖標
+                    Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_down
+                          : Icons.keyboard_arrow_right,
+                      color: Colors.white.withValues(alpha: 0.4),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    // 週標籤
+                    Text(
+                      '${week.weekStart.month}/${week.weekStart.day} 週',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (isCurrent) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
                         ),
-                        const SizedBox(width: 8),
-                        // 週標籤
-                        Text(
-                          '${week.weekStart.month}/${week.weekStart.day} 週',
-                          style: const TextStyle(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '本週',
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        if (isCurrent) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3B82F6),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              '本週',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        // 負載標籤
-                        Text(
-                          _getLoadLabel(week.taskCount),
-                          style: TextStyle(
-                            color: _getLoadLabelColor(week.taskCount),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // 任務數量
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.check_circle_outline,
-                              color: const Color(0xFF3B82F6),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${week.taskCount}',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                        // 總數
-                        Text(
-                          '= ${week.taskCount}',
-                          style: TextStyle(
-                            color: week.taskCount >= _LoadThresholds.warning
-                                ? const Color(0xFFEF4444)
-                                : Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                    const Spacer(),
+                    // 負載標籤
+                    Text(
+                      _getLoadLabel(week.taskCount),
+                      style: TextStyle(
+                        color: loadColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    // 負載條
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: (week.taskCount / 10).clamp(0.0, 1.0),
-                        minHeight: 6,
-                        backgroundColor: Colors.white.withValues(alpha: 0.1),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _getLoadColor(week.taskCount),
+                    const SizedBox(width: 8),
+                    // 任務數
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: loadColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${week.taskCount}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -319,49 +329,44 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 ),
               ),
             ),
+            // 負載條
+            if (!isExpanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (week.taskCount / 10).clamp(0.0, 1.0),
+                    minHeight: 6,
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation<Color>(loadColor),
+                  ),
+                ),
+              ),
             // 展開詳情
             if (isExpanded && week.tasks.isNotEmpty)
               Container(
                 decoration: BoxDecoration(
                   border: Border(
                     top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withValues(alpha: 0.08),
                     ),
                   ),
                 ),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 日期範圍
                     Text(
                       '${_formatDate(week.weekStart)} ~ ${_formatDate(week.weekEnd)}',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    // 任務列表
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.check_circle_outline,
-                          color: const Color(0xFF3B82F6),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          '任務',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 8),
+                    // 任務列表
                     ...week.tasks.map((task) => _buildTaskItem(task)),
                   ],
                 ),
@@ -374,37 +379,47 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
 
   Widget _buildTaskItem(Task task) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: InkWell(
         onTap: () => _showTaskDetails(task),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          child: Row(
             children: [
-              Text(
-                task.content,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 14,
+              // 小點指示器
+              Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
                 ),
               ),
-              if (task.dueDate != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '${task.dueDate!.month}/${task.dueDate!.day}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      fontSize: 12,
-                    ),
+              const SizedBox(width: 10),
+              // 任務標題
+              Expanded(
+                child: Text(
+                  task.content,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // 日期
+              if (task.dueDate != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '${task.dueDate!.month}/${task.dueDate!.day}',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 12,
                   ),
                 ),
+              ],
             ],
           ),
         ),
@@ -561,31 +576,11 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
     return const Color(0xFFEF4444);
   }
 
-  Color _getLoadBorderColor(int load) {
-    if (load < _LoadThresholds.low) {
-      return const Color(0xFF10B981).withValues(alpha: 0.3);
-    }
-    if (load < _LoadThresholds.medium) {
-      return const Color(0xFF3B82F6).withValues(alpha: 0.3);
-    }
-    if (load < _LoadThresholds.warning) {
-      return const Color(0xFFF59E0B).withValues(alpha: 0.3);
-    }
-    return const Color(0xFFEF4444).withValues(alpha: 0.3);
-  }
-
   String _getLoadLabel(int load) {
     if (load < _LoadThresholds.low) return '輕鬆';
     if (load < _LoadThresholds.medium) return '適中';
     if (load < _LoadThresholds.warning) return '忙碌';
     return '爆炸';
-  }
-
-  Color _getLoadLabelColor(int load) {
-    if (load < _LoadThresholds.low) return const Color(0xFF10B981);
-    if (load < _LoadThresholds.medium) return const Color(0xFF3B82F6);
-    if (load < _LoadThresholds.warning) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
   }
 
   void _showTaskDetails(Task task) {

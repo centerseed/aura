@@ -51,7 +51,15 @@ mixin _$TaskModel {
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'deleted_at')
-  DateTime? get deletedAt => throw _privateConstructorUsedError;
+  DateTime? get deletedAt => throw _privateConstructorUsedError; // Reminder fields
+  @JsonKey(name: 'remind_at')
+  DateTime? get remindAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'reminder_enabled')
+  bool get reminderEnabled => throw _privateConstructorUsedError;
+  @JsonKey(name: 'reminder_timezone')
+  String? get reminderTimezone => throw _privateConstructorUsedError;
+  @JsonKey(name: 'notification_id')
+  int? get notificationId => throw _privateConstructorUsedError;
 
   /// Serializes this TaskModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -86,6 +94,10 @@ abstract class $TaskModelCopyWith<$Res> {
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+    @JsonKey(name: 'remind_at') DateTime? remindAt,
+    @JsonKey(name: 'reminder_enabled') bool reminderEnabled,
+    @JsonKey(name: 'reminder_timezone') String? reminderTimezone,
+    @JsonKey(name: 'notification_id') int? notificationId,
   });
 }
 
@@ -121,6 +133,10 @@ class _$TaskModelCopyWithImpl<$Res, $Val extends TaskModel>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
     Object? deletedAt = freezed,
+    Object? remindAt = freezed,
+    Object? reminderEnabled = null,
+    Object? reminderTimezone = freezed,
+    Object? notificationId = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -192,6 +208,22 @@ class _$TaskModelCopyWithImpl<$Res, $Val extends TaskModel>
                 ? _value.deletedAt
                 : deletedAt // ignore: cast_nullable_to_non_nullable
                       as DateTime?,
+            remindAt: freezed == remindAt
+                ? _value.remindAt
+                : remindAt // ignore: cast_nullable_to_non_nullable
+                      as DateTime?,
+            reminderEnabled: null == reminderEnabled
+                ? _value.reminderEnabled
+                : reminderEnabled // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            reminderTimezone: freezed == reminderTimezone
+                ? _value.reminderTimezone
+                : reminderTimezone // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            notificationId: freezed == notificationId
+                ? _value.notificationId
+                : notificationId // ignore: cast_nullable_to_non_nullable
+                      as int?,
           )
           as $Val,
     );
@@ -225,6 +257,10 @@ abstract class _$$TaskModelImplCopyWith<$Res>
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+    @JsonKey(name: 'remind_at') DateTime? remindAt,
+    @JsonKey(name: 'reminder_enabled') bool reminderEnabled,
+    @JsonKey(name: 'reminder_timezone') String? reminderTimezone,
+    @JsonKey(name: 'notification_id') int? notificationId,
   });
 }
 
@@ -259,6 +295,10 @@ class __$$TaskModelImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
     Object? deletedAt = freezed,
+    Object? remindAt = freezed,
+    Object? reminderEnabled = null,
+    Object? reminderTimezone = freezed,
+    Object? notificationId = freezed,
   }) {
     return _then(
       _$TaskModelImpl(
@@ -330,6 +370,22 @@ class __$$TaskModelImplCopyWithImpl<$Res>
             ? _value.deletedAt
             : deletedAt // ignore: cast_nullable_to_non_nullable
                   as DateTime?,
+        remindAt: freezed == remindAt
+            ? _value.remindAt
+            : remindAt // ignore: cast_nullable_to_non_nullable
+                  as DateTime?,
+        reminderEnabled: null == reminderEnabled
+            ? _value.reminderEnabled
+            : reminderEnabled // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        reminderTimezone: freezed == reminderTimezone
+            ? _value.reminderTimezone
+            : reminderTimezone // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        notificationId: freezed == notificationId
+            ? _value.notificationId
+            : notificationId // ignore: cast_nullable_to_non_nullable
+                  as int?,
       ),
     );
   }
@@ -356,6 +412,10 @@ class _$TaskModelImpl extends _TaskModel {
     @JsonKey(name: 'created_at') this.createdAt,
     @JsonKey(name: 'updated_at') this.updatedAt,
     @JsonKey(name: 'deleted_at') this.deletedAt,
+    @JsonKey(name: 'remind_at') this.remindAt,
+    @JsonKey(name: 'reminder_enabled') this.reminderEnabled = false,
+    @JsonKey(name: 'reminder_timezone') this.reminderTimezone,
+    @JsonKey(name: 'notification_id') this.notificationId,
   }) : _aiAnalysis = aiAnalysis,
        _subItems = subItems,
        _tag = tag,
@@ -445,10 +505,23 @@ class _$TaskModelImpl extends _TaskModel {
   @override
   @JsonKey(name: 'deleted_at')
   final DateTime? deletedAt;
+  // Reminder fields
+  @override
+  @JsonKey(name: 'remind_at')
+  final DateTime? remindAt;
+  @override
+  @JsonKey(name: 'reminder_enabled')
+  final bool reminderEnabled;
+  @override
+  @JsonKey(name: 'reminder_timezone')
+  final String? reminderTimezone;
+  @override
+  @JsonKey(name: 'notification_id')
+  final int? notificationId;
 
   @override
   String toString() {
-    return 'TaskModel(id: $id, userId: $userId, productId: $productId, topicId: $topicId, content: $content, status: $status, dueDate: $dueDate, startDate: $startDate, timeConfidence: $timeConfidence, inferredFromMilestone: $inferredFromMilestone, aiAnalysis: $aiAnalysis, subItems: $subItems, tag: $tag, tags: $tags, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt)';
+    return 'TaskModel(id: $id, userId: $userId, productId: $productId, topicId: $topicId, content: $content, status: $status, dueDate: $dueDate, startDate: $startDate, timeConfidence: $timeConfidence, inferredFromMilestone: $inferredFromMilestone, aiAnalysis: $aiAnalysis, subItems: $subItems, tag: $tag, tags: $tags, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, remindAt: $remindAt, reminderEnabled: $reminderEnabled, reminderTimezone: $reminderTimezone, notificationId: $notificationId)';
   }
 
   @override
@@ -482,12 +555,20 @@ class _$TaskModelImpl extends _TaskModel {
             (identical(other.updatedAt, updatedAt) ||
                 other.updatedAt == updatedAt) &&
             (identical(other.deletedAt, deletedAt) ||
-                other.deletedAt == deletedAt));
+                other.deletedAt == deletedAt) &&
+            (identical(other.remindAt, remindAt) ||
+                other.remindAt == remindAt) &&
+            (identical(other.reminderEnabled, reminderEnabled) ||
+                other.reminderEnabled == reminderEnabled) &&
+            (identical(other.reminderTimezone, reminderTimezone) ||
+                other.reminderTimezone == reminderTimezone) &&
+            (identical(other.notificationId, notificationId) ||
+                other.notificationId == notificationId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     runtimeType,
     id,
     userId,
@@ -506,7 +587,11 @@ class _$TaskModelImpl extends _TaskModel {
     createdAt,
     updatedAt,
     deletedAt,
-  );
+    remindAt,
+    reminderEnabled,
+    reminderTimezone,
+    notificationId,
+  ]);
 
   /// Create a copy of TaskModel
   /// with the given fields replaced by the non-null parameter values.
@@ -542,6 +627,10 @@ abstract class _TaskModel extends TaskModel {
     @JsonKey(name: 'created_at') final DateTime? createdAt,
     @JsonKey(name: 'updated_at') final DateTime? updatedAt,
     @JsonKey(name: 'deleted_at') final DateTime? deletedAt,
+    @JsonKey(name: 'remind_at') final DateTime? remindAt,
+    @JsonKey(name: 'reminder_enabled') final bool reminderEnabled,
+    @JsonKey(name: 'reminder_timezone') final String? reminderTimezone,
+    @JsonKey(name: 'notification_id') final int? notificationId,
   }) = _$TaskModelImpl;
   const _TaskModel._() : super._();
 
@@ -595,7 +684,19 @@ abstract class _TaskModel extends TaskModel {
   DateTime? get updatedAt;
   @override
   @JsonKey(name: 'deleted_at')
-  DateTime? get deletedAt;
+  DateTime? get deletedAt; // Reminder fields
+  @override
+  @JsonKey(name: 'remind_at')
+  DateTime? get remindAt;
+  @override
+  @JsonKey(name: 'reminder_enabled')
+  bool get reminderEnabled;
+  @override
+  @JsonKey(name: 'reminder_timezone')
+  String? get reminderTimezone;
+  @override
+  @JsonKey(name: 'notification_id')
+  int? get notificationId;
 
   /// Create a copy of TaskModel
   /// with the given fields replaced by the non-null parameter values.
