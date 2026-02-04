@@ -137,6 +137,26 @@ cython_debug/
 !.env.example
 !.env.*.example
 
+# Migration scripts (may contain credentials)
+migrate-*.js
+verify-migration.js
+**/migrate-*.js
+**/verify-*.js
+
+# Sensitive documentation (may contain credentials)
+MIGRATION_COMPLETE.md
+SUPABASE_*.md
+*_COMPLETE.md
+
+# Scripts with hardcoded secrets
+scripts/archive/deploy-*.sh
+
+# Service account keys
+*-service-account*.json
+*firebase*.json
+!**/google-services.json
+!**/GoogleService-Info.plist
+
 # Node.js
 node_modules/
 npm-debug.log*

@@ -2,6 +2,46 @@
 
 ## 🚨🚨🚨 最高優先級規則 - 資料安全 🚨🚨🚨
 
+### 機密資訊保護（違反即終止）
+
+**Claude 曾經犯過的嚴重錯誤：把 API keys、資料庫密碼、Service Account 私鑰寫入會被 git commit 的檔案中，導致機密洩漏到 GitHub。這是不可原諒的低級錯誤。**
+
+#### 絕對禁止將以下資訊寫入任何可能被 commit 的檔案：
+
+1. **API Keys / Tokens**
+   - 🚫 Google API Key (`AIzaSy...`)
+   - 🚫 Firebase API Key
+   - 🚫 Gemini API Key (`GOOGLE_GENERATIVE_AI_API_KEY`)
+   - 🚫 任何 `sk-`, `pk_`, `ghp_`, `gho_` 開頭的 token
+
+2. **資料庫連線字串**
+   - 🚫 包含密碼的 `DATABASE_URL`
+   - 🚫 任何 `postgres://user:PASSWORD@` 格式的連線字串
+   - 🚫 Supabase pooler URL 含密碼
+
+3. **Service Account / Private Keys**
+   - 🚫 `-----BEGIN PRIVATE KEY-----`
+   - 🚫 Firebase Admin SDK JSON
+   - 🚫 任何 `.json` 格式的 service account 檔案
+
+#### 安全的做法：
+
+1. **環境變數**：敏感資訊只能放在 `.env` 檔案（已被 .gitignore 忽略）
+2. **範例檔案**：`.env.example` 只能包含 placeholder，如 `your-api-key-here`
+3. **文件**：任何 `.md` 文件不得包含真實的密碼或 API key
+4. **腳本**：任何 `.sh` / `.js` 腳本不得硬編碼機密資訊，必須從環境變數讀取
+
+#### 寫入檔案前的強制檢查：
+
+在執行 Write 或 Edit 工具前，Claude 必須自問：
+- 這個內容是否包含任何看起來像 API key 的字串？
+- 這個內容是否包含任何密碼？
+- 這個檔案會被 git 追蹤嗎？
+
+**如果有任何疑慮，絕對不要寫入。詢問用戶確認。**
+
+---
+
 ### 測試環境絕對禁令（違反即終止）
 
 1. **絕對禁止連接生產資料庫**
