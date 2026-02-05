@@ -1,0 +1,177 @@
+/**
+ * POC Librarian Engine - Database Setup Script
+ *
+ * 建立 poc_librarian schema 和所有必要的表
+ * 🛡️ 只操作 poc_librarian schema，不影響主系統
+ */
+
+import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const { Client } = pg;
+
+const SCHEMA_SQL = `
+-- ============================================================================
+-- 🛡️ POC Librarian Schema Setup
+-- ============================================================================
+
+-- 建立獨立 schema（不影響主系統）
+CREATE SCHEMA IF NOT EXISTS poc_librarian;
+
+-- 設定 search_path（後續所有操作只在這個 schema）
+SET search_path TO poc_librarian;
+
+-- 啟用 pgvector（如果尚未安裝）
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- ============================================================================
+-- Corrections 表（用戶修正紀錄）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS corrections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+
+    original_input TEXT NOT NULL,
+    ai_prediction JSONB NOT NULL,
+    user_correction JSONB NOT NULL,
+    corrected_field TEXT NOT NULL,
+
+    embedding VECTOR(3072),
+    processed BOOLEAN DEFAULT FALSE,
+    phase_number INT,
+
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- Rules 表（蒸餾出的規則）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+
+    description TEXT NOT NULL,
+    trigger_conditions JSONB,
+    result_action JSONB,
+
+    confidence FLOAT DEFAULT 0.5,
+    times_applied INT DEFAULT 0,
+    times_correct INT DEFAULT 0,
+
+    embedding VECTOR(3072),
+    is_active BOOLEAN DEFAULT TRUE,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ
+);
+
+-- ============================================================================
+-- Evaluations 表（評估結果）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS evaluations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    phase_number INT NOT NULL,
+
+    input TEXT NOT NULL,
+    expected_output JSONB,
+    actual_output JSONB,
+    is_correct BOOLEAN,
+
+    rules_applied UUID[],
+    latency_ms INT,
+
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- 索引
+-- ============================================================================
+
+-- HNSW 向量索引（快速檢索）
+CREATE INDEX IF NOT EXISTS idx_corrections_embedding
+    ON corrections USING hnsw (embedding vector_cosine_ops);
+
+CREATE INDEX IF NOT EXISTS idx_rules_embedding
+    ON rules USING hnsw (embedding vector_cosine_ops);
+
+-- 常規索引
+CREATE INDEX IF NOT EXISTS idx_corrections_user_processed
+    ON corrections (user_id, processed);
+
+CREATE INDEX IF NOT EXISTS idx_rules_user_active
+    ON rules (user_id, is_active);
+
+CREATE INDEX IF NOT EXISTS idx_evaluations_user_phase
+    ON evaluations (user_id, phase_number);
+
+-- ============================================================================
+-- 驗證
+-- ============================================================================
+SELECT 'poc_librarian schema 設置完成' AS status;
+`;
+
+async function setupDatabase() {
+  console.log('🚀 開始設置 POC Librarian 資料庫...\n');
+
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    console.error('❌ 錯誤：DATABASE_URL 環境變數未設定');
+    console.log('\n請複製 .env.example 為 .env 並填入資料庫連線資訊');
+    process.exit(1);
+  }
+
+  const client = new Client({ connectionString });
+
+  try {
+    // 連線資料庫
+    await client.connect();
+    console.log('✅ 資料庫連線成功');
+
+    // 執行 schema 建立
+    console.log('📦 建立 poc_librarian schema 和表...');
+    await client.query(SCHEMA_SQL);
+
+    // 驗證表是否建立成功
+    const tables = await client.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'poc_librarian'
+      ORDER BY table_name
+    `);
+
+    console.log('\n✅ 已建立的表：');
+    tables.rows.forEach(row => {
+      console.log(`   - ${row.table_name}`);
+    });
+
+    // 驗證 pgvector
+    const vectorCheck = await client.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_extension WHERE extname = 'vector'
+      ) AS has_vector
+    `);
+
+    if (vectorCheck.rows[0].has_vector) {
+      console.log('\n✅ pgvector 擴展已啟用');
+    } else {
+      console.log('\n⚠️ pgvector 擴展未啟用，向量功能可能無法使用');
+    }
+
+    console.log('\n🎉 POC Librarian 資料庫設置完成！');
+    console.log('   現在可以執行 npm run poc 開始驗證');
+
+  } catch (error) {
+    console.error('\n❌ 資料庫設置失敗：');
+    console.error(error);
+    process.exit(1);
+  } finally {
+    await client.end();
+  }
+}
+
+// 執行
+setupDatabase();
