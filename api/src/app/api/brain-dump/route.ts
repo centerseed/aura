@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
           ${explicitProductId
             ? Prisma.sql`AND id = ${explicitProductId}::uuid`
             : vectorStr
-              ? Prisma.sql`AND embedding IS NOT NULL ORDER BY embedding <=> ${vectorStr}::vector LIMIT 5`
+              ? Prisma.sql`AND embedding IS NOT NULL ORDER BY embedding <=> ${vectorStr}::vector LIMIT 4`
               : Prisma.sql`LIMIT 10`
           }
       ),
@@ -534,9 +534,10 @@ export async function POST(request: NextRequest) {
       tasksPerProduct = Math.max(1, Math.min(5, Math.floor(MAX_CONTEXT_ITEMS / totalProducts)));
       const totalTaskBudget = totalProducts * tasksPerProduct;
 
-      // 剩餘預算分配給 sub_items（每個 task 最多 2 個）
+      // 剩餘預算分配給 sub_items（每個 task 至少 1 個，最多 2 個）
+      // 🔥 至少 1 個 sub_item 是為了讓 LLM 能判斷是否追加
       const remainingBudget = MAX_CONTEXT_ITEMS - totalTaskBudget;
-      subItemsPerTask = Math.max(0, Math.min(2, Math.floor(remainingBudget / totalTaskBudget)));
+      subItemsPerTask = Math.max(1, Math.min(2, Math.floor(remainingBudget / totalTaskBudget)));
     }
 
     console.log(`📊 [brain-dump] Dynamic budget: ${totalProducts} Products × ${tasksPerProduct} tasks × ${subItemsPerTask} sub_items = ~${totalProducts * tasksPerProduct * (1 + subItemsPerTask)} items`);
