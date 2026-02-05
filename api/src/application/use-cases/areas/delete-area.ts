@@ -21,18 +21,26 @@ export class DeleteAreaUseCase {
       throw new ValidationException('Area ID and User ID are required', 'areaId')
     }
 
+    // 使用 _count 避免載入完整 products 記錄
     const existing = await prisma.area.findFirst({
       where: { id: request.areaId, user_id: request.userId, deleted_at: null },
-      include: { products: { where: { deleted_at: null } } },
+      select: {
+        id: true,
+        _count: {
+          select: {
+            products: { where: { deleted_at: null } },
+          },
+        },
+      },
     })
 
     if (!existing) {
       throw new NotFoundException('Area')
     }
 
-    if (existing.products.length > 0) {
+    if (existing._count.products > 0) {
       throw new ConflictException(
-        `Cannot delete area with existing products. This area has ${existing.products.length} product(s). Please delete or move them first.`
+        `Cannot delete area with existing products. This area has ${existing._count.products} product(s). Please delete or move them first.`
       )
     }
 

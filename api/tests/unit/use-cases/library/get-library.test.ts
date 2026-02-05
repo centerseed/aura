@@ -10,9 +10,7 @@ import { prisma } from '@/lib/db'
 // Mock Prisma
 vi.mock('@/lib/db', () => ({
   prisma: {
-    area: {
-      findMany: vi.fn(),
-    },
+    $queryRaw: vi.fn(),
   },
 }))
 
@@ -22,7 +20,6 @@ describe('GetLibraryUseCase', () => {
   beforeEach(() => {
     useCase = new GetLibraryUseCase()
     vi.clearAllMocks()
-    vi.mocked(prisma.area.findMany).mockReset()
   })
 
   describe('驗證邏輯', () => {
@@ -37,41 +34,37 @@ describe('GetLibraryUseCase', () => {
 
   describe('成功情況', () => {
     it('應該成功返回完整的層級結構', async () => {
-      const mockAreas = [
+      // Mock raw SQL 返回的資料格式
+      const mockRawRows = [
         {
-          id: 'area-1',
-          name: 'Work',
-          description: null,
-          scope: 'work',
-          products: [
-            {
-              id: 'product-1',
-              name: 'Project A',
-              description: null,
-              status: 'ACTIVE',
-              lifecycle: 'FINITE',
-              references: [],
-              tasks: [
-                {
-                  id: 'task-1',
-                  content: 'Task content',
-                  status: 'ACTIVE',
-                  ai_analysis: null,
-                  sub_items: [],
-                  references: [],
-                  topic: null,
-                  start_date: null,
-                  due_date: null,
-                  time_confidence: null,
-                  inferred_from_milestone: null,
-                },
-              ],
-            },
-          ],
+          area_id: 'area-1',
+          area_name: 'Work',
+          area_description: null,
+          area_scope: 'work',
+          product_id: 'product-1',
+          product_name: 'Project A',
+          product_description: null,
+          product_status: 'ACTIVE',
+          product_lifecycle: 'FINITE',
+          product_references: [],
+          product_display_order: 0,
+          task_id: 'task-1',
+          task_content: 'Task content',
+          task_status: 'ACTIVE',
+          task_ai_analysis: null,
+          task_sub_items: [],
+          task_references: [],
+          task_start_date: null,
+          task_due_date: null,
+          task_time_confidence: null,
+          task_inferred_from_milestone: null,
+          task_created_at: new Date(),
+          task_updated_at: new Date(),
+          topic_name: null,
         },
       ]
 
-      vi.mocked(prisma.area.findMany).mockResolvedValue(mockAreas as any)
+      vi.mocked(prisma.$queryRaw).mockResolvedValue(mockRawRows)
 
       const result = await useCase.execute({ userId: 'user-123' })
 
@@ -81,7 +74,7 @@ describe('GetLibraryUseCase', () => {
     })
 
     it('應該返回空結構當沒有資料', async () => {
-      vi.mocked(prisma.area.findMany).mockResolvedValue([])
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([])
 
       const result = await useCase.execute({ userId: 'user-123' })
 

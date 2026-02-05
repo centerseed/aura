@@ -60,19 +60,10 @@ describe('DeleteProductUseCase', () => {
     })
 
     it('應該拋出錯誤當 Product 下還有 active Tasks', async () => {
+      // 🚀 優化：使用 _count 格式而非 include tasks
       const productWithTasks = {
         id: 'product-123',
-        user_id: 'user-123',
-        area_id: 'area-123',
-        name: 'Test Product',
-        description: null,
-        status: 'ACTIVE' as const,
-        lifecycle: 'FINITE' as const,
-        display_order: 0,
-        created_at: new Date(),
-        updated_at: new Date(),
-        deleted_at: null,
-        tasks: [{ id: 'task-1', content: 'Task 1', status: 'ACTIVE' }],
+        _count: { tasks: 1 },
       } as any
 
       vi.mocked(prisma.product.findFirst).mockResolvedValue(productWithTasks)
@@ -88,7 +79,13 @@ describe('DeleteProductUseCase', () => {
 
   describe('成功情況', () => {
     it('應該成功軟刪除 Product', async () => {
-      const existingProduct = {
+      // 🚀 優化：使用 _count 格式
+      const productWithNoTasks = {
+        id: 'product-123',
+        _count: { tasks: 0 },
+      } as any
+
+      const deletedProduct = {
         id: 'product-123',
         user_id: 'user-123',
         area_id: 'area-123',
@@ -99,16 +96,6 @@ describe('DeleteProductUseCase', () => {
         display_order: 0,
         created_at: new Date(),
         updated_at: new Date(),
-        deleted_at: null,
-      }
-
-      const productWithNoTasks = {
-        ...existingProduct,
-        tasks: [],
-      } as any
-
-      const deletedProduct = {
-        ...existingProduct,
         deleted_at: new Date(),
       }
 

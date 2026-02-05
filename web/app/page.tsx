@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,17 @@ export default function HomeDemo() {
   const [currentUser, setCurrentUser] = useState<{ uid: string; email?: string; name?: string } | null>(null);
   const [hasLibraryData, setHasLibraryData] = useState(false);
 
+  // 追蹤是否正在進行登入流程（防止 onAuthStateChanged 的時序問題）
+  const isSigningInRef = useRef(false);
+
   // 檢查使用者是否已登入
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // 如果正在進行登入流程，跳過此次檢查（由登入流程自行處理重定向）
+      if (isSigningInRef.current) {
+        return;
+      }
+
       if (user) {
         // 使用者已登入，先從 /api/me 取得使用者資料庫 ID
         try {
@@ -154,6 +162,7 @@ export default function HomeDemo() {
 
   const handleGoogleSignIn = async () => {
     setIsEntering(true);
+    isSigningInRef.current = true;
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
@@ -176,12 +185,14 @@ export default function HomeDemo() {
     } catch (error) {
       console.error("Google 登入失敗:", error);
       setIsEntering(false);
+      isSigningInRef.current = false;
       alert(`登入失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
     }
   };
 
   const handleAnonymousSignIn = async () => {
     setIsEntering(true);
+    isSigningInRef.current = true;
     try {
       const result = await signInAnonymously(auth);
       const user = result.user;
@@ -204,6 +215,7 @@ export default function HomeDemo() {
     } catch (error) {
       console.error("匿名登入失敗:", error);
       setIsEntering(false);
+      isSigningInRef.current = false;
       alert(`登入失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
     }
   };
@@ -211,6 +223,7 @@ export default function HomeDemo() {
   const handleNameSignIn = async () => {
     if (!name.trim()) return;
     setIsEntering(true);
+    isSigningInRef.current = true;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signin`, {
         method: "POST",
@@ -231,6 +244,7 @@ export default function HomeDemo() {
     } catch (error) {
       console.error("名稱登入失敗:", error);
       setIsEntering(false);
+      isSigningInRef.current = false;
       alert(`登入失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
     }
   };
@@ -266,6 +280,7 @@ export default function HomeDemo() {
     } catch (error) {
       console.error("檢查使用者狀態失敗:", error);
       setIsEntering(false);
+      isSigningInRef.current = false;
       alert("無法檢查使用者狀態，請稍後再試");
     }
   };

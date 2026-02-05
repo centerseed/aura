@@ -6,11 +6,14 @@
 # 用途: 啟動 Next.js Web 前端開發伺服器
 #
 # 使用方式:
-#   ./scripts/dev-web.sh
+#   ./scripts/dev-web.sh           # 連接本地 API (localhost:3002)
+#   ./scripts/dev-web.sh local     # 連接本地 API (localhost:3002)
+#   ./scripts/dev-web.sh remote    # 連接 Cloud Run API
 #
 # 環境配置:
 #   - Web: http://localhost:3001
-#   - API: http://localhost:3002 (需另外啟動 dev-api.sh)
+#   - API (local): http://localhost:3002
+#   - API (remote): https://zentropy-api-894512935237.asia-east1.run.app
 #
 # ==============================================================================
 
@@ -21,6 +24,10 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 端口配置
 WEB_PORT=3001
+
+# API URL 配置
+LOCAL_API_URL="http://localhost:3002"
+REMOTE_API_URL="https://zentropy-api-894512935237.asia-east1.run.app"
 
 # 顏色輸出
 GREEN='\033[0;32m'
@@ -84,12 +91,25 @@ kill_port() {
 # 啟動 Web (Frontend)
 # ==============================================================================
 start_web() {
+    local mode=${1:-local}
+    local api_url
+
+    if [ "$mode" = "remote" ]; then
+        api_url="$REMOTE_API_URL"
+    else
+        api_url="$LOCAL_API_URL"
+    fi
+
     log_info "======================================"
-    log_info "   Naruvia Web Frontend"
+    if [ "$mode" = "remote" ]; then
+        log_info "   Naruvia Web Frontend (Remote API)"
+    else
+        log_info "   Naruvia Web Frontend (Local API)"
+    fi
     log_info "======================================"
     echo ""
     log_info "Web:  http://localhost:$WEB_PORT"
-    log_info "API:  http://localhost:3002 (需另外啟動)"
+    log_info "API:  $api_url"
     echo ""
 
     # 釋放端口
@@ -114,10 +134,24 @@ start_web() {
     npm run db:generate
 
     log_success "Web 啟動中: http://localhost:$WEB_PORT"
-    PORT=$WEB_PORT npm run dev
+
+    # 使用環境變數覆蓋 API URL
+    NEXT_PUBLIC_API_URL="$api_url" PORT=$WEB_PORT npm run dev
 }
 
 # ==============================================================================
 # 主程式
 # ==============================================================================
-start_web
+MODE=${1:-local}
+
+if [ "$MODE" != "local" ] && [ "$MODE" != "remote" ]; then
+    log_error "無效的模式: $MODE"
+    echo ""
+    echo "使用方式:"
+    echo "  ./scripts/dev-web.sh           # 連接本地 API"
+    echo "  ./scripts/dev-web.sh local     # 連接本地 API"
+    echo "  ./scripts/dev-web.sh remote    # 連接 Cloud Run API"
+    exit 1
+fi
+
+start_web "$MODE"

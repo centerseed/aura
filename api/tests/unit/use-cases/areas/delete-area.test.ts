@@ -60,18 +60,10 @@ describe('DeleteAreaUseCase', () => {
     })
 
     it('應該拋出錯誤當 Area 下還有 Products', async () => {
+      // 🚀 優化：使用 _count 格式而非 include products
       const areaWithProducts = {
         id: 'area-123',
-        user_id: 'user-123',
-        name: 'Test Area',
-        scope: 'work',
-        description: null,
-        is_custom: true,
-        display_order: 0,
-        created_at: new Date(),
-        updated_at: new Date(),
-        deleted_at: null,
-        products: [{ id: 'product-1', name: 'Product 1' }],
+        _count: { products: 1 },
       } as any
 
       vi.mocked(prisma.area.findFirst).mockResolvedValue(areaWithProducts)
@@ -87,7 +79,13 @@ describe('DeleteAreaUseCase', () => {
 
   describe('成功情況', () => {
     it('應該成功軟刪除 Area', async () => {
-      const existingArea = {
+      // 🚀 優化：使用 _count 格式
+      const areaWithNoProducts = {
+        id: 'area-123',
+        _count: { products: 0 },
+      } as any
+
+      const deletedArea = {
         id: 'area-123',
         user_id: 'user-123',
         name: 'Test Area',
@@ -97,16 +95,6 @@ describe('DeleteAreaUseCase', () => {
         display_order: 0,
         created_at: new Date(),
         updated_at: new Date(),
-        deleted_at: null,
-      }
-
-      const areaWithNoProducts = {
-        ...existingArea,
-        products: [],
-      } as any
-
-      const deletedArea = {
-        ...existingArea,
         deleted_at: new Date(),
       }
 

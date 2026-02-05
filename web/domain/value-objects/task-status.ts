@@ -129,7 +129,10 @@ export class TaskStatusVO {
         TaskStatus.ARCHIVE,
       ],
       [TaskStatus.ARCHIVE]: [
-        TaskStatus.INBOX, // 可以重新打開已歸檔的任務
+        TaskStatus.INBOX,
+        TaskStatus.ACTIVE,
+        TaskStatus.MAINTAIN,
+        TaskStatus.REFERENCE,
       ],
     }
 

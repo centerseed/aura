@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, User, Mail, Shield, Loader2, ArrowLeft } from "lucide-react";
+import { LogOut, User, Mail, Shield, Loader2, ArrowLeft, Wrench, RotateCcw, Eye } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-client";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isResettingOnboarding, setIsResettingOnboarding] = useState(false);
   const [userData, setUserData] = useState<{
     id: string;
     email: string | null;
@@ -58,6 +59,60 @@ export default function SettingsPage() {
       console.error("登出失敗:", error);
       alert("登出失敗，請稍後再試");
       setIsSigningOut(false);
+    }
+  };
+
+  const handleViewOnboarding = () => {
+    router.push("/onboarding");
+  };
+
+  const handleResetOnboarding = async () => {
+    const confirmed = confirm(
+      "這將刪除所有現有的 Areas（身份地圖）並重新開始 Onboarding 流程。\n\n確定要繼續嗎？"
+    );
+
+    if (!confirmed) return;
+
+    setIsResettingOnboarding(true);
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        alert("請先登入");
+        return;
+      }
+
+      const token = await firebaseUser.getIdToken();
+
+      // 獲取所有 Areas
+      const areasRes = await fetch(`${API_BASE_URL}/api/areas`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!areasRes.ok) {
+        throw new Error("無法獲取 Areas 列表");
+      }
+
+      const areasData = await areasRes.json();
+      const areas = areasData.data?.areas || [];
+
+      // 刪除所有 Areas
+      for (const area of areas) {
+        await fetch(`${API_BASE_URL}/api/areas/${area.id}`, {
+          method: "DELETE",
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      }
+
+      // 導向 onboarding 頁面
+      router.push("/onboarding");
+    } catch (error) {
+      console.error("重置 Onboarding 失敗:", error);
+      alert(`重置失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
+      setIsResettingOnboarding(false);
     }
   };
 
@@ -170,6 +225,54 @@ export default function SettingsPage() {
                   </>
                 )}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* 開發者工具 */}
+          <Card className="bg-slate-900 border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="flex items-center text-white">
+                <Wrench className="w-5 h-5 mr-2 text-amber-400" />
+                開發者工具
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                測試與開發用功能
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* 查看 Onboarding */}
+              <Button
+                onClick={handleViewOnboarding}
+                variant="outline"
+                className="w-full border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                查看 Onboarding 流程
+              </Button>
+
+              {/* 重置 Onboarding */}
+              <Button
+                onClick={handleResetOnboarding}
+                disabled={isResettingOnboarding}
+                variant="outline"
+                className="w-full border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300"
+              >
+                {isResettingOnboarding ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    重置中...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    重置並重新開始 Onboarding
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-slate-500 mt-2">
+                ⚠️ 重置將刪除所有 Areas（身份地圖），請謹慎使用
+              </p>
             </CardContent>
           </Card>
 

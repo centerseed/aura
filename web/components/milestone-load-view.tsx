@@ -232,10 +232,11 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
       }
     });
 
-    // 排序並轉為陣列
-    return Array.from(weekMap.values()).sort(
-      (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
-    );
+    // 排序並轉為陣列，過濾掉過去的週（只顯示本週及之後）
+    const currentWeekStart = getWeekStart(new Date());
+    return Array.from(weekMap.values())
+      .filter(week => week.weekStart.getTime() >= currentWeekStart.getTime())
+      .sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime());
   }, [allTasks, milestones]);
 
   // 預設全部展開

@@ -43,11 +43,14 @@ function TourContent() {
           throw new Error("無法獲取用戶資料");
         }
         const userData = await userRes.json();
-        setUserId(userData.id);
+        // API 回應格式: { success: true, data: { user: {...} } }
+        setUserId(userData.data?.user?.id);
 
         const areasRes = await fetch(`${API_BASE_URL}/api/areas`, { headers });
         const areasData = await areasRes.json();
-        setUserAreas(areasData.map((area: any) => area.name));
+        // API 回應格式: { success: true, data: { areas: [...] } }
+        const areas = areasData.data?.areas || [];
+        setUserAreas(areas.map((area: any) => area.name));
       } catch (error) {
         console.error("Failed to load user areas:", error);
       } finally {

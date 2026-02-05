@@ -8,6 +8,19 @@ abstract class ProductRepository {
   Future<Either<Failure, List<Product>>> getProducts();
   Future<Either<Failure, Product>> createProduct(String name, String areaId);
 
+  /// 更新 Product
+  Future<Either<Failure, Product>> updateProduct({
+    required String productId,
+    String? name,
+    String? description,
+    String? areaId,
+    ProductStatus? status,
+    ProductLifecycle? lifecycle,
+  });
+
+  /// 刪除 Product（軟刪除）
+  Future<Either<Failure, void>> deleteProduct(String productId);
+
   /// AI Reorganization
   Future<Either<Failure, ReorganizeProposal>> reorganizeTopics(
     String productId,

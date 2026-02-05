@@ -15,6 +15,20 @@ import { authenticateRequest } from "@/lib/auth-middleware";
 import { Status, Lifecycle } from "@prisma/client";
 import { ApiResponseBuilder, catchDomainException } from "@/lib/api-response";
 
+// 🚀 Raw SQL 查詢結果的型別
+interface RawStructureRow {
+  area_id: string
+  area_name: string
+  area_scope: string | null
+  product_id: string | null
+  product_name: string | null
+  topic_id: string | null
+  topic_name: string | null
+  task_id: string | null
+  task_content: string | null
+  task_ai_analysis: unknown
+}
+
 // AI 重新分類結果結構（繁體中文）
 const ReorganizeResultSchema = z.object({
   analysis: z.string().describe("以繁體中文描述目前結構的問題分析（1-2 句話）"),
@@ -47,27 +61,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as any;
     const { preview = false, confirmed = false, selected_operation_ids = null } = body;
 
-    // 獲取用戶所有現有結構（只查詢未完成的任務）
-    const existingAreas = await prisma.area.findMany({
-      where: { user_id: userId, deleted_at: null },
-      include: {
-        products: {
-          where: { deleted_at: null },
-          include: {
-            topics: { where: { deleted_at: null } },
-            tasks: {
-              where: {
-                deleted_at: null,
-                status: { not: Status.ARCHIVE },  // ✅ 排除已完成任務
-              },
-              orderBy: { created_at: "desc" },
-            },
-          },
-        },
-      },
-    });
+    // 🚀 獲取用戶所有現有結構（單一 SQL 查詢）
+    const rawRows = await prisma.$queryRaw<RawStructureRow[]>`
+      SELECT
+        a.id::text as area_id,
+        a.name as area_name,
+        a.scope as area_scope,
+        p.id::text as product_id,
+        p.name as product_name,
+        top.id::text as topic_id,
+        top.name as topic_name,
+        t.id::text as task_id,
+        t.content as task_content,
+        t.ai_analysis as task_ai_analysis
+      FROM areas a
+      LEFT JOIN products p ON p.area_id = a.id AND p.deleted_at IS NULL
+      LEFT JOIN topics top ON top.product_id = p.id AND top.deleted_at IS NULL
+      LEFT JOIN tasks t ON t.product_id = p.id
+        AND t.deleted_at IS NULL
+        AND t.status != 'ARCHIVE'::"statusenum"
+      WHERE a.user_id = ${userId}::uuid AND a.deleted_at IS NULL
+      ORDER BY a.name, p.name, t.created_at DESC
+    `
 
-    if (existingAreas.length === 0) {
+    if (rawRows.length === 0) {
       return ApiResponseBuilder.success({
         message: "No data to reorganize",
         changes: { merges: 0, reclassifications: 0 },
@@ -80,45 +97,68 @@ export async function POST(request: NextRequest) {
     const productByNameCache = new Map<string, Array<{ id: string; areaName: string; taskCount: number }>>();
     const taskMap: Record<string, { areaName: string; productName: string; content: string; aiAnalysis: object | null }> = {};
 
+    // 用於計數和去重
+    const productTaskCounts = new Map<string, number>();
+    const tasksProcessed = new Set<string>();
+
+    // 第一遍：計算每個 product 的 task 數量
+    for (const row of rawRows) {
+      if (row.product_id && row.task_id && !tasksProcessed.has(row.task_id)) {
+        tasksProcessed.add(row.task_id);
+        productTaskCounts.set(row.product_id, (productTaskCounts.get(row.product_id) || 0) + 1);
+      }
+    }
+    tasksProcessed.clear();
+
     // 構建完整的結構摘要給 AI
     let structureSummary = "### Current Structure:\n\n";
+    const areasProcessed = new Set<string>();
+    const productsProcessed = new Set<string>();
 
-    for (const area of existingAreas) {
-      // 快取 Area
-      areaCache.set(area.name, { id: area.id, name: area.name });
+    for (const row of rawRows) {
+      // 處理 Area
+      if (!areasProcessed.has(row.area_id)) {
+        areasProcessed.add(row.area_id);
+        areaCache.set(row.area_name, { id: row.area_id, name: row.area_name });
+        structureSummary += `**Area: ${row.area_name}** (scope: ${row.area_scope || "undefined"})\n`;
+      }
 
-      structureSummary += `**Area: ${area.name}** (scope: ${area.scope || "undefined"})\n`;
-      for (const product of area.products) {
-        const taskCount = product.tasks.length;
+      // 處理 Product
+      if (row.product_id && !productsProcessed.has(row.product_id)) {
+        productsProcessed.add(row.product_id);
+        const taskCount = productTaskCounts.get(row.product_id) || 0;
 
         // 快取 Product (by ID)
-        productCache.set(product.id, {
-          id: product.id,
-          name: product.name,
-          areaId: area.id,
-          areaName: area.name,
+        productCache.set(row.product_id, {
+          id: row.product_id,
+          name: row.product_name!,
+          areaId: row.area_id,
+          areaName: row.area_name,
           taskCount,
         });
 
         // 快取 Product (by name，可能有多個同名 product)
-        const existingByName = productByNameCache.get(product.name) || [];
-        existingByName.push({ id: product.id, areaName: area.name, taskCount });
-        productByNameCache.set(product.name, existingByName);
+        const existingByName = productByNameCache.get(row.product_name!) || [];
+        existingByName.push({ id: row.product_id, areaName: row.area_name, taskCount });
+        productByNameCache.set(row.product_name!, existingByName);
 
-        structureSummary += `  - Product: ${product.name}\n`;
-        for (const task of product.tasks) {
-          const aiAnalysis = task.ai_analysis as { narrative?: string } || {};
-          structureSummary += `    - Task [${task.id}]: ${task.content} (${aiAnalysis.narrative || "no context"})\n`;
-          taskMap[task.id] = {
-            areaName: area.name,
-            productName: product.name,
-            content: task.content,
-            aiAnalysis: task.ai_analysis as object | null,
-          };
-        }
+        structureSummary += `  - Product: ${row.product_name}\n`;
       }
-      structureSummary += "\n";
+
+      // 處理 Task
+      if (row.task_id && row.product_id && !tasksProcessed.has(row.task_id)) {
+        tasksProcessed.add(row.task_id);
+        const aiAnalysis = row.task_ai_analysis as { narrative?: string } || {};
+        structureSummary += `    - Task [${row.task_id}]: ${row.task_content} (${aiAnalysis.narrative || "no context"})\n`;
+        taskMap[row.task_id] = {
+          areaName: row.area_name,
+          productName: row.product_name!,
+          content: row.task_content!,
+          aiAnalysis: row.task_ai_analysis as object | null,
+        };
+      }
     }
+    structureSummary += "\n";
 
     // 調用 AI 進行分析和重新整理建議
     const { object: result } = await generateObject({

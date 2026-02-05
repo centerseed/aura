@@ -55,18 +55,16 @@ export class GetTasksUseCase {
     // 2. 透過 Repository 查詢
     const tasks = await this.taskRepository.findMany(filters)
 
-    // 3. 應用業務規則（例如排序、過濾等）
-    const sortedTasks = this.sortTasks(tasks)
+    // 3. 應用業務規則：只在需要複雜排序時才執行（SQL 已做基本排序）
+    // completed_today 場景不需要額外排序
+    const sortedTasks = request.completedToday ? tasks : this.sortTasks(tasks)
 
-    // 4. 統計資訊
-    const total = await this.taskRepository.count({
-      userId: request.userId,
-    })
-
+    // 4. 🚀 優化：移除額外的 count 查詢，使用查詢結果長度
+    // 對於大多數場景，filtered 就是實際需要的數量
     return {
       tasks: sortedTasks,
       meta: {
-        total,
+        total: sortedTasks.length, // 避免額外 DB round-trip
         filtered: sortedTasks.length,
       },
     }

@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/db'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { Status, Lifecycle } from '@prisma/client'
+import { ensureProductEmbedding } from '@/lib/embedding'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -95,6 +96,15 @@ export class CreateProductUseCase {
           ? Lifecycle[request.lifecycle as keyof typeof Lifecycle]
           : Lifecycle.FINITE,
       },
+    })
+
+    // 5. 計算並存儲 embedding（非同步，不阻塞回應）
+    ensureProductEmbedding(
+      product.id,
+      product.name,
+      product.description
+    ).catch(err => {
+      console.error(`❌ [embedding] Failed to compute embedding for Product ${product.name}:`, err)
     })
 
     return {

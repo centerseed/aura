@@ -3,8 +3,9 @@ const nextConfig = {
   // API-only mode
   reactStrictMode: true,
 
-  // Output standalone for deployment
-  output: 'standalone',
+  // 不使用 standalone - standalone server 有並發阻塞問題
+  // 參考: https://github.com/vercel/next.js/issues/64396
+  // output: 'standalone',
 
   // Optimize for API routes only
   serverExternalPackages: ['@prisma/client', 'firebase-admin'],

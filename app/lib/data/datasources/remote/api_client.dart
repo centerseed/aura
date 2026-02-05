@@ -109,6 +109,25 @@ class ApiClient {
     return ProductModel.fromJson(data);
   }
 
+  /// 更新 Product
+  /// PATCH /api/products/:id
+  Future<ProductModel> updateProduct(
+    String productId,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _dio.patch('/products/$productId', data: body);
+    final data = response.data['data'] ?? response.data;
+    // API 返回 { data: { product: {...} } }
+    final productData = data['product'] ?? data;
+    return ProductModel.fromJson(productData);
+  }
+
+  /// 刪除 Product（軟刪除）
+  /// DELETE /api/products/:id
+  Future<void> deleteProduct(String productId) async {
+    await _dio.delete('/products/$productId');
+  }
+
   Future<Map<String, dynamic>> reorganizeProductTopics(String productId) async {
     final response = await _dio.post('/products/$productId/reorganize-topics');
     return response.data;
@@ -205,6 +224,31 @@ class ApiClient {
     final response = await _dio.get('/me/statistics');
     // API 返回格式: {data: {statistics: {...}}, meta: {...}}
     return response.data;
+  }
+
+  // ==================== Dashboard ====================
+
+  /// Dashboard - 統一資料載入（解決 Cloud Run HTTP/1.1 序列化問題）
+  /// 在 API 層使用 Promise.all 並發查詢，前端只需一次 HTTP 請求
+  ///
+  /// [include] - 要載入的數據區塊（逗號分隔）
+  ///   - Flutter 常用: areas,products,tasks,completedToday
+  ///   - Web 常用: user,library,milestones,completedToday
+  /// [includeArchived] - 是否包含已歸檔任務
+  /// [tasksStatus] - 任務狀態過濾（用於 tasks 區塊）
+  Future<Map<String, dynamic>> getDashboard({
+    String? include,
+    bool? includeArchived,
+    String? tasksStatus,
+  }) async {
+    final queryParams = <String, dynamic>{};
+    if (include != null) queryParams['include'] = include;
+    if (includeArchived == true) queryParams['include_archived'] = 'true';
+    if (tasksStatus != null) queryParams['tasks_status'] = tasksStatus;
+
+    final response = await _dio.get('/dashboard', queryParameters: queryParams);
+    // API 返回格式: {data: {...}, meta: {sections: [...]}}
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> updateCurrentUser(Map<String, dynamic> body) async {

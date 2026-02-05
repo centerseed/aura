@@ -106,6 +106,7 @@ describe('GetTasksUseCase', () => {
       ]
 
       mockFindMany.mockResolvedValue(mockTasks)
+      // 🚀 優化：移除了額外的 count 查詢，total 現在等於 filtered
       mockCount.mockResolvedValue(10)
 
       const result = await useCase.execute({
@@ -114,7 +115,7 @@ describe('GetTasksUseCase', () => {
       })
 
       expect(result.tasks.length).toBe(1)
-      expect(result.meta.total).toBe(10)
+      expect(result.meta.total).toBe(1) // 優化後 total = filtered
       expect(result.meta.filtered).toBe(1)
       expect(mockFindMany).toHaveBeenCalledWith(
         expect.objectContaining({

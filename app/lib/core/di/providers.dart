@@ -28,12 +28,15 @@ import '../../domain/repositories/product_repository.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../../domain/repositories/user_repository.dart';
 import '../../domain/repositories/milestone_repository.dart';
+import '../../domain/repositories/dashboard_repository.dart';
 import '../../data/repositories/milestone_repository_impl.dart';
+import '../../data/repositories/dashboard_repository_impl.dart';
 import '../../application/use_cases/add_product_reference_use_case.dart';
 import '../../application/use_cases/add_sub_item_use_case.dart';
 import '../../application/use_cases/apply_reorganization_use_case.dart';
 import '../../application/use_cases/create_task_use_case.dart';
 import '../../application/use_cases/delete_product_reference_use_case.dart';
+import '../../application/use_cases/delete_product_use_case.dart';
 import '../../application/use_cases/delete_sub_item_use_case.dart';
 import '../../application/use_cases/delete_task_use_case.dart';
 import '../../application/use_cases/promote_sub_item_use_case.dart';
@@ -47,6 +50,7 @@ import '../../application/use_cases/reorder_sub_items_use_case.dart';
 import '../../application/use_cases/reorganize_product_topics_use_case.dart';
 import '../../application/use_cases/submit_brain_dump_use_case.dart';
 import '../../application/use_cases/update_sub_item_use_case.dart';
+import '../../application/use_cases/update_product_use_case.dart';
 import '../../application/use_cases/update_task_details_use_case.dart';
 import '../../application/use_cases/update_task_use_case.dart';
 import '../../application/use_cases/schedule_task_reminder_use_case.dart';
@@ -246,6 +250,15 @@ final milestoneRepositoryProvider = Provider<MilestoneRepository>((ref) {
   return MilestoneRepositoryImpl(apiClient);
 });
 
+/// Dashboard Repository Provider
+///
+/// 統一資料載入端點，在服務端使用 Promise.all 並發查詢
+/// 解決 Cloud Run HTTP/1.1 請求序列化問題
+final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return DashboardRepositoryImpl(apiClient);
+});
+
 // ==================== Use Case Providers ====================
 
 /// Get Tasks Use Case Provider
@@ -332,6 +345,18 @@ final getAreasUseCaseProvider = Provider<GetAreasUseCase>((ref) {
 final getProductsUseCaseProvider = Provider<GetProductsUseCase>((ref) {
   final repository = ref.watch(productRepositoryProvider);
   return GetProductsUseCase(repository);
+});
+
+/// Update Product Use Case Provider
+final updateProductUseCaseProvider = Provider<UpdateProductUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return UpdateProductUseCase(repository);
+});
+
+/// Delete Product Use Case Provider
+final deleteProductUseCaseProvider = Provider<DeleteProductUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return DeleteProductUseCase(repository);
 });
 
 /// Get Product References Use Case Provider

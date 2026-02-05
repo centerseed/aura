@@ -13,6 +13,20 @@ import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
 import { Status, Lifecycle } from "@prisma/client";
 
+// 🚀 Raw SQL 查詢結果的型別
+interface RawStructureRow {
+  area_id: string
+  area_name: string
+  product_id: string | null
+  product_name: string | null
+  topic_id: string | null
+  topic_name: string | null
+  task_id: string | null
+  task_content: string | null
+  task_topic_id: string | null
+  task_ai_analysis: unknown
+}
+
 // AI 解析自然語言調整指令的結構（繁體中文）
 const AdjustmentIntentSchema = z.object({
   intent_type: z.enum(["move_tasks", "change_topic", "no_action"]).describe(
@@ -46,30 +60,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "text is required" }, { status: 400 });
     }
 
-    // 獲取用戶現有結構（只查詢未完成的任務）
+    // 🚀 獲取用戶現有結構（單一 SQL 查詢）
     const startDbStructure = Date.now();
-    const existingAreas = await prisma.area.findMany({
-      where: { user_id: userId, deleted_at: null },
-      include: {
-        products: {
-          where: { deleted_at: null },
-          include: {
-            topics: { where: { deleted_at: null } },
-            tasks: {
-              where: {
-                deleted_at: null,
-                status: { not: Status.ARCHIVE },  // ✅ 排除已完成任務
-              },
-              orderBy: { created_at: "desc" },
-            },
-          },
-        },
-      },
-    });
 
-    // 構建結構摘要
+    // 使用 raw SQL JOIN 替代 3 層 nested include
+    const rawRows = await prisma.$queryRaw<RawStructureRow[]>`
+      SELECT
+        a.id::text as area_id,
+        a.name as area_name,
+        p.id::text as product_id,
+        p.name as product_name,
+        top.id::text as topic_id,
+        top.name as topic_name,
+        t.id::text as task_id,
+        t.content as task_content,
+        t.topic_id::text as task_topic_id,
+        t.ai_analysis as task_ai_analysis
+      FROM areas a
+      LEFT JOIN products p ON p.area_id = a.id AND p.deleted_at IS NULL
+      LEFT JOIN topics top ON top.product_id = p.id AND top.deleted_at IS NULL
+      LEFT JOIN tasks t ON t.product_id = p.id
+        AND t.deleted_at IS NULL
+        AND t.status != 'ARCHIVE'::"statusenum"
+      WHERE a.user_id = ${userId}::uuid AND a.deleted_at IS NULL
+      ORDER BY a.name, p.name, t.created_at DESC
+    `
+
+    // 構建結構摘要和 taskMap
     let contextSummary = "### 用戶現有結構:\n\n";
-    // ✅ 優化：擴展 taskMap 以包含執行模式需要的所有資訊
     const taskMap: Record<string, {
       areaName: string;
       productName: string;
@@ -79,34 +97,83 @@ export async function POST(request: NextRequest) {
       aiAnalysis: object | null;
     }> = {};
 
-    for (const area of existingAreas) {
-      contextSummary += `**Area: ${area.name}**\n`;
-      for (const product of area.products) {
-        contextSummary += `  📦 Product: ${product.name}\n`;
+    // 用於去重和組織數據的結構
+    const areasProcessed = new Set<string>();
+    const productsProcessed = new Set<string>();
+    const topicsByProduct = new Map<string, Set<string>>();
+    const tasksProcessed = new Set<string>();
+
+    // 第一遍：收集所有 topics
+    for (const row of rawRows) {
+      if (row.product_id && row.topic_name) {
+        if (!topicsByProduct.has(row.product_id)) {
+          topicsByProduct.set(row.product_id, new Set());
+        }
+        topicsByProduct.get(row.product_id)!.add(row.topic_name);
+      }
+    }
+
+    // 第二遍：構建 contextSummary 和 taskMap
+    let currentAreaId: string | null = null;
+    let currentProductId: string | null = null;
+
+    for (const row of rawRows) {
+      // 處理 Area
+      if (!areasProcessed.has(row.area_id)) {
+        areasProcessed.add(row.area_id);
+        currentAreaId = row.area_id;
+        contextSummary += `**Area: ${row.area_name}**\n`;
+      }
+
+      // 處理 Product
+      if (row.product_id && !productsProcessed.has(row.product_id)) {
+        productsProcessed.add(row.product_id);
+        currentProductId = row.product_id;
+        contextSummary += `  📦 Product: ${row.product_name}\n`;
 
         // 顯示 Topics
-        if (product.topics.length > 0) {
-          contextSummary += `     可用 Topics: ${product.topics.map(t => t.name).join(", ")}\n`;
-        }
-
-        // 顯示任務
-        for (const task of product.tasks) {
-          const aiAnalysis = task.ai_analysis as { narrative?: string } || {};
-          const topicName = product.topics.find(t => t.id === task.topic_id)?.name || null;
-          contextSummary += `     - [${task.id}] ${task.content}${topicName ? ` (Topic: ${topicName})` : ""}${aiAnalysis.narrative ? ` | ${aiAnalysis.narrative}` : ""}\n`;
-
-          taskMap[task.id] = {
-            areaName: area.name,
-            productName: product.name,
-            content: task.content,
-            topicName: topicName,
-            productId: product.id,
-            aiAnalysis: task.ai_analysis as object | null,
-          };
+        const topics = topicsByProduct.get(row.product_id);
+        if (topics && topics.size > 0) {
+          contextSummary += `     可用 Topics: ${Array.from(topics).join(", ")}\n`;
         }
       }
-      contextSummary += "\n";
+
+      // 處理 Task
+      if (row.task_id && !tasksProcessed.has(row.task_id)) {
+        tasksProcessed.add(row.task_id);
+        const aiAnalysis = row.task_ai_analysis as { narrative?: string } || {};
+
+        // 找到 task 的 topic name
+        let taskTopicName: string | null = null;
+        if (row.task_topic_id) {
+          // 從同一 product 的 topics 中找
+          for (const r of rawRows) {
+            if (r.product_id === row.product_id && r.topic_id === row.task_topic_id) {
+              taskTopicName = r.topic_name;
+              break;
+            }
+          }
+        }
+
+        contextSummary += `     - [${row.task_id}] ${row.task_content}${taskTopicName ? ` (Topic: ${taskTopicName})` : ""}${aiAnalysis.narrative ? ` | ${aiAnalysis.narrative}` : ""}\n`;
+
+        taskMap[row.task_id] = {
+          areaName: row.area_name,
+          productName: row.product_name!,
+          content: row.task_content!,
+          topicName: taskTopicName,
+          productId: row.product_id!,
+          aiAnalysis: row.task_ai_analysis as object | null,
+        };
+      }
+
+      // 處理 Area 換行
+      if (currentAreaId !== row.area_id) {
+        contextSummary += "\n";
+        currentAreaId = row.area_id;
+      }
     }
+    contextSummary += "\n";
     timings["db_structure"] = Date.now() - startDbStructure;
 
     // 調用 AI 解析用戶意圖

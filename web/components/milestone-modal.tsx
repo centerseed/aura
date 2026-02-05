@@ -141,8 +141,8 @@ export function MilestoneModal({
       };
 
       const url = editingMilestone?.id
-        ? `/api/milestones/${editingMilestone.id}`
-        : "/api/milestones";
+        ? `${API_BASE_URL}/api/milestones/${editingMilestone.id}`
+        : `${API_BASE_URL}/api/milestones`;
       const method = editingMilestone?.id ? "PUT" : "POST";
 
       const res = await fetch(url, {

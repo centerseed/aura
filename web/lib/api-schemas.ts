@@ -84,9 +84,9 @@ export const ApiSchemas = {
   me: z.object({
     user: z.object({
       id: z.string(),
-      email: z.string(),
+      email: z.string().nullable(),  // 匿名用戶的 email 可能是 null
       displayName: z.string().optional(),
-      name: z.string().optional(),
+      name: z.string().nullable().optional(),  // 也可能是 null
     }).passthrough(),
   }),
 }

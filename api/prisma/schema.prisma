@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
 }
 
 datasource db {
@@ -25,6 +26,8 @@ model User {
   topics               Topic[]
   evaluation_logs      SystemEvaluationLog[]
 
+  @@index([auth_provider_id])
+  @@index([auth_provider, auth_provider_id])
   @@map("users")
 }
 
@@ -151,6 +154,8 @@ model GovernanceProposal {
   status     ProposalStatus
   users      User           @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([user_id])
+  @@index([user_id, status])
   @@map("governance_proposals")
 }
 
@@ -260,5 +265,7 @@ model SystemEvaluationLog {
   @@index([type])
   @@index([user_action])
   @@index([created_at])
+  @@index([user_id, type])
+  @@index([user_id, type, user_action])
   @@map("system_evaluation_logs")
 }

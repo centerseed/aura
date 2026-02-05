@@ -4,6 +4,7 @@ import '../../core/di/providers.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/task.dart';
 import '../../application/use_cases/update_sub_item_use_case.dart';
+import 'dashboard_provider.dart';
 
 // ==================== Cache-Based Task Providers ====================
 // 這些 Providers 直接從 dual cache 獲取資料，支援：
@@ -265,15 +266,21 @@ final taskControllerProvider =
 /// 刷新任務快取的便捷方法
 ///
 /// 用於 RefreshIndicator.onRefresh
+/// 同時刷新 Task Cache 和 Dashboard，確保今日焦點和全視圖都顯示最新資料
 Future<void> refreshTasks(WidgetRef ref) async {
   final repo = ref.read(taskUnifiedRepositoryProvider);
   await repo.refresh();
+  // 同時刷新 Dashboard（用於 OverviewTab）
+  ref.invalidate(dashboardProvider);
 }
 
 /// 靜默刷新任務快取
 ///
 /// 用於變更操作後的背景刷新
+/// 同時刷新 Task Cache 和 Dashboard，確保今日焦點和全視圖都顯示最新資料
 Future<void> silentRefreshTasks(WidgetRef ref) async {
   final repo = ref.read(taskUnifiedRepositoryProvider);
   await repo.silentRefresh();
+  // 同時刷新 Dashboard（用於 OverviewTab）
+  ref.invalidate(dashboardProvider);
 }
