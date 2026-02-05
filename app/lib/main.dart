@@ -83,6 +83,7 @@ class ZentropyApp extends ConsumerWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system,
+      locale: const Locale('zh', 'TW'),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -92,6 +93,15 @@ class ZentropyApp extends ConsumerWidget {
         Locale('zh', 'TW'),
         Locale('en', 'US'),
       ],
+      localeResolutionCallback: (locale, supportedLocales) {
+        for (final supportedLocale in supportedLocales) {
+          if (supportedLocale.languageCode == locale?.languageCode &&
+              supportedLocale.countryCode == locale?.countryCode) {
+            return supportedLocale;
+          }
+        }
+        return const Locale('zh', 'TW');
+      },
       routerConfig: router,
     );
   }
