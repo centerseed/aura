@@ -257,50 +257,55 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final areasAsync = ref.watch(areasProvider);
     final productsAsync = ref.watch(productsProvider);
 
-    return Container(
-      height: screenHeight * 0.8,
-      decoration: const BoxDecoration(
-        color: Color(0xFF161B22),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // 拖曳指示器
-          Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 8),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: screenHeight * 0.8,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF161B22),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 拖曳指示器
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
 
-          // 標籤選擇器
-          _buildAreaSelector(areasAsync),
+            // 標籤選擇器（鍵盤開啟時隱藏以節省空間）
+            if (bottomInset == 0) _buildAreaSelector(areasAsync),
 
-          // Product 選擇器 (當選擇了 Area 時顯示)
-          if (_selectedAreaId != null) _buildProductSelector(productsAsync),
+            // Product 選擇器 (當選擇了 Area 時顯示，鍵盤開啟時隱藏)
+            if (_selectedAreaId != null && bottomInset == 0)
+              _buildProductSelector(productsAsync),
 
-          // 說明文字
-          _buildInstructions(),
+            // 說明文字
+            if (bottomInset == 0) _buildInstructions(),
 
-          // 對話紀錄區域
-          Expanded(
-            child: _buildChatArea(),
-          ),
+            // 對話紀錄區域
+            Expanded(
+              child: _buildChatArea(),
+            ),
 
-          // 輸入區域
-          _buildInputArea(),
-
-          // 安全區域
-          SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
-        ],
+            // 輸入區域
+            _buildInputArea(),
+          ],
+        ),
       ),
     );
   }
