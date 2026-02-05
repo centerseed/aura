@@ -43,6 +43,9 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
+  static const double _maxHeightRatio = 0.8;
+  static const double _keyboardVisibleThreshold = 50.0;
+
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
@@ -258,6 +261,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardVisible = bottomInset > _keyboardVisibleThreshold;
     final areasAsync = ref.watch(areasProvider);
     final productsAsync = ref.watch(productsProvider);
 
@@ -265,7 +269,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: screenHeight * 0.8,
+          maxHeight: screenHeight * _maxHeightRatio,
         ),
         decoration: const BoxDecoration(
           color: Color(0xFF161B22),
@@ -287,22 +291,29 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               ),
             ),
 
-            // 標籤選擇器（鍵盤開啟時隱藏以節省空間）
-            if (bottomInset == 0) _buildAreaSelector(areasAsync),
-
-            // Product 選擇器 (當選擇了 Area 時顯示，鍵盤開啟時隱藏)
-            if (_selectedAreaId != null && bottomInset == 0)
-              _buildProductSelector(productsAsync),
-
-            // 說明文字
-            if (bottomInset == 0) _buildInstructions(),
+            // 標籤選擇器（鍵盤開啟時收合，帶動畫過渡）
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: isKeyboardVisible
+                  ? const SizedBox.shrink()
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildAreaSelector(areasAsync),
+                        if (_selectedAreaId != null)
+                          _buildProductSelector(productsAsync),
+                        _buildInstructions(),
+                      ],
+                    ),
+            ),
 
             // 對話紀錄區域
             Expanded(
               child: _buildChatArea(),
             ),
 
-            // 輸入區域
+            // 輸入區域（已選擇的專案透過 @ badge 持續顯示）
             _buildInputArea(),
           ],
         ),
