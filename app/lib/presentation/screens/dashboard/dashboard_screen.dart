@@ -528,17 +528,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           );
         }
       },
-      // 成功：背景刷新快取
+      // 成功：立即刷新快取確保所有頁面同步
       (_) async {
         // 刷新今日完成列表
         ref.invalidate(completedTodayTasksProvider);
-
-        // 延遲 2 秒後背景刷新快取（避免 30 秒節流問題）
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            silentRefreshTasks(ref);
-          }
-        });
+        // 立即刷新 dashboard 確保全視圖也更新
+        await silentRefreshTasks(ref);
       },
     );
   }
