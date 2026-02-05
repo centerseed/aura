@@ -288,17 +288,35 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     });
 
     final useCase = ref.read(updateTaskDetailsUseCaseProvider);
-    await useCase(UpdateTaskDetailsParams(
+    final result = await useCase(UpdateTaskDetailsParams(
       taskId: widget.task.id,
       status: TaskStatus.archive,
     ));
 
-    // repository 會自動靜默刷新快取
-    HapticFeedback.mediumImpact();
+    result.fold(
+      (failure) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = '完成失敗: ${failure.message}';
+          });
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) setState(() => _errorMessage = null);
+          });
+        }
+      },
+      (_) async {
+        // 刷新 dashboard 確保全視圖也更新
+        await silentRefreshTasks(ref);
+        // 刷新今日完成列表
+        ref.invalidate(completedTodayTasksProvider);
+        HapticFeedback.mediumImpact();
 
-    if (mounted) {
-      Navigator.pop(context);
-    }
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      },
+    );
   }
 
   /// 刪除任務
@@ -352,8 +370,11 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           });
         }
       },
-      (_) {
-        // repository 會自動靜默刷新快取
+      (_) async {
+        // 刷新 dashboard 確保全視圖也更新
+        await silentRefreshTasks(ref);
+        // 刷新今日完成列表
+        ref.invalidate(completedTodayTasksProvider);
         HapticFeedback.mediumImpact();
         if (mounted) {
           Navigator.pop(context);
