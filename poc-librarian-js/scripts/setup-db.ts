@@ -12,6 +12,11 @@ dotenv.config();
 
 const { Client } = pg;
 
+const EXTENSION_SQL = `
+-- 啟用 pgvector（資料庫層級，需要先執行）
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+`;
+
 const SCHEMA_SQL = `
 -- ============================================================================
 -- 🛡️ POC Librarian Schema Setup
@@ -21,10 +26,7 @@ const SCHEMA_SQL = `
 CREATE SCHEMA IF NOT EXISTS poc_librarian;
 
 -- 設定 search_path（後續所有操作只在這個 schema）
-SET search_path TO poc_librarian;
-
--- 啟用 pgvector（如果尚未安裝）
-CREATE EXTENSION IF NOT EXISTS vector;
+SET search_path TO poc_librarian, public;
 
 -- ============================================================================
 -- Corrections 表（用戶修正紀錄）
@@ -38,7 +40,7 @@ CREATE TABLE IF NOT EXISTS corrections (
     user_correction JSONB NOT NULL,
     corrected_field TEXT NOT NULL,
 
-    embedding VECTOR(3072),
+    embedding VECTOR(768),
     processed BOOLEAN DEFAULT FALSE,
     phase_number INT,
 
@@ -60,7 +62,7 @@ CREATE TABLE IF NOT EXISTS rules (
     times_applied INT DEFAULT 0,
     times_correct INT DEFAULT 0,
 
-    embedding VECTOR(3072),
+    embedding VECTOR(768),
     is_active BOOLEAN DEFAULT TRUE,
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -90,7 +92,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
 -- 索引
 -- ============================================================================
 
--- HNSW 向量索引（快速檢索）
+-- HNSW 向量索引（768 維可以使用 HNSW，限制是 2000 維）
 CREATE INDEX IF NOT EXISTS idx_corrections_embedding
     ON corrections USING hnsw (embedding vector_cosine_ops);
 
@@ -130,6 +132,20 @@ async function setupDatabase() {
     // 連線資料庫
     await client.connect();
     console.log('✅ 資料庫連線成功');
+
+    // 先安裝 pgvector extension（資料庫層級）
+    console.log('📦 安裝 pgvector 擴展...');
+    try {
+      await client.query(EXTENSION_SQL);
+      console.log('✅ pgvector 擴展已安裝');
+    } catch (extError: any) {
+      if (extError.code === '42710') {
+        // extension already exists
+        console.log('✅ pgvector 擴展已存在');
+      } else {
+        throw extError;
+      }
+    }
 
     // 執行 schema 建立
     console.log('📦 建立 poc_librarian schema 和表...');

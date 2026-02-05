@@ -151,7 +151,64 @@ poc-librarian-js/
 - **Language**: TypeScript
 - **Database**: PostgreSQL + pgvector
 - **LLM**: Gemini API (@ai-sdk/google)
-- **Clustering**: ml-kmeans (fallback: LLM)
+- **Embedding**: gemini-embedding-001 (768 維，MRL)
+- **Clustering**: ml-kmeans + Silhouette Score (fallback: LLM)
+
+## System 1 + System 2 架構
+
+### System 1: 快思考 (Recall)
+
+- **技術**: pgvector HNSW 向量索引
+- **延遲**: < 200ms
+- **功能**: 檢索相關規則，RAG 增強分類
+
+### System 2: 慢思考 (Reflect)
+
+- **技術**: LLM 蒸餾 + 自適應分群
+- **觸發**: 累積 10 筆修正
+- **功能**: 歸納規則、驗證衝突、合併相似
+
+### 多階段蒸餾流程
+
+```
+Stage 0: 規則老化
+├─ 30 天未使用 → 降權 50%
+└─ 60 天未使用 → 歸檔
+
+Stage 1: 分群
+├─ ml-kmeans (K = sqrt(N/2))
+├─ Silhouette Score 驗證
+└─ Fallback: LLM 語意分群
+
+Stage 2: 蒸餾
+├─ LLM 歸納規則
+├─ 抽象化（非死記）
+└─ 信心度評估
+
+Stage 3: 驗證
+├─ 衝突檢測
+├─ 重複過濾
+└─ 相似合併
+```
+
+### 規則生命週期
+
+| 狀態 | 條件 | 處理 |
+|------|------|------|
+| Active | 30 天內使用 | 正常權重 |
+| Stale | 30-60 天未使用 | 降權 50% |
+| Archived | > 60 天未使用 | 停用 |
+
+### 規則健康分數 (ACT-R 模型)
+
+```
+Score = Accuracy × 0.4 + Frequency × 0.3 + Recency × 0.2 + Age × 0.1
+```
+
+- **Accuracy**: 規則準確率
+- **Frequency**: 使用頻率 (對數衰減)
+- **Recency**: 最近使用 (指數衰減，半衰期 30 天)
+- **Age**: 規則年齡 (越老越穩定)
 
 ## 安全措施
 
@@ -187,6 +244,19 @@ poc-librarian-js/
 |------|------|-----|------|
 | 買 RTX 5090 | 公司資產 ✅ | 個人娛樂 ✅ | ✅ |
 ```
+
+## 未來改進方向
+
+基於學術研究，可選的進階改進：
+
+| 方向 | 說明 | 優先級 |
+|------|------|--------|
+| **P-RLHF** | 輕量級 User Model + LLM 聯合學習 | 中 |
+| **Coactive Learning** | 從隱性行為推斷偏好 | 高 |
+| **Memory Hierarchy** | Episodic/Semantic/Procedural 分層 | 中 |
+| **Neuro-Symbolic** | 符號邏輯驗證規則一致性 | 低 |
+
+詳見: [034_Librarian_Engine_POC_Implementation.md](../docs/02_Plan/034_Librarian_Engine_POC_Implementation.md)
 
 ## License
 

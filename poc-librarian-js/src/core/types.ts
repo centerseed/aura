@@ -226,3 +226,74 @@ export interface LibrarianAdapter {
   recall(query: RecallQuery): Promise<Rule[]>;
   reflect(userId: string): Promise<Rule[]>;
 }
+
+// ============================================================================
+// Rule Lifecycle Types (System 2 Improvements)
+// ============================================================================
+
+/**
+ * 規則老化狀態
+ */
+export type RuleAgeStatus = 'active' | 'stale' | 'archived';
+
+/**
+ * 規則健康度評估
+ */
+export interface RuleHealthScore {
+  ruleId: string;
+  score: number;           // 0-1, 綜合健康分數
+  factors: {
+    accuracy: number;      // 準確率權重
+    frequency: number;     // 使用頻率權重
+    recency: number;       // 最近使用權重
+    age: number;          // 規則年齡權重
+  };
+  recommendation: 'keep' | 'merge' | 'archive' | 'delete';
+}
+
+/**
+ * 規則合併建議
+ */
+export interface RuleMergeCandidate {
+  sourceRule: Rule;
+  targetRule: Rule;
+  similarity: number;
+  reason: string;
+}
+
+/**
+ * 規則驗證結果
+ */
+export interface RuleValidationResult {
+  isValid: boolean;
+  conflicts: RuleConflict[];
+  mergeCandidate?: RuleMergeCandidate;
+}
+
+/**
+ * 規則衝突
+ */
+export interface RuleConflict {
+  existingRule: Rule;
+  newRule: Partial<Rule>;
+  conflictType: 'same_trigger_different_result' | 'subset' | 'overlap';
+  resolution: 'keep_existing' | 'replace' | 'merge' | 'ask_user';
+}
+
+/**
+ * 多階段蒸餾配置
+ */
+export interface MultiStageDistillConfig {
+  stage1_clustering: {
+    minClusterSize: number;
+    silhouetteThreshold: number;
+  };
+  stage2_extraction: {
+    minConfidence: number;
+    maxRulesPerCluster: number;
+  };
+  stage3_validation: {
+    conflictResolution: 'auto' | 'manual';
+    mergeThreshold: number;
+  };
+}

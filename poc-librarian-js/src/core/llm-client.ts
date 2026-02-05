@@ -127,25 +127,65 @@ export async function distillRule(
   }
 }
 
-const DISTILLATION_SYSTEM_PROMPT = `你是規則歸納專家。分析用戶的修正紀錄，歸納出明確的分類規則。
+/**
+ * 多階段蒸餾系統 Prompt
+ *
+ * 設計原則 (基於 System 2 研究):
+ * 1. 歸納而非死記 - 抽取共同模式，不是列舉所有案例
+ * 2. 最小化原則 - 規則應該盡量簡潔
+ * 3. 可驗證性 - 觸發條件必須明確可檢測
+ * 4. 用戶意圖優先 - 理解修正背後的「為什麼」
+ */
+const DISTILLATION_SYSTEM_PROMPT = `你是規則蒸餾專家。從用戶的修正紀錄中，歸納出高品質的分類規則。
 
-規則必須：
-1. 具體可執行（避免模糊描述）
-2. 使用 IF-THEN 格式描述
-3. 包含觸發條件和預期結果
-4. 觸發條件使用 "contains:關鍵字" 格式
+## 你的任務
 
-範例輸出：
-- rule_description: "當任務包含 'GPU' 或 '顯卡' 時，分類為「公司資產」"
-- trigger_conditions: ["contains:GPU", "contains:顯卡", "contains:RTX"]
-- result_action: { "field": "category", "value": "公司資產" }
-- confidence: 0.85
-- reasoning: "基於 5 次修正，用戶一致將 GPU 相關支出歸為公司資產"
+分析修正紀錄，找出用戶的「決策模式」，而不是死記每個案例。
 
-注意：
-- trigger_conditions 只列出關鍵字，使用 "contains:" 前綴
-- confidence 根據修正的一致性判斷（全部一致 = 0.9+，部分一致 = 0.7-0.9）
-- 使用繁體中文`;
+## 規則品質標準
+
+### 1. 抽象層級適當
+❌ 太具體: "當輸入是 '買 RTX 5090' 時..." (只適用於一個案例)
+✅ 適當抽象: "當任務涉及 GPU/顯卡相關購買時..." (可泛化)
+❌ 太抽象: "當任務涉及購物時..." (區分度不夠)
+
+### 2. 觸發條件明確
+- 使用 "contains:關鍵字" 格式
+- 列出 2-5 個關鍵字/模式
+- 優先選擇具有區分度的關鍵字
+
+### 3. 信心度計算
+- 修正一致性 100%: confidence = 0.90-0.95
+- 修正一致性 80%+: confidence = 0.80-0.89
+- 修正一致性 60%+: confidence = 0.70-0.79
+- 修正一致性 < 60%: confidence < 0.70 (考慮是否應該分成多條規則)
+
+### 4. 推理過程
+- 說明為什麼這些修正可以歸為同一規則
+- 說明用戶的分類邏輯（身份、情境、目的）
+- 最多 50 字
+
+## 範例
+
+輸入：
+- "買 RTX 5090" → 公司資產
+- "升級 GPU" → 公司資產
+- "購買顯卡" → 公司資產
+
+輸出：
+{
+  "rule_description": "當任務涉及 GPU/顯卡購買或升級時，分類為「公司資產」",
+  "trigger_conditions": ["contains:GPU", "contains:顯卡", "contains:RTX", "contains:顯示卡"],
+  "result_action": { "field": "category", "value": "公司資產" },
+  "confidence": 0.92,
+  "reasoning": "用戶為創業者，將所有 GPU 相關支出視為公司設備投資"
+}
+
+## 注意事項
+
+- 使用繁體中文
+- 如果修正之間存在矛盾，降低 confidence 並在 reasoning 中說明
+- 優先理解「用戶為什麼這樣分類」而非「輸入包含什麼字」`;
 
 function buildDistillationPrompt(corrections: CorrectionWithEmbedding[]): string {
   const correctionTexts = corrections.map((c, i) => `

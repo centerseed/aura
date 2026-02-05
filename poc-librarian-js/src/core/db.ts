@@ -128,7 +128,7 @@ export async function queryInSchema<T extends pg.QueryResultRow = pg.QueryResult
 
   try {
     // 🛡️ 強制使用 poc_librarian schema
-    await client.query(`SET search_path TO ${ALLOWED_SCHEMA};`);
+    await client.query(`SET search_path TO ${ALLOWED_SCHEMA}, public;`);
     return await client.query<T>(sql, params);
   } finally {
     client.release();
@@ -162,7 +162,7 @@ export async function validateDatabaseSafety(): Promise<void> {
     }
 
     // 設定 search_path
-    await client.query(`SET search_path TO ${ALLOWED_SCHEMA};`);
+    await client.query(`SET search_path TO ${ALLOWED_SCHEMA}, public;`);
 
     // 驗證 search_path
     const schemaCheck = await client.query('SELECT current_schema();');
@@ -191,7 +191,7 @@ export async function withTransaction<T>(
 
   try {
     await client.query('BEGIN');
-    await client.query(`SET search_path TO ${ALLOWED_SCHEMA};`);
+    await client.query(`SET search_path TO ${ALLOWED_SCHEMA}, public;`);
 
     const result = await fn(client);
 

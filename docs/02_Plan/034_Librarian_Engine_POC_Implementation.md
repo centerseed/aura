@@ -607,13 +607,78 @@ npm run poc:report       # 生成報告
 
 ---
 
-## 12. 下一步行動
+## 12. System 2 改進方案研究
+
+### 12.1 學術研究方向
+
+經過文獻調研，以下是 System 2（LLM 蒸餾）的進階改進方向：
+
+#### A. P-RLHF (Personalized RLHF)
+- **核心思想**: 輕量級 User Model + LLM 聯合學習
+- **優點**: 用 User Model 編碼用戶偏好，減少 LLM 呼叫
+- **適用**: 用戶數量多、偏好差異大的場景
+- **參考**: [Personalized Soups: Personalized Large Language Model Alignment via Post-hoc Parameter Merging](https://arxiv.org/abs/2310.11564)
+
+#### B. Coactive Learning (協作學習)
+- **核心思想**: 從用戶的隱性反饋（implicit correction）學習
+- **優點**: 不需要明確的修正，從行為模式推斷偏好
+- **適用**: 用戶懶得修正但有明確行為模式的場景
+- **參考**: Coactive Learning for Interactive Decision Making
+
+#### C. Memory Hierarchy (記憶層級)
+- **核心思想**: 分層記憶架構，類似人腦
+  - **Episodic Memory**: 原始事件（修正紀錄）
+  - **Semantic Memory**: 抽象知識（蒸餾規則）
+  - **Procedural Memory**: 行為習慣（自動化模式）
+- **優點**: 不同層級適用不同檢索策略
+- **適用**: 複雜的長期學習場景
+
+#### D. Continual Learning (持續學習)
+- **核心思想**: 記憶鞏固 + 遺忘機制（ACT-R 模型）
+- **技術**:
+  - **Memory Consolidation**: 重要記憶強化
+  - **Spaced Repetition**: 間隔重複提升保留
+  - **Decay Function**: 使用頻率決定記憶強度
+- **優點**: 防止規則庫無限膨脹
+- **參考**: ACT-R 認知架構
+
+#### E. Neuro-Symbolic (神經符號結合)
+- **核心思想**: LLM 產出 + 符號邏輯驗證
+- **技術**:
+  - **Differentiable ILP**: 可微分歸納邏輯編程
+  - **Logic Verification**: 符號系統驗證規則一致性
+- **優點**: 規則可解釋、可驗證
+- **適用**: 需要高確定性的場景
+
+### 12.2 POC 已實作的改進
+
+| 改進 | 狀態 | 說明 |
+|------|------|------|
+| **規則驗證迴圈** | ✅ | 新規則與現有規則衝突檢測 |
+| **規則合併** | ✅ | 相似規則自動合併 |
+| **使用頻率衰減** | ✅ | 30/60 天未使用降權/歸檔 |
+| **多階段蒸餾** | ✅ | 先歸納、再抽象、最後驗證 |
+| **Silhouette Score** | ✅ | 分群品質驗證 |
+
+### 12.3 未來可選實作
+
+| 改進 | 優先級 | 複雜度 | 說明 |
+|------|--------|--------|------|
+| **P-RLHF User Model** | 中 | 高 | 需要訓練輕量級模型 |
+| **Implicit Feedback** | 高 | 中 | 從用戶行為推斷偏好 |
+| **Memory Decay (ACT-R)** | 中 | 低 | 公式化的遺忘機制 |
+| **Logic Verification** | 低 | 高 | 需要符號系統整合 |
+
+---
+
+## 13. 下一步行動
 
 1. ✅ 確認此計畫書符合需求
-2. 🔲 建立專案骨架
-3. 🔲 實作 Core Components
-4. 🔲 實作 Simulation Runner
-5. 🔲 執行驗證並產出報告
+2. ✅ 建立專案骨架
+3. ✅ 實作 Core Components
+4. ✅ 實作 Simulation Runner
+5. ✅ 執行驗證並產出報告
+6. ✅ 加入 System 2 改進（規則驗證、合併、老化）
 
 ---
 
