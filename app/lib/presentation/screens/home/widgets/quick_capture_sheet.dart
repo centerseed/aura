@@ -43,6 +43,9 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
+  static const double _maxHeightRatio = 0.8;
+  static const double _keyboardVisibleThreshold = 50.0;
+
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
@@ -257,50 +260,63 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardVisible = bottomInset > _keyboardVisibleThreshold;
     final areasAsync = ref.watch(areasProvider);
     final productsAsync = ref.watch(productsProvider);
 
-    return Container(
-      height: screenHeight * 0.8,
-      decoration: const BoxDecoration(
-        color: Color(0xFF161B22),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // 拖曳指示器
-          Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 8),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: screenHeight * _maxHeightRatio,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF161B22),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 拖曳指示器
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
 
-          // 標籤選擇器
-          _buildAreaSelector(areasAsync),
+            // 標籤選擇器（鍵盤開啟時收合，帶動畫過渡）
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: isKeyboardVisible
+                  ? const SizedBox.shrink()
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildAreaSelector(areasAsync),
+                        if (_selectedAreaId != null)
+                          _buildProductSelector(productsAsync),
+                        _buildInstructions(),
+                      ],
+                    ),
+            ),
 
-          // Product 選擇器 (當選擇了 Area 時顯示)
-          if (_selectedAreaId != null) _buildProductSelector(productsAsync),
+            // 對話紀錄區域
+            Expanded(
+              child: _buildChatArea(),
+            ),
 
-          // 說明文字
-          _buildInstructions(),
-
-          // 對話紀錄區域
-          Expanded(
-            child: _buildChatArea(),
-          ),
-
-          // 輸入區域
-          _buildInputArea(),
-
-          // 安全區域
-          SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
-        ],
+            // 輸入區域（已選擇的專案透過 @ badge 持續顯示）
+            _buildInputArea(),
+          ],
+        ),
       ),
     );
   }
