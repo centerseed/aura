@@ -191,6 +191,32 @@ export async function deleteAPI<T = any>(endpoint: string): Promise<T> {
  * 便利的 API 端點集合（加入 Runtime Validation）
  */
 export const API = {
+  // Dashboard - 統一資料載入（解決 HTTP/1.1 序列化問題）
+  // 在 API 層使用 Promise.all 並發查詢，前端只需一次 HTTP 請求
+  dashboard: async (params?: {
+    include?: string
+    include_archived?: boolean
+    tasks_status?: string
+  }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.include) queryParams.set('include', params.include)
+    if (params?.include_archived) queryParams.set('include_archived', 'true')
+    if (params?.tasks_status) queryParams.set('tasks_status', params.tasks_status)
+
+    const queryString = queryParams.toString()
+    const endpoint = '/api/dashboard' + (queryString ? `?${queryString}` : '')
+    const response = await fetchWithAuth(endpoint, { method: 'GET' })
+    return handleResponse(response) as Promise<{
+      user?: any
+      library?: { areas: any[] }
+      milestones?: any[]
+      completedToday?: { tasks: any[]; meta: any }
+      areas?: any[]
+      products?: any[]
+      tasks?: { tasks: any[]; meta: any }
+    }>
+  },
+
   // 用戶
   // ⚠️ 注意: getAPI 已在 handleResponse 中自動解包 data
   // 所以這裡的型別是 data 內部的結構，不是完整的 API 回應

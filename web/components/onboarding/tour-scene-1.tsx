@@ -58,21 +58,21 @@ export function TourScene1({ userAreas }: Props) {
             </div>
           </div>
 
-          {/* Product 層 */}
+          {/* Project 層 */}
           <div className="mb-5 ml-8">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/50">
                 <Package className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <h4 className="text-base font-bold text-white">Product (資產)</h4>
+                <h4 className="text-base font-bold text-white">Project (專案)</h4>
                 <p className="text-xs text-white/70">在做什麼？</p>
               </div>
             </div>
             <div className="ml-13 space-y-2">
-              {["Mobile App", "健康計畫", "投資組合"].slice(0, userAreas.length).map((product, i) => (
+              {["Mobile App", "健康計畫", "投資組合"].slice(0, userAreas.length).map((project, i) => (
                 <div key={i} className="text-sm text-white/90 pl-3 border-l-2 border-blue-400/60 font-medium">
-                  {product}
+                  {project}
                 </div>
               ))}
             </div>
@@ -85,7 +85,7 @@ export function TourScene1({ userAreas }: Props) {
                 <Tag className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h5 className="text-base font-bold text-white">Topic (性質)</h5>
+                <h5 className="text-base font-bold text-white">Topic (主題)</h5>
                 <p className="text-xs text-white/70">怎麼做？</p>
               </div>
             </div>
@@ -113,7 +113,7 @@ export function TourScene1({ userAreas }: Props) {
         <p className="text-white text-center text-base leading-relaxed font-medium">
           <span className="text-indigo-200 font-bold text-lg">AI 會自動將你的想法分類</span>
           <br />
-          <span className="text-white/90">到對應的身份、資產和工作性質</span>
+          <span className="text-white/90">到對應的身份、專案和主題</span>
         </p>
       </div>
     </div>

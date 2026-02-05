@@ -76,17 +76,14 @@ export function useDashboardData() {
    */
   const refreshData = useCallback(async () => {
     try {
-      // 並行載入 library 和 milestones (API 回傳格式: { areas: [...] }, { milestones: [...] })
-      const [libraryData, milestonesData] = await Promise.all([
-        API.library(),
-        API.milestones.list(),
-      ])
+      // 🚀 使用統一的 Dashboard API 重新載入（不含 user，因為 user 不會變）
+      const dashboardData = await API.dashboard({
+        include: 'library,milestones,completedToday',
+      })
 
-      setAreas(Array.isArray(libraryData?.areas) ? libraryData.areas : [])
-      setMilestones(Array.isArray(milestonesData?.milestones) ? milestonesData.milestones : [])
-
-      // 重新載入今日完成
-      loadCompletedToday()
+      setAreas(Array.isArray(dashboardData.library?.areas) ? dashboardData.library.areas : [])
+      setMilestones(dashboardData.milestones || [])
+      setCompletedTodayTasks(dashboardData.completedToday?.tasks || [])
 
       // 重置已歸檔狀態以便下次載入
       setArchivedLoaded(false)
@@ -94,7 +91,7 @@ export function useDashboardData() {
       console.error('Failed to refresh data:', err)
       setError(err instanceof Error ? err.message : '刷新資料失敗')
     }
-  }, [loadCompletedToday])
+  }, [])
 
   /**
    * 初始載入用戶資料
@@ -112,20 +109,24 @@ export function useDashboardData() {
           }
 
           try {
-            // 獲取用戶資料 (API 回傳格式: { user: { id, email, displayName, ... } })
-            const meResult = await API.users.me()
-            const user = meResult.user
+            // 🚀 使用統一的 Dashboard API（單一 HTTP 請求，解決 Cloud Run 序列化問題）
+            const dashboardData = await API.dashboard()
 
-            setUserId(user.id)
-            setUserName(user.displayName || user.name || user.email || 'User')
+            // 設定用戶資料
+            const user = dashboardData.user
+            if (user) {
+              setUserId(user.id)
+              setUserName(user.displayName || user.name || user.email || 'User')
+            }
 
-            // 獲取 Library (API 回傳格式: { areas: [...] })
-            const libraryData = await API.library()
-            setAreas(Array.isArray(libraryData?.areas) ? libraryData.areas : [])
+            // 設定 Library
+            setAreas(Array.isArray(dashboardData.library?.areas) ? dashboardData.library.areas : [])
 
-            // 獲取 Milestones (API 回傳格式: { milestones: [...] })
-            const milestonesData = await API.milestones.list()
-            setMilestones(milestonesData.milestones || [])
+            // 設定 Milestones
+            setMilestones(dashboardData.milestones || [])
+
+            // 設定今日完成任務
+            setCompletedTodayTasks(dashboardData.completedToday?.tasks || [])
           } catch (err) {
             setError(err instanceof Error ? err.message : '載入失敗')
           } finally {
@@ -143,12 +144,7 @@ export function useDashboardData() {
     loadData()
   }, [router])
 
-  // 初始載入今日完成任務
-  useEffect(() => {
-    if (userId) {
-      loadCompletedToday()
-    }
-  }, [userId, loadCompletedToday])
+  // 初始載入今日完成任務已移至主要載入流程中並行執行
 
   /**
    * 計算統計數據

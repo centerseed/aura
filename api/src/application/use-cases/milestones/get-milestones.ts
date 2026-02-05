@@ -3,6 +3,8 @@
  *
  * Application Layer Use Case
  * 處理獲取用戶所有里程碑的業務邏輯,包括多態關聯處理
+ *
+ * 🚀 優化：使用單一 JOIN 查詢取代批次查詢，減少網路往返次數
  */
 
 import { prisma } from '@/lib/db'
@@ -42,6 +44,28 @@ export interface GetMilestonesResponse {
 // Use Case
 // ============================================================================
 
+// Raw SQL 查詢結果的型別
+interface RawMilestoneRow {
+  milestone_id: string
+  milestone_user_id: string
+  milestone_name: string
+  milestone_target_date: Date
+  milestone_entity_type: string
+  milestone_entity_id: string
+  milestone_priority: number
+  milestone_description: string | null
+  milestone_status: string
+  milestone_created_at: Date
+  milestone_updated_at: Date
+  milestone_deleted_at: Date | null
+  product_id: string | null
+  product_name: string | null
+  area_id: string | null
+  area_name: string | null
+  topic_id: string | null
+  topic_name: string | null
+}
+
 export class GetMilestonesUseCase {
   async execute(
     request: GetMilestonesRequest
@@ -49,76 +73,75 @@ export class GetMilestonesUseCase {
     // 1. 驗證輸入
     this.validateRequest(request)
 
-    // 2. 查詢所有未刪除的里程碑
-    const milestones = await prisma.milestone.findMany({
-      where: {
-        user_id: request.userId,
-        deleted_at: null,
-      },
-      orderBy: {
-        target_date: 'asc',
-      },
-    })
+    // 2. 🚀 使用單一 JOIN 查詢，一次載入所有資料
+    const rawRows = await prisma.$queryRaw<RawMilestoneRow[]>`
+      SELECT
+        m.id::text as milestone_id,
+        m.user_id::text as milestone_user_id,
+        m.name as milestone_name,
+        m.target_date as milestone_target_date,
+        m.entity_type::text as milestone_entity_type,
+        m.entity_id as milestone_entity_id,
+        m.priority as milestone_priority,
+        m.description as milestone_description,
+        m.status as milestone_status,
+        m.created_at as milestone_created_at,
+        m.updated_at as milestone_updated_at,
+        m.deleted_at as milestone_deleted_at,
+        p.id::text as product_id,
+        p.name as product_name,
+        a.id::text as area_id,
+        a.name as area_name,
+        t.id::text as topic_id,
+        t.name as topic_name
+      FROM milestones m
+      LEFT JOIN products p ON m.entity_type = 'PRODUCT' AND m.entity_id::uuid = p.id
+      LEFT JOIN areas a ON m.entity_type = 'AREA' AND m.entity_id::uuid = a.id
+      LEFT JOIN topics t ON m.entity_type = 'TOPIC' AND m.entity_id::uuid = t.id
+      WHERE m.user_id = ${request.userId}::uuid
+        AND m.deleted_at IS NULL
+      ORDER BY m.target_date ASC
+    `
 
-    // 3. 手動處理多態關聯 - 根據 entity_type 批次查詢關聯實體
-    const productIds = milestones
-      .filter((m) => m.entity_type === 'PRODUCT')
-      .map((m) => m.entity_id)
-    const areaIds = milestones
-      .filter((m) => m.entity_type === 'AREA')
-      .map((m) => m.entity_id)
-    const topicIds = milestones
-      .filter((m) => m.entity_type === 'TOPIC')
-      .map((m) => m.entity_id)
-
-    // 4. 批次查詢所有關聯實體 (性能優化)
-    const [products, areas, topics] = await Promise.all([
-      productIds.length > 0
-        ? prisma.product.findMany({
-            where: { id: { in: productIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      areaIds.length > 0
-        ? prisma.area.findMany({
-            where: { id: { in: areaIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      topicIds.length > 0
-        ? prisma.topic.findMany({
-            where: { id: { in: topicIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-    ])
-
-    // 5. 建立 ID -> Entity 的 Map 以便快速查找
-    const productMap = new Map(products.map((p) => [p.id, p]) as any)
-    const areaMap = new Map(areas.map((a) => [a.id, a]) as any)
-    const topicMap = new Map(topics.map((t) => [t.id, t]) as any)
-
-    // 6. 組合最終結果
-    const milestonesWithEntities = milestones.map((milestone) => {
-      let entity = null
-      if (milestone.entity_type === 'PRODUCT') {
-        entity = productMap.get(milestone.entity_id) || null
-      } else if (milestone.entity_type === 'AREA') {
-        entity = areaMap.get(milestone.entity_id) || null
-      } else if (milestone.entity_type === 'TOPIC') {
-        entity = topicMap.get(milestone.entity_id) || null
-      }
-
-      return {
-        ...milestone,
-        product: milestone.entity_type === 'PRODUCT' ? entity : null,
-        area: milestone.entity_type === 'AREA' ? entity : null,
-        topic: milestone.entity_type === 'TOPIC' ? entity : null,
-      } as MilestoneWithEntity
-    })
+    // 3. 轉換為 Domain 格式
+    const milestonesWithEntities = rawRows.map((row) =>
+      this.transformToMilestone(row)
+    )
 
     return {
       milestones: milestonesWithEntities,
+    }
+  }
+
+  /**
+   * 將 Raw SQL 結果轉換為 MilestoneWithEntity 格式
+   */
+  private transformToMilestone(row: RawMilestoneRow): MilestoneWithEntity {
+    return {
+      id: row.milestone_id,
+      user_id: row.milestone_user_id,
+      name: row.milestone_name,
+      target_date: row.milestone_target_date,
+      entity_type: row.milestone_entity_type as 'AREA' | 'PRODUCT' | 'TOPIC',
+      entity_id: row.milestone_entity_id,
+      priority: row.milestone_priority,
+      description: row.milestone_description,
+      status: row.milestone_status,
+      created_at: row.milestone_created_at,
+      updated_at: row.milestone_updated_at,
+      deleted_at: row.milestone_deleted_at,
+      product:
+        row.milestone_entity_type === 'PRODUCT' && row.product_id
+          ? { id: row.product_id, name: row.product_name! }
+          : null,
+      area:
+        row.milestone_entity_type === 'AREA' && row.area_id
+          ? { id: row.area_id, name: row.area_name! }
+          : null,
+      topic:
+        row.milestone_entity_type === 'TOPIC' && row.topic_id
+          ? { id: row.topic_id, name: row.topic_name! }
+          : null,
     }
   }
 

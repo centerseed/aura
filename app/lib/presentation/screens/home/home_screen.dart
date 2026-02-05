@@ -5,6 +5,8 @@ import 'tabs/today_focus_tab.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/load_view_tab.dart';
 import 'widgets/quick_capture_sheet.dart';
+import 'widgets/tutorial_overlay.dart';
+import '../../providers/first_time_tutorial_provider.dart';
 
 /// 主頁面 - 包含三個分頁
 class HomeScreen extends ConsumerStatefulWidget {
@@ -24,10 +26,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // 檢查是否需要顯示首次使用引導
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTutorial();
+    });
+  }
+
+  Future<void> _checkAndShowTutorial() async {
+    final hasCompleted = await ref.read(hasCompletedTutorialProvider.future);
+    if (!hasCompleted && mounted) {
+      // 顯示引導
+      ref.read(showTutorialProvider.notifier).state = true;
+      ref.read(tutorialStepProvider.notifier).state =
+          TutorialStep.welcome.index;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1117), // GitHub dark
-      body: IndexedStack(
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFF0D1117), // GitHub dark
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF0D1117),
+            elevation: 0,
+            actions: [
+              // 開發者工具 - 重置引導
+              IconButton(
+                icon: Icon(
+                  Icons.refresh,
+                  color: Colors.white.withValues(alpha: 0.5),
+                ),
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+
+                  await resetTutorial();
+                  if (mounted) {
+                    ref.read(showTutorialProvider.notifier).state = true;
+                    ref.read(tutorialStepProvider.notifier).state =
+                        TutorialStep.welcome.index;
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('引導已重置')),
+                    );
+                  }
+                },
+                tooltip: '重置引導 (開發工具)',
+              ),
+            ],
+          ),
+          body: IndexedStack(
         index: _currentIndex,
         children: _tabs,
       ),
@@ -76,6 +126,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         elevation: 4,
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
+        ),
+
+        // 首次使用引導 Overlay
+        const TutorialOverlay(),
+      ],
     );
   }
 

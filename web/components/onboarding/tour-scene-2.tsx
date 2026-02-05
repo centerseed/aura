@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Target, Calendar, Zap } from "lucide-react";
+import { Calendar, Anchor, Sparkles, Lightbulb } from "lucide-react";
 
-interface Props {
-  userAreas: string[];
-}
-
-export function TourScene2({ userAreas }: Props) {
+export function TourScene2() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -15,97 +11,88 @@ export function TourScene2({ userAreas }: Props) {
     return () => clearTimeout(timer);
   }, []);
 
-  const milestones = [
-    {
-      id: 1,
-      area: userAreas[0] || "事業",
-      name: "MVP Release",
-      date: "2026-03-01",
-      daysAway: 36,
-      color: "from-blue-500 to-blue-600",
-      icon: "🎯",
-    },
-    {
-      id: 2,
-      area: userAreas[1] || "個人",
-      name: "達成目標體重",
-      date: "2026-06-01",
-      daysAway: 128,
-      color: "from-green-500 to-emerald-600",
-      icon: "🏃",
-    },
-    {
-      id: 3,
-      area: userAreas[0] || "事業",
-      name: "正式上線",
-      date: "2026-04-01",
-      daysAway: 67,
-      color: "from-indigo-500 to-emerald-600",
-      icon: "🚀",
-    },
-  ];
-
-  const sortedMilestones = [...milestones].sort((a, b) => a.daysAway - b.daysAway);
-
   return (
     <div className="space-y-12 max-w-3xl mx-auto">
-      {/* 標題區域 - 統一風格 */}
+      {/* 標題區域 */}
       <div className="text-center space-y-3 animate-in fade-in duration-500">
         <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-[0_2px_20px_rgba(168,85,247,0.4)]">
-          為重要的事設定里程碑
+          什麼是里程碑？
         </h1>
         <p className="text-lg text-white/90 max-w-xl mx-auto font-medium">
-          Milestone 是你的時間錨點
+          里程碑是你為重要目標設定的截止日期
         </p>
       </div>
 
-      {/* 時間軸視覺化 - 簡化高對比版 */}
+      {/* 三個重點說明 */}
       <div
-        className={`transition-all duration-500 ${
+        className={`space-y-6 transition-all duration-500 ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         }`}
       >
-        <div className="p-8 rounded-3xl bg-slate-900/80 backdrop-blur-xl border-2 border-white/20 shadow-2xl">
-          {/* 時間軸 */}
-          <div className="relative h-24 mb-8">
-            <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500/40 via-indigo-500/40 to-emerald-500/40 rounded-full shadow-lg" />
+        {/* 重點 1 */}
+        <div className="flex gap-4 items-start">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-500/20 border-2 border-indigo-400/40 flex items-center justify-center">
+            <span className="text-indigo-400 text-xl font-bold">1</span>
+          </div>
+          <div className="flex-1 pt-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="w-5 h-5 text-indigo-400" />
+              <h3 className="text-white text-xl font-semibold">你需要自己設定里程碑</h3>
+            </div>
+            <p className="text-white/70 text-base">為重要的事情設定明確的完成日期</p>
+          </div>
+        </div>
 
-            {sortedMilestones.map((milestone, i) => {
-              const position = (milestone.daysAway / 150) * 100;
-              return (
-                <div
-                  key={milestone.id}
-                  className="absolute top-1/2 -translate-y-1/2"
-                  style={{ left: `${Math.min(position, 92)}%` }}
-                >
-                  <div className="flex flex-col items-center -translate-x-1/2">
-                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${milestone.color} flex items-center justify-center text-lg shadow-xl shadow-indigo-500/50 border-2 border-white/30`}>
-                      {milestone.icon}
-                    </div>
-                    <div className="mt-3 bg-slate-800/90 border border-white/30 rounded-lg px-3 py-2 text-center whitespace-nowrap backdrop-blur-sm shadow-xl">
-                      <p className="font-bold text-white text-sm">{milestone.name}</p>
-                      <p className="text-white/70 text-xs">{milestone.daysAway} 天後</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        {/* 重點 2 */}
+        <div className="flex gap-4 items-start">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-violet-500/20 border-2 border-violet-400/40 flex items-center justify-center">
+            <span className="text-violet-400 text-xl font-bold">2</span>
+          </div>
+          <div className="flex-1 pt-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Anchor className="w-5 h-5 text-violet-400" />
+              <h3 className="text-white text-xl font-semibold">里程碑是時間錨點</h3>
+            </div>
+            <p className="text-white/70 text-base">讓系統知道什麼時候必須完成</p>
+          </div>
+        </div>
+
+        {/* 重點 3 */}
+        <div className="flex gap-4 items-start">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-emerald-500/20 border-2 border-emerald-400/40 flex items-center justify-center">
+            <span className="text-emerald-400 text-xl font-bold">3</span>
+          </div>
+          <div className="flex-1 pt-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-white text-xl font-semibold">AI 會自動安排任務</h3>
+            </div>
+            <p className="text-white/70 text-base">根據你的里程碑倒推任務時間</p>
           </div>
         </div>
       </div>
 
-      {/* 核心說明 - 簡化版 */}
+      {/* 範例說明 */}
       <div
-        className={`p-6 rounded-2xl bg-gradient-to-r from-indigo-600/30 to-violet-600/30 border-2 border-indigo-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
+        className={`p-6 rounded-2xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 border-2 border-amber-500/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         }`}
         style={{ transitionDelay: "300ms" }}
       >
-        <p className="text-white text-center text-lg leading-relaxed font-medium">
-          <span className="text-indigo-200 font-bold text-xl">設定 Milestone 後</span>
-          <br />
-          <span className="text-white/90">AI 會根據時間點自動推斷任務完成日期</span>
-        </p>
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+            <Lightbulb className="w-6 h-6 text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-amber-400 text-xl font-bold mb-3">舉例</h3>
+            <p className="text-white/90 text-base leading-relaxed">
+              你設定：「3 月 1 日要完成 MVP Release」
+              <br />
+              <br />
+              AI 會自動：為相關任務安排合適的完成時間，確保在 3 月 1 日前都能完成
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -67,6 +67,10 @@ export class CreateTaskUseCase {
       dueDate: request.dueDate ? new Date(request.dueDate) : null,
       timeConfidence: request.timeConfidence || null,
       inferredFromMilestone: request.inferredFromMilestone || null,
+      remindAt: null,
+      reminderEnabled: false,
+      reminderTimezone: null,
+      notificationId: null,
     }
 
     // 4. 業務規則驗證
@@ -83,23 +87,20 @@ export class CreateTaskUseCase {
 
   /**
    * 檢查是否已存在相同標題的任務（最近 24 小時內）
+   * 🚀 優化：直接在 DB 層用 content 過濾，避免載入所有任務
    */
   private async checkDuplicates(request: CreateTaskRequest): Promise<void> {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-    // 使用 findMany 查詢最近的任務
+    // 直接用 content 和 createdAtFrom 過濾，只查詢重複的
     const existingTasks = await this.taskRepository.findMany({
       userId: request.userId,
-      updatedAtFrom: twentyFourHoursAgo,
+      content: request.content.trim(),
+      createdAtFrom: twentyFourHoursAgo,
       includeDeleted: false,
     })
 
-    // 檢查是否有相同內容的任務
-    const duplicateTask = existingTasks.find(
-      task => task.content.trim() === request.content.trim()
-    )
-
-    if (duplicateTask) {
+    if (existingTasks.length > 0) {
       throw new ValidationException(
         `已存在相同標題的任務: "${request.content.trim()}"`,
         'content'

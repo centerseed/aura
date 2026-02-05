@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/db'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
+import { ensureProductEmbedding } from '@/lib/embedding'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -96,6 +97,21 @@ export class UpdateProductUseCase {
         lifecycle: request.lifecycle as any,
       },
     })
+
+    // 5. 如果 name 或 description 變更，重新計算 embedding
+    const nameChanged = request.name !== undefined && request.name !== existing.name
+    const descChanged = request.description !== undefined && request.description !== existing.description
+
+    if (nameChanged || descChanged) {
+      ensureProductEmbedding(
+        updated.id,
+        updated.name,
+        updated.description,
+        true  // force=true 強制重算
+      ).catch(err => {
+        console.error(`❌ [embedding] Failed to update embedding for Product ${updated.name}:`, err)
+      })
+    }
 
     return {
       product: updated,

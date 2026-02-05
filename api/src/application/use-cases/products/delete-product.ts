@@ -33,18 +33,23 @@ export class DeleteProductUseCase {
     // 1. 驗證輸入
     this.validateRequest(request)
 
-    // 2. 檢查 product 是否存在且屬於當前用戶
+    // 2. 檢查 product 是否存在且屬於當前用戶，使用 _count 避免載入完整 tasks 記錄
     const existing = await prisma.product.findFirst({
       where: {
         id: request.productId,
         user_id: request.userId,
         deleted_at: null,
       },
-      include: {
-        tasks: {
-          where: {
-            deleted_at: null,
-            status: { not: 'ARCHIVE' }, // 只檢查未歸檔的 tasks
+      select: {
+        id: true,
+        _count: {
+          select: {
+            tasks: {
+              where: {
+                deleted_at: null,
+                status: { not: 'ARCHIVE' }, // 只計算未歸檔的 tasks
+              },
+            },
           },
         },
       },
@@ -55,9 +60,9 @@ export class DeleteProductUseCase {
     }
 
     // 3. 檢查是否有關聯的未完成 Tasks
-    if (existing.tasks.length > 0) {
+    if (existing._count.tasks > 0) {
       throw new ConflictException(
-        `無法刪除此專案，因為還有 ${existing.tasks.length} 個進行中的任務。請先完成、刪除或移動這些任務。`
+        `無法刪除此專案，因為還有 ${existing._count.tasks} 個進行中的任務。請先完成、刪除或移動這些任務。`
       )
     }
 

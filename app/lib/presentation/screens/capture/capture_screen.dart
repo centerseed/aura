@@ -67,12 +67,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         (brainDumpResult) {
           if (mounted) {
             _textController.clear();
-            // repository 會自動靜默刷新快取
             // Dismiss keyboard
             FocusScope.of(context).unfocus();
+            // 刷新任務列表
+            silentRefreshTasks(ref);
 
             // Show results sheet
-            _showBrainDumpResults(brainDumpResult.items);
+            _showBrainDumpResults(brainDumpResult);
           }
         },
       );
@@ -85,7 +86,15 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     }
   }
 
-  void _showBrainDumpResults(List<BrainDumpResultItem> items) {
+  void _showBrainDumpResults(BrainDumpResult result) {
+    // 處理追加 sub-item 的情況
+    if (result.isAppendSubItem && result.appendInfo != null) {
+      _showAppendSubItemResult(result.appendInfo!);
+      return;
+    }
+
+    // 處理創建新任務的情況
+    final items = result.items;
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1c1c1e),
@@ -146,98 +155,112 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = items[index];
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                      return GestureDetector(
+                        onTap: () {
+                          // 根據 id 從 task list 中找到對應的 task
+                          final taskState = ref.read(activeTasksProvider);
+                          if (taskState.tasks != null) {
+                            final task = taskState.tasks!.firstWhere(
+                              (t) => t.id == item.id,
+                              orElse: () => entity.Task(
+                                id: item.id,
+                                content: item.title,
+                                status: entity.TaskStatus.active,
+                                areaName: item.areaName,
+                                productName: item.productName,
+                                topicName: item.topicName,
+                                dueDate: item.dueDate,
                               ),
+                            );
+                            // 關閉結果 sheet
+                            Navigator.pop(context);
+                            // 打開編輯 sheet
+                            showModalBottomSheet(
+                              context: this.context,
+                              backgroundColor: Colors.transparent,
+                              isScrollControlled: true,
+                              builder: (ctx) => Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                                ),
+                                child: TaskEditBottomSheet(task: task),
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
                             ),
-                            if (item.narrative.isNotEmpty &&
-                                item.narrative != item.title) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                item.narrative,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6),
-                                  fontSize: 13,
-                                ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.title,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  // 編輯圖示提示
+                                  Icon(
+                                    Icons.edit_outlined,
+                                    size: 16,
+                                    color: Colors.white.withOpacity(0.3),
+                                  ),
+                                ],
                               ),
-                            ],
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                // Area/Product Tag
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(
-                                      0xFF6C63FF,
-                                    ).withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.folder_outlined,
-                                        size: 12,
-                                        color: const Color(0xFF8B85FF),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${item.areaName} / ${item.productName}',
-                                        style: const TextStyle(
-                                          color: Color(0xFF8B85FF),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
+                              if (item.narrative.isNotEmpty &&
+                                  item.narrative != item.title) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.narrative,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 13,
                                   ),
                                 ),
-                                // Due Date Tag
-                                if (item.dueDate != null)
+                              ],
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  // Area/Product Tag
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.2),
+                                      color: const Color(
+                                        0xFF6C63FF,
+                                      ).withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.calendar_today_outlined,
+                                          Icons.folder_outlined,
                                           size: 12,
-                                          color: Colors.orange[300],
+                                          color: const Color(0xFF8B85FF),
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          "${item.dueDate!.month}/${item.dueDate!.day}",
-                                          style: TextStyle(
-                                            color: Colors.orange[300],
+                                          '${item.areaName} / ${item.productName}',
+                                          style: const TextStyle(
+                                            color: Color(0xFF8B85FF),
                                             fontSize: 11,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -245,9 +268,41 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                       ],
                                     ),
                                   ),
-                              ],
-                            ),
-                          ],
+                                  // Due Date Tag
+                                  if (item.dueDate != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_today_outlined,
+                                            size: 12,
+                                            color: Colors.orange[300],
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "${item.dueDate!.month}/${item.dueDate!.day}",
+                                            style: TextStyle(
+                                              color: Colors.orange[300],
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -270,6 +325,140 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  /// 顯示追加 sub-item 的結果
+  void _showAppendSubItemResult(AppendSubItemInfo info) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1c1c1e),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[600],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // 標題
+              Row(
+                children: [
+                  const Icon(Icons.playlist_add, color: Color(0xFF10B981), size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    '已追加到既有任務',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // 目標任務
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      info.targetTaskContent,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C63FF).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        info.targetProductName,
+                        style: const TextStyle(
+                          color: Color(0xFF8B85FF),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // 新增的項目
+              Text(
+                '新增的待辦項目：',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...info.appendedItems.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline,
+                      size: 16,
+                      color: const Color(0xFF10B981),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 20),
+              // 完成按鈕
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF6C63FF),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text('完成'),
+                ),
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom),
+            ],
+          ),
         );
       },
     );

@@ -1,29 +1,143 @@
 /**
  * Embedding 工具模組
  *
- * 提供語意向量計算與相似度比對功能，用於兩階段檢索優化
- *
- * 使用 gemini-embedding-001 模型（取代 text-embedding-004）
- * - 支援 100+ 種語言，包括繁體中文、簡體中文、日文等
- * - 輸出 3072 維向量
- * - 修復了 text-embedding-004 對中文/日文返回相同向量的 bug
+ * 使用 Gemini Embedding API (gemini-embedding-001):
+ * - 維度: 768 (透過 MRL 從 3072 縮減)
+ * - 延遲: ~100-200ms (API 呼叫)
+ * - 支援 100+ 語言
+ * - 無需本地模型載入，零冷啟動
  */
 
-import { google } from "@ai-sdk/google";
-import { embed, embedMany } from "ai";
+import { prisma } from "./db";
 
-// Embedding 模型配置
-const EMBEDDING_MODEL = "gemini-embedding-001";
+// ============================================================================
+// 配置
+// ============================================================================
+
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
+const EMBEDDING_DIM = 768;
+
+// API 端點
+const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+
+// ============================================================================
+// Gemini Embedding API
+// ============================================================================
+
+interface GeminiEmbeddingResponse {
+  embedding: {
+    values: number[];
+  };
+}
+
+interface GeminiBatchEmbeddingResponse {
+  embeddings: Array<{
+    values: number[];
+  }>;
+}
+
+/**
+ * 呼叫 Gemini Embedding API
+ */
+async function callGeminiEmbedding(text: string): Promise<number[]> {
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
+  }
+
+  const url = `${GEMINI_API_BASE}/models/${GEMINI_EMBEDDING_MODEL}:embedContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: `models/${GEMINI_EMBEDDING_MODEL}`,
+      content: {
+        parts: [{ text }],
+      },
+      outputDimensionality: EMBEDDING_DIM,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini Embedding API error: ${response.status} - ${error}`);
+  }
+
+  const data = (await response.json()) as GeminiEmbeddingResponse;
+  return data.embedding.values;
+}
+
+/**
+ * 批次呼叫 Gemini Embedding API
+ */
+async function callGeminiBatchEmbedding(texts: string[]): Promise<number[][]> {
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
+  }
+
+  const url = `${GEMINI_API_BASE}/models/${GEMINI_EMBEDDING_MODEL}:batchEmbedContents?key=${apiKey}`;
+
+  const requests = texts.map((text) => ({
+    model: `models/${GEMINI_EMBEDDING_MODEL}`,
+    content: {
+      parts: [{ text }],
+    },
+    outputDimensionality: EMBEDDING_DIM,
+  }));
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ requests }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini Batch Embedding API error: ${response.status} - ${error}`);
+  }
+
+  const data = (await response.json()) as GeminiBatchEmbeddingResponse;
+  return data.embeddings.map((e) => e.values);
+}
+
+// ============================================================================
+// 公開 API（保持與舊版相同的介面）
+// ============================================================================
+
+/**
+ * 預熱（Gemini API 版本不需要，但保留介面相容性）
+ */
+export async function warmupModel(): Promise<void> {
+  console.log("🔥 [embedding] Gemini API mode - no warmup needed");
+}
+
+/**
+ * 檢查是否就緒（Gemini API 總是就緒）
+ */
+export function isModelReady(): boolean {
+  return true;
+}
+
+/**
+ * 取得 embedding 維度
+ */
+export function getEmbeddingDimension(): number {
+  return EMBEDDING_DIM;
+}
 
 /**
  * 計算單一文本的 Embedding 向量
  */
 export async function getEmbedding(text: string): Promise<number[]> {
-  const { embedding } = await embed({
-    model: google.textEmbeddingModel(EMBEDDING_MODEL),
-    value: text,
-  });
-
+  const startTime = Date.now();
+  const embedding = await callGeminiEmbedding(text);
+  console.log(`⏱️ [embedding] getEmbedding: ${Date.now() - startTime}ms`);
   return embedding;
 }
 
@@ -31,11 +145,15 @@ export async function getEmbedding(text: string): Promise<number[]> {
  * 批次計算多個文本的 Embedding 向量
  */
 export async function batchGetEmbeddings(texts: string[]): Promise<number[][]> {
-  const { embeddings } = await embedMany({
-    model: google.textEmbeddingModel(EMBEDDING_MODEL),
-    values: texts,
-  });
+  if (texts.length === 0) return [];
+  if (texts.length === 1) {
+    const embedding = await getEmbedding(texts[0]);
+    return [embedding];
+  }
 
+  const startTime = Date.now();
+  const embeddings = await callGeminiBatchEmbedding(texts);
+  console.log(`⏱️ [embedding] batchGetEmbeddings (${texts.length} texts): ${Date.now() - startTime}ms`);
   return embeddings;
 }
 
@@ -81,16 +199,11 @@ export interface ProductSimilarity {
  */
 export interface TaskInfo {
   content: string;
-  subItems?: string[];  // sub_items 的名稱列表
+  subItems?: string[];
 }
 
 /**
  * 找出與用戶輸入最相關的 Products
- *
- * @param userInput - 用戶輸入的文本
- * @param products - 所有可用的 Products
- * @param topK - 返回前 K 個最相似的 Products（預設 4）
- * @returns 按相似度排序的 Product 列表
  */
 export async function findRelevantProducts(
   userInput: string,
@@ -98,39 +211,35 @@ export async function findRelevantProducts(
     id: string;
     name: string;
     description?: string | null;
-    tasks?: TaskInfo[];  // 任務內容（包含 sub_items）
+    tasks?: TaskInfo[];
   }>,
   topK: number = 4
 ): Promise<ProductSimilarity[]> {
-  // 如果沒有 Product，直接返回空陣列
   if (products.length === 0) {
     return [];
   }
 
-  // 過濾掉完全沒有內容的 Products（沒有 description 也沒有 tasks）
-  // 這些空 Product 會產生異常的 embedding 向量
-  const validProducts = products.filter(p => {
+  // 過濾掉完全沒有內容的 Products
+  const validProducts = products.filter((p) => {
     const hasDescription = p.description && p.description.trim().length > 0;
     const hasTasks = p.tasks && p.tasks.length > 0;
     return hasDescription || hasTasks;
   });
 
-  // 如果過濾後沒有有效的 Product，返回空陣列
   if (validProducts.length === 0) {
     return [];
   }
 
-  // 構建增強的 Product 描述（名稱 + 描述 + 任務 + sub_items）
-  const productTexts = validProducts.map(p => {
+  // 構建增強的 Product 描述
+  const productTexts = validProducts.map((p) => {
     const parts = [p.name];
 
     if (p.description) {
       parts.push(p.description);
     }
 
-    // 加入所有未完成任務內容及其 sub_items 作為語意輔助
     if (p.tasks && p.tasks.length > 0) {
-      const taskTexts = p.tasks.map(t => {
+      const taskTexts = p.tasks.map((t) => {
         if (t.subItems && t.subItems.length > 0) {
           return `${t.content}（${t.subItems.join("、")}）`;
         }
@@ -142,7 +251,7 @@ export async function findRelevantProducts(
     return parts.join(" | ");
   });
 
-  // 批次計算 Embedding（用戶輸入 + 所有 Products）
+  // 批次計算 Embedding
   const allTexts = [userInput, ...productTexts];
   const embeddings = await batchGetEmbeddings(allTexts);
 
@@ -154,8 +263,217 @@ export async function findRelevantProducts(
     similarity: cosineSimilarity(userEmbedding, embeddings[idx + 1]),
   }));
 
-  // 按相似度排序並返回 top K
   return similarities
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, Math.min(topK, similarities.length));
+}
+
+// ============================================================================
+// pgvector 快取功能
+// ============================================================================
+
+/**
+ * 計算並存儲 Product 的 embedding 向量
+ */
+export async function ensureProductEmbedding(
+  productId: string,
+  name: string,
+  description: string | null,
+  force: boolean = false
+): Promise<void> {
+  // 檢查是否已有 embedding
+  if (!force) {
+    const existing = await prisma.$queryRaw<Array<{ has_embedding: boolean }>>`
+      SELECT embedding IS NOT NULL as has_embedding
+      FROM products
+      WHERE id = ${productId}::uuid
+    `;
+
+    if (existing.length > 0 && existing[0].has_embedding) {
+      return;
+    }
+  }
+
+  // 構建 embedding 文本
+  const text = description ? `${name} | ${description}` : name;
+
+  // 計算 embedding
+  const embedding = await getEmbedding(text);
+
+  // 存儲到資料庫
+  const vectorStr = `[${embedding.join(",")}]`;
+
+  await prisma.$executeRaw`
+    UPDATE products
+    SET embedding = ${vectorStr}::vector
+    WHERE id = ${productId}::uuid
+  `;
+
+  console.log(`✅ [embedding] Stored embedding for Product: ${name}`);
+}
+
+/**
+ * 批次確保多個 Products 都有 embedding
+ */
+export async function ensureProductEmbeddings(
+  products: Array<{ id: string; name: string; description: string | null }>
+): Promise<void> {
+  const productIds = products.map((p) => p.id);
+
+  const missingEmbeddings = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id::text
+    FROM products
+    WHERE id = ANY(${productIds}::uuid[])
+      AND embedding IS NULL
+  `;
+
+  const missingIds = new Set(missingEmbeddings.map((r) => r.id));
+
+  if (missingIds.size === 0) {
+    return;
+  }
+
+  const productsToEmbed = products.filter((p) => missingIds.has(p.id));
+
+  console.log(
+    `📊 [embedding] Computing embeddings for ${productsToEmbed.length} Products...`
+  );
+
+  // 批次計算 embeddings
+  const texts = productsToEmbed.map((p) =>
+    p.description ? `${p.name} | ${p.description}` : p.name
+  );
+  const embeddings = await batchGetEmbeddings(texts);
+
+  // 批次存儲
+  for (let i = 0; i < productsToEmbed.length; i++) {
+    const vectorStr = `[${embeddings[i].join(",")}]`;
+    await prisma.$executeRaw`
+      UPDATE products
+      SET embedding = ${vectorStr}::vector
+      WHERE id = ${productsToEmbed[i].id}::uuid
+    `;
+  }
+
+  console.log(`✅ [embedding] Stored ${productsToEmbed.length} embeddings`);
+}
+
+/**
+ * 使用 pgvector 找出最相關的 Products
+ */
+export async function findRelevantProductsByVector(
+  userInput: string,
+  userId: string,
+  topK: number = 4
+): Promise<ProductSimilarity[]> {
+  const userEmbedding = await getEmbedding(userInput);
+  const vectorStr = `[${userEmbedding.join(",")}]`;
+
+  const results = await prisma.$queryRaw<
+    Array<{ id: string; name: string; similarity: number }>
+  >`
+    SELECT
+      id::text,
+      name,
+      1 - (embedding <=> ${vectorStr}::vector) as similarity
+    FROM products
+    WHERE user_id = ${userId}::uuid
+      AND deleted_at IS NULL
+      AND embedding IS NOT NULL
+    ORDER BY embedding <=> ${vectorStr}::vector
+    LIMIT ${topK}
+  `;
+
+  return results.map((r) => ({
+    productId: r.id,
+    productName: r.name,
+    similarity: Number(r.similarity),
+  }));
+}
+
+/**
+ * 混合搜尋：優先使用 pgvector
+ */
+export async function findRelevantProductsHybrid(
+  userInput: string,
+  userId: string,
+  topK: number = 4
+): Promise<{ results: ProductSimilarity[]; allCached: boolean }> {
+  const t1 = Date.now();
+  const userEmbedding = await getEmbedding(userInput);
+  const embeddingTime = Date.now() - t1;
+
+  const vectorStr = `[${userEmbedding.join(",")}]`;
+
+  const t2 = Date.now();
+  const results = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      name: string;
+      similarity: number;
+      total_products: bigint;
+      products_with_embedding: bigint;
+    }>
+  >`
+    WITH stats AS (
+      SELECT
+        COUNT(*) as total,
+        COUNT(embedding) as with_embedding
+      FROM products
+      WHERE user_id = ${userId}::uuid AND deleted_at IS NULL
+    ),
+    ranked AS (
+      SELECT
+        id::text,
+        name,
+        1 - (embedding <=> ${vectorStr}::vector) as similarity
+      FROM products
+      WHERE user_id = ${userId}::uuid
+        AND deleted_at IS NULL
+        AND embedding IS NOT NULL
+      ORDER BY embedding <=> ${vectorStr}::vector
+      LIMIT ${topK}
+    )
+    SELECT
+      r.id,
+      r.name,
+      r.similarity,
+      s.total as total_products,
+      s.with_embedding as products_with_embedding
+    FROM ranked r
+    CROSS JOIN stats s
+  `;
+
+  if (results.length === 0) {
+    const countResult = await prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(*) as total FROM products
+      WHERE user_id = ${userId}::uuid AND deleted_at IS NULL
+    `;
+    const total = Number(countResult[0]?.total || 0);
+    return { results: [], allCached: total === 0 };
+  }
+
+  const sqlTime = Date.now() - t2;
+  const total = Number(results[0].total_products);
+  const withEmbedding = Number(results[0].products_with_embedding);
+  const allCached = withEmbedding === total;
+
+  console.log(
+    `⏱️ [embedding] embedding=${embeddingTime}ms, sql=${sqlTime}ms, total=${embeddingTime + sqlTime}ms`
+  );
+
+  if (!allCached) {
+    console.log(
+      `⚠️ [embedding] ${total - withEmbedding}/${total} Products missing embedding`
+    );
+  }
+
+  return {
+    results: results.map((r) => ({
+      productId: r.id,
+      productName: r.name,
+      similarity: Number(r.similarity),
+    })),
+    allCached,
+  };
 }

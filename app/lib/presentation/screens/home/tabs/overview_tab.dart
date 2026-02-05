@@ -11,7 +11,7 @@ import '../../../../application/use_cases/add_product_reference_use_case.dart';
 import '../../../../application/use_cases/delete_product_reference_use_case.dart';
 import '../../../../application/use_cases/reorganize_product_topics_use_case.dart';
 import '../../../../application/use_cases/apply_reorganization_use_case.dart';
-import '../../../providers/area_provider.dart';
+import '../../../providers/dashboard_provider.dart';
 import '../../../providers/product_provider.dart';
 import '../../../providers/product_reference_provider.dart';
 import '../widgets/task_detail_bottom_sheet.dart';
@@ -36,14 +36,15 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
 
   @override
   Widget build(BuildContext context) {
-    final areasAsync = ref.watch(areasProvider);
-    final productsAsync = ref.watch(productsProvider);
+    // 使用 Dashboard API 統一載入 Areas + Products（單一 HTTP 請求）
+    final areasAsync = ref.watch(dashboardAreasProvider);
+    final productsAsync = ref.watch(dashboardProductsProvider);
 
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(areasProvider);
-          ref.invalidate(productsProvider);
+          // 只需 invalidate dashboardProvider，areas 和 products 會自動重新載入
+          ref.invalidate(dashboardProvider);
         },
         color: const Color(0xFF6C63FF),
         backgroundColor: const Color(0xFF161B22),
@@ -875,8 +876,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.invalidate(areasProvider);
-                ref.invalidate(productsProvider);
+                ref.invalidate(dashboardProvider);
               },
               child: const Text('重試'),
             ),

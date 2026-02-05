@@ -13,7 +13,9 @@
 #   - Platform: Google Cloud Run
 #   - Min Instances: 0 (按需付費)
 #   - Max Instances: 10
-#   - Database: Remote Supabase (PostgreSQL)
+#   - Memory: 512Mi
+#   - Database: Neon PostgreSQL (ap-southeast-1)
+#   - Embedding: Gemini API (768 維)
 #
 # ==============================================================================
 
@@ -256,6 +258,8 @@ log_info "   - 最大實例數: 10"
 log_info "   - 記憶體: 512Mi"
 log_info "   - CPU: 1"
 log_info "   - 閒置時自動縮減至 0，無請求時不收費"
+log_info "   - Embedding: Gemini API (零冷啟動)"
+log_info "   - ⚠️ Cold start 約 3-5 秒 (Neon 連線)"
 echo ""
 log_info "📝 下一步:"
 log_info "   1. 更新 web/.env.production 中的 API URL:"

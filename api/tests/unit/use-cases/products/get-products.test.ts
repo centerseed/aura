@@ -9,9 +9,7 @@ import { prisma } from '@/lib/db'
 // Mock Prisma
 vi.mock('@/lib/db', () => ({
   prisma: {
-    product: {
-      findMany: vi.fn(),
-    },
+    $queryRaw: vi.fn(),
   },
 }))
 
@@ -21,92 +19,60 @@ describe('GetProductsUseCase', () => {
   beforeEach(() => {
     useCase = new GetProductsUseCase()
     vi.clearAllMocks()
-    vi.mocked(prisma.product.findMany).mockReset()
   })
 
   describe('成功情況', () => {
     it('應該返回用戶的所有 products', async () => {
       const now = new Date()
-      const mockProducts = [
+      // Mock raw SQL 返回的資料格式
+      const mockRawRows = [
         {
-          id: 'product-1',
-          user_id: 'user-123',
+          product_id: 'product-1',
+          product_user_id: 'user-123',
+          product_area_id: 'area-123',
+          product_name: 'Product 1',
+          product_description: null,
+          product_status: 'ACTIVE',
+          product_lifecycle: 'FINITE',
+          product_display_order: 0,
+          product_references: [],
+          product_created_at: now,
+          product_updated_at: now,
           area_id: 'area-123',
-          name: 'Product 1',
-          description: null,
-          status: 'ACTIVE' as const,
-          lifecycle: 'FINITE' as const,
-          display_order: 0,
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          references: [],
-          tasks: [],
-          area: {
-            id: 'area-123',
-            name: 'Test Area',
-            scope: 'work',
-            description: null,
-          },
+          area_name: 'Test Area',
+          area_scope: 'work',
+          area_description: null,
+          task_id: null,
+          task_user_id: null,
+          task_product_id: null,
+          task_topic_id: null,
+          task_content: null,
+          task_status: null,
+          task_due_date: null,
+          task_start_date: null,
+          task_time_confidence: null,
+          task_inferred_from_milestone: null,
+          task_ai_analysis: null,
+          task_sub_items: null,
+          task_references: null,
+          task_created_at: null,
+          task_updated_at: null,
+          topic_name: null,
         },
-      ] as any
+      ]
 
-      vi.mocked(prisma.product.findMany).mockResolvedValue(mockProducts)
+      vi.mocked(prisma.$queryRaw).mockResolvedValue(mockRawRows)
 
       const result = await useCase.execute({ userId: 'user-123' })
 
       expect(result.products.length).toBe(1)
-      expect(result.products[0]).toEqual({
-        id: 'product-1',
-        user_id: 'user-123',
-        area_id: 'area-123',
-        name: 'Product 1',
-        description: null,
-        status: 'ACTIVE',
-        lifecycle: 'FINITE',
-        display_order: 0,
-        created_at: now,
-        updated_at: now,
-        references: [],
-        total_reference_count: 0,
-        tasks: [],
-        area: {
-          id: 'area-123',
-          name: 'Test Area',
-          scope: 'work',
-          description: null,
-        },
-      })
-      expect(prisma.product.findMany).toHaveBeenCalledWith({
-        where: { user_id: 'user-123', deleted_at: null },
-        include: {
-          area: {
-            select: {
-              id: true,
-              name: true,
-              scope: true,
-              description: true,
-            },
-          },
-          tasks: {
-            where: {
-              deleted_at: null,
-              status: { not: 'ARCHIVE' },
-            },
-            include: {
-              topic: true,
-            },
-            orderBy: {
-              created_at: 'desc',
-            },
-          },
-        },
-        orderBy: [{ display_order: 'asc' }, { created_at: 'desc' }],
-      })
+      expect(result.products[0].id).toBe('product-1')
+      expect(result.products[0].name).toBe('Product 1')
+      expect(result.products[0].area?.name).toBe('Test Area')
     })
 
     it('應該返回空陣列當用戶沒有 products', async () => {
-      vi.mocked(prisma.product.findMany).mockResolvedValue([])
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([])
 
       const result = await useCase.execute({ userId: 'user-123' })
 

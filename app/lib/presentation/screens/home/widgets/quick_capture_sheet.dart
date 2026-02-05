@@ -196,7 +196,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
             taskIds: taskIds,
           ));
         });
-        // repository 會自動靜默刷新快取
+        // 刷新任務快取，讓今日/全視圖頁面立即顯示新任務
+        refreshTasks(ref);
         HapticFeedback.mediumImpact();
       },
     );

@@ -3,10 +3,47 @@
  *
  * Application Layer Use Case
  * 處理獲取用戶所有產品的業務邏輯
+ *
+ * 🚀 優化：使用 raw SQL JOIN 取代 nested include，減少 DB round-trips
  */
 
 import { prisma } from '@/lib/db'
 import { ValidationException } from '@/lib/api-response'
+
+// Raw SQL 查詢結果的型別
+interface RawProductRow {
+  product_id: string
+  product_user_id: string
+  product_area_id: string
+  product_name: string
+  product_description: string | null
+  product_status: string
+  product_lifecycle: string
+  product_display_order: number
+  product_references: unknown
+  product_created_at: Date
+  product_updated_at: Date
+  area_id: string | null
+  area_name: string | null
+  area_scope: string | null
+  area_description: string | null
+  task_id: string | null
+  task_user_id: string | null
+  task_product_id: string | null
+  task_topic_id: string | null
+  task_content: string | null
+  task_status: string | null
+  task_due_date: Date | null
+  task_start_date: Date | null
+  task_time_confidence: number | null
+  task_inferred_from_milestone: string | null
+  task_ai_analysis: unknown
+  task_sub_items: unknown
+  task_references: unknown
+  task_created_at: Date | null
+  task_updated_at: Date | null
+  topic_name: string | null
+}
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -93,66 +130,69 @@ export class GetProductsUseCase {
     // 1. 驗證輸入
     this.validateRequest(request)
 
-    // 2. 查詢所有未軟刪除的 Product,並做排序
-    const productsRaw = await prisma.product.findMany({
-      where: {
-        user_id: request.userId,
-        deleted_at: null,
-      },
-      include: {
-        area: {
-          select: {
-            id: true,
-            name: true,
-            scope: true,
-            description: true,
-          },
-        },
-        tasks: {
-          where: {
-            deleted_at: null,
-            status: { not: 'ARCHIVE' }, // 排除已歸檔的任務
-          },
-          include: {
-            topic: true,
-          },
-          orderBy: {
-            created_at: 'desc',
-          },
-          // 返回所有 tasks (不限制數量)
-        },
-      },
-      orderBy: [
-        { display_order: 'asc' },
-        { created_at: 'desc' },
-      ],
-    })
+    // 2. 🚀 單一 SQL 查詢：products JOIN areas JOIN tasks JOIN topics
+    const rawRows = await prisma.$queryRaw<RawProductRow[]>`
+      SELECT
+        p.id::text as product_id,
+        p.user_id::text as product_user_id,
+        p.area_id::text as product_area_id,
+        p.name as product_name,
+        p.description as product_description,
+        p.status::text as product_status,
+        p.lifecycle::text as product_lifecycle,
+        p.display_order as product_display_order,
+        p.references as product_references,
+        p.created_at as product_created_at,
+        p.updated_at as product_updated_at,
+        a.id::text as area_id,
+        a.name as area_name,
+        a.scope as area_scope,
+        a.description as area_description,
+        t.id::text as task_id,
+        t.user_id::text as task_user_id,
+        t.product_id::text as task_product_id,
+        t.topic_id::text as task_topic_id,
+        t.content as task_content,
+        t.status::text as task_status,
+        t.due_date as task_due_date,
+        t.start_date as task_start_date,
+        t.time_confidence as task_time_confidence,
+        t.inferred_from_milestone as task_inferred_from_milestone,
+        t.ai_analysis as task_ai_analysis,
+        t.sub_items as task_sub_items,
+        t.references as task_references,
+        t.created_at as task_created_at,
+        t.updated_at as task_updated_at,
+        top.name as topic_name
+      FROM products p
+      LEFT JOIN areas a ON a.id = p.area_id
+      LEFT JOIN tasks t ON t.product_id = p.id
+        AND t.deleted_at IS NULL
+        AND t.status != 'ARCHIVE'::"statusenum"
+      LEFT JOIN topics top ON top.id = t.topic_id
+      WHERE p.user_id = ${request.userId}::uuid AND p.deleted_at IS NULL
+      ORDER BY p.display_order ASC, p.created_at DESC, t.created_at DESC
+    `
 
-    // 3. 轉換格式，提取 references 和 tasks
-    const products: ProductData[] = productsRaw.map((product) => {
-      // 提取 product 層級的 references
-      const productReferences = (product.references as Array<{
-        id: string
-        type: 'url' | 'note'
-        content: string
-        title?: string | null
-        created_at: string
-      }>) || []
+    // 3. 將扁平結果轉換為巢狀結構
+    const products = this.transformToProductStructure(rawRows)
 
-      // 轉換 tasks 格式 (返回所有非歸檔任務)
-      const tasks = product.tasks.map((task) => {
-        // 提取 sub_items
-        const subItems = (task.sub_items as Array<{
-          id: string
-          content: string
-          completed: boolean
-          created_at: string
-          completed_at: string | null
-          order: number
-        }>) || []
+    return {
+      products,
+    }
+  }
 
-        // 提取 task 層級的 references
-        const taskReferences = (task.references as Array<{
+  /**
+   * 將扁平的 SQL 結果轉換為 Product → Task 結構
+   */
+  private transformToProductStructure(rows: RawProductRow[]): ProductData[] {
+    const productsMap = new Map<string, ProductData>()
+    const taskIdsAdded = new Set<string>()
+
+    for (const row of rows) {
+      // 處理 Product
+      if (!productsMap.has(row.product_id)) {
+        const productReferences = (row.product_references as Array<{
           id: string
           type: 'url' | 'note'
           content: string
@@ -160,56 +200,88 @@ export class GetProductsUseCase {
           created_at: string
         }>) || []
 
-        return {
-          id: task.id,
-          user_id: task.user_id,
-          product_id: task.product_id,
-          topic_id: task.topic_id,
-          content: task.content,
-          status: task.status,
-          due_date: task.due_date?.toISOString() || null,
-          start_date: task.start_date?.toISOString() || null,
-          time_confidence: task.time_confidence,
-          inferred_from_milestone: task.inferred_from_milestone,
-          ai_analysis: (task.ai_analysis as Record<string, unknown>) || null,
-          tag: {
-            area: product.area?.name || '',
-            product: product.name,
-            topic: (task.topic as { name: string } | null)?.name || '未分類',
-          },
-          sub_items: subItems,
-          references: taskReferences,
-          created_at: task.created_at.toISOString(),
-          updated_at: task.updated_at.toISOString(),
-        }
-      })
-
-      // 計算 task 層級的 references 總數
-      const taskReferencesCount = tasks.reduce(
-        (sum, task) => sum + task.references.length,
-        0
-      )
-
-      return {
-        id: product.id,
-        user_id: product.user_id,
-        area_id: product.area_id,
-        name: product.name,
-        description: product.description,
-        status: product.status,
-        lifecycle: product.lifecycle,
-        display_order: product.display_order,
-        created_at: product.created_at,
-        updated_at: product.updated_at,
-        references: productReferences,
-        total_reference_count: productReferences.length + taskReferencesCount,
-        tasks: tasks,
-        area: product.area,
+        productsMap.set(row.product_id, {
+          id: row.product_id,
+          user_id: row.product_user_id,
+          area_id: row.product_area_id,
+          name: row.product_name,
+          description: row.product_description,
+          status: row.product_status,
+          lifecycle: row.product_lifecycle,
+          display_order: row.product_display_order,
+          created_at: row.product_created_at,
+          updated_at: row.product_updated_at,
+          references: productReferences,
+          total_reference_count: productReferences.length, // 先計算 product refs
+          tasks: [],
+          area: row.area_id ? {
+            id: row.area_id,
+            name: row.area_name!,
+            scope: row.area_scope,
+            description: row.area_description,
+          } : undefined,
+        })
       }
-    })
+
+      // 處理 Task
+      if (row.task_id && !taskIdsAdded.has(row.task_id)) {
+        taskIdsAdded.add(row.task_id)
+        const product = productsMap.get(row.product_id)!
+        const taskData = this.transformTask(row, product)
+        product.tasks.push(taskData)
+
+        // 累加 task references 到 total_reference_count
+        product.total_reference_count += taskData.references.length
+      }
+    }
+
+    return Array.from(productsMap.values())
+  }
+
+  /**
+   * 轉換單一 Task 資料
+   */
+  private transformTask(row: RawProductRow, product: ProductData): ProductData['tasks'][0] {
+    // 提取 sub_items
+    const subItems = (row.task_sub_items as Array<{
+      id: string
+      content: string
+      completed: boolean
+      created_at: string
+      completed_at: string | null
+      order: number
+    }>) || []
+
+    // 提取 task 層級的 references
+    const taskReferences = (row.task_references as Array<{
+      id: string
+      type: 'url' | 'note'
+      content: string
+      title?: string | null
+      created_at: string
+    }>) || []
 
     return {
-      products,
+      id: row.task_id!,
+      user_id: row.task_user_id!,
+      product_id: row.task_product_id!,
+      topic_id: row.task_topic_id,
+      content: row.task_content!,
+      status: row.task_status!,
+      due_date: row.task_due_date?.toISOString() || null,
+      start_date: row.task_start_date?.toISOString() || null,
+      time_confidence: row.task_time_confidence,
+      inferred_from_milestone: row.task_inferred_from_milestone,
+      ai_analysis: (row.task_ai_analysis as Record<string, unknown>) || null,
+      tag: {
+        area: product.area?.name || '',
+        product: product.name,
+        topic: row.topic_name || '未分類',
+      },
+      sub_items: subItems,
+      references: taskReferences,
+      created_at: row.task_created_at!.toISOString(),
+      updated_at: row.task_updated_at!.toISOString(),
     }
   }
 

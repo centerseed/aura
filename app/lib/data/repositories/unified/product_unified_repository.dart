@@ -123,6 +123,45 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
   }
 
   @override
+  Future<Either<Failure, Product>> updateProduct({
+    required String productId,
+    String? name,
+    String? description,
+    String? areaId,
+    ProductStatus? status,
+    ProductLifecycle? lifecycle,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (name != null) body['name'] = name;
+      if (description != null) body['description'] = description;
+      if (areaId != null) body['area_id'] = areaId;
+      if (status != null) body['status'] = status.name.toUpperCase();
+      if (lifecycle != null) body['lifecycle'] = lifecycle.name.toUpperCase();
+
+      final model = await _apiClient.updateProduct(productId, body);
+      final product = model.toEntity();
+
+      await silentRefresh();
+
+      return Right(product);
+    } catch (e) {
+      return Left(handleDioError(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteProduct(String productId) async {
+    try {
+      await _apiClient.deleteProduct(productId);
+      await silentRefresh();
+      return const Right(null);
+    } catch (e) {
+      return Left(handleDioError(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, ReorganizeProposal>> reorganizeTopics(
     String productId,
   ) async {
@@ -175,7 +214,12 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
         content: content,
         title: title,
       );
-      return Right(referenceModel.toEntity());
+      final reference = referenceModel.toEntity();
+
+      // Reference 變更也需要刷新 Product 快取
+      await silentRefresh();
+
+      return Right(reference);
     } catch (e) {
       return Left(handleDioError(e));
     }
@@ -193,6 +237,10 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
         referenceId: referenceId,
         taskId: taskId,
       );
+
+      // Reference 變更也需要刷新 Product 快取
+      await silentRefresh();
+
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));

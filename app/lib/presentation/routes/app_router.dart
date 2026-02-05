@@ -9,6 +9,7 @@ import '../screens/home/home_screen.dart';
 import '../screens/focus/focus_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/splash/splash_screen.dart';
+import '../screens/onboarding/onboarding_screen.dart';
 import '../../domain/entities/task.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -32,6 +33,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isAuthenticated = authState.valueOrNull != null;
       final isGoingToAuth = state.matchedLocation.startsWith('/auth');
+      final isOnboarding = state.matchedLocation == '/onboarding';
       final isSecureRoute =
           state.matchedLocation.startsWith('/dashboard') ||
           state.matchedLocation.startsWith('/quick-capture');
@@ -39,16 +41,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // 1. 已登入
       if (isAuthenticated) {
-        // 如果在 Auth 頁面或 Splash 頁面，跳轉 Dashboard
+        // 允許訪問 onboarding（由 splash screen 決定是否需要）
+        if (isOnboarding) {
+          return null;
+        }
+        // 如果在 Auth 頁面或 Splash 頁面，交由 splash screen 處理導向
         if (isGoingToAuth || isSplash) {
-          return '/dashboard';
+          return '/splash';
         }
       }
 
       // 2. 未登入
       if (!isAuthenticated) {
-        // 如果要去安全頁面，跳轉 Login
-        if (isSecureRoute) {
+        // 如果要去安全頁面或 onboarding，跳轉 Login
+        if (isSecureRoute || isOnboarding) {
           return '/auth/signin';
         }
         // 如果自 Splash 醒來發現沒登入，也去 Login
@@ -67,6 +73,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/auth/signin',
         builder: (context, state) => const SignInScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/dashboard',

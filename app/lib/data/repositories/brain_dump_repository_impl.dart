@@ -21,6 +21,7 @@ class BrainDumpRepositoryImpl implements BrainDumpRepository {
         createNewTasks: (success, items) {
           final result = BrainDumpResult(
             success: success,
+            action: BrainDumpAction.createNewTasks,
             items: items
                 .map(
                   (item) => BrainDumpResultItem(
@@ -45,11 +46,18 @@ class BrainDumpRepositoryImpl implements BrainDumpRepository {
           return Right(result);
         },
         appendSubItem: (success, targetTask, appendedSubItems, reasoning) {
-          // 對於 append sub-item 的情況，返回空列表
-          // TODO: 未來可能需要不同的處理邏輯
+          // 對於 append sub-item 的情況，返回追加資訊
           final result = BrainDumpResult(
             success: success,
+            action: BrainDumpAction.appendSubItem,
             items: [],
+            appendInfo: AppendSubItemInfo(
+              targetTaskId: targetTask.id,
+              targetTaskContent: targetTask.content,
+              targetProductName: targetTask.product,
+              appendedItems: appendedSubItems.map((s) => s.content).toList(),
+              reasoning: reasoning,
+            ),
           );
           return Right(result);
         },

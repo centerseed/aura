@@ -16,10 +16,10 @@ export function TourScene3() {
       {/* 標題區域 - 統一風格 */}
       <div className="text-center space-y-3 animate-in fade-in duration-500">
         <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-[0_2px_20px_rgba(168,85,247,0.4)]">
-          AI 會自動幫你安排時間
+          AI 會自動整理並安排時間
         </h1>
         <p className="text-lg text-white/90 max-w-xl mx-auto font-medium">
-          你只需記錄想法，其餘的交給系統
+          你只需記錄想法，分類和時間都交給 AI
         </p>
       </div>
 
@@ -45,17 +45,20 @@ export function TourScene3() {
 
           <ArrowRight className="w-6 h-6 text-white/40 mx-auto" />
 
-          {/* AI 分析 */}
+          {/* AI 整理與分析 */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-lg">
                 2
               </div>
-              <h3 className="text-white font-bold">AI 分析</h3>
+              <h3 className="text-white font-bold">AI 整理與分析</h3>
             </div>
             <div className="ml-8 space-y-2 text-sm">
               <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-400/30 text-white/90">
-                🎯 識別 Milestone: MVP Release (2026-03-01)
+                🏷️ 自動分類: 事業 → Mobile App → 功能開發
+              </div>
+              <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-400/30 text-white/90">
+                🎯 識別里程碑: MVP Release (2026-03-01)
               </div>
               <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-400/30 text-white/90">
                 ⚙️ 評估複雜度: 中等，預留 5 天
@@ -102,7 +105,7 @@ export function TourScene3() {
         <p className="text-white text-center text-lg leading-relaxed font-medium">
           <span className="text-indigo-200 font-bold text-xl">不用手動排程</span>
           <br />
-          <span className="text-white/90">AI 會根據 Milestone 自動推斷最適合的完成時間</span>
+          <span className="text-white/90">AI 會根據里程碑自動推斷最適合的完成時間</span>
         </p>
       </div>
     </div>

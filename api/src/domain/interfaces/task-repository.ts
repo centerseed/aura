@@ -76,6 +76,8 @@ export interface TaskFilters {
   status?: TaskStatus
   productId?: string
   topicId?: string
+  content?: string        // 精確匹配 content（用於重複檢查）
+  createdAtFrom?: Date    // 創建時間範圍（用於重複檢查）
   completedToday?: boolean
   startDateFrom?: Date
   startDateTo?: Date

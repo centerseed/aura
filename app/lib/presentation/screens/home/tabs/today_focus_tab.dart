@@ -255,12 +255,12 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
       );
     }
 
-    // 按 due date 排序，取最近 10 個
+    // 按 due date 排序：無日期的排最前面，有日期的按日期升序
     final sortedTasks = List<Task>.from(activeTasks)
       ..sort((a, b) {
         if (a.dueDate == null && b.dueDate == null) return 0;
-        if (a.dueDate == null) return 1;
-        if (b.dueDate == null) return -1;
+        if (a.dueDate == null) return -1; // 無日期排前面
+        if (b.dueDate == null) return 1;
         return a.dueDate!.compareTo(b.dueDate!);
       });
 

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/providers.dart';
 import '../../../../domain/entities/task.dart';
+import '../../../../application/use_cases/delete_task_use_case.dart';
 import '../../../../application/use_cases/update_task_details_use_case.dart';
 import '../../../../application/use_cases/update_sub_item_use_case.dart';
 import '../../../../application/use_cases/schedule_task_reminder_use_case.dart';
@@ -298,6 +299,70 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     if (mounted) {
       Navigator.pop(context);
     }
+  }
+
+  /// 刪除任務
+  Future<void> _handleDelete() async {
+    // 顯示確認對話框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2c2c2e),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '刪除任務',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          '確定要刪除「${widget.task.content}」嗎？\n此操作無法復原。',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final useCase = ref.read(deleteTaskUseCaseProvider);
+    final result = await useCase(DeleteTaskParams(taskId: widget.task.id));
+
+    result.fold(
+      (failure) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = '刪除失敗: ${failure.message}';
+          });
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) setState(() => _errorMessage = null);
+          });
+        }
+      },
+      (_) {
+        // repository 會自動靜默刷新快取
+        HapticFeedback.mediumImpact();
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('任務已刪除')),
+          );
+        }
+      },
+    );
   }
 
   @override
@@ -869,6 +934,28 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF4ADE80)),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 刪除任務
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: _isLoading ? null : _handleDelete,
+              icon: Icon(
+                Icons.delete_outline,
+                color: Colors.red.withValues(alpha: 0.7),
+              ),
+              label: Text(
+                "刪除任務",
+                style: TextStyle(color: Colors.red.withValues(alpha: 0.7)),
+              ),
+              style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
