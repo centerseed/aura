@@ -11,7 +11,7 @@ class TutorialOverlay extends ConsumerWidget {
     final showTutorial = ref.watch(showTutorialProvider);
     final currentStep = ref.watch(tutorialStepProvider);
 
-    if (!showTutorial || currentStep >= TutorialStep.complete.index) {
+    if (!showTutorial || currentStep > TutorialStep.complete.index) {
       return const SizedBox.shrink();
     }
 
@@ -138,12 +138,12 @@ class TutorialOverlay extends ConsumerWidget {
   Widget _buildOverviewStep(BuildContext context, WidgetRef ref) {
     return Stack(
       children: [
-        // 高亮底部導航的負載 tab
+        // 高亮底部導航的總覽 tab（中間位置）
         Positioned(
-          left: MediaQuery.of(context).size.width * 0.65, // 假設在第三個位置
-          right: MediaQuery.of(context).size.width * 0.02,
-          bottom: 0,
-          height: 70,
+          left: (MediaQuery.of(context).size.width - 80) / 2,
+          bottom: MediaQuery.of(context).padding.bottom,
+          width: 80,
+          height: 64,
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
@@ -162,10 +162,10 @@ class TutorialOverlay extends ConsumerWidget {
           ),
         ),
 
-        // 箭頭指向負載 tab
+        // 箭頭指向總覽 tab
         Positioned(
-          right: MediaQuery.of(context).size.width * 0.2,
-          bottom: 75,
+          left: (MediaQuery.of(context).size.width - 40) / 2,
+          bottom: MediaQuery.of(context).padding.bottom + 68,
           child: Icon(
             Icons.arrow_downward,
             size: 40,
@@ -243,7 +243,9 @@ class TutorialOverlay extends ConsumerWidget {
     required VoidCallback onNext,
     bool showSkip = false,
   }) {
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -345,6 +347,7 @@ class TutorialOverlay extends ConsumerWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }

@@ -10,7 +10,7 @@ class AreaModel with _$AreaModel {
     required String id,
     @JsonKey(name: 'user_id') required String userId,
     required String name,
-    required String description,
+    String? description,
     String? scope,
     @JsonKey(name: 'rolling_summary') Object? rollingSummary,
     @JsonKey(name: 'is_custom') required bool isCustom,

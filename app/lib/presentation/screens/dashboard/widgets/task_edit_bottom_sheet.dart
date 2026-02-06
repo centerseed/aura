@@ -97,26 +97,147 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
     required DateTime? initialDate,
     required Function(DateTime?) onDateSelected,
   }) async {
-    final picked = await showDatePicker(
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    // 計算下週一
+    final daysUntilNextMonday = (DateTime.monday - today.weekday + 7) % 7;
+    final nextMonday = today.add(Duration(days: daysUntilNextMonday == 0 ? 7 : daysUntilNextMonday));
+
+    final result = await showModalBottomSheet<DateTime?>(
       context: context,
-      initialDate: initialDate ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF6C63FF),
-              surface: Color(0xFF1c1c1e),
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF2c2c2e),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          child: child!,
-        );
-      },
+            const SizedBox(height: 16),
+            _buildQuickDateOption(
+              context,
+              icon: Icons.today,
+              label: '今天',
+              subtitle: DateFormat('MM/dd (E)', 'zh_TW').format(today),
+              color: Colors.blue,
+              date: today,
+              isSelected: initialDate != null &&
+                  initialDate.year == today.year &&
+                  initialDate.month == today.month &&
+                  initialDate.day == today.day,
+            ),
+            _buildQuickDateOption(
+              context,
+              icon: Icons.wb_sunny_outlined,
+              label: '明天',
+              subtitle: DateFormat('MM/dd (E)', 'zh_TW').format(tomorrow),
+              color: Colors.orange,
+              date: tomorrow,
+              isSelected: initialDate != null &&
+                  initialDate.year == tomorrow.year &&
+                  initialDate.month == tomorrow.month &&
+                  initialDate.day == tomorrow.day,
+            ),
+            _buildQuickDateOption(
+              context,
+              icon: Icons.next_week_outlined,
+              label: '下週一',
+              subtitle: DateFormat('MM/dd (E)', 'zh_TW').format(nextMonday),
+              color: Colors.purple,
+              date: nextMonday,
+              isSelected: initialDate != null &&
+                  initialDate.year == nextMonday.year &&
+                  initialDate.month == nextMonday.month &&
+                  initialDate.day == nextMonday.day,
+            ),
+            const Divider(color: Colors.white12, height: 1, indent: 16, endIndent: 16),
+            ListTile(
+              leading: const Icon(Icons.calendar_month, color: Colors.green, size: 22),
+              title: const Text('自訂日期...', style: TextStyle(color: Colors.white, fontSize: 15)),
+              onTap: () async {
+                Navigator.pop(context); // 先關閉 bottom sheet
+                final picked = await showDatePicker(
+                  context: this.context,
+                  initialDate: initialDate ?? DateTime.now(),
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                  builder: (context, child) {
+                    return Theme(
+                      data: ThemeData.dark().copyWith(
+                        colorScheme: const ColorScheme.dark(
+                          primary: Color(0xFF6C63FF),
+                          surface: Color(0xFF1c1c1e),
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  onDateSelected(picked);
+                }
+              },
+            ),
+            if (initialDate != null) ...[
+              const Divider(color: Colors.white12, height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: Icon(Icons.clear, color: Colors.red.withValues(alpha: 0.7), size: 22),
+                title: Text('清除日期', style: TextStyle(color: Colors.red.withValues(alpha: 0.7), fontSize: 15)),
+                onTap: () {
+                  onDateSelected(null);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
     );
-    if (picked != null) {
-      onDateSelected(picked);
+
+    if (result != null) {
+      onDateSelected(result);
     }
+  }
+
+  Widget _buildQuickDateOption(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required DateTime date,
+    required bool isSelected,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 15)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            subtitle,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+          ),
+          if (isSelected) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.check_circle, color: Color(0xFF6C63FF), size: 18),
+          ],
+        ],
+      ),
+      onTap: () => Navigator.pop(context, date),
+    );
   }
 
   Future<void> _handleSaveChanges() async {
@@ -534,7 +655,6 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
           child: Column(
             children: [
               _buildHandle(),
-              _buildHeader(),
               // 錯誤訊息橫幅
               if (_errorMessage != null)
                 Container(
@@ -570,19 +690,18 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                   onTap: () => FocusScope.of(context).unfocus(),
                   behavior: HitTestBehavior.opaque,
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildContentSection(),
-                        const SizedBox(height: 16),
-                        _buildDatesSection(),
-                        const SizedBox(height: 16),
-                        _buildReminderSection(),
-                        const SizedBox(height: 16),
-                        _buildAreaProductTopicSection(),
+                        _buildTitleRow(),
+                        _buildDivider(),
+                        _buildDatesRow(),
+                        _buildDivider(),
+                        _buildReminderRow(),
+                        _buildDivider(),
+                        _buildCategoryChips(),
                         if (_subItems.isNotEmpty) ...[
-                          const SizedBox(height: 16),
+                          _buildDivider(),
                           _buildSubItemsSection(),
                         ],
                       ],
@@ -600,7 +719,7 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
 
   Widget _buildHandle() {
     return Container(
-      margin: const EdgeInsets.only(top: 12, bottom: 8),
+      margin: const EdgeInsets.only(top: 12, bottom: 4),
       width: 40,
       height: 4,
       decoration: BoxDecoration(
@@ -610,205 +729,210 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 0.5,
+      color: Colors.white.withValues(alpha: 0.1),
+      indent: 20,
+      endIndent: 20,
+    );
+  }
+
+  /// 標題行：大字 TextField 直接編輯 + 關閉按鈕
+  Widget _buildTitleRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _contentController,
+              maxLines: null,
+              minLines: 1,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              decoration: InputDecoration.collapsed(
+                hintText: '輸入任務內容...',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.close,
+                color: Colors.white.withValues(alpha: 0.6),
+                size: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 日期並排一行：開始 | 截止
+  Widget _buildDatesRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
-          const Icon(Icons.edit_rounded, color: Color(0xFF6C63FF), size: 24),
-          const SizedBox(width: 8),
-          const Text(
-            '編輯任務',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContentSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "任務內容",
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _contentController,
-            maxLines: 3,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-            decoration: InputDecoration(
-              hintText: '輸入任務內容...',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 2),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDatesSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "日期設定",
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 12),
           // 開始日期
-          Row(
-            children: [
-              const Icon(Icons.play_circle_outline, size: 18, color: Colors.blue),
-              const SizedBox(width: 8),
-              const Text(
-                "開始",
-                style: TextStyle(color: Colors.white70, fontSize: 14),
+          Expanded(
+            child: _buildDateCell(
+              icon: Icons.play_circle_outline,
+              iconColor: Colors.blue,
+              label: '開始',
+              date: _selectedStartDate,
+              dateColor: Colors.blue,
+              onTap: () => _showDatePicker(
+                title: '選擇開始日期',
+                initialDate: _selectedStartDate,
+                onDateSelected: (date) => setState(() => _selectedStartDate = date),
               ),
-              const Spacer(),
-              if (_selectedStartDate != null) ...[
-                Text(
-                  DateFormat('yyyy/MM/dd').format(_selectedStartDate!),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              IconButton(
-                icon: Icon(
-                  _selectedStartDate == null ? Icons.add_circle_outline : Icons.edit_calendar,
-                  color: const Color(0xFF6C63FF),
-                  size: 20,
-                ),
-                onPressed: () => _showDatePicker(
-                  title: '選擇開始日期',
-                  initialDate: _selectedStartDate,
-                  onDateSelected: (date) => setState(() => _selectedStartDate = date),
-                ),
-              ),
-              if (_selectedStartDate != null)
-                IconButton(
-                  icon: Icon(Icons.clear, color: Colors.white.withValues(alpha: 0.5), size: 20),
-                  onPressed: () => setState(() => _selectedStartDate = null),
-                ),
-            ],
+            ),
           ),
-          const SizedBox(height: 8),
+          Container(
+            height: 24,
+            width: 0.5,
+            color: Colors.white.withValues(alpha: 0.15),
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+          ),
           // 截止日期
-          Row(
-            children: [
-              const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.orange),
-              const SizedBox(width: 8),
-              const Text(
-                "截止",
-                style: TextStyle(color: Colors.white70, fontSize: 14),
+          Expanded(
+            child: _buildDateCell(
+              icon: Icons.flag_outlined,
+              iconColor: Colors.orange,
+              label: '截止',
+              date: _selectedDueDate,
+              dateColor: Colors.orange,
+              onTap: () => _showDatePicker(
+                title: '選擇截止日期',
+                initialDate: _selectedDueDate,
+                onDateSelected: (date) => setState(() => _selectedDueDate = date),
               ),
-              const Spacer(),
-              if (_selectedDueDate != null) ...[
-                Text(
-                  DateFormat('yyyy/MM/dd').format(_selectedDueDate!),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.orange,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              IconButton(
-                icon: Icon(
-                  _selectedDueDate == null ? Icons.add_circle_outline : Icons.edit_calendar,
-                  color: const Color(0xFF6C63FF),
-                  size: 20,
-                ),
-                onPressed: () => _showDatePicker(
-                  title: '選擇截止日期',
-                  initialDate: _selectedDueDate,
-                  onDateSelected: (date) => setState(() => _selectedDueDate = date),
-                ),
-              ),
-              if (_selectedDueDate != null)
-                IconButton(
-                  icon: Icon(Icons.clear, color: Colors.white.withValues(alpha: 0.5), size: 20),
-                  onPressed: () => setState(() => _selectedDueDate = null),
-                ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildReminderSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+  Widget _buildDateCell({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required DateTime? date,
+    required Color dateColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: iconColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              date != null ? DateFormat('MM/dd').format(date) : '未設定',
+              style: TextStyle(
+                color: date != null ? dateColor : Colors.white.withValues(alpha: 0.3),
+                fontSize: 14,
+                fontWeight: date != null ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  /// 提醒單行：icon + 文字 + 時間 + Switch
+  Widget _buildReminderRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Text(
-                "提醒設定",
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+          Icon(
+            Icons.notifications_outlined,
+            size: 18,
+            color: _reminderEnabled ? const Color(0xFFFFB020) : Colors.white.withValues(alpha: 0.6),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '提醒',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 14,
+            ),
+          ),
+          const Spacer(),
+          if (_reminderEnabled && _selectedRemindAt != null)
+            GestureDetector(
+              onTap: _showReminderTimePicker,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  DateFormat('MM/dd HH:mm').format(_selectedRemindAt!),
+                  style: const TextStyle(
+                    color: Color(0xFFFFB020),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const Spacer(),
-              Switch(
+            )
+          else if (_reminderEnabled)
+            GestureDetector(
+              onTap: _showReminderTimePicker,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  '設定時間',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          SizedBox(
+            height: 32,
+            child: FittedBox(
+              child: Switch(
                 value: _reminderEnabled,
                 onChanged: (value) {
                   setState(() {
                     _reminderEnabled = value;
+                    if (value && _selectedRemindAt == null) {
+                      _showReminderTimePicker();
+                    }
                     if (!value) {
                       _selectedRemindAt = null;
                     }
@@ -817,46 +941,8 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                 activeTrackColor: const Color(0xFFFFB020),
                 activeThumbColor: Colors.white,
               ),
-            ],
-          ),
-          if (_reminderEnabled) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.notifications_active, size: 18, color: Color(0xFFFFB020)),
-                const SizedBox(width: 8),
-                const Text(
-                  "提醒時間",
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-                const Spacer(),
-                if (_selectedRemindAt != null) ...[
-                  Text(
-                    DateFormat('yyyy/MM/dd HH:mm').format(_selectedRemindAt!),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFFFFB020),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                IconButton(
-                  icon: Icon(
-                    _selectedRemindAt == null ? Icons.add_circle_outline : Icons.edit_calendar,
-                    color: const Color(0xFF6C63FF),
-                    size: 20,
-                  ),
-                  onPressed: _showReminderTimePicker,
-                ),
-                if (_selectedRemindAt != null)
-                  IconButton(
-                    icon: Icon(Icons.clear, color: Colors.white.withValues(alpha: 0.5), size: 20),
-                    onPressed: () => setState(() => _selectedRemindAt = null),
-                  ),
-              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -926,7 +1012,8 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
     }
   }
 
-  Widget _buildAreaProductTopicSection() {
+  /// 分類 chips 行
+  Widget _buildCategoryChips() {
     final areasAsync = ref.watch(areasProvider);
     final productsAsync = ref.watch(productsProvider);
 
@@ -954,194 +1041,140 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
       });
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "分類",
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              '分類',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          // 橫向排列的選擇器
-          Row(
-            children: [
-              // Area 選擇器
-              Flexible(
-                flex: 1,
-                child: areasAsync.when(
+          const SizedBox(width: 12),
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                // Area chip
+                areasAsync.when(
                   data: (eitherAreas) {
                     return eitherAreas.fold(
-                      (failure) => const Text("載入失敗",
-                        style: TextStyle(color: Colors.red, fontSize: 12)),
+                      (failure) => _buildChip('載入失敗', Colors.red),
                       (areas) {
-                        if (areas.isEmpty) {
-                          return const Text("無領域",
-                            style: TextStyle(color: Colors.white70, fontSize: 12));
-                        }
-
+                        if (areas.isEmpty) return _buildChip('無領域', Colors.grey);
                         if (_selectedAreaId == null) {
                           return const SizedBox(
-                            width: 40,
-                            height: 40,
+                            width: 20, height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           );
                         }
-
                         final selectedArea = areas.firstWhere(
                           (area) => area.id == _selectedAreaId,
                           orElse: () => areas.first,
                         );
-
-                        return InkWell(
+                        return _buildChip(
+                          selectedArea.name,
+                          const Color(0xFF6C63FF),
                           onTap: () => _showAreaSelector(areas),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.5)),
-                            ),
-                            child: Center(
-                              child: Text(
-                                selectedArea.name,
-                                style: const TextStyle(color: Colors.white, fontSize: 11),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
                         );
                       },
                     );
                   },
                   loading: () => const SizedBox(
-                    width: 40,
-                    height: 40,
+                    width: 20, height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  error: (err, _) => const Text("載入失敗", style: TextStyle(color: Colors.red, fontSize: 12)),
+                  error: (err, _) => _buildChip('載入失敗', Colors.red),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Product 選擇器
-              Flexible(
-                flex: 1,
-                child: productsAsync.when(
+                // Product chip
+                productsAsync.when(
                   data: (eitherProducts) {
                     return eitherProducts.fold(
-                      (failure) => const Text("載入失敗",
-                        style: TextStyle(color: Colors.red, fontSize: 12)),
+                      (failure) => _buildChip('載入失敗', Colors.red),
                       (products) {
                         if (_selectedAreaId == null) {
                           return const SizedBox(
-                            width: 40,
-                            height: 40,
+                            width: 20, height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           );
                         }
-
                         final filteredProducts = products
                             .where((product) => product.areaId == _selectedAreaId)
                             .toList();
-
                         if (filteredProducts.isEmpty) {
-                          return Text(
-                            "無專案",
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12),
-                          );
+                          return _buildChip('無專案', Colors.grey);
                         }
-
                         // 檢查當前選中的 Product 是否屬於選中的 Area
                         final currentProductInArea = filteredProducts.any(
-                          (product) => product.id == _selectedProductId
+                          (product) => product.id == _selectedProductId,
                         );
-
                         if (!currentProductInArea) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             if (mounted) {
                               setState(() {
                                 _selectedProductId = filteredProducts.first.id;
-                                _selectedTopicId = null; // 重置 topic
+                                _selectedTopicId = null;
                               });
                             }
                           });
                         }
-
                         final selectedProduct = filteredProducts.firstWhere(
                           (product) => product.id == _selectedProductId,
                           orElse: () => filteredProducts.first,
                         );
-
-                        return InkWell(
+                        return _buildChip(
+                          selectedProduct.name,
+                          Colors.green,
                           onTap: () => _showProductSelector(filteredProducts),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
-                            ),
-                            child: Center(
-                              child: Text(
-                                selectedProduct.name,
-                                style: const TextStyle(color: Colors.white, fontSize: 11),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
                         );
                       },
                     );
                   },
                   loading: () => const SizedBox(
-                    width: 40,
-                    height: 40,
+                    width: 20, height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  error: (err, _) => const Text("載入失敗", style: TextStyle(color: Colors.red, fontSize: 12)),
+                  error: (err, _) => _buildChip('載入失敗', Colors.red),
                 ),
-              ),
-              // Topic 選擇器
-              if (_selectedTopicId != null) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  flex: 1,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.purple.withValues(alpha: 0.5)),
-                    ),
-                    child: Center(
-                      child: Text(
-                        widget.task.topicName ?? '未分類',
-                        style: const TextStyle(color: Colors.white, fontSize: 11),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+                // Topic chip
+                if (_selectedTopicId != null)
+                  _buildChip(
+                    widget.task.topicName ?? '未分類',
+                    Colors.purple,
                   ),
-                ),
               ],
-            ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChip(String label, Color color, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color.withValues(alpha: 0.9),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -1150,70 +1183,50 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
     final completedCount = _subItems.where((s) => s.completed).length;
     final total = _subItems.length;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 標題列 - 加入編輯模式切換按鈕
+          // 標題列
           Row(
             children: [
               const Icon(Icons.checklist, size: 18, color: Color(0xFF6C63FF)),
-              const SizedBox(width: 8),
-              const Text(
-                "待辦事項",
+              const SizedBox(width: 6),
+              Text(
+                '待辦 $completedCount/$total',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
               const Spacer(),
-              // 編輯模式切換按鈕
               if (_subItems.isNotEmpty)
-                TextButton.icon(
-                  icon: Icon(
-                    _isSubItemEditMode ? Icons.check : Icons.edit,
-                    size: 16,
-                    color: _isSubItemEditMode ? Colors.orange : Colors.white54,
-                  ),
-                  label: Text(
-                    _isSubItemEditMode ? '完成' : '排序',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: _isSubItemEditMode ? Colors.orange : Colors.white54,
+                GestureDetector(
+                  onTap: () => setState(() => _isSubItemEditMode = !_isSubItemEditMode),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(
+                      _isSubItemEditMode ? '完成' : '排序',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _isSubItemEditMode ? Colors.orange : Colors.white54,
+                      ),
                     ),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _isSubItemEditMode = !_isSubItemEditMode;
-                    });
-                  },
                 ),
-              Text(
-                "$completedCount/$total 完成",
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.white54,
+              GestureDetector(
+                onTap: _handleAddSubItem,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.add_circle_outline, color: Color(0xFF6C63FF), size: 20),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline, color: Color(0xFF6C63FF), size: 20),
-                onPressed: _handleAddSubItem,
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Divider(height: 1, color: Colors.white10),
-          const SizedBox(height: 8),
-          // Sub-items 列表 - 根據編輯模式切換顯示方式
+          // Sub-items 列表
           if (_isSubItemEditMode)
-            // 編輯模式: 使用 ReorderableListView 支援拖拽
             ReorderableListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -1223,25 +1236,22 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                 final sub = _subItems[index];
                 return Container(
                   key: ValueKey(sub.id),
-                  margin: const EdgeInsets.only(bottom: 6),
+                  margin: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // 拖拽手柄
                       Icon(
                         Icons.drag_handle,
                         size: 20,
                         color: Colors.white.withValues(alpha: 0.5),
                       ),
                       const SizedBox(width: 8),
-                      // 完成狀態圖示
                       Icon(
                         sub.completed ? Icons.check_circle : Icons.circle_outlined,
-                        size: 20,
+                        size: 18,
                         color: sub.completed ? Colors.green : Colors.white.withValues(alpha: 0.4),
                       ),
-                      const SizedBox(width: 10),
-                      // 內容
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           sub.content,
@@ -1250,21 +1260,23 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                                 ? Colors.white.withValues(alpha: 0.5)
                                 : Colors.white,
                             fontSize: 14,
-                            height: 1.4,
                             decoration: sub.completed ? TextDecoration.lineThrough : null,
                           ),
                         ),
                       ),
-                      // 升級按鈕
-                      IconButton(
-                        icon: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 18),
-                        onPressed: () => _handlePromoteSubItem(sub.id),
-                        tooltip: '升級為獨立任務',
+                      GestureDetector(
+                        onTap: () => _handlePromoteSubItem(sub.id),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 16),
+                        ),
                       ),
-                      // 刪除按鈕
-                      IconButton(
-                        icon: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 18),
-                        onPressed: () => _handleDeleteSubItem(sub.id),
+                      GestureDetector(
+                        onTap: () => _handleDeleteSubItem(sub.id),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 16),
+                        ),
                       ),
                     ],
                   ),
@@ -1272,9 +1284,8 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
               },
             )
           else
-            // 一般模式: 可勾選、刪除
             ..._subItems.map((sub) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -1287,13 +1298,13 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                             child: Icon(
                               sub.completed ? Icons.check_circle : Icons.circle_outlined,
                               key: ValueKey(sub.completed),
-                              size: 20,
+                              size: 18,
                               color: sub.completed ? Colors.green : Colors.white.withValues(alpha: 0.4),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 200),
@@ -1302,21 +1313,24 @@ class _TaskEditBottomSheetState extends ConsumerState<TaskEditBottomSheet> {
                                 ? Colors.white.withValues(alpha: 0.5)
                                 : Colors.white,
                             fontSize: 14,
-                            height: 1.4,
                             decoration: sub.completed ? TextDecoration.lineThrough : null,
                           ),
                           child: Text(sub.content),
                         ),
                       ),
-                      // 升級按鈕
-                      IconButton(
-                        icon: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 18),
-                        onPressed: () => _handlePromoteSubItem(sub.id),
-                        tooltip: '升級為獨立任務',
+                      GestureDetector(
+                        onTap: () => _handlePromoteSubItem(sub.id),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 16),
+                        ),
                       ),
-                      IconButton(
-                        icon: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 18),
-                        onPressed: () => _handleDeleteSubItem(sub.id),
+                      GestureDetector(
+                        onTap: () => _handleDeleteSubItem(sub.id),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 16),
+                        ),
                       ),
                     ],
                   ),

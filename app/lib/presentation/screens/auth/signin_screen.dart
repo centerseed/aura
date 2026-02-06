@@ -38,6 +38,41 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     productRepo.refresh();
   }
 
+  Future<void> _signInAnonymously() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final authRepo = ref.read(authRepositoryProvider);
+    final result = await authRepo.signInAnonymously();
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      result.fold(
+        (failure) {
+          setState(() {
+            _errorMessage = failure.message;
+          });
+        },
+        (user) {
+          final analytics = ref.read(analyticsServiceProvider);
+          analytics.setUserId(user.uid);
+          analytics.logLogin(method: 'anonymous');
+
+          _refreshAllCaches();
+
+          if (mounted) {
+            context.go('/dashboard');
+          }
+        },
+      );
+    }
+  }
+
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
@@ -155,21 +190,37 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                         ),
                       _isLoading
                           ? const Center(child: CircularProgressIndicator())
-                          : FilledButton.icon(
-                              onPressed: _signInWithGoogle,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: _signInWithGoogle,
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.login),
+                                  label: const Text(
+                                    'Sign in with Google',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  onPressed: _signInAnonymously,
+                                  child: Text(
+                                    '稍後再說，先逛逛',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              icon: const Icon(Icons.login),
-                              label: const Text(
-                                'Sign in with Google',
-                                style: TextStyle(fontSize: 16),
-                              ),
+                              ],
                             ),
                       const SizedBox(height: 24),
                     ],

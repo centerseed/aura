@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'tabs/today_focus_tab.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/load_view_tab.dart';
-import 'widgets/quick_capture_sheet.dart';
 import 'widgets/tutorial_overlay.dart';
-import '../../providers/first_time_tutorial_provider.dart';
+import '../../providers/first_time_tutorial_provider.dart' show hasCompletedTutorialProvider, showTutorialProvider, tutorialStepProvider, TutorialStep;
 
 /// 主頁面 - 包含三個分頁
 class HomeScreen extends ConsumerStatefulWidget {
@@ -50,33 +50,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         Scaffold(
           backgroundColor: const Color(0xFF0D1117), // GitHub dark
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF0D1117),
-            elevation: 0,
-            actions: [
-              // 開發者工具 - 重置引導
-              IconButton(
-                icon: Icon(
-                  Icons.refresh,
-                  color: Colors.white.withValues(alpha: 0.5),
-                ),
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-
-                  await resetTutorial();
-                  if (mounted) {
-                    ref.read(showTutorialProvider.notifier).state = true;
-                    ref.read(tutorialStepProvider.notifier).state =
-                        TutorialStep.welcome.index;
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('引導已重置')),
-                    );
-                  }
-                },
-                tooltip: '重置引導 (開發工具)',
-              ),
-            ],
-          ),
           body: IndexedStack(
         index: _currentIndex,
         children: _tabs,
@@ -174,11 +147,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _showQuickCapture(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const QuickCaptureSheet(),
-    );
+    context.push('/quick-capture');
   }
 }

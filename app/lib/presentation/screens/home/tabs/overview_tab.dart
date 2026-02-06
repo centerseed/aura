@@ -109,17 +109,31 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '全視圖',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                ).createShader(bounds),
+                child: const Text(
+                  '全視圖',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.person_outline, color: Colors.white70),
-                onPressed: () => context.push('/profile'),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.person_outline, color: Colors.white70),
+                  onPressed: () => context.push('/profile'),
+                ),
               ),
             ],
           ),
@@ -127,7 +141,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           Text(
             'Area → Product 結構',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: Colors.white.withValues(alpha: 0.5),
               fontSize: 14,
             ),
           ),
@@ -175,14 +189,18 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
       child: Row(
         children: [
           Container(
-            width: 4,
-            height: 24,
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF),
-              borderRadius: BorderRadius.circular(2),
+              color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.folder_outlined,
+              color: Color(0xFF6366F1),
+              size: 18,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,164 +239,253 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
     final isExpanded = _expandedProducts.contains(product.id);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF3B82F6).withValues(alpha: 0.08),
+              Colors.white.withValues(alpha: 0.03),
+            ],
+          ),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.18),
+          ),
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product Header
-            Row(
-              children: [
-                // 展開/折疊圖示 - 點擊展開/折疊任務
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (isExpanded) {
-                        _expandedProducts.remove(product.id);
-                      } else {
-                        _expandedProducts.add(product.id);
-                      }
-                    });
-                  },
-                  child: Icon(
-                    isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.white.withValues(alpha: 0.5),
-                    size: 24,
-                  ),
+            // 左側色條
+            Container(
+              width: 4,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF3B82F6),
+                    Color(0xFF6366F1),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                // Product 名稱 - 點擊進入詳情頁
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProjectDetailScreen(product: product),
-                        ),
-                      );
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (product.description != null && product.description!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              product.description!,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
-                                fontSize: 13,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // References Button
-                if (hasReferences)
-                  _buildActionButton(
-                    icon: Icons.library_books,
-                    label: '${product.referenceCount}',
-                    color: const Color(0xFFF59E0B),
-                    onTap: () => _showReferences(product),
-                  ),
-                const SizedBox(width: 8),
-                // AI Reorganize Button
-                _buildActionButton(
-                  icon: Icons.auto_awesome,
-                  label: 'AI',
-                  color: const Color(0xFF6C63FF),
-                  onTap: () => _handleReorganize(product),
-                ),
-              ],
-            ),
-            // 縮略模式：顯示最近3個任務
-            if (!isExpanded && displayTasks.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Divider(color: Colors.white10, height: 1),
-              const SizedBox(height: 8),
-              ...displayTasks.take(3).map((task) => _buildTaskPreview(task)),
-              if (product.taskCount > 3)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '+ ${product.taskCount - 3} 更多任務',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-            ],
-            // 展開模式：顯示所有任務及子項
-            if (isExpanded) ...[
-              const SizedBox(height: 12),
-              const Divider(color: Colors.white10, height: 1),
-              const SizedBox(height: 12),
-              // 調試：顯示任務數量
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '任務數：${displayTasks.length}',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 12,
-                  ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
                 ),
               ),
-              if (displayTasks.isNotEmpty)
-                Column(
-                  children: displayTasks.map((task) => _buildExpandedTaskCard(task)).toList(),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Center(
-                    child: Text(
-                      '無任務',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 14,
-                      ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Product Header
+                    Row(
+                      children: [
+                        // 展開/折疊圖示
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              if (isExpanded) {
+                                _expandedProducts.remove(product.id);
+                              } else {
+                                _expandedProducts.add(product.id);
+                              }
+                            });
+                          },
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isExpanded ? Icons.expand_less : Icons.expand_more,
+                              color: Colors.white.withValues(alpha: 0.5),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Product 名稱
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProjectDetailScreen(product: product),
+                                ),
+                              );
+                            },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (product.description != null && product.description!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      product.description!,
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.45),
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // References Button
+                        if (hasReferences) ...[
+                          _buildActionButton(
+                            icon: Icons.library_books,
+                            label: '${product.referenceCount}',
+                            color: const Color(0xFFF59E0B),
+                            onTap: () => _showReferences(product),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        // AI Reorganize Button
+                        _buildActionButton(
+                          icon: Icons.auto_awesome,
+                          label: 'AI',
+                          color: const Color(0xFF8B5CF6),
+                          onTap: () => _handleReorganize(product),
+                        ),
+                      ],
                     ),
-                  ),
+                    // 縮略模式：顯示最近3個任務
+                    if (!isExpanded && displayTasks.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 1,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withValues(alpha: 0.1),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...displayTasks.take(3).map((task) => _buildTaskPreview(task)),
+                      if (product.taskCount > 3)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 18),
+                          child: Text(
+                            '+ ${product.taskCount - 3} 更多任務',
+                            style: TextStyle(
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                    // 展開模式：顯示所有任務及子項
+                    if (isExpanded) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 1,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withValues(alpha: 0.1),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${displayTasks.length} 個任務',
+                              style: TextStyle(
+                                color: const Color(0xFF3B82F6).withValues(alpha: 0.8),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (displayTasks.isNotEmpty)
+                        Column(
+                          children: displayTasks.map((task) => _buildExpandedTaskCard(task)).toList(),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: Text(
+                              '無任務',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.4),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
                 ),
-            ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// 展開模式中的任務卡片 - 使用今日畫面的樣式
+  /// 展開模式中的任務卡片
   Widget _buildExpandedTaskCard(Task task) {
+    final accentColor = task.isOverdue
+        ? const Color(0xFFEF4444)
+        : task.isToday
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF6366F1);
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              accentColor.withValues(alpha: 0.06),
+              Colors.transparent,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: accentColor.withValues(alpha: 0.12),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,121 +494,127 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             InkWell(
               onTap: () => _showTaskDetails(task),
               borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    // 移除誤導性的完成按鈕圓圈，改用更簡潔的樣式
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withValues(alpha: 0.4),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      task.content,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 日期標籤
+                  if (task.dueDate != null)
                     Container(
-                      width: 4,
-                      height: 4,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: task.isOverdue
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFF3B82F6),
-                        shape: BoxShape.circle,
+                        color: accentColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: accentColor.withValues(alpha: 0.2),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
                       child: Text(
-                        task.content,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                        _formatDueDate(task.dueDate!),
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // 日期標籤
-                    if (task.dueDate != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: task.isOverdue
-                              ? const Color(0xFFEF4444).withValues(alpha: 0.15)
-                              : const Color(0xFF3B82F6).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: task.isOverdue
-                                ? const Color(0xFFEF4444).withValues(alpha: 0.3)
-                                : const Color(0xFF3B82F6).withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Text(
-                          _formatDueDate(task.dueDate!),
-                          style: TextStyle(
-                            color: task.isOverdue
-                                ? const Color(0xFFEF4444)
-                                : const Color(0xFF3B82F6),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
-            // Sub-items (如果有)
+            // Sub-items
             if (task.subItems != null && task.subItems!.isNotEmpty) ...[
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.only(left: 30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: task.subItems!.map((subItem) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: subItem.completed
-                                  ? const Color(0xFF4ADE80)
-                                  : Colors.transparent,
-                              border: Border.all(
-                                color: subItem.completed
-                                    ? const Color(0xFF4ADE80)
-                                    : Colors.white.withValues(alpha: 0.3),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: subItem.completed
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 10,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              subItem.content,
-                              style: TextStyle(
-                                color: subItem.completed
-                                    ? Colors.white.withValues(alpha: 0.4)
-                                    : Colors.white.withValues(alpha: 0.7),
-                                fontSize: 13,
-                                decoration: subItem.completed
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                padding: const EdgeInsets.only(left: 18),
+                child: Container(
+                  padding: const EdgeInsets.only(left: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1,
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: task.subItems!.map((subItem) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(4),
+                                color: subItem.completed
+                                    ? const Color(0xFF10B981)
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: subItem.completed
+                                      ? const Color(0xFF10B981)
+                                      : Colors.white.withValues(alpha: 0.2),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: subItem.completed
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 10,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                subItem.content,
+                                style: TextStyle(
+                                  color: subItem.completed
+                                      ? Colors.white.withValues(alpha: 0.35)
+                                      : Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 13,
+                                  decoration: subItem.completed
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  decorationColor: Colors.white.withValues(alpha: 0.3),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
             ],
@@ -521,22 +634,27 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
+          gradient: LinearGradient(
+            colors: [
+              color.withValues(alpha: 0.2),
+              color.withValues(alpha: 0.1),
+            ],
+          ),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
+            Icon(icon, size: 13, color: color),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 color: color,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -547,22 +665,33 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   }
 
   Widget _buildTaskPreview(Task task) {
+    final dotColor = task.isOverdue
+        ? const Color(0xFFEF4444)
+        : task.isToday
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF6366F1);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: () => _showTaskDetails(task),
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
             children: [
-              // 移除誤導性的圓圈圖標，改用小點指示
               Container(
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: dotColor,
                   shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: dotColor.withValues(alpha: 0.4),
+                      blurRadius: 4,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 12),
@@ -579,19 +708,18 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
               ),
               if (task.dueDate != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: task.isOverdue
-                        ? const Color(0xFFEF4444).withValues(alpha: 0.2)
-                        : const Color(0xFF3B82F6).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+                    color: dotColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: dotColor.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Text(
                     _formatDueDate(task.dueDate!),
                     style: TextStyle(
-                      color: task.isOverdue
-                          ? const Color(0xFFEF4444)
-                          : const Color(0xFF3B82F6),
+                      color: dotColor,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
@@ -837,17 +965,38 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
         padding: const EdgeInsets.all(48.0),
         child: Column(
           children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 64,
-              color: Colors.white.withValues(alpha: 0.3),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF6366F1).withValues(alpha: 0.2),
+                    const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                  ],
+                ),
+              ),
+              child: const Icon(
+                Icons.dashboard_outlined,
+                size: 40,
+                color: Color(0xFF6366F1),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
-              '太棒了！沒有待辦事項',
+              '尚未建立任何專案',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '開始記錄你的第一個想法吧',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.4),
+                fontSize: 14,
               ),
             ),
           ],
@@ -891,7 +1040,10 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TaskDetailBottomSheet(task: task),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: TaskDetailBottomSheet(task: task),
+      ),
     );
   }
 

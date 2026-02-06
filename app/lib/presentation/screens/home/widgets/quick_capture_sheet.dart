@@ -2,7 +2,6 @@ import 'package:dartz/dartz.dart' hide Task;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 
@@ -34,7 +33,7 @@ class ChatMessage {
   });
 }
 
-/// 快速新增任務的底部彈窗 - 對話式界面
+/// 快速新增任務 - 全螢幕對話式界面
 class QuickCaptureSheet extends ConsumerStatefulWidget {
   const QuickCaptureSheet({super.key});
 
@@ -43,9 +42,6 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
-  static const double _maxHeightRatio = 0.8;
-  static const double _keyboardVisibleThreshold = 50.0;
-
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
@@ -152,6 +148,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     });
 
     _textController.clear();
+    FocusScope.of(context).unfocus();
     _scrollToBottom();
 
     // 呼叫 API 創建任務 - 使用 Brain Dump AI 自動分類
@@ -173,31 +170,57 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
         setState(() {
           _isLoading = false;
 
-          // 構建 AI 回應訊息,顯示每個任務的分類理由
-          final buffer = StringBuffer();
-          for (var i = 0; i < brainDumpResult.items.length; i++) {
-            final item = brainDumpResult.items[i];
-            if (i > 0) buffer.write('\n\n');
+          if (brainDumpResult.isAppendSubItem && brainDumpResult.appendInfo != null) {
+            // append_sub_item：追加到既有任務
+            final info = brainDumpResult.appendInfo!;
+            final buffer = StringBuffer();
+            buffer.write('📌 已追加到「${info.targetTaskContent}」\n');
+            buffer.write('📁 ${info.targetProductName}\n\n');
 
-            buffer.write('✓ ${item.title}\n');
-            buffer.write('📁 ${item.productName}');
-            if (item.topicName != null && item.topicName!.isNotEmpty) {
-              buffer.write(' / ${item.topicName}');
+            for (final item in info.appendedItems) {
+              buffer.write('  ＋ $item\n');
             }
 
-            if (item.reasoning != null && item.reasoning!.isNotEmpty) {
-              buffer.write('\n💡 ${item.reasoning}');
+            if (info.reasoning.isNotEmpty) {
+              buffer.write('\n💡 ${info.reasoning}');
             }
+
+            _messages.add(ChatMessage(
+              content: buffer.toString(),
+              type: MessageType.ai,
+              taskIds: [info.targetTaskId],
+            ));
+          } else if (brainDumpResult.items.isNotEmpty) {
+            // create_new_tasks：建立新任務
+            final buffer = StringBuffer();
+            for (var i = 0; i < brainDumpResult.items.length; i++) {
+              final item = brainDumpResult.items[i];
+              if (i > 0) buffer.write('\n\n');
+
+              buffer.write('✓ ${item.title}\n');
+              buffer.write('📁 ${item.productName}');
+              if (item.topicName != null && item.topicName!.isNotEmpty) {
+                buffer.write(' / ${item.topicName}');
+              }
+
+              if (item.reasoning != null && item.reasoning!.isNotEmpty) {
+                buffer.write('\n💡 ${item.reasoning}');
+              }
+            }
+
+            final taskIds = brainDumpResult.items.map((item) => item.id).toList();
+
+            _messages.add(ChatMessage(
+              content: buffer.toString(),
+              type: MessageType.ai,
+              taskIds: taskIds,
+            ));
+          } else {
+            _messages.add(const ChatMessage(
+              content: '已收到，但未能自動分類。請再試一次或補充更多資訊。',
+              type: MessageType.ai,
+            ));
           }
-
-          // 收集所有創建的任務 IDs
-          final taskIds = brainDumpResult.items.map((item) => item.id).toList();
-
-          _messages.add(ChatMessage(
-            content: buffer.toString(),
-            type: MessageType.ai,
-            taskIds: taskIds,
-          ));
         });
         // 刷新任務快取，讓今日/全視圖頁面立即顯示新任務
         refreshTasks(ref);
@@ -257,66 +280,108 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     });
   }
 
+  /// 檢查是否有 AI 成功回覆（最後一條 AI 訊息且非錯誤且有內容）
+  bool get _hasSuccessfulAiReply {
+    if (_messages.isEmpty) return false;
+    final lastMsg = _messages.last;
+    return lastMsg.type == MessageType.ai &&
+        !lastMsg.content.startsWith('處理失敗') &&
+        lastMsg.content.trim().isNotEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final isKeyboardVisible = bottomInset > _keyboardVisibleThreshold;
     final areasAsync = ref.watch(areasProvider);
     final productsAsync = ref.watch(productsProvider);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        constraints: BoxConstraints(
-          maxHeight: screenHeight * _maxHeightRatio,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+      backgroundColor: const Color(0xFF0D1117),
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF161B22),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
-        decoration: const BoxDecoration(
-          color: Color(0xFF161B22),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        title: const Text(
+          '新增事項',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 拖曳指示器
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // 標籤選擇器
+          _buildAreaSelector(areasAsync),
+          if (_selectedAreaId != null)
+            _buildProductSelector(productsAsync),
+          _buildInstructions(),
+
+          // 對話紀錄區域
+          Expanded(
+            child: _buildChatArea(),
+          ),
+
+          // 完成提示按鈕
+          if (_hasSuccessfulAiReply && !_isLoading)
+            _buildDoneBar(),
+
+          // 輸入區域
+          _buildInputArea(),
+        ],
+      ),
+      ),
+    );
+  }
+
+  /// 完成提示列
+  Widget _buildDoneBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '可繼續新增，或點完成返回',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 13,
               ),
             ),
-
-            // 標籤選擇器（鍵盤開啟時收合，帶動畫過渡）
-            AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
-              child: isKeyboardVisible
-                  ? const SizedBox.shrink()
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildAreaSelector(areasAsync),
-                        if (_selectedAreaId != null)
-                          _buildProductSelector(productsAsync),
-                        _buildInstructions(),
-                      ],
-                    ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
             ),
-
-            // 對話紀錄區域
-            Expanded(
-              child: _buildChatArea(),
+            child: const Text(
+              '完成',
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
-
-            // 輸入區域（已選擇的專案透過 @ badge 持續顯示）
-            _buildInputArea(),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -750,16 +815,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
       return;
     }
 
-    // 先關閉對話框
     if (mounted) {
-      Navigator.pop(context);
-    }
-
-    // 延遲一下再顯示編輯畫面，避免動畫衝突
-    await Future.delayed(const Duration(milliseconds: 100));
-
-    if (mounted) {
-      // 顯示編輯 BottomSheet
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -893,7 +949,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                 Expanded(
                   child: TextField(
                     controller: _textController,
-                    autofocus: true,
+                    autofocus: false,
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                     decoration: InputDecoration(
                       hintText: '輸入新事項...',

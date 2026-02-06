@@ -114,7 +114,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
       final model = await _apiClient.createProduct(payload);
       final product = model.toEntity();
 
-      await silentRefresh();
+      await silentRefresh(force: true);
 
       return Right(product);
     } catch (e) {
@@ -142,7 +142,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
       final model = await _apiClient.updateProduct(productId, body);
       final product = model.toEntity();
 
-      await silentRefresh();
+      await silentRefresh(force: true);
 
       return Right(product);
     } catch (e) {
@@ -154,7 +154,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
   Future<Either<Failure, void>> deleteProduct(String productId) async {
     try {
       await _apiClient.deleteProduct(productId);
-      await silentRefresh();
+      await silentRefresh(force: true);
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));
@@ -180,7 +180,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
   ) async {
     try {
       await _apiClient.applyProductReorganization(productId, proposal.toJson());
-      await silentRefresh();
+      await silentRefresh(force: true);
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));
@@ -217,7 +217,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
       final reference = referenceModel.toEntity();
 
       // Reference 變更也需要刷新 Product 快取
-      await silentRefresh();
+      await silentRefresh(force: true);
 
       return Right(reference);
     } catch (e) {
@@ -239,7 +239,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
       );
 
       // Reference 變更也需要刷新 Product 快取
-      await silentRefresh();
+      await silentRefresh(force: true);
 
       return const Right(null);
     } catch (e) {

@@ -281,6 +281,7 @@ export async function POST(request: NextRequest) {
       task_status: string | null;
       task_sub_items: any;
       task_updated_at: Date | null;
+      task_due_date: Date | null;
       // Milestone 欄位
       milestone_id: string | null;
       milestone_name: string | null;
@@ -334,6 +335,7 @@ export async function POST(request: NextRequest) {
           rt.status::text as task_status,
           rt.sub_items as task_sub_items,
           rt.updated_at as task_updated_at,
+          rt.due_date as task_due_date,
           NULL::text as milestone_id,
           NULL::text as milestone_name,
           NULL::text as milestone_description,
@@ -365,6 +367,7 @@ export async function POST(request: NextRequest) {
           NULL::text as task_status,
           NULL::json as task_sub_items,
           NULL::timestamp as task_updated_at,
+          NULL::timestamp as task_due_date,
           id::text as milestone_id,
           name as milestone_name,
           description as milestone_description,
@@ -397,6 +400,7 @@ export async function POST(request: NextRequest) {
       task_status: string | null;
       task_sub_items: any;
       task_updated_at: Date | null;
+      task_due_date: Date | null;
       task_row_num: number | null;
     }> = [];
 
@@ -419,6 +423,7 @@ export async function POST(request: NextRequest) {
           task_status: row.task_status,
           task_sub_items: row.task_sub_items,
           task_updated_at: row.task_updated_at,
+          task_due_date: row.task_due_date,
           task_row_num: null,
         });
         // 收集相關 Products（去重）
@@ -457,7 +462,7 @@ export async function POST(request: NextRequest) {
         id: string;
         name: string;
         topics: Array<{ id: string; name: string }>;
-        tasks: Array<{ id: string; content: string; status: string; sub_items: any; updated_at: Date }>;
+        tasks: Array<{ id: string; content: string; status: string; sub_items: any; updated_at: Date; due_date: Date | null }>;
       }>;
     }>();
 
@@ -502,6 +507,7 @@ export async function POST(request: NextRequest) {
               status: row.task_status || 'INBOX',
               sub_items: rawSubItems.slice(0, 2), // 只取前 2 個 sub_items
               updated_at: row.task_updated_at || new Date(),
+              due_date: row.task_due_date,
             });
           }
         }
@@ -578,8 +584,12 @@ export async function POST(request: NextRequest) {
                   ? `${Math.floor(updatedAgo / 60)} 小時前更新`
                   : `${Math.floor(updatedAgo / 1440)} 天前更新`;
 
+              const dueDateDisplay = task.due_date
+                ? new Date(task.due_date).toLocaleDateString("zh-TW")
+                : "無期限";
+
               contextSummary += `       - [${task.id}] ${task.content}\n`;
-              contextSummary += `         ⏰ ${timeDisplay} | 狀態: ${task.status}\n`;
+              contextSummary += `         ⏰ ${timeDisplay} | 狀態: ${task.status} | 截止: ${dueDateDisplay}\n`;
 
               // 顯示 sub-items（動態限制數量）
               if (task.sub_items && subItemsPerTask > 0) {
@@ -657,6 +667,7 @@ export async function POST(request: NextRequest) {
 1. **因果關係成立**：輸入是既有任務的「達成手段」
 2. **粒度更細**：輸入的範圍比既有任務更小、更具體
 3. **同一目標**：輸入和既有任務服務於同一個最終目標
+4. **時間一致**：如果用戶輸入帶有明確時間意圖，目標任務的截止日期必須落在相同時間範圍內。時間不一致則不得追加，必須創建新任務
 
 ### 常見誤判情況（這些都是新任務）
 

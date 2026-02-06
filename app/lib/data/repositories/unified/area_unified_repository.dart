@@ -111,7 +111,7 @@ class AreaUnifiedRepository extends CachedRepository<Area, String>
       });
       final area = model.toEntity();
 
-      await silentRefresh();
+      await silentRefresh(force: true);
 
       return Right(area);
     } catch (e) {

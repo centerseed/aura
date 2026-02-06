@@ -588,7 +588,10 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TaskDetailBottomSheet(task: task),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: TaskDetailBottomSheet(task: task),
+      ),
     );
   }
 }

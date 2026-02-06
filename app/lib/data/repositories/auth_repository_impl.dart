@@ -26,6 +26,9 @@ class AuthRepositoryImpl implements AuthRepository {
   User? get currentUser => _firebaseAuth.currentUser;
 
   @override
+  bool get isAnonymous => _firebaseAuth.currentUser?.isAnonymous ?? false;
+
+  @override
   Future<Either<Failure, User>> signInWithEmailAndPassword({
     required String email,
     required String password,
@@ -101,13 +104,73 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, User>> signInAnonymously() async {
+    try {
+      final userCredential = await _firebaseAuth.signInAnonymously();
+
+      if (userCredential.user == null) {
+        return Left(AuthFailure('Anonymous sign in failed'));
+      }
+
+      await _syncWithBackend(userCredential.user!);
+      return Right(userCredential.user!);
+    } on FirebaseAuthException catch (e) {
+      return Left(AuthFailure(e.message ?? 'Anonymous sign in failed'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, User>> linkWithGoogle() async {
+    try {
+      final currentUser = _firebaseAuth.currentUser;
+      if (currentUser == null) {
+        return Left(AuthFailure('No user logged in'));
+      }
+
+      // 1. 觸發 Google 登入流程
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return Left(AuthFailure('Google sign in cancelled'));
+      }
+
+      // 2. 獲取認證詳細信息
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // 3. 創建 Firebase 憑證
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // 4. 綁定到當前匿名帳號
+      final userCredential = await currentUser.linkWithCredential(credential);
+
+      if (userCredential.user == null) {
+        return Left(AuthFailure('Link with Google failed'));
+      }
+
+      // 5. 與後端同步更新用戶資料
+      await _syncWithBackend(userCredential.user!);
+      return Right(userCredential.user!);
+    } on FirebaseAuthException catch (e) {
+      return Left(AuthFailure(e.message ?? 'Link with Google failed'));
+    } catch (e) {
+      return Left(AuthFailure(e.toString()));
+    }
+  }
+
   Future<void> _syncWithBackend(User user) async {
     try {
+      final provider = user.isAnonymous ? 'anonymous' : 'google';
       final response = await _apiClient.signIn({
-        'provider': 'google',
+        'provider': provider,
         'providerId': user.uid,
         'email': user.email,
-        'name': user.displayName ?? user.email?.split('@')[0] ?? 'User',
+        'name': user.displayName ?? user.email?.split('@')[0] ?? '訪客',
         'photo_url': user.photoURL,
       });
 

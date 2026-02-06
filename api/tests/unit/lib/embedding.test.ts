@@ -3,14 +3,22 @@
  *
  * 測試目標：
  * 1. cosineSimilarity() 計算正確性（純函數，不依賴外部 API）
- * 2. 邊界條件處理
+ * 2. callGeminiEmbedding() API 呼叫邏輯（使用 Mock）
+ * 3. 邊界條件處理
  *
  * 注意：findRelevantProducts() 的完整測試在整合測試中
  * (因為需要調用 Google Embedding API)
  */
 
-import { describe, it, expect } from 'vitest'
-import { cosineSimilarity, findRelevantProducts } from '@/lib/embedding'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import {
+  cosineSimilarity,
+  findRelevantProducts,
+  callGeminiEmbedding,
+  callGeminiBatchEmbedding,
+  getEmbedding,
+  batchGetEmbeddings,
+} from '@/lib/embedding'
 
 describe('Embedding 工具模組', () => {
   describe('cosineSimilarity()', () => {
@@ -89,5 +97,279 @@ describe('Embedding 工具模組', () => {
 
     // 注意：其他 findRelevantProducts 測試（排序、語意匹配等）在整合測試中
     // 因為需要調用真實的 Google Embedding API
+  })
+
+  describe('callGeminiEmbedding (Mock 版本)', () => {
+    let originalFetch: typeof global.fetch
+    let originalEnv: string | undefined
+
+    beforeEach(() => {
+      originalFetch = global.fetch
+      originalEnv = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      // 設置測試用的 API key
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-api-key-12345'
+      // Mock fetch
+      global.fetch = vi.fn()
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+      if (originalEnv !== undefined) {
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY = originalEnv
+      } else {
+        delete process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      }
+    })
+
+    it('應該正確呼叫 Gemini Embedding API', async () => {
+      const mockEmbedding = Array(768).fill(0.1)
+      ;(global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ embedding: { values: mockEmbedding } }),
+      })
+
+      const result = await callGeminiEmbedding('測試文本')
+
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-embedding-001'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: expect.stringContaining('測試文本'),
+        })
+      )
+      expect(result).toEqual(mockEmbedding)
+      expect(result.length).toBe(768)
+    })
+
+    it('應該拋出錯誤當 API key 未設定', async () => {
+      delete process.env.GOOGLE_GENERATIVE_AI_API_KEY
+
+      await expect(callGeminiEmbedding('test')).rejects.toThrow(
+        'GOOGLE_GENERATIVE_AI_API_KEY is not set'
+      )
+    })
+
+    it('應該處理 API 429 錯誤（速率限制）', async () => {
+      ;(global.fetch as any).mockResolvedValue({
+        ok: false,
+        status: 429,
+        text: async () => 'Rate limit exceeded',
+      })
+
+      await expect(callGeminiEmbedding('test')).rejects.toThrow(
+        'Gemini Embedding API error: 429 - Rate limit exceeded'
+      )
+    })
+
+    it('應該處理 API 500 錯誤（伺服器錯誤）', async () => {
+      ;(global.fetch as any).mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      })
+
+      await expect(callGeminiEmbedding('test')).rejects.toThrow(
+        'Gemini Embedding API error: 500 - Internal Server Error'
+      )
+    })
+
+    it('應該處理網路錯誤（fetch 失敗）', async () => {
+      ;(global.fetch as any).mockRejectedValue(new Error('Network error'))
+
+      await expect(callGeminiEmbedding('test')).rejects.toThrow('Network error')
+    })
+
+    it('應該在請求 body 中包含正確的參數', async () => {
+      const mockEmbedding = Array(768).fill(0.5)
+      ;(global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ embedding: { values: mockEmbedding } }),
+      })
+
+      await callGeminiEmbedding('測試輸入')
+
+      const callArgs = (global.fetch as any).mock.calls[0]
+      const requestBody = JSON.parse(callArgs[1].body)
+
+      expect(requestBody).toEqual({
+        model: 'models/gemini-embedding-001',
+        content: {
+          parts: [{ text: '測試輸入' }],
+        },
+        outputDimensionality: 768,
+      })
+    })
+  })
+
+  describe('callGeminiBatchEmbedding (Mock 版本)', () => {
+    let originalFetch: typeof global.fetch
+    let originalEnv: string | undefined
+
+    beforeEach(() => {
+      originalFetch = global.fetch
+      originalEnv = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-api-key-12345'
+      global.fetch = vi.fn()
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+      if (originalEnv !== undefined) {
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY = originalEnv
+      } else {
+        delete process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      }
+    })
+
+    it('應該批次處理多個文本', async () => {
+      const mockEmbeddings = [
+        Array(768).fill(0.1),
+        Array(768).fill(0.2),
+        Array(768).fill(0.3),
+      ]
+      ;(global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          embeddings: mockEmbeddings.map((values) => ({ values })),
+        }),
+      })
+
+      const result = await callGeminiBatchEmbedding(['text1', 'text2', 'text3'])
+
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+      expect(result).toHaveLength(3)
+      expect(result[0]).toEqual(mockEmbeddings[0])
+      expect(result[1]).toEqual(mockEmbeddings[1])
+      expect(result[2]).toEqual(mockEmbeddings[2])
+    })
+
+    it('應該處理空陣列輸入', async () => {
+      ;(global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ embeddings: [] }),
+      })
+
+      const result = await callGeminiBatchEmbedding([])
+
+      expect(result).toEqual([])
+    })
+
+    it('應該拋出錯誤當 API key 未設定', async () => {
+      delete process.env.GOOGLE_GENERATIVE_AI_API_KEY
+
+      await expect(callGeminiBatchEmbedding(['test'])).rejects.toThrow(
+        'GOOGLE_GENERATIVE_AI_API_KEY is not set'
+      )
+    })
+
+    it('應該處理 API 錯誤', async () => {
+      ;(global.fetch as any).mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => 'Bad Request',
+      })
+
+      await expect(callGeminiBatchEmbedding(['test'])).rejects.toThrow(
+        'Gemini Batch Embedding API error: 400 - Bad Request'
+      )
+    })
+  })
+
+  describe('getEmbedding (Mock callGeminiEmbedding)', () => {
+    let originalFetch: typeof global.fetch
+    let originalEnv: string | undefined
+
+    beforeEach(() => {
+      originalFetch = global.fetch
+      originalEnv = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-api-key-12345'
+      global.fetch = vi.fn()
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+      if (originalEnv !== undefined) {
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY = originalEnv
+      } else {
+        delete process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      }
+    })
+
+    it('應該正確呼叫底層 API', async () => {
+      const mockEmbedding = Array(768).fill(0.5)
+      ;(global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ embedding: { values: mockEmbedding } }),
+      })
+
+      const result = await getEmbedding('測試文本')
+
+      expect(result).toEqual(mockEmbedding)
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('batchGetEmbeddings', () => {
+    let originalFetch: typeof global.fetch
+    let originalEnv: string | undefined
+
+    beforeEach(() => {
+      originalFetch = global.fetch
+      originalEnv = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-api-key-12345'
+      global.fetch = vi.fn()
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+      if (originalEnv !== undefined) {
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY = originalEnv
+      } else {
+        delete process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      }
+    })
+
+    it('應該批次獲取 embeddings', async () => {
+      const mockEmbeddings = [
+        Array(768).fill(0.1),
+        Array(768).fill(0.2),
+      ]
+      ;(global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          embeddings: mockEmbeddings.map((values) => ({ values })),
+        }),
+      })
+
+      const result = await batchGetEmbeddings(['text1', 'text2'])
+
+      expect(result).toHaveLength(2)
+      expect(result[0]).toEqual(mockEmbeddings[0])
+      expect(result[1]).toEqual(mockEmbeddings[1])
+    })
+
+    it('應該返回空陣列當輸入為空', async () => {
+      const result = await batchGetEmbeddings([])
+      expect(result).toEqual([])
+      expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    it('應該對單一文本使用 getEmbedding', async () => {
+      const mockEmbedding = Array(768).fill(0.3)
+      ;(global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ embedding: { values: mockEmbedding } }),
+      })
+
+      const result = await batchGetEmbeddings(['single text'])
+
+      expect(result).toEqual([mockEmbedding])
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('embedContent'), // 使用單一 API
+        expect.any(Object)
+      )
+    })
   })
 })

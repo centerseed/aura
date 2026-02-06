@@ -46,16 +46,33 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               child: _buildHeader(dailyProgress, isRefreshing: taskState.isRefreshing),
             ),
             // 最近任務標題
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
-                child: Text(
-                  '最近任務',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        ),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      '最近任務',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -104,12 +121,17 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
             children: [
               Row(
                 children: [
-                  const Text(
-                    'Zentropy',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF10B981)],
+                    ).createShader(bounds),
+                    child: const Text(
+                      'Zentropy',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   if (isRefreshing) ...[
@@ -125,9 +147,18 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   ],
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.person_outline, color: Colors.white70),
-                onPressed: () => context.push('/profile'),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.person_outline, color: Colors.white70),
+                  onPressed: () => context.push('/profile'),
+                ),
               ),
             ],
           ),
@@ -143,21 +174,31 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     final percentage = progress.total > 0
         ? (progress.completed / progress.total * 100).round()
         : 0;
+    final progressValue = progress.total > 0
+        ? progress.completed / progress.total
+        : 0.0;
+
+    // 根據進度選色
+    final progressColor = progressValue >= 1.0
+        ? const Color(0xFF10B981) // 完成：翠綠
+        : progressValue >= 0.5
+            ? const Color(0xFF4ADE80) // 過半：淺綠
+            : const Color(0xFF6366F1); // 未過半：靛藍
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            const Color(0xFF6C63FF).withValues(alpha: 0.2),
-            const Color(0xFF6C63FF).withValues(alpha: 0.05),
-          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            progressColor.withValues(alpha: 0.15),
+            progressColor.withValues(alpha: 0.05),
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
+          color: progressColor.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -169,38 +210,48 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
+                        color: progressColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        '今天已完成 (${progress.completed}/${progress.total})',
-                        style: const TextStyle(
-                          color: Color(0xFF4ADE80),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      child: Icon(
+                        progressValue >= 1.0
+                            ? Icons.celebration
+                            : Icons.trending_up,
+                        color: progressColor,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '今日進度',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${progress.completed}/${progress.total}',
+                      style: TextStyle(
+                        color: progressColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 // 進度條
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
-                    value: progress.total > 0
-                        ? progress.completed / progress.total
-                        : 0,
+                    value: progressValue,
                     minHeight: 8,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF4ADE80),
-                    ),
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                   ),
                 ),
               ],
@@ -217,14 +268,11 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   width: 60,
                   height: 60,
                   child: CircularProgressIndicator(
-                    value: progress.total > 0
-                        ? progress.completed / progress.total
-                        : 0,
-                    strokeWidth: 6,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF4ADE80),
-                    ),
+                    value: progressValue,
+                    strokeWidth: 5,
+                    strokeCap: StrokeCap.round,
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                   ),
                 ),
                 Center(
@@ -275,104 +323,192 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildTaskCard(Task task, {bool expanded = false}) {
+    final accentColor = task.isOverdue
+        ? const Color(0xFFEF4444)
+        : task.isToday
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF6366F1);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showTaskDetails(task),
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF161B22),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  accentColor.withValues(alpha: 0.08),
+                  Colors.white.withValues(alpha: 0.03),
+                ],
+              ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: task.isOverdue
-                    ? const Color(0xFFEF4444).withValues(alpha: 0.3)
-                    : task.isToday
-                        ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
-                        : Colors.white.withValues(alpha: 0.08),
+                color: accentColor.withValues(alpha: 0.2),
               ),
             ),
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    // 完成按鈕
-                    GestureDetector(
-                      onTap: () => _completeTask(task),
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            width: 2,
-                          ),
-                        ),
-                      ),
+                // 左側色條
+                Container(
+                  width: 4,
+                  height: expanded && task.subItems != null && task.subItems!.isNotEmpty
+                      ? null : 64,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        accentColor,
+                        accentColor.withValues(alpha: 0.3),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    // 任務內容
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            task.content,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (task.areaName != null || task.productName != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                [task.areaName, task.productName]
-                                    .whereType<String>()
-                                    .join(' > '),
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                  fontSize: 12,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                    ),
+                  ),
+                ),
+                // 內容區域
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            // 完成按鈕
+                            GestureDetector(
+                              onTap: () => _completeTask(task),
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: accentColor.withValues(alpha: 0.5),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: accentColor.withValues(alpha: 0.3),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                        ],
-                      ),
+                            const SizedBox(width: 12),
+                            // 任務內容
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    task.content,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (task.areaName != null || task.productName != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.folder_outlined,
+                                            size: 12,
+                                            color: Colors.white.withValues(alpha: 0.35),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              [task.areaName, task.productName]
+                                                  .whereType<String>()
+                                                  .join(' > '),
+                                              style: TextStyle(
+                                                color: Colors.white.withValues(alpha: 0.4),
+                                                fontSize: 12,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            // 日期標籤
+                            task.dueDate != null
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getDueDateColor(task).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _getDueDateColor(task).withValues(alpha: 0.2),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _formatDueDate(task.dueDate!),
+                                    style: TextStyle(
+                                      color: _getDueDateColor(task),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.06),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '未排程',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.35),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                          ],
+                        ),
+                        // Sub-items (展開顯示)
+                        if (expanded &&
+                            task.subItems != null &&
+                            task.subItems!.isNotEmpty)
+                          _buildSubItems(task),
+                      ],
                     ),
-                    // 日期標籤
-                    if (task.dueDate != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getDueDateColor(task).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _formatDueDate(task.dueDate!),
-                          style: TextStyle(
-                            color: _getDueDateColor(task),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
-                // Sub-items (展開顯示)
-                if (expanded &&
-                    task.subItems != null &&
-                    task.subItems!.isNotEmpty)
-                  _buildSubItems(task),
               ],
             ),
           ),
@@ -383,68 +519,79 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
 
   Widget _buildSubItems(Task task) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12, left: 36),
-      child: Column(
-        children: task.subItems!.map((subItem) {
-          // 使用樂觀更新狀態（如果有）
-          final key = '${task.id}:${subItem.id}';
-          final isCompleted = _optimisticSubItemStates[key] ?? subItem.completed;
+      padding: const EdgeInsets.only(top: 12, left: 34),
+      child: Container(
+        padding: const EdgeInsets.only(left: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
+            ),
+          ),
+        ),
+        child: Column(
+          children: task.subItems!.map((subItem) {
+            final key = '${task.id}:${subItem.id}';
+            final isCompleted = _optimisticSubItemStates[key] ?? subItem.completed;
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () => _toggleSubItem(task, subItem),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isCompleted
-                          ? const Color(0xFF4ADE80)
-                          : Colors.transparent,
-                      border: Border.all(
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => _toggleSubItem(task, subItem),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(5),
                         color: isCompleted
-                            ? const Color(0xFF4ADE80)
-                            : Colors.white.withValues(alpha: 0.3),
-                        width: 1.5,
+                            ? const Color(0xFF10B981)
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: isCompleted
+                              ? const Color(0xFF10B981)
+                              : Colors.white.withValues(alpha: 0.2),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: isCompleted
+                            ? const Icon(
+                                Icons.check,
+                                key: ValueKey('check'),
+                                size: 12,
+                                color: Colors.white,
+                              )
+                            : const SizedBox.shrink(key: ValueKey('empty')),
                       ),
                     ),
-                    child: AnimatedSwitcher(
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 200),
-                      child: isCompleted
-                          ? const Icon(
-                              Icons.check,
-                              key: ValueKey('check'),
-                              size: 12,
-                              color: Colors.white,
-                            )
-                          : const SizedBox.shrink(key: ValueKey('empty')),
+                      style: TextStyle(
+                        color: isCompleted
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.white.withValues(alpha: 0.8),
+                        fontSize: 14,
+                        decoration:
+                            isCompleted ? TextDecoration.lineThrough : null,
+                        decorationColor: Colors.white.withValues(alpha: 0.3),
+                      ),
+                      child: Text(subItem.content),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 200),
-                    style: TextStyle(
-                      color: isCompleted
-                          ? Colors.white.withValues(alpha: 0.4)
-                          : Colors.white.withValues(alpha: 0.8),
-                      fontSize: 14,
-                      decoration:
-                          isCompleted ? TextDecoration.lineThrough : null,
-                    ),
-                    child: Text(subItem.content),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -527,16 +674,29 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
         padding: const EdgeInsets.all(48.0),
         child: Column(
           children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 64,
-              color: Colors.white.withValues(alpha: 0.3),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF10B981).withValues(alpha: 0.2),
+                    const Color(0xFF6366F1).withValues(alpha: 0.2),
+                  ],
+                ),
+              ),
+              child: const Icon(
+                Icons.check_circle_outline,
+                size: 40,
+                color: Color(0xFF10B981),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               '太棒了！沒有待辦事項',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 16,
               ),
             ),
@@ -590,7 +750,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     if (diff < 0) return '逾期 ${-diff} 天';
     if (diff == 0) return '今天';
     if (diff == 1) return '明天';
-    if (diff < 7) return '${diff} 天後';
+    if (diff < 7) return '$diff 天後';
     return '${date.month}/${date.day}';
   }
 
@@ -599,7 +759,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TaskDetailBottomSheet(task: task),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: TaskDetailBottomSheet(task: task),
+      ),
     );
   }
 

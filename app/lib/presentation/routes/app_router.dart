@@ -10,6 +10,7 @@ import '../screens/focus/focus_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
+import '../screens/home/widgets/quick_capture_sheet.dart';
 import '../../domain/entities/task.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -85,6 +86,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/quick-capture',
+        builder: (context, state) => const QuickCaptureSheet(),
       ),
       GoRoute(
         path: '/focus/:taskId',

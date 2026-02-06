@@ -25,7 +25,7 @@ mixin _$AreaModel {
   @JsonKey(name: 'user_id')
   String get userId => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  String get description => throw _privateConstructorUsedError;
+  String? get description => throw _privateConstructorUsedError;
   String? get scope => throw _privateConstructorUsedError;
   @JsonKey(name: 'rolling_summary')
   Object? get rollingSummary => throw _privateConstructorUsedError;
@@ -57,7 +57,7 @@ abstract class $AreaModelCopyWith<$Res> {
     String id,
     @JsonKey(name: 'user_id') String userId,
     String name,
-    String description,
+    String? description,
     String? scope,
     @JsonKey(name: 'rolling_summary') Object? rollingSummary,
     @JsonKey(name: 'is_custom') bool isCustom,
@@ -85,7 +85,7 @@ class _$AreaModelCopyWithImpl<$Res, $Val extends AreaModel>
     Object? id = null,
     Object? userId = null,
     Object? name = null,
-    Object? description = null,
+    Object? description = freezed,
     Object? scope = freezed,
     Object? rollingSummary = freezed,
     Object? isCustom = null,
@@ -107,10 +107,10 @@ class _$AreaModelCopyWithImpl<$Res, $Val extends AreaModel>
                 ? _value.name
                 : name // ignore: cast_nullable_to_non_nullable
                       as String,
-            description: null == description
+            description: freezed == description
                 ? _value.description
                 : description // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as String?,
             scope: freezed == scope
                 ? _value.scope
                 : scope // ignore: cast_nullable_to_non_nullable
@@ -153,7 +153,7 @@ abstract class _$$AreaModelImplCopyWith<$Res>
     String id,
     @JsonKey(name: 'user_id') String userId,
     String name,
-    String description,
+    String? description,
     String? scope,
     @JsonKey(name: 'rolling_summary') Object? rollingSummary,
     @JsonKey(name: 'is_custom') bool isCustom,
@@ -180,7 +180,7 @@ class __$$AreaModelImplCopyWithImpl<$Res>
     Object? id = null,
     Object? userId = null,
     Object? name = null,
-    Object? description = null,
+    Object? description = freezed,
     Object? scope = freezed,
     Object? rollingSummary = freezed,
     Object? isCustom = null,
@@ -202,10 +202,10 @@ class __$$AreaModelImplCopyWithImpl<$Res>
             ? _value.name
             : name // ignore: cast_nullable_to_non_nullable
                   as String,
-        description: null == description
+        description: freezed == description
             ? _value.description
             : description // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as String?,
         scope: freezed == scope
             ? _value.scope
             : scope // ignore: cast_nullable_to_non_nullable
@@ -241,7 +241,7 @@ class _$AreaModelImpl extends _AreaModel {
     required this.id,
     @JsonKey(name: 'user_id') required this.userId,
     required this.name,
-    required this.description,
+    this.description,
     this.scope,
     @JsonKey(name: 'rolling_summary') this.rollingSummary,
     @JsonKey(name: 'is_custom') required this.isCustom,
@@ -261,7 +261,7 @@ class _$AreaModelImpl extends _AreaModel {
   @override
   final String name;
   @override
-  final String description;
+  final String? description;
   @override
   final String? scope;
   @override
@@ -345,7 +345,7 @@ abstract class _AreaModel extends AreaModel {
     required final String id,
     @JsonKey(name: 'user_id') required final String userId,
     required final String name,
-    required final String description,
+    final String? description,
     final String? scope,
     @JsonKey(name: 'rolling_summary') final Object? rollingSummary,
     @JsonKey(name: 'is_custom') required final bool isCustom,
@@ -366,7 +366,7 @@ abstract class _AreaModel extends AreaModel {
   @override
   String get name;
   @override
-  String get description;
+  String? get description;
   @override
   String? get scope;
   @override

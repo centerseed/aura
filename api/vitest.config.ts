@@ -2,7 +2,8 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 import dotenv from 'dotenv'
 
-// 載入 .env.test（override: true 強制覆蓋已存在的環境變數）
+// 先載入 .env（提供真實 API keys 等），再用 .env.test 覆蓋測試專屬設定
+dotenv.config({ path: '.env' })
 dotenv.config({ path: '.env.test', override: true })
 
 // 強制設定 DATABASE_URL 為本地測試資料庫（用於整合測試）

@@ -124,7 +124,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
       final model = await _apiClient.createTask(body);
       final task = model.toEntity();
 
-      await silentRefresh();
+      await silentRefresh(force: true);
 
       return Right(task);
     } catch (e) {
@@ -170,7 +170,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
       final model = await _apiClient.updateTask(taskId, requestBody);
       final task = model.toEntity();
 
-      await silentRefresh();
+      await silentRefresh(force: true);
 
       return Right(task);
     } catch (e) {
@@ -182,7 +182,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
   Future<Either<Failure, void>> deleteTask(String taskId) async {
     try {
       await _apiClient.deleteTask(taskId);
-      await silentRefresh();
+      await silentRefresh(force: true);
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));
@@ -206,7 +206,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
       }
 
       await _apiClient.updateSubItem(taskId, subItemId, requestBody);
-      await silentRefresh();
+      await silentRefresh(force: true);
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));
@@ -220,7 +220,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
   ) async {
     try {
       await _apiClient.addSubItem(taskId, content);
-      await silentRefresh();
+      await silentRefresh(force: true);
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));
@@ -234,7 +234,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
   ) async {
     try {
       await _apiClient.deleteSubItem(taskId, subItemId);
-      await silentRefresh();
+      await silentRefresh(force: true);
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));
@@ -248,7 +248,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
   ) async {
     try {
       final response = await _apiClient.promoteSubItem(taskId, subItemId);
-      await silentRefresh();
+      await silentRefresh(force: true);
       final newTaskData = response['newTask'] as Map<String, dynamic>;
       return Right(TaskModel.fromJson(newTaskData).toEntity());
     } catch (e) {
@@ -263,7 +263,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
   ) async {
     try {
       await _apiClient.reorderSubItems(taskId, subItemIds);
-      await silentRefresh();
+      await silentRefresh(force: true);
       return const Right(null);
     } catch (e) {
       return Left(handleDioError(e));

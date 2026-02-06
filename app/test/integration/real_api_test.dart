@@ -10,7 +10,7 @@ import 'package:dio/dio.dart';
 /// 這個測試會實際連接到本地後端，執行完整的 CRUD 操作
 ///
 /// 前置要求:
-/// 1. 本地後端必須在 http://localhost:3001 運行
+/// 1. 本地後端必須在 http://localhost:3002 運行
 /// 2. Firebase 必須正確配置
 /// 3. 需要有測試用戶
 ///
@@ -63,7 +63,7 @@ void main() {
 
     test('後端連線檢查 - 測試任意端點返回認證錯誤', () async {
       try {
-        await dio.get('/api/tasks');
+        await dio.get('/tasks');
         fail('應該要拋出 401 錯誤');
       } catch (e) {
         if (e is DioException) {

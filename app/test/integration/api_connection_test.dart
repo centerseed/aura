@@ -38,35 +38,30 @@ void main() {
       print('========================================\n');
 
       try {
-        // 嘗試連接到根路徑
-        final response = await dio.get('/');
+        // 用 /tasks 端點驗證 server 是否運行（401 = server 活著，只是未認證）
+        final response = await dio.get('/tasks');
 
         print('✅ API 連線成功!');
         print('Status Code: ${response.statusCode}');
-        print('Response: ${response.data}');
 
-        expect(response.statusCode, equals(200));
+        expect(response.statusCode, isIn([200, 401, 403]));
       } catch (e) {
-        print('❌ API 連線失敗!');
-        print('錯誤: $e');
-
-        if (e is DioException) {
-          print('錯誤類型: ${e.type}');
-          print('錯誤訊息: ${e.message}');
-          if (e.response != null) {
-            print('回應狀態碼: ${e.response?.statusCode}');
-            print('回應內容: ${e.response?.data}');
-          }
+        if (e is DioException && e.response != null) {
+          // 收到 HTTP 回應（包括 401）代表 server 有在運行
+          print('✅ API server 運行中 (HTTP ${e.response?.statusCode})');
+          expect(e.response?.statusCode, isIn([401, 403]));
+        } else {
+          print('❌ API 連線失敗! (server 可能未啟動)');
+          print('錯誤: $e');
+          rethrow;
         }
-
-        rethrow;
       }
     });
 
     test('應該能存取 /api/me 端點', () async {
       try {
         // 注意: 這個測試會因為未認證而失敗,但可以驗證端點存在
-        final response = await dio.get('/api/me');
+        final response = await dio.get('/me');
 
         print('✅ /api/me 端點可存取!');
         print('Status Code: ${response.statusCode}');
@@ -74,7 +69,7 @@ void main() {
         expect(response.statusCode, isIn([200, 401, 403]));
       } catch (e) {
         if (e is DioException && e.response?.statusCode == 401) {
-          print('✅ /api/me 端點存在 (未認證,預期行為)');
+          print('✅ /me 端點存在 (未認證,預期行為)');
           print('Status Code: 401');
           expect(true, true); // 401 是預期的
         } else {
@@ -87,7 +82,7 @@ void main() {
 
     test('應該能存取 /api/areas 端點', () async {
       try {
-        final response = await dio.get('/api/areas');
+        final response = await dio.get('/areas');
 
         print('✅ /api/areas 端點可存取!');
         print('Status Code: ${response.statusCode}');
@@ -95,7 +90,7 @@ void main() {
         expect(response.statusCode, isIn([200, 401, 403]));
       } catch (e) {
         if (e is DioException && e.response?.statusCode == 401) {
-          print('✅ /api/areas 端點存在 (未認證,預期行為)');
+          print('✅ /areas 端點存在 (未認證,預期行為)');
           expect(true, true);
         } else {
           print('❌ /api/areas 端點測試失敗!');
@@ -107,7 +102,7 @@ void main() {
 
     test('應該能存取 /api/products 端點', () async {
       try {
-        final response = await dio.get('/api/products');
+        final response = await dio.get('/products');
 
         print('✅ /api/products 端點可存取!');
         print('Status Code: ${response.statusCode}');
@@ -115,7 +110,7 @@ void main() {
         expect(response.statusCode, isIn([200, 401, 403]));
       } catch (e) {
         if (e is DioException && e.response?.statusCode == 401) {
-          print('✅ /api/products 端點存在 (未認證,預期行為)');
+          print('✅ /products 端點存在 (未認證,預期行為)');
           expect(true, true);
         } else {
           print('❌ /api/products 端點測試失敗!');
@@ -127,7 +122,7 @@ void main() {
 
     test('應該能存取 /api/tasks 端點', () async {
       try {
-        final response = await dio.get('/api/tasks');
+        final response = await dio.get('/tasks');
 
         print('✅ /api/tasks 端點可存取!');
         print('Status Code: ${response.statusCode}');
@@ -135,7 +130,7 @@ void main() {
         expect(response.statusCode, isIn([200, 401, 403]));
       } catch (e) {
         if (e is DioException && e.response?.statusCode == 401) {
-          print('✅ /api/tasks 端點存在 (未認證,預期行為)');
+          print('✅ /tasks 端點存在 (未認證,預期行為)');
           expect(true, true);
         } else {
           print('❌ /api/tasks 端點測試失敗!');

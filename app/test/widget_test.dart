@@ -33,6 +33,11 @@ class MockAuthRepository implements AuthRepository {
   Future<Either<Failure, String>> getIdToken() async {
     return Left(AuthFailure('No token'));
   }
+
+  @override
+  Future<Either<Failure, void>> ensureBackendSync() async {
+    return const Right(null);
+  }
 }
 
 void main() {

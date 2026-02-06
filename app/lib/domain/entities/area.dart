@@ -4,7 +4,7 @@ import 'package:equatable/equatable.dart';
 class Area extends Equatable {
   final String id;
   final String name;
-  final String description;
+  final String? description;
   final String? scope;
   final String? rollingSummary;
   final bool isCustom;
@@ -14,7 +14,7 @@ class Area extends Equatable {
   const Area({
     required this.id,
     required this.name,
-    required this.description,
+    this.description,
     this.scope,
     this.rollingSummary,
     required this.isCustom,

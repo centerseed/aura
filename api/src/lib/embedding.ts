@@ -39,7 +39,7 @@ interface GeminiBatchEmbeddingResponse {
 /**
  * 呼叫 Gemini Embedding API
  */
-async function callGeminiEmbedding(text: string): Promise<number[]> {
+export async function callGeminiEmbedding(text: string): Promise<number[]> {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
@@ -73,7 +73,7 @@ async function callGeminiEmbedding(text: string): Promise<number[]> {
 /**
  * 批次呼叫 Gemini Embedding API
  */
-async function callGeminiBatchEmbedding(texts: string[]): Promise<number[][]> {
+export async function callGeminiBatchEmbedding(texts: string[]): Promise<number[][]> {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
