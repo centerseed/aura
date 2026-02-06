@@ -34,6 +34,7 @@ SET search_path TO poc_librarian, public;
 CREATE TABLE IF NOT EXISTS corrections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT NOT NULL,
+    domain VARCHAR(50) NOT NULL DEFAULT 'naruvia',
 
     original_input TEXT NOT NULL,
     ai_prediction JSONB NOT NULL,
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS corrections (
 CREATE TABLE IF NOT EXISTS rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT NOT NULL,
+    domain VARCHAR(50) NOT NULL DEFAULT 'naruvia',
 
     description TEXT NOT NULL,
     trigger_conditions JSONB,
@@ -89,6 +91,28 @@ CREATE TABLE IF NOT EXISTS evaluations (
 );
 
 -- ============================================================================
+-- Domain Configs 表（各 domain 的蒸餾設定）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS domain_configs (
+    domain VARCHAR(50) PRIMARY KEY,
+    display_name VARCHAR(100),
+    warm_threshold INT DEFAULT 3,
+    distill_threshold INT DEFAULT 10,
+    similarity_threshold FLOAT DEFAULT 0.85,
+    confidence_decay_days INT DEFAULT 30,
+    categories JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 預設設定
+INSERT INTO domain_configs (domain, display_name, warm_threshold, distill_threshold, similarity_threshold, confidence_decay_days, categories)
+VALUES
+    ('naruvia', 'Naruvia 任務分類', 3, 10, 0.85, 30,
+     '["公司資產","營運成本","人才投資","個人娛樂","工作工具","職涯發展"]'),
+    ('paceriz', 'Paceriz 課表修正', 5, 15, 0.80, 60, NULL)
+ON CONFLICT (domain) DO NOTHING;
+
+-- ============================================================================
 -- 索引
 -- ============================================================================
 
@@ -101,10 +125,10 @@ CREATE INDEX IF NOT EXISTS idx_rules_embedding
 
 -- 常規索引
 CREATE INDEX IF NOT EXISTS idx_corrections_user_processed
-    ON corrections (user_id, processed);
+    ON corrections (user_id, domain, processed);
 
 CREATE INDEX IF NOT EXISTS idx_rules_user_active
-    ON rules (user_id, is_active);
+    ON rules (user_id, domain, is_active);
 
 CREATE INDEX IF NOT EXISTS idx_evaluations_user_phase
     ON evaluations (user_id, phase_number);

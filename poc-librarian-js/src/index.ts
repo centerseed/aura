@@ -10,6 +10,7 @@ export * from './core/types.js';
 export * from './core/db.js';
 export * from './core/vector-store.js';
 export * from './core/llm-client.js';
+export * from './core/domain-config.js';
 
 // Intelligence exports
 export * from './intelligence/clustering.js';

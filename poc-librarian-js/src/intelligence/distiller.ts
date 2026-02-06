@@ -24,6 +24,7 @@ import type { Rule, Cluster, CorrectionWithEmbedding, RuleValidationResult } fro
 // ============================================================================
 
 const DEFAULT_DISTILL_THRESHOLD = 10;
+const WARM_DISTILL_THRESHOLD = 3;
 
 // ============================================================================
 // Rule Distiller
@@ -32,20 +33,26 @@ const DEFAULT_DISTILL_THRESHOLD = 10;
 export class RuleDistiller {
   private clusteringEngine: AdaptiveClusteringEngine;
   private distillThreshold: number;
+  private warmThreshold: number;
+  private domain: string;
 
   constructor(options: {
+    domain?: string;
     similarityThreshold?: number;
     distillThreshold?: number;
+    warmThreshold?: number;
   } = {}) {
     this.clusteringEngine = new AdaptiveClusteringEngine(options.similarityThreshold);
     this.distillThreshold = options.distillThreshold ?? DEFAULT_DISTILL_THRESHOLD;
+    this.warmThreshold = options.warmThreshold ?? WARM_DISTILL_THRESHOLD;
+    this.domain = options.domain ?? 'naruvia';
   }
 
   /**
    * 檢查是否應該觸發蒸餾
    */
   async shouldDistill(userId: string): Promise<boolean> {
-    const unprocessed = await getUnprocessedCorrections(userId);
+    const unprocessed = await getUnprocessedCorrections(userId, this.domain);
     return unprocessed.length >= this.distillThreshold;
   }
 
@@ -61,7 +68,7 @@ export class RuleDistiller {
 
     // ========== Stage 0: 規則老化 ==========
     console.log('\n📅 Stage 0: 執行規則老化...');
-    const agingResult = await applyRuleAging(userId);
+    const agingResult = await applyRuleAging(userId, this.domain);
     if (agingResult.staleCount > 0 || agingResult.archivedCount > 0) {
       console.log(`   ⏰ 降權 ${agingResult.staleCount} 條過時規則`);
       console.log(`   📦 歸檔 ${agingResult.archivedCount} 條長期未用規則`);
@@ -69,7 +76,7 @@ export class RuleDistiller {
 
     // ========== Stage 1: 取得並分群 ==========
     console.log('\n📊 Stage 1: 分群階段...');
-    const corrections = await getUnprocessedCorrections(userId);
+    const corrections = await getUnprocessedCorrections(userId, this.domain);
     console.log(`   📥 取得 ${corrections.length} 筆未處理的修正`);
 
     if (corrections.length < 2) {
@@ -128,7 +135,8 @@ export class RuleDistiller {
         userId,
         distillResult.ruleDescription,
         distillResult.resultAction,
-        embedding
+        embedding,
+        this.domain
       );
 
       if (conflictCheck.hasConflict) {
@@ -163,6 +171,7 @@ export class RuleDistiller {
       // 儲存新規則
       const ruleId = await storeRule({
         userId,
+        domain: this.domain,
         description: distillResult.ruleDescription,
         triggerConditions: distillResult.triggerConditions,
         resultAction: distillResult.resultAction,
@@ -174,6 +183,7 @@ export class RuleDistiller {
       const rule: Rule = {
         id: ruleId,
         userId,
+        domain: this.domain,
         description: distillResult.ruleDescription,
         triggerConditions: distillResult.triggerConditions,
         resultAction: distillResult.resultAction,
@@ -217,11 +227,11 @@ export class RuleDistiller {
     console.log(`\n🔧 開始規則庫維護 (userId: ${userId})...`);
 
     // 1. 老化
-    const agingResult = await applyRuleAging(userId);
+    const agingResult = await applyRuleAging(userId, this.domain);
     console.log(`   ⏰ 老化: 降權 ${agingResult.staleCount}，歸檔 ${agingResult.archivedCount}`);
 
     // 2. 合併
-    const mergeCandidates = await findMergeCandidates(userId);
+    const mergeCandidates = await findMergeCandidates(userId, undefined, this.domain);
     let mergedCount = 0;
     for (const candidate of mergeCandidates) {
       await mergeRules(candidate.sourceRule.id, candidate.targetRule.id);
@@ -240,6 +250,89 @@ export class RuleDistiller {
   }
 
   /**
+   * Warm Path: 低閾值快速蒸餾
+   *
+   * 當未處理修正達到 WARM_DISTILL_THRESHOLD (3) 但未達完整蒸餾閾值時，
+   * 嘗試直接用 LLM 歸納 1 條規則（跳過分群），降低冷啟動延遲。
+   */
+  async warmDistill(userId: string): Promise<Rule | null> {
+    const corrections = await getUnprocessedCorrections(userId, this.domain);
+
+    if (corrections.length < this.warmThreshold) {
+      return null;
+    }
+
+    // 已達完整蒸餾閾值，交給 Cold Path
+    if (corrections.length >= this.distillThreshold) {
+      return null;
+    }
+
+    console.log(`\n⚡ Warm Path 蒸餾 (${corrections.length} 筆修正)...`);
+
+    // 跳過分群，直接對所有修正歸納 1 條規則
+    const distillResult = await distillRule(corrections);
+
+    if (!distillResult) {
+      console.log('   ⚠️ Warm Path 無法歸納規則');
+      return null;
+    }
+
+    const ruleEmbedding = await getEmbedding(distillResult.ruleDescription);
+
+    // 檢查衝突
+    const conflictCheck = await checkRuleConflicts(
+      userId,
+      distillResult.ruleDescription,
+      distillResult.resultAction,
+      ruleEmbedding,
+      this.domain
+    );
+
+    if (conflictCheck.hasConflict) {
+      const conflict = conflictCheck.conflictingRules[0];
+      if (conflict.conflictType === 'duplicate' || conflict.conflictType === 'similar') {
+        console.log(`   ⏭️ 與現有規則重複/相似，跳過`);
+        return null;
+      }
+    }
+
+    // 儲存新規則
+    const ruleId = await storeRule({
+      userId,
+      domain: this.domain,
+      description: distillResult.ruleDescription,
+      triggerConditions: distillResult.triggerConditions,
+      resultAction: distillResult.resultAction,
+      confidence: distillResult.confidence * 0.9,
+      embedding: ruleEmbedding,
+      isActive: true,
+    });
+
+    // 標記已處理
+    const processedIds = corrections.map(c => c.id);
+    await markCorrectionsProcessed(processedIds);
+
+    const rule: Rule = {
+      id: ruleId,
+      userId,
+      domain: this.domain,
+      description: distillResult.ruleDescription,
+      triggerConditions: distillResult.triggerConditions,
+      resultAction: distillResult.resultAction,
+      confidence: distillResult.confidence * 0.9,
+      timesApplied: 0,
+      timesCorrect: 0,
+      embedding: ruleEmbedding,
+      isActive: true,
+      createdAt: new Date(),
+    };
+
+    console.log(`   ✅ Warm Path 規則: "${rule.description}" (信心度: ${(rule.confidence * 100).toFixed(0)}%)`);
+
+    return rule;
+  }
+
+  /**
    * 取得蒸餾摘要
    */
   async getDistillationSummary(userId: string): Promise<{
@@ -247,7 +340,7 @@ export class RuleDistiller {
     threshold: number;
     readyToDistill: boolean;
   }> {
-    const corrections = await getUnprocessedCorrections(userId);
+    const corrections = await getUnprocessedCorrections(userId, this.domain);
 
     return {
       pendingCorrections: corrections.length,

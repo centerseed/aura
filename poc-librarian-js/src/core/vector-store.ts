@@ -182,12 +182,13 @@ export async function storeCorrection(
 ): Promise<string> {
   const result = await queryInSchema<{ id: string }>(
     `INSERT INTO corrections (
-      user_id, original_input, ai_prediction, user_correction,
+      user_id, domain, original_input, ai_prediction, user_correction,
       corrected_field, embedding, processed, phase_number
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING id`,
     [
       correction.userId,
+      correction.domain,
       correction.originalInput,
       JSON.stringify(correction.aiPrediction),
       JSON.stringify(correction.userCorrection),
@@ -209,12 +210,13 @@ export async function storeRule(
 ): Promise<string> {
   const result = await queryInSchema<{ id: string }>(
     `INSERT INTO rules (
-      user_id, description, trigger_conditions, result_action,
+      user_id, domain, description, trigger_conditions, result_action,
       confidence, embedding, is_active
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING id`,
     [
       rule.userId,
+      rule.domain,
       rule.description,
       JSON.stringify(rule.triggerConditions),
       JSON.stringify(rule.resultAction),
@@ -230,10 +232,11 @@ export async function storeRule(
 /**
  * 取得用戶未處理的 Corrections
  */
-export async function getUnprocessedCorrections(userId: string): Promise<CorrectionWithEmbedding[]> {
+export async function getUnprocessedCorrections(userId: string, domain: string = 'naruvia'): Promise<CorrectionWithEmbedding[]> {
   const result = await queryInSchema<{
     id: string;
     user_id: string;
+    domain: string;
     original_input: string;
     ai_prediction: Record<string, unknown>;
     user_correction: Record<string, unknown>;
@@ -244,14 +247,15 @@ export async function getUnprocessedCorrections(userId: string): Promise<Correct
     created_at: Date;
   }>(
     `SELECT * FROM corrections
-     WHERE user_id = $1 AND processed = false AND embedding IS NOT NULL
+     WHERE user_id = $1 AND domain = $2 AND processed = false AND embedding IS NOT NULL
      ORDER BY created_at ASC`,
-    [userId]
+    [userId, domain]
   );
 
   return result.rows.map(row => ({
     id: row.id,
     userId: row.user_id,
+    domain: row.domain,
     originalInput: row.original_input,
     aiPrediction: row.ai_prediction,
     userCorrection: row.user_correction,
@@ -281,11 +285,13 @@ export async function markCorrectionsProcessed(correctionIds: string[]): Promise
 export async function searchSimilarRules(
   userId: string,
   queryEmbedding: number[],
-  topK: number = 5
+  topK: number = 5,
+  domain: string = 'naruvia'
 ): Promise<Rule[]> {
   const result = await queryInSchema<{
     id: string;
     user_id: string;
+    domain: string;
     description: string;
     trigger_conditions: string[];
     result_action: Record<string, unknown>;
@@ -300,15 +306,16 @@ export async function searchSimilarRules(
   }>(
     `SELECT *, 1 - (embedding <=> $1::vector) AS similarity
      FROM rules
-     WHERE user_id = $2 AND is_active = true AND embedding IS NOT NULL
+     WHERE user_id = $2 AND domain = $3 AND is_active = true AND embedding IS NOT NULL
      ORDER BY embedding <=> $1::vector
-     LIMIT $3`,
-    [`[${queryEmbedding.join(',')}]`, userId, topK]
+     LIMIT $4`,
+    [`[${queryEmbedding.join(',')}]`, userId, domain, topK]
   );
 
   return result.rows.map(row => ({
     id: row.id,
     userId: row.user_id,
+    domain: row.domain,
     description: row.description,
     triggerConditions: row.trigger_conditions,
     resultAction: row.result_action,
@@ -342,10 +349,11 @@ export async function updateRuleUsage(
 /**
  * 取得用戶的所有 Rules
  */
-export async function getUserRules(userId: string): Promise<Rule[]> {
+export async function getUserRules(userId: string, domain: string = 'naruvia'): Promise<Rule[]> {
   const result = await queryInSchema<{
     id: string;
     user_id: string;
+    domain: string;
     description: string;
     trigger_conditions: string[];
     result_action: Record<string, unknown>;
@@ -357,13 +365,14 @@ export async function getUserRules(userId: string): Promise<Rule[]> {
     created_at: Date;
     last_used_at: Date | null;
   }>(
-    `SELECT * FROM rules WHERE user_id = $1 ORDER BY confidence DESC`,
-    [userId]
+    `SELECT * FROM rules WHERE user_id = $1 AND domain = $2 ORDER BY confidence DESC`,
+    [userId, domain]
   );
 
   return result.rows.map(row => ({
     id: row.id,
     userId: row.user_id,
+    domain: row.domain,
     description: row.description,
     triggerConditions: row.trigger_conditions,
     resultAction: row.result_action,
@@ -491,9 +500,10 @@ export function calculateRuleHealthScore(rule: Rule): RuleHealthScore {
  */
 export async function findMergeCandidates(
   userId: string,
-  threshold: number = SIMILARITY_MERGE_THRESHOLD
+  threshold: number = SIMILARITY_MERGE_THRESHOLD,
+  domain: string = 'naruvia'
 ): Promise<RuleMergeCandidate[]> {
-  const rules = await getUserRules(userId);
+  const rules = await getUserRules(userId, domain);
   const candidates: RuleMergeCandidate[] = [];
 
   for (let i = 0; i < rules.length; i++) {
@@ -531,7 +541,7 @@ export async function findMergeCandidates(
 /**
  * 執行規則老化（降權過時規則）
  */
-export async function applyRuleAging(userId: string): Promise<{
+export async function applyRuleAging(userId: string, domain: string = 'naruvia'): Promise<{
   staleCount: number;
   archivedCount: number;
 }> {
@@ -539,24 +549,24 @@ export async function applyRuleAging(userId: string): Promise<{
   const staleResult = await queryInSchema<{ count: string }>(
     `UPDATE rules
      SET confidence = confidence * 0.5
-     WHERE user_id = $1
+     WHERE user_id = $1 AND domain = $2
        AND is_active = true
        AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '30 days')
        AND created_at < NOW() - INTERVAL '30 days'
      RETURNING id`,
-    [userId]
+    [userId, domain]
   );
 
   // 60 天未使用 → 歸檔（停用）
   const archiveResult = await queryInSchema<{ count: string }>(
     `UPDATE rules
      SET is_active = false
-     WHERE user_id = $1
+     WHERE user_id = $1 AND domain = $2
        AND is_active = true
        AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '60 days')
        AND created_at < NOW() - INTERVAL '60 days'
      RETURNING id`,
-    [userId]
+    [userId, domain]
   );
 
   return {
@@ -591,13 +601,46 @@ export async function mergeRules(
 }
 
 /**
+ * 即時增強規則信心度（Hot Path）
+ *
+ * 當新修正與現有規則匹配時，提升該規則的 confidence。
+ * 純 SQL 操作，不呼叫 LLM。
+ */
+export async function boostRuleConfidence(
+  ruleId: string,
+  boostAmount: number = 0.02,
+  maxConfidence: number = 0.98
+): Promise<void> {
+  await queryInSchema(
+    `UPDATE rules
+     SET confidence = LEAST($2, confidence + $3),
+         last_used_at = NOW()
+     WHERE id = $1`,
+    [ruleId, maxConfidence, boostAmount]
+  );
+}
+
+/**
+ * 取得用戶未匹配的修正數量（未被 Hot Path 處理的修正）
+ */
+export async function getUnmatchedCorrectionCount(userId: string, domain: string = 'naruvia'): Promise<number> {
+  const result = await queryInSchema<{ count: string }>(
+    `SELECT COUNT(*) as count FROM corrections
+     WHERE user_id = $1 AND domain = $2 AND processed = false AND embedding IS NOT NULL`,
+    [userId, domain]
+  );
+  return parseInt(result.rows[0].count, 10);
+}
+
+/**
  * 檢查新規則是否與現有規則衝突
  */
 export async function checkRuleConflicts(
   userId: string,
   newRuleDescription: string,
   newRuleAction: Record<string, unknown>,
-  newRuleEmbedding: number[]
+  newRuleEmbedding: number[],
+  domain: string = 'naruvia'
 ): Promise<{
   hasConflict: boolean;
   conflictingRules: Array<{
@@ -606,7 +649,7 @@ export async function checkRuleConflicts(
     conflictType: 'same_trigger_different_result' | 'duplicate' | 'similar';
   }>;
 }> {
-  const existingRules = await searchSimilarRules(userId, newRuleEmbedding, 5);
+  const existingRules = await searchSimilarRules(userId, newRuleEmbedding, 5, domain);
   const conflicts: Array<{
     rule: Rule;
     similarity: number;

@@ -20,9 +20,11 @@ import type {
  */
 export abstract class BaseLibrarianAdapter implements LibrarianAdapter {
   protected userId: string;
+  protected domain: string;
 
-  constructor(userId: string) {
+  constructor(userId: string, domain: string = 'naruvia') {
     this.userId = userId;
+    this.domain = domain;
   }
 
   /**

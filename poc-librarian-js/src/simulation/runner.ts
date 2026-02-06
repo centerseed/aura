@@ -149,27 +149,30 @@ export class SimulationRunner {
       if (!isCorrect) {
         corrections++;
 
-        // 記錄修正
+        // 記錄修正（observe 內部自動執行 Hot/Warm Path）
         await adapter.observe({
           userId: persona.id,
+          domain: 'naruvia',
           type: 'correction',
           input,
           aiPrediction: { category: result.category },
           userCorrection: { category: expectedCategory },
           phaseNumber,
         });
+
+        // 同步更新本地規則快取（Warm Path 可能已產出新規則）
+        this.userRules.set(persona.id, await adapter.getRules());
       }
     }
 
-    // 階段結束後，檢查是否需要蒸餾
+    // 階段結束後，檢查是否需要 Cold Path 蒸餾
     const status = await adapter.getDistillationStatus();
     if (status.readyToDistill) {
-      console.log(`   🔄 觸發蒸餾 (${status.pendingCorrections} 筆修正)...`);
+      console.log(`   🔄 Cold Path 蒸餾 (${status.pendingCorrections} 筆修正)...`);
       const newRules = await adapter.reflect(persona.id);
 
       // 更新用戶規則
-      const existingRules = this.userRules.get(persona.id) || [];
-      this.userRules.set(persona.id, [...existingRules, ...newRules]);
+      this.userRules.set(persona.id, await adapter.getRules());
 
       console.log(`   ✅ 蒸餾完成：產出 ${newRules.length} 條新規則`);
     }

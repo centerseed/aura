@@ -14,6 +14,7 @@
 export interface Correction {
   id: string;
   userId: string;
+  domain: string;
   originalInput: string;
   aiPrediction: Record<string, unknown>;
   userCorrection: Record<string, unknown>;
@@ -30,6 +31,7 @@ export interface Correction {
 export interface Rule {
   id: string;
   userId: string;
+  domain: string;
   description: string;
   triggerConditions: string[];
   resultAction: Record<string, unknown>;
@@ -202,6 +204,7 @@ export interface ClassificationResult {
  */
 export interface ObserveEvent {
   userId: string;
+  domain: string;
   type: 'correction' | 'feedback';
   input: string;
   aiPrediction: Record<string, unknown>;
@@ -214,6 +217,7 @@ export interface ObserveEvent {
  */
 export interface RecallQuery {
   userId: string;
+  domain: string;
   input: string;
   topK?: number;
 }
@@ -283,6 +287,20 @@ export interface RuleConflict {
 /**
  * 多階段蒸餾配置
  */
+/**
+ * Domain 設定
+ */
+export interface DomainConfig {
+  domain: string;
+  displayName: string;
+  warmThreshold: number;
+  distillThreshold: number;
+  similarityThreshold: number;
+  confidenceDecayDays: number;
+  categories: string[] | null;
+  createdAt: Date;
+}
+
 export interface MultiStageDistillConfig {
   stage1_clustering: {
     minClusterSize: number;
