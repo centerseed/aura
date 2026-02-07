@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../core/utils/date_utils.dart' as utils;
+
 /// Task 實體 (Domain Layer)
 class Task extends Equatable {
   final String id;
@@ -57,20 +59,13 @@ class Task extends Equatable {
     if (dueDate == null) return false;
     if (status == TaskStatus.archive) return false;
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final due = dueDate!.toLocal();
-    final dueDateOnly = DateTime(due.year, due.month, due.day);
-
-    return dueDateOnly.isBefore(today);
+    return utils.DateUtils.isOverdue(dueDate!);
   }
 
   /// 是否今日任務 (截止日 == 今天)
   bool get isToday {
     if (dueDate == null) return false;
-    final now = DateTime.now();
-    final due = dueDate!.toLocal();
-    return due.year == now.year && due.month == now.month && due.day == now.day;
+    return utils.DateUtils.isToday(dueDate!);
   }
 
   /// 是否已開始 (In Progress / Workload)

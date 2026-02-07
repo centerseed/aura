@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../core/utils/date_utils.dart' as utils;
 import '../../../../domain/entities/task.dart';
 import '../../../../application/use_cases/update_sub_item_use_case.dart';
 import '../../../../application/use_cases/update_task_details_use_case.dart';
@@ -741,17 +742,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   String _formatDueDate(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dueDay = DateTime(date.year, date.month, date.day);
-
-    final diff = dueDay.difference(today).inDays;
-
-    if (diff < 0) return '逾期 ${-diff} 天';
-    if (diff == 0) return '今天';
-    if (diff == 1) return '明天';
-    if (diff < 7) return '$diff 天後';
-    return '${date.month}/${date.day}';
+    return utils.DateUtils.formatDueDate(date);
   }
 
   void _showTaskDetails(Task task) {

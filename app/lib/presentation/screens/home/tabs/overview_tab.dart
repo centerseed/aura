@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../core/utils/date_utils.dart' as utils;
 import '../../../../domain/entities/task.dart';
 import '../../../../domain/entities/product.dart';
 import '../../../../domain/entities/area.dart';
@@ -733,17 +734,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   }
 
   String _formatDueDate(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dueDay = DateTime(date.year, date.month, date.day);
-
-    final diff = dueDay.difference(today).inDays;
-
-    if (diff < 0) return '逾期 ${-diff} 天';
-    if (diff == 0) return '今天';
-    if (diff == 1) return '明天';
-    if (diff < 7) return '$diff 天後';
-    return '${date.month}/${date.day}';
+    return utils.DateUtils.formatDueDate(date);
   }
 
   void _showReferences(Product product) {
