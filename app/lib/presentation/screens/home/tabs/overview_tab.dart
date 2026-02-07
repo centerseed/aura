@@ -734,12 +734,15 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
 
   String _formatDueDate(DateTime date) {
     final now = DateTime.now();
-    final diff = date.difference(now).inDays;
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(date.year, date.month, date.day);
 
-    if (diff < 0) return '逾期';
+    final diff = dueDay.difference(today).inDays;
+
+    if (diff < 0) return '逾期 ${-diff} 天';
     if (diff == 0) return '今天';
     if (diff == 1) return '明天';
-    if (diff < 7) return '$diff 天';
+    if (diff < 7) return '$diff 天後';
     return '${date.month}/${date.day}';
   }
 
