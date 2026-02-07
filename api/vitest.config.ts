@@ -27,7 +27,18 @@ export default defineConfig({
     testTimeout: 30000,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
+
+      // 🎯 覆蓋率門檻（未達標時測試失敗）
+      // 漸進式門檻策略：從當前覆蓋率開始，逐步提升至最終目標 85%+
+      // 當前覆蓋率: ~70%, 隨著 embedding/repository 測試完成後提升至 85%
+      thresholds: {
+        lines: 70,       // 最終目標: 85
+        functions: 76,   // 最終目標: 85
+        branches: 53,    // 最終目標: 80
+        statements: 70,  // 最終目標: 85
+      },
+
       include: [
         'src/application/**/*.ts',
         'src/domain/**/*.ts',
@@ -42,7 +53,9 @@ export default defineConfig({
         '.next/',
         'dist/',
         'coverage/',
-        'src/app/**/*.ts',
+        'src/app/**/*.ts',          // Next.js routes 由整合測試覆蓋
+        'src/domain/entities/**/*.ts', // 純型別定義（用戶明確接受 0% 覆蓋）
+        'src/domain/interfaces/**/*.ts', // 介面定義
       ],
     },
   },

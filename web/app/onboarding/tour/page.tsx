@@ -101,7 +101,7 @@ function TourContent() {
       {/* Scene Content */}
       <div className="relative max-w-5xl mx-auto px-6 py-8 pb-24">
         {currentScene === 1 && <TourScene1 userAreas={userAreas} />}
-        {currentScene === 2 && <TourScene2 userAreas={userAreas} />}
+        {currentScene === 2 && <TourScene2 />}
         {currentScene === 3 && <TourScene3 />}
       </div>
 

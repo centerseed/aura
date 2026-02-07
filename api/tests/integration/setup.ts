@@ -120,3 +120,157 @@ export function createTestAuthHeader(): HeadersInit {
     'Content-Type': 'application/json',
   }
 }
+
+// ============================================================================
+// Transaction-based 測試隔離
+// ============================================================================
+
+/**
+ * Transaction-based 測試隔離機制
+ *
+ * 使用 Prisma interactive transaction + 強制 rollback 確保測試隔離性
+ *
+ * 優點：
+ * 1. 自動清理測試資料（無需手動 deleteMany）
+ * 2. 更快的測試執行（rollback 比 delete 快）
+ * 3. 避免資料污染（每個測試完全隔離）
+ * 4. 避免遺漏清理（transaction 保證一致性）
+ *
+ * 限制：
+ * 1. 不支援嵌套 transaction（Prisma 限制）
+ * 2. 測試內的所有操作必須使用提供的 tx client
+ *
+ * @example
+ * ```typescript
+ * it('應該創建 product', async () => {
+ *   await withTestTransaction(async (tx) => {
+ *     const product = await tx.product.create({
+ *       data: { user_id: TEST_USER_ID, name: 'Test' }
+ *     })
+ *     expect(product).toBeDefined()
+ *     // Transaction 結束後自動 rollback，資料不會真正存入 DB
+ *   })
+ * })
+ * ```
+ */
+export async function withTestTransaction<T = void>(
+  testFn: (tx: typeof prisma) => Promise<T>
+): Promise<T> {
+  let result: T | undefined
+
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        // 執行測試函數
+        result = await testFn(tx as typeof prisma)
+
+        // 強制 rollback（即使測試成功）
+        // 拋出特殊錯誤來觸發 rollback
+        throw new Error('FORCE_ROLLBACK_TEST_TRANSACTION')
+      },
+      {
+        // 設置較長的 timeout（某些測試可能需要呼叫外部 API）
+        timeout: 60000, // 60 秒
+        // 隔離級別：Read Committed（避免幻讀）
+        isolationLevel: 'ReadCommitted',
+      }
+    )
+  } catch (error: any) {
+    // 忽略強制 rollback 的錯誤（這是預期的）
+    if (error.message === 'FORCE_ROLLBACK_TEST_TRANSACTION') {
+      // Rollback 成功，返回測試結果
+      return result as T
+    }
+
+    // 其他錯誤正常拋出（測試失敗）
+    throw error
+  }
+
+  // 理論上不會到這裡，但 TypeScript 需要返回值
+  return result as T
+}
+
+/**
+ * 批次 Transaction 隔離（用於多個獨立測試）
+ *
+ * 當需要在單個測試檔案中運行多個獨立的 transaction 測試時使用
+ *
+ * @example
+ * ```typescript
+ * describe('Product Tests', () => {
+ *   const tests = [
+ *     { name: '測試 1', fn: async (tx) => { ... } },
+ *     { name: '測試 2', fn: async (tx) => { ... } },
+ *   ]
+ *
+ *   tests.forEach(({ name, fn }) => {
+ *     it(name, async () => {
+ *       await withTestTransaction(fn)
+ *     })
+ *   })
+ * })
+ * ```
+ */
+export async function withTestTransactions<T = void>(
+  tests: Array<{
+    name: string
+    fn: (tx: typeof prisma) => Promise<T>
+  }>
+): Promise<void> {
+  for (const test of tests) {
+    try {
+      await withTestTransaction(test.fn)
+    } catch (error) {
+      console.error(`❌ Test failed: ${test.name}`, error)
+      throw error
+    }
+  }
+}
+
+/**
+ * 使用 Transaction 的整合測試輔助函數
+ *
+ * 結合 setupIntegrationTests 和 withTestTransaction
+ * 適用於需要基礎設置但希望每個測試自動 rollback 的場景
+ *
+ * @example
+ * ```typescript
+ * describe('API Tests', () => {
+ *   beforeAll(async () => {
+ *     await setupIntegrationTests() // 建立測試用戶
+ *   })
+ *
+ *   it('應該創建 area', async () => {
+ *     await withIsolatedTest(async (tx) => {
+ *       const area = await tx.area.create({
+ *         data: { user_id: TEST_USER_ID, name: 'Test Area' }
+ *       })
+ *       expect(area).toBeDefined()
+ *     })
+ *   })
+ * })
+ * ```
+ */
+export async function withIsolatedTest<T = void>(
+  testFn: (tx: typeof prisma) => Promise<T>
+): Promise<T> {
+  // 確保測試用戶存在（如果不存在則創建）
+  const existingUser = await prisma.user.findUnique({
+    where: { id: TEST_USER_ID },
+  })
+
+  if (!existingUser) {
+    await prisma.user.create({
+      data: {
+        id: TEST_USER_ID,
+        email: 'test@example.com',
+        name: 'Test User',
+        auth_provider: 'GOOGLE',
+        auth_provider_id: TEST_FIREBASE_UID,
+      },
+    })
+  }
+
+  // 執行測試（使用 transaction rollback）
+  return withTestTransaction(testFn)
+}

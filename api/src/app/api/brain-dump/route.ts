@@ -515,10 +515,30 @@ export async function POST(request: NextRequest) {
     }
 
     // 轉換為原本的格式
-    const existingAreas = Array.from(areaMap.values()).map(area => ({
+    let existingAreas = Array.from(areaMap.values()).map(area => ({
       ...area,
       products: Array.from(area.products.values()),
     }));
+
+    // 如果用戶完全沒有 Area，自動創建預設 Area「一般」
+    if (existingAreas.length === 0) {
+      console.log(`📦 [brain-dump] No Areas found, auto-creating default Area "一般"`);
+      const defaultArea = await prisma.area.create({
+        data: {
+          user_id: userId,
+          name: "一般",
+          description: "系統自動建立的預設領域",
+          is_custom: false,
+          scope: "個人事務與日常任務",
+        },
+      });
+      existingAreas = [{
+        id: defaultArea.id,
+        name: defaultArea.name,
+        scope: defaultArea.scope,
+        products: [],
+      }];
+    }
 
     timings["db_parallel"] = Date.now() - startDbParallel;
 
@@ -558,6 +578,9 @@ export async function POST(request: NextRequest) {
       } else {
         contextSummary = "\n### 用戶尚無任何專案\n";
       }
+
+      // 列出所有可用的 Area 名稱（讓 AI 知道可以選哪些）
+      contextSummary += `\n**可用的 Areas**: ${existingAreas.map(a => a.name).join(", ")}\n`;
 
       for (const area of existingAreas) {
         if (area.products.length === 0) continue;

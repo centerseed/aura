@@ -18,6 +18,8 @@ import {
   NotFoundException,
   ConflictException,
 } from '@/lib/api-response'
+import { librarianObserve } from '@/lib/librarian-client'
+import { prisma } from '@/lib/db'
 
 // ============================================================================
 // DTOs
@@ -182,7 +184,65 @@ export class UpdateTaskUseCase {
       updateData
     )
 
-    // 7. 返回結果
+    // 7. 非同步推送分類修正到 Librarian Service
+    if (request.productId && request.productId !== existingTaskData.productId) {
+      // 查詢 product names（Librarian 需要可讀文字，不能用 UUID）
+      const [oldProduct, newProduct] = await Promise.all([
+        prisma.product.findUnique({
+          where: { id: existingTaskData.productId },
+          select: { name: true },
+        }),
+        prisma.product.findUnique({
+          where: { id: request.productId },
+          select: { name: true },
+        }),
+      ])
+
+      if (oldProduct && newProduct) {
+        librarianObserve({
+          userId: request.userId,
+          taskContent: existingTaskData.content,
+          originalProduct: oldProduct.name,
+          correctedProduct: newProduct.name,
+        }).catch(() => {})
+      }
+    }
+
+    if (request.topicId !== undefined && request.topicId !== existingTaskData.topicId) {
+      // Topic 變更：保持 product 不變，只改 topic
+      const product = await prisma.product.findUnique({
+        where: { id: existingTaskData.productId },
+        select: { name: true },
+      })
+
+      const [oldTopic, newTopic] = await Promise.all([
+        existingTaskData.topicId
+          ? prisma.topic.findUnique({
+              where: { id: existingTaskData.topicId },
+              select: { name: true },
+            })
+          : Promise.resolve(null),
+        request.topicId
+          ? prisma.topic.findUnique({
+              where: { id: request.topicId },
+              select: { name: true },
+            })
+          : Promise.resolve(null),
+      ])
+
+      if (product) {
+        librarianObserve({
+          userId: request.userId,
+          taskContent: existingTaskData.content,
+          originalProduct: product.name,
+          correctedProduct: product.name,
+          originalTopic: oldTopic?.name ?? null,
+          correctedTopic: newTopic?.name ?? null,
+        }).catch(() => {})
+      }
+    }
+
+    // 8. 返回結果
     return {
       task: updatedTask,
       message: statusMessage,

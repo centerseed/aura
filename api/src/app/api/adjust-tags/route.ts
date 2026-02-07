@@ -11,6 +11,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { librarianObserve } from "@/lib/librarian-client";
 import { Status, Lifecycle } from "@prisma/client";
 
 // 🚀 Raw SQL 查詢結果的型別
@@ -404,6 +405,14 @@ ${text}
           `✅ 移動「${taskInfo.content}」\n   從 ${taskInfo.areaName} / ${taskInfo.productName} → ${intent.target_area || taskInfo.areaName} / ${intent.target_product}`
         );
         movedCount++;
+
+        // 非同步推送分類修正到 Librarian Service
+        librarianObserve({
+          userId,
+          taskContent: taskInfo.content,
+          originalProduct: taskInfo.productName,
+          correctedProduct: intent.target_product!,
+        }).catch(() => {});
       }
     }
 
@@ -466,6 +475,16 @@ ${text}
           `🏷️  更改「${taskInfo.content}」的 Topic\n   從 ${taskInfo.topicName || "(無)"} → ${intent.target_topic}`
         );
         movedCount++;
+
+        // 非同步推送 Topic 修正到 Librarian Service
+        librarianObserve({
+          userId,
+          taskContent: taskInfo.content,
+          originalProduct: taskInfo.productName,
+          correctedProduct: taskInfo.productName, // Product 不變
+          originalTopic: taskInfo.topicName,
+          correctedTopic: intent.target_topic,
+        }).catch(() => {});
       }
     }
 

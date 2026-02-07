@@ -21,7 +21,8 @@
     "deploy": "bash scripts/deploy.sh",
     "test:smoke": "bash scripts/smoke-test.sh",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "monitoring": "node monitoring/server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

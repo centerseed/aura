@@ -2,10 +2,27 @@
  * UpdateTaskUseCase 單元測試
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { UpdateTaskUseCase } from '@/application/use-cases/tasks/update-task'
 import { NotFoundException, ValidationException } from '@/lib/api-response'
 import { TaskStatus } from '@/domain/value-objects/task-status'
+
+// Mock Librarian client
+vi.mock('@/lib/librarian-client', () => ({
+  librarianObserve: vi.fn().mockResolvedValue(undefined),
+}))
+
+// Mock Prisma
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    product: {
+      findUnique: vi.fn(),
+    },
+    topic: {
+      findUnique: vi.fn(),
+    },
+  },
+}))
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -853,6 +870,198 @@ describe('UpdateTaskUseCase', () => {
           notificationId: 1001,
         })
       )
+    })
+  })
+
+  describe('Librarian 學習整合', () => {
+    let librarianObserveMock: any
+    let prismaMock: any
+
+    beforeEach(async () => {
+      const { librarianObserve } = await import('@/lib/librarian-client')
+      const { prisma } = await import('@/lib/db')
+      librarianObserveMock = librarianObserve as any
+      prismaMock = prisma as any
+
+      vi.clearAllMocks()
+    })
+
+    afterEach(() => {
+      vi.clearAllMocks()
+    })
+
+    it('當 productId 變更時，應該推送修正到 Librarian', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'old-product-id',
+        topicId: null,
+        content: '買牛奶',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        productId: 'new-product-id',
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      // Mock product name 查詢
+      prismaMock.product.findUnique
+        .mockResolvedValueOnce({ name: '行政事務' })  // old product
+        .mockResolvedValueOnce({ name: '生活雜務' })  // new product
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        productId: 'new-product-id',
+      })
+
+      expect(librarianObserveMock).toHaveBeenCalledWith({
+        userId: 'user-123',
+        taskContent: '買牛奶',
+        originalProduct: '行政事務',
+        correctedProduct: '生活雜務',
+      })
+    })
+
+    it('當 topicId 變更時，應該推送修正到 Librarian', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: 'old-topic-id',
+        content: '預約牙醫',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        topicId: 'new-topic-id',
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      // Mock product and topic name 查詢
+      prismaMock.product.findUnique.mockResolvedValue({ name: '生活雜務' })
+      prismaMock.topic.findUnique
+        .mockResolvedValueOnce({ name: '健康' })     // old topic
+        .mockResolvedValueOnce({ name: '醫療' })     // new topic
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        topicId: 'new-topic-id',
+      })
+
+      expect(librarianObserveMock).toHaveBeenCalledWith({
+        userId: 'user-123',
+        taskContent: '預約牙醫',
+        originalProduct: '生活雜務',
+        correctedProduct: '生活雜務',
+        originalTopic: '健康',
+        correctedTopic: '醫療',
+      })
+    })
+
+    it('當 productId 未變更時，不應該推送到 Librarian', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: '測試任務',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        content: '更新後的任務',
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        content: '更新後的任務',
+      })
+
+      expect(librarianObserveMock).not.toHaveBeenCalled()
+    })
+
+    it('當 product 查詢失敗時，不應該推送到 Librarian', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'old-product-id',
+        topicId: null,
+        content: '測試任務',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const updatedTask = {
+        ...existingTask,
+        productId: 'new-product-id',
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      // Mock product 查詢失敗（返回 null）
+      prismaMock.product.findUnique.mockResolvedValue(null)
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        productId: 'new-product-id',
+      })
+
+      expect(librarianObserveMock).not.toHaveBeenCalled()
     })
   })
 })

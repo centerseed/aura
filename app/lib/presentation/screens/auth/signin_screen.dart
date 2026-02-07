@@ -66,7 +66,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           _refreshAllCaches();
 
           if (mounted) {
-            context.go('/dashboard');
+            context.go('/splash');
           }
         },
       );
@@ -110,7 +110,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           _refreshAllCaches();
 
           if (mounted) {
-            context.go('/dashboard');
+            context.go('/splash');
           }
         },
       );

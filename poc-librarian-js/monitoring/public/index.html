@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Librarian 蒸餾規則監控</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #334155;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #60a5fa;
+      margin-bottom: 10px;
+    }
+
+    .last-update {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #60a5fa;
+    }
+
+    .stat-sub {
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-top: 5px;
+    }
+
+    .section {
+      background: #1e293b;
+      padding: 25px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #334155;
+    }
+
+    .section-title {
+      font-size: 18px;
+      color: #60a5fa;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .rule-card {
+      background: #0f172a;
+      padding: 20px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      border-left: 4px solid #3b82f6;
+    }
+
+    .rule-card.inactive {
+      border-left-color: #64748b;
+      opacity: 0.6;
+    }
+
+    .rule-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+
+    .rule-description {
+      font-size: 16px;
+      color: #f1f5f9;
+      font-weight: 500;
+      flex: 1;
+      margin-right: 15px;
+    }
+
+    .rule-badges {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge.confidence {
+      background: #065f46;
+      color: #6ee7b7;
+    }
+
+    .badge.confidence.low {
+      background: #7c2d12;
+      color: #fca5a5;
+    }
+
+    .badge.source {
+      background: #1e3a8a;
+      color: #93c5fd;
+    }
+
+    .badge.source.cold {
+      background: #581c87;
+      color: #d8b4fe;
+    }
+
+    .badge.inactive {
+      background: #374151;
+      color: #9ca3af;
+    }
+
+    .badge.user {
+      background: #0f766e;
+      color: #5eead4;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 11px;
+    }
+
+    .rule-details {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .detail-label {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      color: #cbd5e1;
+    }
+
+    .condition-tag {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      margin-right: 6px;
+      margin-bottom: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+
+    .action-code {
+      background: #064e3b;
+      color: #6ee7b7;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+    }
+
+    .timestamp {
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .correction-item {
+      background: #0f172a;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      border-left: 3px solid #8b5cf6;
+    }
+
+    .correction-text {
+      color: #e2e8f0;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .correction-arrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .correction-from {
+      color: #f87171;
+      font-weight: 500;
+    }
+
+    .correction-to {
+      color: #4ade80;
+      font-weight: 500;
+    }
+
+    .arrow {
+      color: #64748b;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+
+    .error {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    .refresh-btn {
+      background: #1e40af;
+      color: #bfdbfe;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+
+    .refresh-btn:hover {
+      background: #1e3a8a;
+    }
+
+    .auto-refresh {
+      color: #94a3b8;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔍 Librarian 蒸餾規則監控</h1>
+      <div class="last-update">
+        最後更新: <span id="lastUpdate">載入中...</span>
+        <span class="auto-refresh">（每 30 秒自動更新）</span>
+      </div>
+    </header>
+
+    <div id="stats" class="stats">
+      <div class="loading">載入統計資料中...</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span>📋 最新蒸餾規則</span>
+        <button class="refresh-btn" onclick="loadData()">🔄 刷新</button>
+      </div>
+      <div id="rules">
+        <div class="loading">載入規則中...</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span>✏️ 最近修正記錄</span>
+      </div>
+      <div id="corrections">
+        <div class="loading">載入修正記錄中...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let autoRefreshTimer = null
+
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/stats')
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.error)
+        }
+
+        const { rules, corrections } = data.stats
+        const avgConfidence = parseFloat(rules.avg_confidence || 0)
+        const totalApplications = parseInt(rules.total_applications || 0)
+        const totalCorrect = parseInt(rules.total_correct || 0)
+        const accuracy = totalApplications > 0 ? (totalCorrect / totalApplications * 100) : 0
+
+        document.getElementById('stats').innerHTML = `
+          <div class="stat-card">
+            <div class="stat-label">總規則數</div>
+            <div class="stat-value">${rules.total_rules || 0}</div>
+            <div class="stat-sub">${rules.active_rules || 0} 個啟用中</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">平均信心度</div>
+            <div class="stat-value">${(avgConfidence * 100).toFixed(0)}%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">規則應用次數</div>
+            <div class="stat-value">${totalApplications}</div>
+            <div class="stat-sub">${totalCorrect} 次正確</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">規則準確率</div>
+            <div class="stat-value">${accuracy.toFixed(0)}%</div>
+            <div class="stat-sub">實際應用表現</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">總修正數</div>
+            <div class="stat-value">${corrections.total_corrections || 0}</div>
+            <div class="stat-sub">${corrections.active_days || 0} 天有活動</div>
+          </div>
+        `
+      } catch (error) {
+        document.getElementById('stats').innerHTML = `
+          <div class="error">載入統計失敗: ${error.message}</div>
+        `
+      }
+    }
+
+    async function loadRules() {
+      try {
+        const response = await fetch('/api/rules?limit=20')
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.error)
+        }
+
+        if (data.rules.length === 0) {
+          document.getElementById('rules').innerHTML = '<div class="loading">尚無規則</div>'
+          return
+        }
+
+        const rulesHtml = data.rules.map(rule => {
+          const confidence = parseFloat(rule.confidence || 0)
+          const confidenceClass = confidence < 0.5 ? 'low' : ''
+          const inactiveClass = !rule.is_active ? 'inactive' : ''
+
+          const timesApplied = parseInt(rule.times_applied || 0)
+          const timesCorrect = parseInt(rule.times_correct || 0)
+          const accuracy = timesApplied > 0 ? (timesCorrect / timesApplied * 100) : 0
+
+          const triggers = Array.isArray(rule.trigger_conditions)
+            ? rule.trigger_conditions
+            : (typeof rule.trigger_conditions === 'string' ? JSON.parse(rule.trigger_conditions) : [])
+
+          const action = typeof rule.result_action === 'string'
+            ? rule.result_action
+            : JSON.stringify(rule.result_action, null, 2)
+
+          const timestamp = new Date(rule.created_at).toLocaleString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+
+          return `
+            <div class="rule-card ${inactiveClass}">
+              <div class="rule-header">
+                <div class="rule-description">${rule.description || '（無描述）'}</div>
+                <div class="rule-badges">
+                  <span class="badge user">👤 ${rule.user_id || 'unknown'}</span>
+                  <span class="badge confidence ${confidenceClass}">${(confidence * 100).toFixed(0)}%</span>
+                  ${timesApplied > 0 ? `<span class="badge source">應用 ${timesApplied} 次 (${accuracy.toFixed(0)}%)</span>` : ''}
+                  ${!rule.is_active ? '<span class="badge inactive">停用</span>' : ''}
+                </div>
+              </div>
+              <div class="rule-details">
+                <div class="detail-label">觸發條件:</div>
+                <div class="detail-value">
+                  ${triggers.map(t => `<span class="condition-tag">${t}</span>`).join('')}
+                </div>
+                <div class="detail-label">執行動作:</div>
+                <div class="detail-value">
+                  <div class="action-code">${action}</div>
+                </div>
+              </div>
+              <div class="timestamp">🕐 ${timestamp}</div>
+            </div>
+          `
+        }).join('')
+
+        document.getElementById('rules').innerHTML = rulesHtml
+      } catch (error) {
+        document.getElementById('rules').innerHTML = `
+          <div class="error">載入規則失敗: ${error.message}</div>
+        `
+      }
+    }
+
+    async function loadCorrections() {
+      try {
+        const response = await fetch('/api/corrections?limit=15')
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.error)
+        }
+
+        if (data.corrections.length === 0) {
+          document.getElementById('corrections').innerHTML = '<div class="loading">尚無修正記錄</div>'
+          return
+        }
+
+        const correctionsHtml = data.corrections.map(c => {
+          const input = c.original_input || '（無輸入）'
+          const displayInput = input.length > 50 ? input.substring(0, 50) + '...' : input
+
+          const aiPred = typeof c.ai_prediction === 'string'
+            ? c.ai_prediction
+            : JSON.stringify(c.ai_prediction)
+
+          const userCorr = typeof c.user_correction === 'string'
+            ? c.user_correction
+            : JSON.stringify(c.user_correction)
+
+          const timestamp = new Date(c.created_at).toLocaleString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+
+          return `
+            <div class="correction-item">
+              <div class="correction-text">${displayInput}</div>
+              <div class="correction-arrow">
+                <span class="correction-from">${aiPred}</span>
+                <span class="arrow">→</span>
+                <span class="correction-to">${userCorr}</span>
+              </div>
+              <div class="timestamp">🕐 ${timestamp}</div>
+            </div>
+          `
+        }).join('')
+
+        document.getElementById('corrections').innerHTML = correctionsHtml
+      } catch (error) {
+        document.getElementById('corrections').innerHTML = `
+          <div class="error">載入修正記錄失敗: ${error.message}</div>
+        `
+      }
+    }
+
+    async function loadData() {
+      document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('zh-TW')
+      await Promise.all([
+        loadStats(),
+        loadRules(),
+        loadCorrections()
+      ])
+    }
+
+    function startAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer)
+      }
+      autoRefreshTimer = setInterval(loadData, 30000) // 30 秒
+    }
+
+    // 初始載入
+    loadData()
+    startAutoRefresh()
+  </script>
+</body>
+</html>
