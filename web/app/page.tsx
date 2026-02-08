@@ -1114,10 +1114,30 @@ export default function HomeDemo() {
 
       {/* 頁腳 */}
       <footer className="relative border-t border-white/5 py-12 px-6">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-xs uppercase tracking-widest text-white/30 font-mono">
-            資訊熵減系統 · 為創業者設計
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col items-center gap-4">
+            {/* 連結 */}
+            <div className="flex items-center gap-6 text-sm">
+              <a
+                href="/privacy"
+                className="text-white/50 hover:text-white/80 transition-colors"
+              >
+                隱私政策 Privacy Policy
+              </a>
+              <span className="text-white/20">·</span>
+              <a
+                href="/terms"
+                className="text-white/50 hover:text-white/80 transition-colors"
+              >
+                服務條款 Terms of Service
+              </a>
+            </div>
+
+            {/* 標語 */}
+            <p className="text-xs uppercase tracking-widest text-white/30 font-mono">
+              資訊熵減系統 · 為創業者設計
+            </p>
+          </div>
         </div>
       </footer>
     </main>

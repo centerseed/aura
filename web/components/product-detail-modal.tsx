@@ -670,29 +670,29 @@ export function ProductDetailModal({
       />
 
       {/* Modal */}
-      <Card className="relative w-full max-w-4xl mx-4 bg-slate-900 border-white/10 shadow-2xl max-h-[90vh] flex flex-col">
+      <Card className="relative w-full max-w-4xl mx-4 bg-white dark:bg-slate-900 border-gray-200 dark:border-white/10 shadow-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
               <Package className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">{product.name}</h2>
-              <p className="text-sm text-white/50">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{product.name}</h2>
+              <p className="text-sm text-gray-500 dark:text-white/50">
                 {activeTab === "edit" ? "編輯專案資訊" : activeTab === "milestones" ? "里程碑管理" : "相關資料"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Tab 切換按鈕 */}
-            <div className="flex rounded-lg bg-white/5 p-1">
+            <div className="flex rounded-lg bg-gray-100 dark:bg-white/5 p-1">
               <button
                 onClick={() => setActiveTab("edit")}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeTab === "edit"
                     ? "bg-indigo-500 text-white"
-                    : "text-white/60 hover:text-white"
+                    : "text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 <Pencil className="w-4 h-4 inline-block mr-1.5" />
@@ -703,7 +703,7 @@ export function ProductDetailModal({
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeTab === "milestones"
                     ? "bg-blue-500 text-white"
-                    : "text-white/60 hover:text-white"
+                    : "text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 <Target className="w-4 h-4 inline-block mr-1.5" />
@@ -719,7 +719,7 @@ export function ProductDetailModal({
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeTab === "references"
                     ? "bg-amber-500 text-white"
-                    : "text-white/60 hover:text-white"
+                    : "text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 <FileText className="w-4 h-4 inline-block mr-1.5" />
@@ -733,7 +733,7 @@ export function ProductDetailModal({
             </div>
             <button
               onClick={onClose}
-              className="text-white/50 hover:text-white transition-colors ml-2"
+              className="text-gray-400 dark:text-white/50 hover:text-gray-900 dark:hover:text-white transition-colors ml-2"
             >
               <X className="w-5 h-5" />
             </button>
@@ -745,7 +745,7 @@ export function ProductDetailModal({
           /* Edit Mode - Two Column Layout */
           <div className="flex-1 overflow-hidden flex">
             {/* Left Column - Edit Form */}
-            <div className="w-1/2 p-6 border-r border-white/10 overflow-y-auto">
+            <div className="w-1/2 p-6 border-r border-gray-200 dark:border-white/10 overflow-y-auto">
             <div className="space-y-5">
               {/* Error Message */}
               {error && (
@@ -1297,33 +1297,33 @@ export function ProductDetailModal({
                           {/* Milestone card */}
                           <div
                             className={cn(
-                              "flex-1 p-4 rounded-lg border transition-all cursor-pointer hover:bg-white/5",
+                              "flex-1 p-4 rounded-lg border transition-all cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5",
                               isCompleted
-                                ? "bg-green-500/5 border-green-500/20"
+                                ? "bg-green-50 border-green-200 dark:bg-green-500/5 dark:border-green-500/20"
                                 : isOverdue
-                                ? "bg-red-500/5 border-red-500/20"
+                                ? "bg-red-50 border-red-200 dark:bg-red-500/5 dark:border-red-500/20"
                                 : isUrgent
-                                ? "bg-orange-500/5 border-orange-500/20"
-                                : "bg-white/5 border-white/10"
+                                ? "bg-orange-50 border-orange-200 dark:bg-orange-500/5 dark:border-orange-500/20"
+                                : "bg-white border-slate-200 dark:bg-white/5 dark:border-white/10"
                             )}
                             onClick={() => startEditMilestone(milestone)}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-white">
+                                  <h4 className="font-medium text-slate-900 dark:text-white">
                                     {milestone.name}
                                   </h4>
                                   <span
                                     className={cn(
                                       "px-2 py-0.5 rounded-full text-xs font-medium",
                                       isCompleted
-                                        ? "bg-green-500/20 text-green-300"
+                                        ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                         : isOverdue
-                                        ? "bg-red-500/20 text-red-300"
+                                        ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
                                         : isUrgent
-                                        ? "bg-orange-500/20 text-orange-300"
-                                        : "bg-blue-500/20 text-blue-300"
+                                        ? "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300"
+                                        : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
                                     )}
                                   >
                                     {isCompleted
@@ -1335,12 +1335,12 @@ export function ProductDetailModal({
                                       : `${daysRemaining} 天後`}
                                   </span>
                                 </div>
-                                <p className="text-sm text-white/50 mt-1 flex items-center gap-1.5">
+                                <p className="text-sm text-slate-500 dark:text-white/50 mt-1 flex items-center gap-1.5">
                                   <Calendar className="w-3.5 h-3.5" />
                                   {format(new Date(milestone.target_date), "yyyy/MM/dd (EEEE)", { locale: zhTW })}
                                 </p>
                                 {milestone.description && (
-                                  <p className="text-sm text-white/40 mt-2">
+                                  <p className="text-sm text-slate-400 dark:text-white/40 mt-2">
                                     {milestone.description}
                                   </p>
                                 )}
@@ -1388,16 +1388,16 @@ export function ProductDetailModal({
           /* References Mode - Two Column Layout (List | Content) */
           <div className="flex-1 overflow-hidden flex">
             {/* Left Column - References List */}
-            <div className="w-2/5 border-r border-white/10 overflow-y-auto">
+            <div className="w-2/5 border-r border-gray-200 dark:border-white/10 overflow-y-auto">
               {/* 新增按鈕 */}
-              <div className="p-4 border-b border-white/10">
+              <div className="p-4 border-b border-gray-200 dark:border-white/10">
                 <Button
                   onClick={() => {
                     setShowAddForm(true);
                     setSelectedReference(null);
                   }}
                   size="sm"
-                  className="w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30"
+                  className="w-full bg-amber-50 dark:bg-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/30 text-amber-600 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   新增資料
@@ -1406,16 +1406,16 @@ export function ProductDetailModal({
 
               {isLoadingRefs ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-400 dark:text-white/50" />
                 </div>
               ) : references.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <FileText className="w-12 h-12 text-white/20 mb-3" />
-                  <p className="text-sm text-white/50">尚無相關資料</p>
-                  <p className="text-xs text-white/30 mt-1">點擊上方按鈕新增</p>
+                  <FileText className="w-12 h-12 text-gray-200 dark:text-white/20 mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-white/50">尚無相關資料</p>
+                  <p className="text-xs text-gray-400 dark:text-white/30 mt-1">點擊上方按鈕新增</p>
                 </div>
               ) : (
-                <div className="divide-y divide-white/5">
+                <div className="divide-y divide-gray-100 dark:divide-white/5">
                   {references.filter(ref => ref && ref.type).map((ref) => (
                     <button
                       key={ref.id}
@@ -1423,24 +1423,24 @@ export function ProductDetailModal({
                         setSelectedReference(ref);
                         setShowAddForm(false);
                       }}
-                      className={`w-full p-4 text-left hover:bg-white/5 transition-colors ${
-                        selectedReference?.id === ref.id ? "bg-white/10" : ""
+                      className={`w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${
+                        selectedReference?.id === ref.id ? "bg-gray-100 dark:bg-white/10" : ""
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         {ref.type === "url" ? (
-                          <LinkIcon className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                          <LinkIcon className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0 mt-0.5" />
                         ) : (
-                          <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <FileText className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white/90 truncate">
+                          <p className="text-sm font-medium text-gray-800 dark:text-white/90 truncate">
                             {ref.title || (ref.type === "url" ? ref.content : "未命名筆記")}
                           </p>
-                          <p className="text-xs text-white/40 mt-1 truncate">
+                          <p className="text-xs text-gray-400 dark:text-white/40 mt-1 truncate">
                             {ref.type === "url" ? ref.content : ref.content.slice(0, 50)}
                           </p>
-                          <p className="text-xs text-white/30 mt-1 flex items-center gap-1">
+                          <p className="text-xs text-gray-400 dark:text-white/30 mt-1 flex items-center gap-1">
                             {ref.source === "product" ? (
                               <Archive className="w-3 h-3" />
                             ) : (
@@ -1457,12 +1457,12 @@ export function ProductDetailModal({
             </div>
 
             {/* Right Column - Selected Reference Content or Add Form */}
-            <div className="w-3/5 flex flex-col bg-slate-950/50">
+            <div className="w-3/5 flex flex-col bg-gray-50 dark:bg-slate-950/50">
               <div className="flex-1 p-6 overflow-y-auto">
               {showAddForm ? (
                 /* 新增表單 */
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white mb-4">新增相關資料</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">新增相關資料</h3>
 
                   {/* 類型選擇 */}
                   <div className="flex gap-2">
@@ -1470,8 +1470,8 @@ export function ProductDetailModal({
                       onClick={() => setNewRefType("url")}
                       className={`flex-1 py-2 px-4 rounded-lg border transition-all ${
                         newRefType === "url"
-                          ? "bg-blue-500/20 border-blue-500/50 text-blue-300"
-                          : "bg-white/5 border-white/10 text-white/60 hover:border-white/20"
+                          ? "bg-blue-50 dark:bg-blue-500/20 border-blue-300 dark:border-blue-500/50 text-blue-600 dark:text-blue-300"
+                          : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:border-gray-300 dark:hover:border-white/20"
                       }`}
                     >
                       <LinkIcon className="w-4 h-4 inline-block mr-2" />
@@ -1481,8 +1481,8 @@ export function ProductDetailModal({
                       onClick={() => setNewRefType("note")}
                       className={`flex-1 py-2 px-4 rounded-lg border transition-all ${
                         newRefType === "note"
-                          ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
-                          : "bg-white/5 border-white/10 text-white/60 hover:border-white/20"
+                          ? "bg-amber-50 dark:bg-amber-500/20 border-amber-300 dark:border-amber-500/50 text-amber-600 dark:text-amber-300"
+                          : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:border-gray-300 dark:hover:border-white/20"
                       }`}
                     >
                       <FileText className="w-4 h-4 inline-block mr-2" />
@@ -1496,7 +1496,7 @@ export function ProductDetailModal({
                     value={newRefTitle}
                     onChange={(e) => setNewRefTitle(e.target.value)}
                     placeholder="標題（選填）"
-                    className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-4 py-3 rounded-lg bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
 
                   {/* 內容 */}
@@ -1506,7 +1506,7 @@ export function ProductDetailModal({
                       value={newRefContent}
                       onChange={(e) => setNewRefContent(e.target.value)}
                       placeholder="https://..."
-                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      className="w-full px-4 py-3 rounded-lg bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
                   ) : (
                     <textarea
@@ -1514,7 +1514,7 @@ export function ProductDetailModal({
                       onChange={(e) => setNewRefContent(e.target.value)}
                       placeholder="筆記內容（支援 Markdown）..."
                       rows={12}
-                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
+                      className="w-full px-4 py-3 rounded-lg bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
                     />
                   )}
 
@@ -1527,7 +1527,7 @@ export function ProductDetailModal({
                         setNewRefContent("");
                       }}
                       variant="outline"
-                      className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
+                      className="border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-white"
                     >
                       取消
                     </Button>
@@ -1558,7 +1558,7 @@ export function ProductDetailModal({
                       ) : (
                         <FileText className="w-5 h-5 text-amber-400" />
                       )}
-                      <span className="text-xs text-white/40 uppercase tracking-wider">
+                      <span className="text-xs text-gray-400 dark:text-white/40 uppercase tracking-wider">
                         {selectedReference.type === "url" ? "連結" : "筆記"}
                       </span>
                     </div>
@@ -1589,7 +1589,7 @@ export function ProductDetailModal({
 
                   {/* Title */}
                   {selectedReference.title && (
-                    <h3 className="text-xl font-semibold text-white">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                       {selectedReference.title}
                     </h3>
                   )}
@@ -1613,20 +1613,20 @@ export function ProductDetailModal({
                         value={editingNoteTitle}
                         onChange={(e) => setEditingNoteTitle(e.target.value)}
                         placeholder="標題（選填）"
-                        className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                        className="w-full px-4 py-3 rounded-lg bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                       />
                       <textarea
                         value={editingNoteContent}
                         onChange={(e) => setEditingNoteContent(e.target.value)}
                         placeholder="筆記內容（支援 Markdown）..."
                         rows={15}
-                        className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+                        className="w-full px-4 py-3 rounded-lg bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
                       />
                       <div className="flex justify-end gap-2">
                         <Button
                           onClick={cancelEditingNote}
                           variant="outline"
-                          className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
+                          className="border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-white"
                           disabled={isUpdatingRef}
                         >
                           取消
@@ -1648,14 +1648,14 @@ export function ProductDetailModal({
                       </div>
                     </div>
                   ) : (
-                    <div className="prose prose-invert max-w-none">
+                    <div className="prose dark:prose-invert max-w-none">
                       {renderMarkdown(selectedReference.content)}
                     </div>
                   )}
 
                   {/* Source info */}
-                  <div className="pt-4 mt-4 border-t border-white/10">
-                    <p className="text-xs text-white/40 flex items-center gap-1">
+                  <div className="pt-4 mt-4 border-t border-gray-200 dark:border-white/10">
+                    <p className="text-xs text-gray-400 dark:text-white/40 flex items-center gap-1">
                       {selectedReference.source === "product" ? (
                         <>
                           <Archive className="w-3 h-3" />
@@ -1673,9 +1673,9 @@ export function ProductDetailModal({
               ) : (
                 /* 未選擇任何 Reference */
                 <div className="flex flex-col items-center justify-center h-full text-center">
-                  <FileText className="w-16 h-16 text-white/10 mb-4" />
-                  <p className="text-white/50">選擇左側的資料以查看詳情</p>
-                  <p className="text-white/30 text-sm mt-1">或點擊「新增資料」按鈕</p>
+                  <FileText className="w-16 h-16 text-gray-200 dark:text-white/10 mb-4" />
+                  <p className="text-gray-400 dark:text-white/50">選擇左側的資料以查看詳情</p>
+                  <p className="text-gray-300 dark:text-white/30 text-sm mt-1">或點擊「新增資料」按鈕</p>
                 </div>
               )}
               </div>
@@ -1684,13 +1684,13 @@ export function ProductDetailModal({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-white/10 shrink-0">
           {/* Delete Button */}
           <Button
             onClick={handleDelete}
             disabled={isDeleting || isSubmitting}
             variant="outline"
-            className="border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300"
+            className="border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
           >
             {isDeleting ? (
               <>
@@ -1709,7 +1709,7 @@ export function ProductDetailModal({
             <Button
               onClick={onClose}
               variant="outline"
-              className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
+              className="border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-white"
               disabled={isSubmitting || isDeleting}
             >
               {activeTab === "edit" ? "取消" : "關閉"}

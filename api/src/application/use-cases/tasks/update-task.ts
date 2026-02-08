@@ -129,7 +129,7 @@ export class UpdateTaskUseCase {
       // 清除 due_date 且目前是 ACTIVE → 自動改回 INBOX
       if (!request.dueDate && currentStatus === TaskStatus.ACTIVE) {
         task.changeStatus(TaskStatus.INBOX)
-        statusMessage = '已清除截止日期，狀態自動變更為收件匣'
+        statusMessage = '已清除截止日期，狀態自動變更為規劃中'
         statusChangedByDueDate = true
       }
     }

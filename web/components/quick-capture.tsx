@@ -153,7 +153,8 @@ interface QuickCaptureProps {
 export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode = false }: QuickCaptureProps) {
   const [isExpanded, setIsExpanded] = useState(welcomeMode);
   const [input, setInput] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingCount, setProcessingCount] = useState(0);
+  const isProcessing = processingCount > 0;
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [adjustmentResult, setAdjustmentResult] = useState<AdjustmentResult | null>(null);
@@ -469,7 +470,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   };
 
   const handleSubmit = async () => {
-    if (!userId || !input.trim() || isProcessing) return;
+    if (!userId || !input.trim()) return;
 
     const userInput = input.trim();
 
@@ -482,8 +483,10 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     };
     setMessages(prev => [...prev, userMessage]);
 
-    setIsProcessing(true);
+    setProcessingCount(prev => prev + 1);
     setInput("");
+    // 保持焦點，讓用戶可以繼續輸入
+    setTimeout(() => inputRef.current?.focus(), 0);
 
     try {
       // 獲取 Firebase token
@@ -553,7 +556,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
-      setIsProcessing(false);
+      setProcessingCount(prev => prev - 1);
     }
   };
 
@@ -563,7 +566,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     if (!pendingOperation || !userId) return;
 
     setShowConfirmDialog(false);
-    setIsProcessing(true);
+    setProcessingCount(prev => prev + 1);
     setShowResults(true);
 
     try {
@@ -604,7 +607,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     } catch (err) {
       console.error("Operation failed:", err);
     } finally {
-      setIsProcessing(false);
+      setProcessingCount(prev => prev - 1);
       setPendingOperation(null);
     }
   };
@@ -613,7 +616,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   const handleCancelOperation = () => {
     setShowConfirmDialog(false);
     setPendingOperation(null);
-    setIsProcessing(false);
+    setProcessingCount(prev => prev - 1);
     setSelectedOperationIds(new Set());
   };
 
@@ -736,9 +739,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                     setTimeout(() => setIsComposing(false), 0);
                   }}
                   placeholder="輸入任何想法..."
-                  disabled={isProcessing}
                   rows={4}
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white text-base placeholder:text-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all disabled:opacity-50"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white text-base placeholder:text-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
                 />
               </div>
 
@@ -756,17 +758,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                 <Button
                   size="lg"
                   onClick={handleSubmit}
-                  disabled={!input.trim() || isProcessing}
+                  disabled={!input.trim()}
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-6"
                 >
-                  {isProcessing ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5 mr-2" />
-                      送出
-                    </>
-                  )}
+                  <Send className="w-5 h-5 mr-2" />
+                  送出
                 </Button>
               </div>
             </div>
@@ -1345,9 +1341,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                 setTimeout(() => setIsComposing(false), 0);
               }}
               placeholder="輸入任何想法... 用 @ 快速指定專案"
-              disabled={isProcessing}
               rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all disabled:opacity-50"
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
             />
 
           </div>
@@ -1366,17 +1361,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!input.trim() || isProcessing}
+              disabled={!input.trim()}
               className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
             >
-              {isProcessing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-1" />
-                  送出
-                </>
-              )}
+              <Send className="w-4 h-4 mr-1" />
+              送出
             </Button>
           </div>
         </div>

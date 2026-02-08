@@ -9,7 +9,7 @@ import '../../../core/di/providers.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/area_provider.dart';
-import '../dashboard/widgets/task_edit_bottom_sheet.dart';
+import '../home/widgets/task_detail_bottom_sheet.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({super.key});
@@ -183,7 +183,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                 padding: EdgeInsets.only(
                                   bottom: MediaQuery.of(ctx).viewInsets.bottom,
                                 ),
-                                child: TaskEditBottomSheet(task: task),
+                                child: TaskDetailBottomSheet(task: task),
                               ),
                             );
                           }
@@ -601,7 +601,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                 padding: EdgeInsets.only(
                                   bottom: MediaQuery.of(context).viewInsets.bottom,
                                 ),
-                                child: TaskEditBottomSheet(task: task),
+                                child: TaskDetailBottomSheet(task: task),
                               ),
                             );
                           },

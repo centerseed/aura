@@ -40,6 +40,13 @@ abstract class ProductRepository {
     required String content,
     String? title,
   });
+  Future<Either<Failure, Reference>> updateProductReference({
+    required String productId,
+    required String referenceId,
+    required String content,
+    String? title,
+    String? taskId,
+  });
   Future<Either<Failure, void>> deleteProductReference({
     required String productId,
     required String referenceId,

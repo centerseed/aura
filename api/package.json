@@ -21,6 +21,7 @@
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "vitest --ui --coverage",
     "test:all:auto": "npm run test:db:setup && npm run test:all",
+    "test:calendar-crud": "tsx tests/manual/calendar-crud-test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -44,6 +45,7 @@
     "@vitest/ui": "^3.2.4",
     "happy-dom": "^20.4.0",
     "prisma": "^6.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^3.2.4"
   }

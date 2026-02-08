@@ -157,19 +157,19 @@ export function ReorganizeModal({
       />
 
       {/* Modal Card */}
-      <Card className="relative w-[calc(100vw-2rem)] md:max-w-2xl max-h-[85vh] overflow-hidden bg-slate-900 border-white/10 shadow-2xl flex flex-col">
+      <Card className="relative w-[calc(100vw-2rem)] md:max-w-2xl max-h-[85vh] overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-white/10 bg-slate-900">
+        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
           <div className="flex-1">
-            <h2 className="flex items-center gap-2 text-xl font-bold text-white">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
+            <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white">
+              <Sparkles className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
               AI 重組建議
             </h2>
             {/* 變化摘要 */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm">
               {/* Topic 數量變化 - 強調減少的正面效果 */}
               {topicDiff < 0 && (
-                <div className="flex items-center gap-2 text-green-400 bg-green-500/10 px-3 py-1.5 rounded-lg">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-500/10 px-3 py-1.5 rounded-lg">
                   <TrendingDown className="w-4 h-4" />
                   <span className="font-medium">
                     ✨ 太棒了！從 {currentTopicCount} 個分類簡化為 {newTopicCount} 個
@@ -177,12 +177,12 @@ export function ReorganizeModal({
                 </div>
               )}
               {topicDiff === 0 && (
-                <div className="flex items-center gap-2 text-blue-400">
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                   <span className="font-medium">維持 {currentTopicCount} 個分類</span>
                 </div>
               )}
               {topicDiff >= 1 && (
-                <div className="flex items-center gap-2 text-indigo-400">
+                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                   <Plus className="w-4 h-4" />
                   <span className="font-medium">新增了 {topicDiff} 個分類</span>
                 </div>
@@ -190,7 +190,7 @@ export function ReorganizeModal({
 
               {/* 任務整合數量 */}
               {hasConsolidations && (
-                <div className="flex items-center gap-1.5 text-indigo-400/80">
+                <div className="flex items-center gap-1.5 text-indigo-500 dark:text-indigo-400/80">
                   <Layers className="w-3.5 h-3.5" />
                   <span>{proposal.task_consolidations!.length} 組整合</span>
                 </div>
@@ -199,7 +199,7 @@ export function ReorganizeModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 dark:text-white/60 hover:text-slate-600 dark:hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -209,16 +209,16 @@ export function ReorganizeModal({
         <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-4">
           {/* 當 AI 判定不需要調整時的訊息 */}
           {hasNoChanges && (
-            <div className="rounded-lg bg-gradient-to-br from-green-950/40 to-slate-900/40 border border-green-500/30 p-4">
+            <div className="rounded-lg bg-gradient-to-br from-green-50 to-white dark:from-green-950/40 dark:to-slate-900/40 border border-green-300 dark:border-green-500/30 p-4">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-5 h-5 text-green-400" />
+                <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-5 h-5 text-green-600 dark:text-green-400" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-base font-semibold text-green-200 mb-1">
+                  <div className="text-base font-semibold text-green-800 dark:text-green-200 mb-1">
                     ✅ 目前的分類組織已經很合理
                   </div>
-                  <div className="text-sm text-green-300/70">
+                  <div className="text-sm text-green-600 dark:text-green-300/70">
                     AI 分析後認為現有的 {currentTopicCount} 個分類和任務分布都很清晰，不需要進行調整。
                   </div>
                 </div>
@@ -229,10 +229,10 @@ export function ReorganizeModal({
           {/* 1. 任務整合建議 - 放最前面！ */}
           {hasConsolidations && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-white font-medium">
-                <Layers className="w-4 h-4 text-indigo-400" />
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-medium">
+                <Layers className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                 <span>任務整合建議</span>
-                <span className="text-sm text-white/50">
+                <span className="text-sm text-slate-500 dark:text-white/50">
                   ({proposal.task_consolidations!.length} 組)
                 </span>
               </div>
@@ -257,19 +257,19 @@ export function ReorganizeModal({
                 return (
                   <div
                     key={idx}
-                    className="rounded-lg bg-slate-800/50 border border-slate-700 overflow-hidden"
+                    className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 overflow-hidden"
                   >
                     {/* 頂部：整合結果（最重要，最突出） */}
-                    <div className="bg-gradient-to-br from-indigo-600/20 to-indigo-500/10 border-b border-indigo-500/30 p-4">
+                    <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:from-indigo-600/20 dark:to-indigo-500/10 border-b border-indigo-200 dark:border-indigo-500/30 p-4">
                       <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center flex-shrink-0">
-                          <Layers className="w-5 h-5 text-indigo-300" />
+                        <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                          <Layers className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-base font-semibold text-indigo-100 mb-1">
+                          <div className="text-base font-semibold text-indigo-900 dark:text-indigo-100 mb-1">
                             {consolidation.consolidated_title}
                           </div>
-                          <div className="text-sm text-indigo-300/80">
+                          <div className="text-sm text-indigo-600 dark:text-indigo-300/80">
                             💡 {consolidation.reasoning}
                           </div>
                         </div>
@@ -280,18 +280,18 @@ export function ReorganizeModal({
                     <div className="p-4 space-y-3">
                       {/* 整合前：直接列出任務 */}
                       <div>
-                        <div className="text-xs font-medium text-white/50 mb-2 uppercase tracking-wide">
+                        <div className="text-xs font-medium text-slate-500 dark:text-white/50 mb-2 uppercase tracking-wide">
                           將這些任務
                         </div>
                         <div className="space-y-1.5">
-                          <div className="flex items-center gap-2.5 text-sm bg-slate-800/30 rounded-lg px-3 py-2 border border-slate-700/50">
+                          <div className="flex items-center gap-2.5 text-sm bg-slate-100 dark:bg-slate-800/30 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700/50">
                             <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                            <span className="text-white/80">{parentTask?.title || consolidation.parent_task_id}</span>
+                            <span className="text-slate-700 dark:text-white/80">{parentTask?.title || consolidation.parent_task_id}</span>
                           </div>
                           {subTasks.map((task, subIdx) => (
-                            <div key={subIdx} className="flex items-center gap-2.5 text-sm bg-slate-800/30 rounded-lg px-3 py-2 border border-slate-700/50">
+                            <div key={subIdx} className="flex items-center gap-2.5 text-sm bg-slate-100 dark:bg-slate-800/30 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700/50">
                               <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                              <span className="text-white/80">{task?.title || consolidation.sub_task_ids[subIdx]}</span>
+                              <span className="text-slate-700 dark:text-white/80">{task?.title || consolidation.sub_task_ids[subIdx]}</span>
                             </div>
                           ))}
                         </div>
@@ -299,26 +299,26 @@ export function ReorganizeModal({
 
                       {/* 向下箭頭（醒目） */}
                       <div className="flex items-center justify-center py-1">
-                        <div className="flex items-center gap-2 text-indigo-400">
-                          <div className="h-px w-16 bg-gradient-to-r from-transparent via-indigo-400/50 to-transparent"></div>
+                        <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                          <div className="h-px w-16 bg-gradient-to-r from-transparent via-indigo-300 dark:via-indigo-400/50 to-transparent"></div>
                           <ChevronDown className="w-4 h-4" />
-                          <div className="h-px w-16 bg-gradient-to-r from-transparent via-indigo-400/50 to-transparent"></div>
+                          <div className="h-px w-16 bg-gradient-to-r from-transparent via-indigo-300 dark:via-indigo-400/50 to-transparent"></div>
                         </div>
                       </div>
 
                       {/* 整合後：樹狀結構（最突出） */}
                       <div>
-                        <div className="text-xs font-medium text-indigo-300 mb-2 uppercase tracking-wide">
+                        <div className="text-xs font-medium text-indigo-600 dark:text-indigo-300 mb-2 uppercase tracking-wide">
                           整合為
                         </div>
-                        <div className="bg-gradient-to-br from-indigo-950/40 to-slate-900/40 border border-indigo-500/20 rounded-lg p-4">
+                        <div className="bg-gradient-to-br from-indigo-50 to-slate-50 dark:from-indigo-950/40 dark:to-slate-900/40 border border-indigo-200 dark:border-indigo-500/20 rounded-lg p-4">
                           {/* 主任務（大勾選框） */}
                           <div className="flex items-start gap-3">
-                            <div className="w-5 h-5 rounded border-2 border-indigo-400 flex items-center justify-center text-indigo-300 flex-shrink-0 mt-0.5">
+                            <div className="w-5 h-5 rounded border-2 border-indigo-500 dark:border-indigo-400 flex items-center justify-center text-indigo-500 dark:text-indigo-300 flex-shrink-0 mt-0.5">
                               <span className="text-xs">☐</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-base font-medium text-indigo-100 leading-snug">
+                              <div className="text-base font-medium text-indigo-900 dark:text-indigo-100 leading-snug">
                                 {consolidation.consolidated_title}
                               </div>
                             </div>
@@ -326,13 +326,13 @@ export function ReorganizeModal({
 
                           {/* 子任務（樹狀縮排） */}
                           {subTasks.length > 0 && (
-                            <div className="ml-8 mt-3 space-y-2 border-l-2 border-indigo-400/30 pl-4">
+                            <div className="ml-8 mt-3 space-y-2 border-l-2 border-indigo-300 dark:border-indigo-400/30 pl-4">
                               {subTasks.map((task, subIdx) => (
                                 <div key={subIdx} className="flex items-center gap-2.5">
-                                  <div className="w-3.5 h-3.5 rounded-sm border border-white/50 flex items-center justify-center text-white/50 flex-shrink-0">
+                                  <div className="w-3.5 h-3.5 rounded-sm border border-slate-400 dark:border-white/50 flex items-center justify-center text-slate-400 dark:text-white/50 flex-shrink-0">
                                     <span className="text-[10px]">☐</span>
                                   </div>
-                                  <span className="text-sm text-white/70">{task?.title || consolidation.sub_task_ids[subIdx]}</span>
+                                  <span className="text-sm text-slate-600 dark:text-white/70">{task?.title || consolidation.sub_task_ids[subIdx]}</span>
                                 </div>
                               ))}
                             </div>
@@ -348,14 +348,14 @@ export function ReorganizeModal({
 
           {/* 2. 新增的 Topics（如果有）- 折疊 */}
           {newTopics.length > 0 && (
-            <details className="group rounded-lg bg-slate-800/30 border border-white/10">
-              <summary className="cursor-pointer px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-slate-700/30 transition-colors flex items-center gap-2">
+            <details className="group rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-white/10">
+              <summary className="cursor-pointer px-3 py-2 text-sm text-slate-600 dark:text-white/70 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/30 transition-colors flex items-center gap-2">
                 <ChevronDown className="w-3 h-3 transition-transform group-open:rotate-180" />
                 <span>📌 新增了 {newTopics.length} 個分類</span>
               </summary>
               <div className="px-3 pb-3 pt-1 flex flex-wrap gap-2">
                 {newTopics.map((topic, idx) => (
-                  <span key={idx} className="px-2 py-1 rounded bg-indigo-500/20 text-indigo-300 text-xs">
+                  <span key={idx} className="px-2 py-1 rounded bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs">
                     {topic}
                   </span>
                 ))}
@@ -366,10 +366,10 @@ export function ReorganizeModal({
           {/* 3. Topic 分群與任務分布 */}
           {proposal.proposed_clusters.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-white/70 text-sm">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-white/70 text-sm">
                 <span>📋 重組後的分類結構</span>
                 {hasConsolidations && (
-                  <span className="text-xs text-white/50">
+                  <span className="text-xs text-slate-400 dark:text-white/50">
                     (「主」任務會保留，「子」任務會變成待辦事項)
                   </span>
                 )}
@@ -394,20 +394,20 @@ export function ReorganizeModal({
                 const isNew = !proposal.current_topics.includes(cluster.topic_name);
 
                 return (
-                  <div key={idx} className="rounded-lg bg-slate-800/50 border border-white/10 overflow-hidden">
+                  <div key={idx} className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-white/10 overflow-hidden">
                     {/* Topic Header */}
-                    <div className="bg-slate-700/30 px-3 py-2 flex items-center justify-between">
+                    <div className="bg-slate-100 dark:bg-slate-700/30 px-3 py-2 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">
+                        <span className="text-sm font-medium text-slate-900 dark:text-white">
                           {cluster.topic_name}
                         </span>
                         {isNew && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
                             新
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-white/50">
+                      <span className="text-xs text-slate-500 dark:text-white/50">
                         {cluster.task_ids.length} 個任務
                       </span>
                     </div>
@@ -420,15 +420,15 @@ export function ReorganizeModal({
                           className="flex items-center justify-between gap-2 text-xs"
                         >
                           <div className="flex items-center gap-1.5 truncate">
-                            <span className={`truncate ${task.isMoved ? 'text-amber-300' : 'text-white/70'}`}>
+                            <span className={`truncate ${task.isMoved ? 'text-amber-600 dark:text-amber-300' : 'text-slate-600 dark:text-white/70'}`}>
                               {task.title}
                             </span>
                             {task.cRole && (
                               <span
                                 className={`text-[10px] px-1 py-0.5 rounded ${
                                   task.cRole === 'p'
-                                    ? 'bg-indigo-500/20 text-indigo-300'
-                                    : 'bg-indigo-500/10 text-indigo-400/60'
+                                    ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
+                                    : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400/60'
                                 }`}
                                 title={task.cRole === 'p' ? '保留為主任務' : '會變成主任務的待辦事項'}
                               >
@@ -438,7 +438,7 @@ export function ReorganizeModal({
                           </div>
                           {/* 只在真的從其他 topic 移動過來時才顯示來源（排除「未分類」） */}
                           {task.isMoved && !task.isFromUncategorized && (
-                            <span className="text-white/30 whitespace-nowrap flex-shrink-0">
+                            <span className="text-slate-400 dark:text-white/30 whitespace-nowrap flex-shrink-0">
                               ← {task.fromTopic}
                             </span>
                           )}
@@ -453,12 +453,12 @@ export function ReorganizeModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-4 md:px-6 py-4 border-t border-white/10 bg-slate-900">
+        <div className="flex items-center justify-end gap-3 px-4 md:px-6 py-4 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
           <Button
             variant="outline"
             onClick={onClose}
             disabled={isApplying}
-            className="border-slate-600 bg-slate-700/50 hover:bg-slate-600 text-white/90 hover:text-white"
+            className="border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-white/90 hover:text-slate-900 dark:hover:text-white"
           >
             {hasNoChanges ? "關閉" : "取消"}
           </Button>

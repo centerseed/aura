@@ -13,7 +13,7 @@ import '../../../../domain/entities/product.dart';
 import '../../../providers/task_provider.dart';
 import '../../../providers/area_provider.dart';
 import '../../../providers/product_provider.dart';
-import '../../dashboard/widgets/task_edit_bottom_sheet.dart';
+import 'task_detail_bottom_sheet.dart';
 
 /// 對話訊息類型
 enum MessageType { user, ai }
@@ -824,7 +824,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
-          child: TaskEditBottomSheet(task: task),
+          child: TaskDetailBottomSheet(task: task),
         ),
       );
     }

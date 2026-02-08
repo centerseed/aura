@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 // Drawer 狀態配置
 export const DRAWER_CONFIG = {
   "00_inbox": {
-    label: "收件匣",
+    label: "規劃中",
     icon: "Inbox",
     bg: "bg-drawer-inbox",
     border: "border-amber-400",

@@ -12,7 +12,6 @@ export type MilestoneStatus =
   | 'in_progress'
   | 'completed'
   | 'delayed'
-  | 'cancelled'
 
 export type EntityType = 'AREA' | 'PRODUCT' | 'TOPIC'
 

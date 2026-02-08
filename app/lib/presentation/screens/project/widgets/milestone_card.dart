@@ -202,9 +202,6 @@ class MilestoneCard extends StatelessWidget {
     if (milestone.status == MilestoneStatus.completed) {
       text = '已完成';
       color = Colors.green;
-    } else if (milestone.status == MilestoneStatus.cancelled) {
-      text = '已取消';
-      color = colorScheme.onSurfaceVariant.withValues(alpha: 0.5);
     } else if (days < 0) {
       text = '逾期 ${days.abs()} 天';
       color = colorScheme.error;

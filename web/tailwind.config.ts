@@ -52,6 +52,11 @@ export default {
           archive: "#ECEFF1",
         },
       },
+      boxShadow: {
+        'float-sm': 'var(--card-shadow-sm)',
+        'float-md': 'var(--card-shadow-md)',
+        'float-lg': 'var(--card-shadow-lg)',
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

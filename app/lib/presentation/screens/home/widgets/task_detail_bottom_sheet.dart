@@ -46,6 +46,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   late String? _selectedTopicId;
   String? _selectedAreaId;
 
+  // 狀態選擇
+  late TaskStatus _selectedStatus;
+
   // Sub-items 本地狀態
   late List<_SubItemState> _subItems;
   bool _isSubItemEditMode = false;
@@ -61,6 +64,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     _reminderEnabled = widget.task.reminderEnabled;
     _selectedProductId = widget.task.productId;
     _selectedTopicId = widget.task.topicId;
+    _selectedStatus = widget.task.status;
 
     _subItems = (widget.task.subItems ?? [])
         .map((sub) => _SubItemState(
@@ -95,6 +99,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final result = await useCase(UpdateTaskDetailsParams(
       taskId: widget.task.id,
       content: content,
+      status: _selectedStatus,
       startDate: _selectedStartDate,
       dueDate: _selectedDueDate,
       productId: _selectedProductId,
@@ -633,6 +638,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       children: [
                         _buildTitleRow(),
                         _buildDivider(),
+                        _buildStatusRow(),
+                        _buildDivider(),
                         _buildDatesRow(),
                         _buildDivider(),
                         _buildReminderRow(),
@@ -750,6 +757,77 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.6), size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 狀態選擇行
+  Widget _buildStatusRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.swap_horiz, size: 18, color: Colors.white.withValues(alpha: 0.6)),
+              const SizedBox(width: 6),
+              Text('狀態', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: TaskStatus.values.map((status) {
+                final isSelected = _selectedStatus == status;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: _isLoading ? null : () {
+                      HapticFeedback.lightImpact();
+                      setState(() => _selectedStatus = status);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? status.color.withValues(alpha: 0.2)
+                            : Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? status.color.withValues(alpha: 0.6)
+                              : Colors.white.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            status.icon,
+                            size: 14,
+                            color: isSelected ? status.color : Colors.white.withValues(alpha: 0.4),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            status.displayName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              color: isSelected ? status.color : Colors.white.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
           ),
         ],

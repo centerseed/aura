@@ -30,7 +30,7 @@ interface WeekLoad {
   tasks: TaskCard[];
   milestones: Milestone[];
   totalLoad: number;
-  dailyLoads: DayLoad[]; // 7天的每日負載
+  dailyLoads: DayLoad[];
 }
 
 // 負載等級閾值
@@ -49,10 +49,10 @@ function getLoadColor(load: number): string {
 }
 
 function getLoadBorderColor(load: number): string {
-  if (load < LOAD_THRESHOLDS.low) return "border-emerald-500/30";
-  if (load < LOAD_THRESHOLDS.medium) return "border-blue-500/30";
-  if (load < LOAD_THRESHOLDS.warning) return "border-amber-500/30";
-  return "border-red-500/30";
+  if (load < LOAD_THRESHOLDS.low) return "border-emerald-300 dark:border-emerald-500/30";
+  if (load < LOAD_THRESHOLDS.medium) return "border-blue-300 dark:border-blue-500/30";
+  if (load < LOAD_THRESHOLDS.warning) return "border-amber-300 dark:border-amber-500/30";
+  return "border-red-300 dark:border-red-500/30";
 }
 
 function getLoadLabel(load: number): string {
@@ -63,10 +63,10 @@ function getLoadLabel(load: number): string {
 }
 
 function getLoadLabelColor(load: number): string {
-  if (load < LOAD_THRESHOLDS.low) return "text-emerald-400";
-  if (load < LOAD_THRESHOLDS.medium) return "text-blue-400";
-  if (load < LOAD_THRESHOLDS.warning) return "text-amber-400";
-  return "text-red-400";
+  if (load < LOAD_THRESHOLDS.low) return "text-emerald-600 dark:text-emerald-400";
+  if (load < LOAD_THRESHOLDS.medium) return "text-blue-600 dark:text-blue-400";
+  if (load < LOAD_THRESHOLDS.warning) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
 }
 
 // 獲取週一
@@ -115,16 +115,16 @@ function getDayLabel(date: Date): string {
 
 // 獲取每日負載顏色（用於熱力圖）
 function getDayLoadColor(count: number): string {
-  if (count === 0) return 'bg-white/5';
-  if (count <= 2) return 'bg-emerald-500/50';
-  if (count <= 4) return 'bg-blue-500/70';
-  if (count <= 7) return 'bg-amber-500/80';
+  if (count === 0) return 'bg-gray-100 dark:bg-white/5';
+  if (count <= 2) return 'bg-emerald-400 dark:bg-emerald-500/50';
+  if (count <= 4) return 'bg-blue-400 dark:bg-blue-500/70';
+  if (count <= 7) return 'bg-amber-400 dark:bg-amber-500/80';
   return 'bg-red-500';
 }
 
 // 獲取每日負載的高度（用於柱狀圖）
 function getDayLoadHeight(count: number): number {
-  return Math.min(count * 8 + 8, 48); // 最小8px，每個任務增加8px，最大48px
+  return Math.min(count * 8 + 8, 48);
 }
 
 function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProps) {
@@ -152,7 +152,6 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
 
-        // 初始化7天的每日負載
         const dailyLoads: DayLoad[] = [];
         for (let i = 0; i < 7; i++) {
           const dayDate = new Date(weekStart);
@@ -179,7 +178,6 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
       week.tasks.push(task);
       week.totalLoad++;
 
-      // 更新對應日期的負載
       const dayIndex = Math.floor((dueDate.getTime() - week.weekStart.getTime()) / (1000 * 60 * 60 * 24));
       if (dayIndex >= 0 && dayIndex < 7) {
         week.dailyLoads[dayIndex].tasks.push(task);
@@ -197,7 +195,6 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
 
-        // 初始化7天的每日負載
         const dailyLoads: DayLoad[] = [];
         for (let i = 0; i < 7; i++) {
           const dayDate = new Date(weekStart);
@@ -224,7 +221,6 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
       week.milestones.push(milestone);
       week.totalLoad++;
 
-      // 更新對應日期的負載
       const dayIndex = Math.floor((targetDate.getTime() - week.weekStart.getTime()) / (1000 * 60 * 60 * 24));
       if (dayIndex >= 0 && dayIndex < 7) {
         week.dailyLoads[dayIndex].milestones.push(milestone);
@@ -232,7 +228,6 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
       }
     });
 
-    // 排序並轉為陣列，過濾掉過去的週（只顯示本週及之後）
     const currentWeekStart = getWeekStart(new Date());
     return Array.from(weekMap.values())
       .filter(week => week.weekStart.getTime() >= currentWeekStart.getTime())
@@ -270,7 +265,7 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
 
   if (weeklyLoads.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-white/50">
+      <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-white/50">
         <Calendar className="h-12 w-12 mb-4 opacity-50" />
         <p>沒有排定日期的任務或里程碑</p>
       </div>
@@ -280,11 +275,11 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
   return (
     <div className="space-y-4">
       {/* 頂部統計 */}
-      <div className="flex items-center gap-6 text-sm text-white/60">
+      <div className="flex items-center gap-6 text-sm text-gray-500 dark:text-white/60">
         <span>共 {weeklyLoads.length} 週</span>
         <span>平均負載: {stats.avgLoad.toFixed(1)}</span>
         {stats.overloadedWeeks > 0 && (
-          <span className="text-red-400 font-medium flex items-center gap-1">
+          <span className="text-red-500 dark:text-red-400 font-medium flex items-center gap-1">
             <AlertTriangle className="h-4 w-4" />
             {stats.overloadedWeeks} 週超載
           </span>
@@ -301,24 +296,24 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
           return (
             <div
               key={key}
-              className={`rounded-xl border bg-white/5 ${getLoadBorderColor(week.totalLoad)} ${
+              className={`rounded-xl border bg-white dark:bg-white/5 ${getLoadBorderColor(week.totalLoad)} ${
                 isCurrent ? "ring-2 ring-blue-500/50" : ""
               }`}
             >
               {/* 週標題列 */}
               <button
                 onClick={() => toggleWeek(key)}
-                className="w-full px-4 py-3 flex items-center gap-4 hover:bg-white/5 transition-colors rounded-xl"
+                className="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors rounded-xl"
               >
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-white/40" />
+                  <ChevronDown className="h-4 w-4 text-gray-400 dark:text-white/40" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-white/40" />
+                  <ChevronRight className="h-4 w-4 text-gray-400 dark:text-white/40" />
                 )}
 
                 {/* 週標籤 */}
                 <div className="flex items-center gap-2 min-w-[100px]">
-                  <span className="font-medium text-white">
+                  <span className="font-medium text-gray-900 dark:text-white">
                     {formatWeekLabel(week.weekStart)} 週
                   </span>
                   {isCurrent && (
@@ -332,7 +327,7 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
                 <div className="flex items-end gap-1.5 h-16 px-2 flex-1">
                   {week.dailyLoads.map((day, idx) => (
                     <div key={idx} className="flex flex-col items-center gap-1.5 group relative flex-1 min-w-[40px]">
-                      {/* 柱狀圖容器 - 固定高度基準線 */}
+                      {/* 柱狀圖容器 */}
                       <div className="flex flex-col justify-end w-full" style={{ height: '48px' }}>
                         <div
                           className={`w-full rounded-t transition-all ${getDayLoadColor(day.count)} ${
@@ -344,17 +339,17 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
                       {/* 星期標籤 */}
                       <span className={`text-xs leading-none ${
                         isToday(day.date)
-                          ? 'text-blue-400 font-bold'
+                          ? 'text-blue-500 dark:text-blue-400 font-bold'
                           : day.count > 0
-                            ? 'text-white/60'
-                            : 'text-white/30'
+                            ? 'text-gray-500 dark:text-white/60'
+                            : 'text-gray-300 dark:text-white/30'
                       }`}>
                         {getDayLabel(day.date)}
                       </span>
                       {/* 懸浮提示 */}
                       {day.count > 0 && (
                         <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                          <div className="bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                          <div className="bg-gray-900 dark:bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
                             {formatFullDate(day.date)}: {day.count} 項
                           </div>
                         </div>
@@ -369,7 +364,7 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
                     {getLoadLabel(week.totalLoad)}
                   </span>
                   <span className={`font-bold text-lg ${
-                    week.totalLoad >= LOAD_THRESHOLDS.warning ? "text-red-400" : "text-white"
+                    week.totalLoad >= LOAD_THRESHOLDS.warning ? "text-red-500 dark:text-red-400" : "text-gray-900 dark:text-white"
                   }`}>
                     {week.totalLoad}
                   </span>
@@ -378,20 +373,20 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
 
               {/* 展開詳情 - 按日期分組 */}
               {isExpanded && (
-                <div className="px-4 pb-4 pt-2 border-t border-white/10 space-y-2">
+                <div className="px-4 pb-4 pt-2 border-t border-gray-100 dark:border-white/10 space-y-2">
                   {week.dailyLoads.filter((day) => day.count > 0).map((day, idx) => (
                     <div
                       key={idx}
                       className={`rounded-lg border p-3 ${
                         isToday(day.date)
-                          ? 'bg-blue-500/10 border-blue-500/30'
-                          : 'bg-white/5 border-white/10'
+                          ? 'bg-blue-50 border-blue-200 dark:bg-blue-500/10 dark:border-blue-500/30'
+                          : 'bg-gray-50 border-gray-200 dark:bg-white/5 dark:border-white/10'
                       }`}
                     >
                       {/* 日期標題 */}
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`text-sm font-bold ${
-                          isToday(day.date) ? 'text-blue-400' : 'text-white'
+                          isToday(day.date) ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'
                         }`}>
                           {formatFullDate(day.date)} ({getDayLabel(day.date)})
                         </span>
@@ -401,7 +396,7 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
                           </span>
                         )}
                         <span className={`text-xs ml-auto ${
-                          day.count >= 5 ? 'text-red-400' : 'text-white/60'
+                          day.count >= 5 ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-white/60'
                         }`}>
                           {day.count} 項
                         </span>
@@ -412,24 +407,24 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
                         {day.tasks.map((task) => (
                           <div
                             key={task.id}
-                            className="flex items-start gap-2 bg-black/20 rounded px-2 py-1.5 text-sm"
+                            className="flex items-start gap-2 bg-white border border-gray-100 dark:bg-black/20 dark:border-transparent rounded px-2 py-1.5 text-sm"
                           >
-                            <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                            <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                             {/* Area 和 Product 標籤 */}
                             <div className="flex flex-col gap-0.5 min-w-[120px] flex-shrink-0">
-                              <span className="text-xs text-white/40 leading-none">{task.tag.area}</span>
-                              <span className="text-xs text-white/50 leading-none">{task.tag.product}</span>
+                              <span className="text-xs text-gray-400 dark:text-white/40 leading-none">{task.tag.area}</span>
+                              <span className="text-xs text-gray-500 dark:text-white/50 leading-none">{task.tag.product}</span>
                             </div>
-                            <span className="text-white/90 flex-1">{task.title}</span>
+                            <span className="text-gray-800 dark:text-white/90 flex-1">{task.title}</span>
                           </div>
                         ))}
                         {day.milestones.map((m) => (
                           <div
                             key={m.id}
-                            className="flex items-start gap-2 bg-purple-500/20 rounded px-2 py-1.5 text-sm border border-purple-500/30"
+                            className="flex items-start gap-2 bg-purple-50 dark:bg-purple-500/20 rounded px-2 py-1.5 text-sm border border-purple-200 dark:border-purple-500/30"
                           >
-                            <Flag className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-purple-300">{m.name}</span>
+                            <Flag className="h-4 w-4 text-purple-500 dark:text-purple-400 mt-0.5 flex-shrink-0" />
+                            <span className="text-purple-700 dark:text-purple-300">{m.name}</span>
                           </div>
                         ))}
                       </div>
@@ -443,7 +438,7 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
       </div>
 
       {/* 圖例 */}
-      <div className="flex flex-wrap gap-4 text-sm text-white/60 pt-2">
+      <div className="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-white/60 pt-2">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
           <span>輕鬆 (0-2)</span>

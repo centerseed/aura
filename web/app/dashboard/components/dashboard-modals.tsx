@@ -79,6 +79,7 @@ export interface DashboardModalsProps {
   onDeleteReference: (taskId: string, referenceId: string) => void
   onComplete: (taskId: string) => void
   onDelete: (taskId: string) => void
+  onStatusChange: (taskId: string, newStatus: import('@/types').DrawerStatus) => void
   // Product Suggestion Modal
   showProductSuggestionModal: boolean
   productSuggestion: ProductSuggestion | null
@@ -151,6 +152,7 @@ export function DashboardModals({
   onDeleteReference,
   onComplete,
   onDelete,
+  onStatusChange,
   // Product Suggestion Modal
   showProductSuggestionModal,
   productSuggestion,
@@ -253,6 +255,7 @@ export function DashboardModals({
           onDeleteReference={onDeleteReference}
           onComplete={onComplete}
           onDelete={onDelete}
+          onStatusChange={onStatusChange}
         />
       )}
 

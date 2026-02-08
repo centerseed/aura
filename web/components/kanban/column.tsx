@@ -1,13 +1,13 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import { Inbox, Rocket, RefreshCw, BookOpen, Archive } from "lucide-react";
+import { ClipboardList, Rocket, RefreshCw, BookOpen, Archive } from "lucide-react";
 import type { TaskCard, DrawerStatus } from "@/types";
 import { TaskCardComponent } from "./task-card";
 
-const COLUMN_CONFIG: Record<DrawerStatus, { icon: typeof Inbox; gradient: string; border: string }> = {
+const COLUMN_CONFIG: Record<DrawerStatus, { icon: typeof ClipboardList; gradient: string; border: string }> = {
   INBOX: {
-    icon: Inbox,
+    icon: ClipboardList,
     gradient: "from-amber-500/10 to-orange-500/5",
     border: "border-amber-200 dark:border-amber-800",
   },
@@ -52,9 +52,8 @@ export function KanbanColumn({ id, title, color, tasks, onToggleSubItem, onSetDu
     <div
       ref={setNodeRef}
       className={`
-        flex flex-col rounded-2xl bg-gradient-to-b ${config.gradient}
-        border-2 ${config.border}
-        min-h-[500px] transition-all duration-200
+        flex flex-col card-float bg-gradient-to-b ${config.gradient}
+        min-h-[500px]
         ${isOver ? "ring-2 ring-indigo-500 ring-offset-2 scale-[1.02]" : ""}
       `}
     >

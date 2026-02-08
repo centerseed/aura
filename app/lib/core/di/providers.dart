@@ -12,6 +12,7 @@ import '../../domain/entities/area.dart';
 import '../../domain/entities/product.dart';
 import '../network/auth_interceptor.dart';
 import '../network/logging_interceptor.dart';
+import '../network/retry_interceptor.dart';
 import '../../data/datasources/remote/api_client.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/repositories/brain_dump_repository_impl.dart';
@@ -49,6 +50,7 @@ import '../../application/use_cases/get_tasks_use_case.dart';
 import '../../application/use_cases/reorder_sub_items_use_case.dart';
 import '../../application/use_cases/reorganize_product_topics_use_case.dart';
 import '../../application/use_cases/submit_brain_dump_use_case.dart';
+import '../../application/use_cases/update_product_reference_use_case.dart';
 import '../../application/use_cases/update_sub_item_use_case.dart';
 import '../../application/use_cases/update_product_use_case.dart';
 import '../../application/use_cases/update_task_details_use_case.dart';
@@ -98,6 +100,7 @@ final dioProvider = Provider<Dio>((ref) {
 
   // 添加攔截器
   dio.interceptors.add(AuthInterceptor(firebaseAuth));
+  dio.interceptors.add(RetryInterceptor(dio: dio));
 
   if (AppConfig.isDebugMode) {
     dio.interceptors.add(LoggingInterceptor());
@@ -392,6 +395,13 @@ final addProductReferenceUseCaseProvider =
     Provider<AddProductReferenceUseCase>((ref) {
   final repository = ref.watch(productRepositoryProvider);
   return AddProductReferenceUseCase(repository);
+});
+
+/// Update Product Reference Use Case Provider
+final updateProductReferenceUseCaseProvider =
+    Provider<UpdateProductReferenceUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return UpdateProductReferenceUseCase(repository);
 });
 
 /// Delete Product Reference Use Case Provider

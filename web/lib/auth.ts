@@ -22,9 +22,10 @@ export async function waitForAuth(): Promise<User | null> {
 
 /**
  * 獲取當前用戶的 ID Token（用於後端驗證）
+ * @param forceRefresh - 是否強制刷新 token（預設 false）
  */
-export async function getIdToken(): Promise<string | null> {
+export async function getIdToken(forceRefresh = false): Promise<string | null> {
   const user = await getCurrentUser();
   if (!user) return null;
-  return user.getIdToken();
+  return user.getIdToken(forceRefresh);
 }

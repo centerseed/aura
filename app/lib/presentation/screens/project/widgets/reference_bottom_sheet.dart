@@ -18,6 +18,7 @@ class ReferenceBottomSheet extends ConsumerStatefulWidget {
   final String productId;
   final String productName;
   final Future<void> Function(String type, String content, String? title) onAddReference;
+  final Future<void> Function(String referenceId, String content, String? title) onEditReference;
   final Future<void> Function(String referenceId) onDeleteReference;
 
   const ReferenceBottomSheet({
@@ -25,6 +26,7 @@ class ReferenceBottomSheet extends ConsumerStatefulWidget {
     required this.productId,
     required this.productName,
     required this.onAddReference,
+    required this.onEditReference,
     required this.onDeleteReference,
   });
 
@@ -37,6 +39,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   final TextEditingController _titleController = TextEditingController();
   ReferenceType _selectedType = ReferenceType.note;
   bool _isLoading = false;
+  String? _editingReferenceId;
 
   @override
   void dispose() {
@@ -45,26 +48,54 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
     super.dispose();
   }
 
-  Future<void> _handleAddReference() async {
+  Future<void> _handleSubmitReference() async {
     if (_contentController.text.trim().isEmpty) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await widget.onAddReference(
-        _selectedType.name,
-        _contentController.text.trim(),
-        _titleController.text.trim().isEmpty ? null : _titleController.text.trim(),
-      );
+      if (_editingReferenceId != null) {
+        await widget.onEditReference(
+          _editingReferenceId!,
+          _contentController.text.trim(),
+          _titleController.text.trim().isEmpty ? null : _titleController.text.trim(),
+        );
+      } else {
+        await widget.onAddReference(
+          _selectedType.name,
+          _contentController.text.trim(),
+          _titleController.text.trim().isEmpty ? null : _titleController.text.trim(),
+        );
+      }
 
       _contentController.clear();
       _titleController.clear();
+      _editingReferenceId = null;
+      FocusScope.of(context).unfocus();
       HapticFeedback.mediumImpact();
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _startEditing(Reference reference) {
+    setState(() {
+      _editingReferenceId = reference.id;
+      _selectedType = reference.type;
+      _titleController.text = reference.title ?? '';
+      _contentController.text = reference.content;
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingReferenceId = null;
+      _titleController.clear();
+      _contentController.clear();
+    });
+    FocusScope.of(context).unfocus();
   }
 
   Future<void> _handleDeleteReference(String referenceId) async {
@@ -295,6 +326,15 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
               ],
             ),
           ),
+          // Edit Button
+          IconButton(
+            icon: Icon(
+              Icons.edit_outlined,
+              color: Colors.white.withValues(alpha: 0.3),
+              size: 20,
+            ),
+            onPressed: _isLoading ? null : () => _startEditing(reference),
+          ),
           // Delete Button
           IconButton(
             icon: Icon(
@@ -325,16 +365,29 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
         children: [
           Row(
             children: [
-              const Icon(Icons.add_circle_outline, color: Color(0xFF6C63FF), size: 20),
+              Icon(
+                _editingReferenceId != null ? Icons.edit : Icons.add_circle_outline,
+                color: const Color(0xFF6C63FF),
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              const Text(
-                "新增資料",
-                style: TextStyle(
+              Text(
+                _editingReferenceId != null ? "編輯資料" : "新增資料",
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
               ),
+              const Spacer(),
+              if (_editingReferenceId != null)
+                TextButton(
+                  onPressed: _cancelEditing,
+                  child: const Text(
+                    '取消',
+                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -404,7 +457,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _isLoading ? null : _handleAddReference,
+              onPressed: _isLoading ? null : _handleSubmitReference,
               icon: _isLoading
                   ? const SizedBox(
                       width: 16,
@@ -414,8 +467,8 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.add),
-              label: const Text('新增'),
+                  : Icon(_editingReferenceId != null ? Icons.check : Icons.add),
+              label: Text(_editingReferenceId != null ? '更新' : '新增'),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF6C63FF),
                 padding: const EdgeInsets.symmetric(vertical: 14),

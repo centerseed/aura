@@ -17,7 +17,7 @@ export interface CreateMilestoneDTO {
   entity_id: string
   priority?: number
   description?: string
-  status?: 'planned' | 'in_progress' | 'completed' | 'delayed' | 'cancelled'
+  status?: 'planned' | 'in_progress' | 'completed' | 'delayed'
 }
 
 /**
@@ -26,7 +26,7 @@ export interface CreateMilestoneDTO {
 export interface UpdateMilestoneDTO {
   name?: string
   target_date?: string
-  status?: 'planned' | 'in_progress' | 'completed' | 'delayed' | 'cancelled'
+  status?: 'planned' | 'in_progress' | 'completed' | 'delayed'
   priority?: number
   description?: string | null
 }

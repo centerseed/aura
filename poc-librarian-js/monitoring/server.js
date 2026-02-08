@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-const PORT = 3002
+const PORT = 3003
 
 // 靜態檔案
 app.use(express.static(path.join(__dirname, 'public')))

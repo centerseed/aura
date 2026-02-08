@@ -44,6 +44,7 @@ export function MilestoneModal({
   const [entityType, setEntityType] = useState<EntityType>("PRODUCT");
   const [entityId, setEntityId] = useState("");
   const [priority, setPriority] = useState(5);
+  const [status, setStatus] = useState<MilestoneStatus>("planned");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export function MilestoneModal({
       setEntityType(editingMilestone.entity_type || "PRODUCT");
       setEntityId(editingMilestone.entity_id || "");
       setPriority(editingMilestone.priority ?? 5);
+      setStatus(editingMilestone.status || "planned");
       setDescription(editingMilestone.description || "");
     } else {
       // 重置表單
@@ -64,6 +66,7 @@ export function MilestoneModal({
       setEntityType("PRODUCT");
       setEntityId("");
       setPriority(5);
+      setStatus("planned");
       setDescription("");
     }
     setError(null);
@@ -133,7 +136,7 @@ export function MilestoneModal({
       const payload = {
         name,
         target_date: targetDate.toISOString(),
-        status: "planned" as MilestoneStatus,
+        status,
         entity_type: entityType,
         entity_id: entityId,
         priority,
@@ -293,6 +296,43 @@ export function MilestoneModal({
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* 狀態選擇（僅編輯模式） */}
+          {editingMilestone?.id && (
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                狀態
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: "planned" as MilestoneStatus, label: "計畫中", color: "gray" },
+                  { value: "in_progress" as MilestoneStatus, label: "進行中", color: "blue" },
+                  { value: "completed" as MilestoneStatus, label: "已完成", color: "green" },
+                  { value: "delayed" as MilestoneStatus, label: "延遲", color: "orange" },
+                ] as const).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setStatus(option.value)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      status === option.value
+                        ? option.color === "gray"
+                          ? "bg-gray-500/20 border-gray-400/50 text-gray-300"
+                          : option.color === "blue"
+                          ? "bg-blue-500/20 border-blue-400/50 text-blue-300"
+                          : option.color === "green"
+                          ? "bg-green-500/20 border-green-400/50 text-green-300"
+                          : "bg-orange-500/20 border-orange-400/50 text-orange-300"
+                        : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/70"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 實體類型和選擇 */}
           <div className="grid grid-cols-2 gap-4">

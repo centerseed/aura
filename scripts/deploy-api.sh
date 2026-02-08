@@ -156,6 +156,9 @@ sync_secret() {
 sync_secret "database-url" "DATABASE_URL"
 sync_secret "gemini-api-key" "GOOGLE_GENERATIVE_AI_API_KEY"
 sync_secret "firebase-admin-key" "FIREBASE_ADMIN_KEY"
+sync_secret "google-oauth-client-id" "GOOGLE_OAUTH_CLIENT_ID"
+sync_secret "google-oauth-client-secret" "GOOGLE_OAUTH_CLIENT_SECRET"
+sync_secret "oauth-encryption-key" "OAUTH_ENCRYPTION_KEY"
 
 log_success "Secrets 同步完成"
 echo ""
@@ -218,9 +221,12 @@ DEPLOY_ARGS=(
     --update-secrets DATABASE_URL=database-url:latest
     --update-secrets GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest
     --update-secrets FIREBASE_ADMIN_KEY=firebase-admin-key:latest
+    --update-secrets GOOGLE_OAUTH_CLIENT_ID=google-oauth-client-id:latest
+    --update-secrets GOOGLE_OAUTH_CLIENT_SECRET=google-oauth-client-secret:latest
+    --update-secrets OAUTH_ENCRYPTION_KEY=oauth-encryption-key:latest
 
     # Node.js 環境變數
-    --set-env-vars NODE_ENV=production
+    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://zentropy.cc"
 )
 
 if [ "$ENVIRONMENT" = "staging" ]; then

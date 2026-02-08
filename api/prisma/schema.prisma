@@ -17,6 +17,7 @@ model User {
   name                 String?               @db.VarChar
   auth_provider        AuthProvider          @default(EMAIL)
   auth_provider_id     String?               @db.VarChar
+  timezone             String?               @default("Asia/Taipei") @db.VarChar(50)
   settings             Json?                 @db.Json
   areas                Area[]
   governance_proposals GovernanceProposal[]
@@ -25,10 +26,31 @@ model User {
   tasks                Task[]
   topics               Topic[]
   evaluation_logs      SystemEvaluationLog[]
+  oauth_tokens         OAuthToken[]
 
   @@index([auth_provider_id])
   @@index([auth_provider, auth_provider_id])
   @@map("users")
+}
+
+model OAuthToken {
+  id                String        @id @default(uuid()) @db.Uuid
+  user_id           String        @db.Uuid
+  provider          OAuthProvider
+  access_token      String        @db.VarChar
+  refresh_token     String?       @db.VarChar
+  expires_at        DateTime      @db.Timestamp(6)
+  scopes            String[]      @db.VarChar
+  authorized_email  String?       @db.VarChar
+  created_at        DateTime      @default(now()) @db.Timestamp(6)
+  updated_at        DateTime      @updatedAt @db.Timestamp(6)
+  user              User          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, provider])
+  @@index([user_id])
+  @@index([provider])
+  @@index([expires_at])
+  @@map("oauth_tokens")
 }
 
 model Area {
@@ -117,6 +139,8 @@ model Task {
   topic                   Topic?                 @relation(fields: [topic_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   ai_metadata             TaskAIMetadata?
+  calendar_events         CalendarEvent[]
+  reminders               ReminderConfig[]
 
   @@index([product_id, deleted_at, status])
   @@index([user_id, deleted_at, status])
@@ -233,6 +257,14 @@ enum AuthProvider {
   @@map("authproviderenum")
 }
 
+enum OAuthProvider {
+  GOOGLE_CALENDAR
+  GOOGLE_DRIVE
+  ZOOM
+
+  @@map("oauthproviderenum")
+}
+
 enum EvaluationLogType {
   BRAIN_DUMP
   ADJUST_TAGS
@@ -268,4 +300,60 @@ model SystemEvaluationLog {
   @@index([user_id, type])
   @@index([user_id, type, user_action])
   @@map("system_evaluation_logs")
+}
+
+model CalendarEvent {
+  id                  String           @id @default(uuid()) @db.Uuid
+  created_at          DateTime         @default(now()) @db.Timestamp(6)
+  updated_at          DateTime         @updatedAt @db.Timestamp(6)
+  deleted_at          DateTime?        @db.Timestamp(6)
+  user_id             String           @db.Uuid
+  task_id             String?          @db.Uuid
+  calendar_event_id   String           @db.VarChar
+  summary             String           @db.VarChar
+  description         String?          @db.Text
+  start_date_time     DateTime         @db.Timestamp(6)
+  end_date_time       DateTime         @db.Timestamp(6)
+  meet_link           String?          @db.VarChar
+  event_link          String           @db.VarChar
+  attendees           String[]         @default([]) @db.VarChar
+  task                Task?            @relation(fields: [task_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  reminders           ReminderConfig[]
+
+  @@unique([calendar_event_id])
+  @@index([user_id, deleted_at])
+  @@index([task_id, deleted_at])
+  @@index([start_date_time])
+  @@map("calendar_events")
+}
+
+model ReminderConfig {
+  id                  String         @id @default(uuid()) @db.Uuid
+  created_at          DateTime       @default(now()) @db.Timestamp(6)
+  updated_at          DateTime       @updatedAt @db.Timestamp(6)
+  deleted_at          DateTime?      @db.Timestamp(6)
+  user_id             String         @db.Uuid
+  task_id             String?        @db.Uuid
+  calendar_event_id   String?        @db.Uuid
+  remind_at           DateTime       @db.Timestamp(6)
+  message             String?        @db.VarChar
+  reminder_type       ReminderType
+  notification_id     Int?
+  calendar_remind_event_id String?   @db.VarChar
+  task                Task?          @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  calendar_event      CalendarEvent? @relation(fields: [calendar_event_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, deleted_at])
+  @@index([task_id, deleted_at])
+  @@index([calendar_event_id, deleted_at])
+  @@index([remind_at])
+  @@index([user_id, reminder_type, remind_at])
+  @@map("reminder_configs")
+}
+
+enum ReminderType {
+  CALENDAR_REMINDER
+  LOCAL_NOTIFICATION
+
+  @@map("remindertypeenum")
 }

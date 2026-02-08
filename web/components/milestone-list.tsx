@@ -16,7 +16,6 @@ const STATUS_COLORS: Record<string, string> = {
   in_progress: "text-blue-400 bg-blue-500/10",
   completed: "text-green-400 bg-green-500/10",
   delayed: "text-orange-400 bg-orange-500/10",
-  cancelled: "text-red-400 bg-red-500/10",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -24,7 +23,6 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: "進行中",
   completed: "已完成",
   delayed: "延遲",
-  cancelled: "已取消",
 };
 
 // 計算剩餘天數
@@ -40,7 +38,7 @@ export function MilestoneList({ milestones, onEdit, onDelete }: MilestoneListPro
   const activeMilestones = (Array.isArray(milestones) ? milestones : [])
     .filter((m) => {
       // 排除已完成和已取消的
-      if (m.status === "completed" || m.status === "cancelled") return false;
+      if (m.status === "completed") return false;
 
       // 排除已過期的
       const daysRemaining = getDaysRemaining(m.target_date);

@@ -7,7 +7,7 @@ import '../../../domain/entities/task.dart';
 import '../../../application/use_cases/create_task_use_case.dart';
 import '../../../application/use_cases/update_task_details_use_case.dart';
 import '../../providers/task_provider.dart';
-import 'widgets/task_edit_bottom_sheet.dart';
+import '../home/widgets/task_detail_bottom_sheet.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -404,7 +404,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: TaskEditBottomSheet(task: task),
+        child: TaskDetailBottomSheet(task: task),
       ),
     );
   }

@@ -24,6 +24,24 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* 背景漸層 */
+    --bg-gradient-from: 220 20% 97%;
+    --bg-gradient-to: 220 15% 93%;
+
+    /* 懸浮卡片陰影系統 */
+    --card-shadow-sm: 0 2px 8px -2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    --card-shadow-md: 0 8px 30px -8px rgba(0,0,0,0.08), 0 4px 12px -4px rgba(0,0,0,0.05);
+    --card-shadow-lg: 0 20px 60px -15px rgba(0,0,0,0.1), 0 8px 24px -8px rgba(0,0,0,0.06);
+
+    /* 卡片邊緣高光 */
+    --card-border-float: 0 0% 100% / 0.7;
+    --card-bg-float: 0 0% 100% / 0.8;
+    --card-backdrop: 12px;
+
+    /* 內層卡片 */
+    --card-inner-bg: 220 20% 96% / 0.6;
+    --card-inner-border: 0 0% 100% / 0.5;
   }
 
   .dark {
@@ -46,6 +64,24 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* 背景漸層 */
+    --bg-gradient-from: 225 25% 8%;
+    --bg-gradient-to: 225 20% 12%;
+
+    /* 懸浮卡片陰影系統 */
+    --card-shadow-sm: 0 2px 8px -2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+    --card-shadow-md: 0 8px 30px -8px rgba(0,0,0,0.4), 0 4px 12px -4px rgba(0,0,0,0.25);
+    --card-shadow-lg: 0 20px 60px -15px rgba(0,0,0,0.5), 0 8px 24px -8px rgba(0,0,0,0.3);
+
+    /* 卡片邊緣高光 */
+    --card-border-float: 0 0% 100% / 0.08;
+    --card-bg-float: 225 20% 13% / 0.8;
+    --card-backdrop: 12px;
+
+    /* 內層卡片 */
+    --card-inner-bg: 225 20% 16% / 0.6;
+    --card-inner-border: 0 0% 100% / 0.06;
   }
 }
 
@@ -67,4 +103,406 @@
     height: 100%;
     -webkit-overscroll-behavior: none;
   }
+}
+
+.card-float {
+  border-radius: 1rem;
+  backdrop-filter: blur(24px);
+  transition: all 0.3s;
+  background: hsl(var(--card-bg-float));
+  border: 1px solid hsl(var(--card-border-float));
+  box-shadow: var(--card-shadow-md);
+}
+.card-float:hover {
+  box-shadow: var(--card-shadow-lg);
+  transform: translateY(-1px);
+}
+
+.card-float-inner {
+  border-radius: 0.75rem;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s;
+  background: hsl(var(--card-inner-bg));
+  border: 1px solid hsl(var(--card-inner-border));
+  box-shadow: var(--card-shadow-sm);
+}
+
+.bg-app {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--bg-gradient-from)),
+    hsl(var(--bg-gradient-to))
+  );
+}
+
+/* ============================================
+   淺色主題：覆蓋 dashboard 寫死的深色 class
+   ============================================ */
+:root:not(.dark) {
+
+  /* === 頁面背景 — 冷藍灰底色 === */
+  .bg-gradient-to-br.from-slate-900 {
+    background: linear-gradient(160deg, #dfe6ee 0%, #d3dbe6 40%, #dae1ea 100%) !important;
+  }
+  .bg-slate-900 { background-color: #dbe2ec !important; }
+  .bg-slate-800 { background-color: #ffffff; }
+
+  /* === 背景光暈 blob — 完全隱藏 === */
+  .blur-3xl.animate-pulse,
+  .blur-3xl.rounded-full {
+    display: none !important;
+  }
+
+  /* === Header 毛玻璃 === */
+  .bg-slate-900\/80 {
+    background-color: rgba(225, 231, 240, 0.7) !important;
+    backdrop-filter: blur(24px) saturate(1.6) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  .bg-slate-800\/50 { background-color: rgba(255, 255, 255, 0.5); }
+
+  /* === 文字色階 === */
+  .text-white    { color: #1a1f36; }
+  .text-white\/80 { color: rgba(26, 31, 54, 0.85); }
+  .text-white\/70 { color: rgba(26, 31, 54, 0.7); }
+  .text-white\/60 { color: #64748b; }
+  .text-white\/50 { color: #94a3b8; }
+  .text-white\/40 { color: #a0aec0; }
+  .text-white\/30 { color: #b8c4d0; }
+  .placeholder\:text-white\/30::placeholder { color: #b8c4d0; }
+
+  /* === 半透明表面 → 懸浮卡片質感 === */
+  .bg-white\/5 {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    box-shadow:
+      0 20px 60px -15px rgba(0, 0, 0, 0.1),
+      0 8px 24px -8px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.8) !important;
+  }
+  .bg-white\/10 {
+    background-color: rgba(255, 255, 255, 0.65) !important;
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.06) !important;
+  }
+  .bg-white\/20 { background-color: rgba(255, 255, 255, 0.75) !important; }
+
+  /* === 邊框 — 柔和高光 === */
+  .border-white\/10 { border-color: rgba(0, 0, 0, 0.06); }
+  .border-white\/20 { border-color: rgba(0, 0, 0, 0.08); }
+  .border-white\/30 { border-color: rgba(0, 0, 0, 0.12); }
+  .border-white\/50 { border-color: rgba(0, 0, 0, 0.15); }
+  .border-dashed.border-white\/20 { border-color: rgba(0, 0, 0, 0.15); }
+
+  /* === Product 卡片（外層容器）=== */
+  .rounded-xl.border-2 {
+    background-color: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(20px) saturate(1.5);
+    border-width: 1px !important;
+    border-color: rgba(255, 255, 255, 0.9) !important;
+    box-shadow:
+      0 25px 70px -20px rgba(0, 0, 0, 0.12),
+      0 10px 30px -10px rgba(0, 0, 0, 0.07),
+      0 0 0 1px rgba(255, 255, 255, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+  }
+
+  /* === Hover 效果 === */
+  .hover\:bg-white\/5:hover { background-color: rgba(0, 0, 0, 0.03); }
+  .hover\:bg-white\/10:hover { background-color: rgba(0, 0, 0, 0.05); }
+  .hover\:bg-white\/20:hover { background-color: rgba(0, 0, 0, 0.06); }
+  .hover\:text-white:hover { color: #1a1f36; }
+  .hover\:text-white\/60:hover { color: #475569; }
+  .hover\:text-white\/70:hover { color: #334155; }
+  .hover\:border-white\/50:hover { border-color: rgba(0, 0, 0, 0.15); }
+
+  /* === 背景光暈色彩（非 blob 用途）=== */
+  .bg-indigo-500\/20 { background-color: rgba(99, 102, 241, 0.06); }
+  .bg-blue-500\/20   { background-color: rgba(59, 130, 246, 0.06); }
+  .bg-indigo-500\/10 { background-color: rgba(99, 102, 241, 0.04); }
+
+  /* === 強調色 — 提高對比 === */
+  .text-indigo-300 { color: #4f46e5; }
+  .text-indigo-400 { color: #6366f1; }
+  .text-blue-300   { color: #2563eb; }
+  .text-purple-300 { color: #7c3aed; }
+  .text-amber-400  { color: #d4a04a; }
+  .text-green-400  { color: #16a34a; }
+  .text-red-400    { color: #e07070; }
+  .text-orange-400 { color: #e0915a; }
+
+  .bg-indigo-500\/30 { background-color: rgba(99, 102, 241, 0.12); }
+  .bg-indigo-500\/20 { background-color: rgba(99, 102, 241, 0.08); }
+  .bg-indigo-500\/10 { background-color: rgba(99, 102, 241, 0.06); }
+  .bg-blue-500\/30   { background-color: rgba(59, 130, 246, 0.12); }
+  .bg-purple-500\/30 { background-color: rgba(124, 58, 237, 0.12); }
+  .bg-green-500\/10  { background-color: rgba(22, 163, 74, 0.08); }
+  .bg-yellow-500\/10 { background-color: rgba(234, 179, 8, 0.08); }
+  .bg-amber-500\/10  { background-color: rgba(245, 158, 11, 0.08); }
+
+  .border-indigo-500\/20 { border-color: rgba(99, 102, 241, 0.2); }
+  .border-indigo-500\/30 { border-color: rgba(99, 102, 241, 0.25); }
+  .border-green-500\/20  { border-color: rgba(22, 163, 74, 0.2); }
+  .border-yellow-500\/20 { border-color: rgba(234, 179, 8, 0.2); }
+  .border-amber-500\/30  { border-color: rgba(245, 158, 11, 0.25); }
+
+  .hover\:bg-indigo-500\/20:hover { background-color: rgba(99, 102, 241, 0.12); }
+  .hover\:bg-indigo-500\/10:hover { background-color: rgba(99, 102, 241, 0.08); }
+  .hover\:bg-green-500\/20:hover  { background-color: rgba(22, 163, 74, 0.12); }
+  .hover\:bg-yellow-500\/20:hover { background-color: rgba(234, 179, 8, 0.12); }
+  .hover\:bg-amber-500\/20:hover  { background-color: rgba(245, 158, 11, 0.12); }
+  .hover\:border-indigo-400\/50:hover { border-color: rgba(99, 102, 241, 0.4); }
+  .hover\:border-amber-400\/50:hover  { border-color: rgba(245, 158, 11, 0.4); }
+
+  /* === Gradient text 修正 === */
+  .bg-clip-text.text-transparent {
+    -webkit-text-fill-color: #1a1f36;
+    background-image: none;
+  }
+
+  /* === Shadow 調整 — 大範圍柔和懸浮 === */
+  .shadow-xl {
+    box-shadow:
+      0 25px 70px -20px rgba(0, 0, 0, 0.12),
+      0 10px 30px -10px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.7) !important;
+  }
+  .shadow-lg {
+    box-shadow:
+      0 20px 50px -15px rgba(0, 0, 0, 0.1),
+      0 8px 24px -8px rgba(0, 0, 0, 0.05),
+      0 0 0 1px rgba(255, 255, 255, 0.7) !important;
+  }
+  .shadow-indigo-500\/25 { --tw-shadow-color: rgba(99, 102, 241, 0.1); }
+  .shadow-indigo-500\/30 { --tw-shadow-color: rgba(99, 102, 241, 0.1); }
+
+  /* === Input 樣式 === */
+  input.bg-white\/10,
+  textarea.bg-white\/10 {
+    background-color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #1a1f36;
+  }
+
+  /* === Drag 狀態 === */
+  .ring-indigo-500 { --tw-ring-color: rgba(99, 102, 241, 0.5); }
+  .ring-indigo-500\/50 { --tw-ring-color: rgba(99, 102, 241, 0.3); }
+  .border-indigo-500 { border-color: rgba(99, 102, 241, 0.6); }
+  .bg-indigo-500\/20.ring-2 {
+    background-color: rgba(99, 102, 241, 0.08);
+  }
+
+  /* === Area icon — 淺色柔和漸層 === */
+  .bg-gradient-to-br.from-indigo-500.to-indigo-600,
+  .bg-gradient-to-br.from-indigo-500.to-purple-600 {
+    background: linear-gradient(135deg, #c7d2fe, #a5b4fc) !important;
+    color: #4338ca !important;
+  }
+  .bg-gradient-to-br.from-indigo-500.to-indigo-600 .text-white,
+  .bg-gradient-to-br.from-indigo-500.to-purple-600 .text-white {
+    color: #4338ca !important;
+  }
+
+  /* === Quick Capture 按鈕 — 柔化 === */
+  .bg-gradient-to-r.from-indigo-600 {
+    background: linear-gradient(135deg, #818cf8, #6366f1) !important;
+  }
+
+  /* === Modal — 淺色底 === */
+  .bg-slate-900.border-white\/10,
+  .bg-slate-900.border.border-white\/20 {
+    background-color: #f3f5f8 !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+  }
+  .bg-slate-950\/50 {
+    background-color: #e8ecf2 !important;
+  }
+  .bg-slate-900\/80.backdrop-blur-xl {
+    background-color: rgba(243, 245, 248, 0.9) !important;
+  }
+
+  /* === Modal 內 gradient header === */
+  .bg-gradient-to-r.from-purple-900\/30,
+  .bg-gradient-to-r.from-purple-900\/20 {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.06), rgba(129, 140, 248, 0.04)) !important;
+  }
+
+  /* === Task 項目 — 內嵌卡片質感 === */
+  .hover\:bg-white\/5.rounded,
+  .hover\:bg-white\/5.rounded-lg {
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 0.5rem;
+  }
+  .hover\:bg-white\/5.rounded:hover,
+  .hover\:bg-white\/5.rounded-lg:hover {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+  }
+
+  /* === Task 卡片 — 內嵌卡片質感 === */
+  .rounded-lg.border.bg-white\/10 {
+    background-color: rgba(255, 255, 255, 0.55) !important;
+    border-color: rgba(255, 255, 255, 0.8) !important;
+    box-shadow:
+      0 4px 16px -4px rgba(0, 0, 0, 0.06),
+      0 1px 4px rgba(0, 0, 0, 0.03),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  }
+  .rounded-lg.border.bg-white\/10:hover {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+    box-shadow:
+      0 6px 20px -6px rgba(0, 0, 0, 0.08),
+      0 2px 6px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+  }
+
+  /* === Completed task 卡片 === */
+  .rounded-lg.border.bg-green-500\/20 {
+    background-color: rgba(220, 252, 231, 0.6) !important;
+    border-color: rgba(134, 239, 172, 0.5) !important;
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  /* === Progress bar 背景 === */
+  .bg-white\/10.rounded-full {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  /* === "新增專案" 按鈕 === */
+  .bg-white\/10.border.border-white\/20 {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* === Settings 頁面 === */
+  .bg-slate-950 {
+    background-color: #e8ecf2 !important;
+  }
+  .bg-slate-900.border-slate-800 {
+    background-color: rgba(255, 255, 255, 0.75) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.06) !important;
+  }
+  .border-slate-800 {
+    border-color: rgba(0, 0, 0, 0.08) !important;
+  }
+  .border-slate-700 {
+    border-color: rgba(0, 0, 0, 0.1) !important;
+  }
+  .border-slate-600 {
+    border-color: rgba(0, 0, 0, 0.15) !important;
+  }
+  .text-slate-400 {
+    color: #64748b !important;
+  }
+  .text-slate-300 {
+    color: #475569 !important;
+  }
+  .text-slate-500 {
+    color: #94a3b8 !important;
+  }
+  .bg-slate-800 {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  .bg-slate-800\/50 {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+  }
+  .hover\:bg-slate-700:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+  }
+  .bg-gradient-to-r.from-indigo-400.to-emerald-400 {
+    -webkit-text-fill-color: transparent !important;
+    background-image: linear-gradient(to right, #4f46e5, #059669) !important;
+  }
+  .border-amber-500\/30 {
+    border-color: rgba(245, 158, 11, 0.25) !important;
+  }
+  .bg-amber-500\/10 {
+    background-color: rgba(245, 158, 11, 0.06) !important;
+  }
+  .hover\:bg-amber-500\/20:hover {
+    background-color: rgba(245, 158, 11, 0.12) !important;
+  }
+  .bg-emerald-950\/30 {
+    background-color: rgba(16, 185, 129, 0.06) !important;
+  }
+  .border-emerald-500\/30 {
+    border-color: rgba(16, 185, 129, 0.2) !important;
+  }
+  .text-emerald-400 {
+    color: #059669 !important;
+  }
+  .bg-red-600 {
+    background-color: #e07070 !important;
+  }
+  .hover\:bg-red-700:hover {
+    background-color: #d45f5f !important;
+  }
+  .border-red-500\/50 {
+    border-color: rgba(224, 112, 112, 0.3) !important;
+  }
+  .hover\:bg-red-500\/10:hover {
+    background-color: rgba(224, 112, 112, 0.06) !important;
+  }
+  .bg-indigo-600 {
+    background-color: #4f46e5 !important;
+  }
+  .hover\:bg-indigo-700:hover {
+    background-color: #4338ca !important;
+  }
+  /* Settings gradient card for anonymous binding */
+  .bg-gradient-to-r.from-indigo-950 {
+    background: linear-gradient(90deg, rgba(99,102,241,0.08), rgba(255,255,255,0.6)) !important;
+    border-color: rgba(99, 102, 241, 0.2) !important;
+  }
+
+  /* === Quick Capture 浮動面板 === */
+  .bg-slate-900\/95 {
+    background-color: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(24px) saturate(1.6) !important;
+    box-shadow: 0 25px 70px -20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.8) !important;
+  }
+  .bg-slate-900\/80 {
+    background-color: rgba(255, 255, 255, 0.88) !important;
+    backdrop-filter: blur(24px) saturate(1.6) !important;
+  }
+  .shadow-indigo-500\/20 {
+    --tw-shadow-color: rgba(99, 102, 241, 0.08) !important;
+  }
+  /* Quick capture input */
+  textarea.bg-white\/5 {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+    color: #1a1f36 !important;
+  }
+  textarea.bg-white\/5::placeholder {
+    color: #94a3b8 !important;
+  }
+  /* Quick capture blue hint */
+  .bg-blue-500\/10 {
+    background-color: rgba(59, 130, 246, 0.06) !important;
+  }
+  .border-blue-500\/20 {
+    border-color: rgba(59, 130, 246, 0.15) !important;
+  }
+  .text-blue-300\/90 {
+    color: #2563eb !important;
+  }
+  .text-blue-300 {
+    color: #2563eb !important;
+  }
+  .text-blue-400 {
+    color: #3b82f6 !important;
+  }
+
+  /* === AI chat bubble in quick capture === */
+  .bg-indigo-600.text-white.rounded-2xl {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+  }
+  .bg-indigo-600.text-white.rounded-2xl .text-white,
+  .bg-indigo-600.text-white.rounded-2xl p {
+    color: #ffffff !important;
+  }
+
+  /* === Scrollbar 淺色 === */
+  ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.12); }
+  ::-webkit-scrollbar-track { background: transparent; }
 }

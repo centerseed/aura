@@ -77,13 +77,14 @@ import { AreaModal } from "@/components/area-modal";
 import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
 import { TaskDetailModal } from "@/components/task-detail-modal";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // 視圖類型
 type ViewMode = "structure" | "timeline" | "load";
 
 // Drawer 狀態配置
 const DRAWER_CONFIG: Record<DrawerStatus, { label: string; icon: typeof Inbox; color: string; dotColor: string }> = {
-  INBOX: { label: "收件匣", icon: Inbox, color: "text-amber-500", dotColor: "bg-amber-500" },
+  INBOX: { label: "規劃中", icon: Inbox, color: "text-amber-500", dotColor: "bg-amber-500" },
   ACTIVE: { label: "進行中", icon: Rocket, color: "text-blue-500", dotColor: "bg-blue-500" },
   MAINTAIN: { label: "維護中", icon: RefreshCw, color: "text-indigo-500", dotColor: "bg-indigo-500" },
   REFERENCE: { label: "參考資料", icon: BookOpen, color: "text-green-500", dotColor: "bg-green-500" },
@@ -830,7 +831,7 @@ function DroppableProduct({
   // 篩選此 Product 的所有里程碑（支援多個，排除已過期）
   const productMilestones = (Array.isArray(milestones) ? milestones : [])
     .filter((m) => m.entity_type === "PRODUCT" && m.entity_id === productId)
-    .filter((m) => m.status !== "completed" && m.status !== "cancelled")
+    .filter((m) => m.status !== "completed")
     .filter((m) => {
       // 排除已過期的 milestone
       const daysRemaining = Math.ceil(
@@ -1782,6 +1783,41 @@ function DashboardContent() {
   };
 
   // 標記任務為已完成
+  const handleTaskStatusChange = async (taskId: string, newStatus: DrawerStatus) => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ taskId, status: newStatus }),
+      });
+
+      if (!res.ok) throw new Error("狀態更新失敗");
+
+      const responseData = await res.json();
+      const { task: updatedTask } = responseData.data;
+
+      if (updatedTask) {
+        setAreas(prevAreas => updateAreasState(prevAreas, (areas) =>
+          areas.map(area => ({
+            ...area,
+            products: area.products.map(product => ({
+              ...product,
+              tasks: product.tasks.map(task =>
+                task.id === taskId ? updatedTask : task
+              ),
+            })),
+          }))
+        ));
+      }
+    } catch (error) {
+      console.error("Failed to change task status:", error);
+    }
+  };
+
   const handleCompleteTask = async (taskId: string) => {
     try {
       // 找到任務的當前狀態（從所有可能的來源）
@@ -3014,6 +3050,9 @@ function DashboardContent() {
                 </button>
               )}
 
+              {/* 主題切換 */}
+              <ThemeToggle />
+
               {/* 今日完成指標 */}
               <button
                 onClick={() => setShowCompletedSheet(true)}
@@ -3609,6 +3648,7 @@ function DashboardContent() {
             onDeleteReference={handleDeleteReference}
             onComplete={handleCompleteTask}
             onDelete={handleDeleteTask}
+            onStatusChange={handleTaskStatusChange}
           />
         )}
 

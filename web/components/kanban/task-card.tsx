@@ -61,12 +61,12 @@ export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate
       ref={setNodeRef}
       style={{ ...style, touchAction: 'auto' }}
       className={`
-        group relative rounded-xl border shadow-sm transition-all duration-200 cursor-pointer
+        group relative card-float-inner cursor-pointer
         ${isCompleted
-          ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 hover:shadow-md"
-          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:shadow-md"
+          ? "!bg-green-50/80 dark:!bg-green-950/30 !border-green-200/70 dark:!border-green-800/50"
+          : ""
         }
-        ${isCurrentlyDragging ? "shadow-xl ring-2 ring-indigo-500 opacity-90 rotate-2 scale-105" : ""}
+        ${isCurrentlyDragging ? "!shadow-float-lg ring-2 ring-indigo-500 opacity-90 rotate-2 scale-105" : ""}
       `}
       onClick={onOpenDetail}
     >

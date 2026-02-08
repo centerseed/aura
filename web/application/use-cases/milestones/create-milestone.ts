@@ -20,7 +20,7 @@ export interface CreateMilestoneRequest {
   entity_id: string
   priority?: number
   description?: string
-  status?: 'planned' | 'in_progress' | 'completed' | 'delayed' | 'cancelled'
+  status?: 'planned' | 'in_progress' | 'completed' | 'delayed'
 }
 
 export interface CreateMilestoneResponse {
@@ -124,7 +124,7 @@ export class CreateMilestoneUseCase {
     }
 
     if (request.status !== undefined) {
-      const validStatuses = ['planned', 'in_progress', 'completed', 'delayed', 'cancelled']
+      const validStatuses = ['planned', 'in_progress', 'completed', 'delayed']
       if (!validStatuses.includes(request.status)) {
         throw new ValidationException(
           `Status must be one of: ${validStatuses.join(', ')}`,

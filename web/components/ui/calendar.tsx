@@ -64,14 +64,14 @@ function Calendar({
   return (
     <div className="relative">
       {/* 自訂標題 */}
-      <div className="flex items-center justify-between px-2 py-2 border-b border-white/10 mb-2">
+      <div className="flex items-center justify-between px-2 py-2 border-b border-gray-200 dark:border-white/10 mb-2">
         {/* 上一個月按鈕 */}
         <button
           type="button"
           onClick={handlePrevMonth}
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-white/10 hover:bg-white/10"
+            "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-gray-300 hover:bg-gray-100 dark:border-white/10 dark:hover:bg-white/10"
           )}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -82,10 +82,10 @@ function Calendar({
           <select
             value={currentYear}
             onChange={handleYearChange}
-            className="text-sm font-medium text-white bg-white/5 border border-white/10 rounded px-2 py-1 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+            className="text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded px-2 py-1 hover:bg-gray-200 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
           >
             {years.map((year) => (
-              <option key={year} value={year} className="bg-slate-900 text-white">
+              <option key={year} value={year} className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">
                 {year}年
               </option>
             ))}
@@ -94,10 +94,10 @@ function Calendar({
           <select
             value={currentMonth}
             onChange={handleMonthSelect}
-            className="text-sm font-medium text-white bg-white/5 border border-white/10 rounded px-2 py-1 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+            className="text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded px-2 py-1 hover:bg-gray-200 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
           >
             {months.map((monthName, index) => (
-              <option key={index} value={index} className="bg-slate-900 text-white">
+              <option key={index} value={index} className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">
                 {monthName}
               </option>
             ))}
@@ -110,7 +110,7 @@ function Calendar({
           onClick={handleNextMonth}
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-white/10 hover:bg-white/10"
+            "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-gray-300 hover:bg-gray-100 dark:border-white/10 dark:hover:bg-white/10"
           )}
         >
           <ChevronRight className="h-4 w-4" />
@@ -126,28 +126,28 @@ function Calendar({
         classNames={{
           months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
           month: "space-y-4",
-          month_caption: "hidden", // 隱藏預設標題,使用自訂的
+          month_caption: "hidden",
           caption_label: "hidden",
-          nav: "hidden", // 隱藏預設導航按鈕
+          nav: "hidden",
           button_previous: "hidden",
           button_next: "hidden",
           month_grid: "w-full border-collapse space-y-1",
           weekdays: "flex",
-          weekday: "text-white/50 rounded-md w-9 font-normal text-[0.8rem]",
+          weekday: "text-gray-500 dark:text-white/50 rounded-md w-9 font-normal text-[0.8rem]",
           week: "flex w-full mt-2",
-          day: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-white/10 [&:has([aria-selected])]:bg-white/10 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+          day: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-blue-50 dark:[&:has([aria-selected].day-outside)]:bg-white/10 [&:has([aria-selected])]:bg-blue-50 dark:[&:has([aria-selected])]:bg-white/10 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
           day_button: cn(
             buttonVariants({ variant: "ghost" }),
-            "h-9 w-9 p-0 font-normal text-white/90 aria-selected:opacity-100 hover:bg-white/10 hover:text-white"
+            "h-9 w-9 p-0 font-normal text-gray-700 dark:text-white/90 aria-selected:opacity-100 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
           ),
           range_end: "day-range-end",
           selected:
             "bg-blue-600 text-white hover:bg-blue-600 hover:text-white focus:bg-blue-600 focus:text-white",
-          today: "bg-white/10 text-white",
+          today: "bg-blue-50 dark:bg-white/10 text-blue-600 dark:text-white font-semibold",
           outside:
-            "day-outside text-white/75 aria-selected:bg-white/10 aria-selected:text-white/90",
-          disabled: "text-white/30 opacity-50",
-          range_middle: "aria-selected:bg-white/10 aria-selected:text-white",
+            "day-outside text-gray-400 dark:text-white/75 aria-selected:bg-blue-50 dark:aria-selected:bg-white/10 aria-selected:text-gray-600 dark:aria-selected:text-white/90",
+          disabled: "text-gray-300 dark:text-white/30 opacity-50",
+          range_middle: "aria-selected:bg-blue-50 dark:aria-selected:bg-white/10 aria-selected:text-gray-900 dark:aria-selected:text-white",
           hidden: "invisible",
           ...classNames,
         }}

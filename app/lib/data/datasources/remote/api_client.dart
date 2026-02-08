@@ -174,6 +174,28 @@ class ApiClient {
     return ReferenceModel.fromJson(referenceJson);
   }
 
+  /// 更新 Product 的 Reference
+  Future<ReferenceModel> updateProductReference({
+    required String productId,
+    required String referenceId,
+    required String content,
+    String? title,
+    String? taskId,
+  }) async {
+    final response = await _dio.patch(
+      '/products/$productId/references',
+      data: {
+        'referenceId': referenceId,
+        'content': content,
+        if (title != null) 'title': title,
+        if (taskId != null) 'taskId': taskId,
+      },
+    );
+    final data = response.data['data'];
+    final referenceJson = data is Map ? (data['reference'] ?? data) : data;
+    return ReferenceModel.fromJson(referenceJson);
+  }
+
   /// 刪除 Product 的 Reference
   Future<void> deleteProductReference({
     required String productId,

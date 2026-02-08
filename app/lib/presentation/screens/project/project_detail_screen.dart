@@ -7,7 +7,7 @@ import '../../providers/task_provider.dart';
 import '../../providers/reorganize_provider.dart';
 
 import '../../../domain/entities/reorganize_proposal.dart';
-import '../dashboard/widgets/task_edit_bottom_sheet.dart';
+import '../home/widgets/task_detail_bottom_sheet.dart';
 import 'widgets/milestone_section.dart';
 
 class ProjectDetailScreen extends ConsumerWidget {
@@ -215,7 +215,7 @@ class ProjectDetailScreen extends ConsumerWidget {
                                   padding: EdgeInsets.only(
                                     bottom: MediaQuery.of(context).viewInsets.bottom,
                                   ),
-                                  child: TaskEditBottomSheet(task: task),
+                                  child: TaskDetailBottomSheet(task: task),
                                 ),
                               );
                             },

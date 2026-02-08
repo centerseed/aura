@@ -110,32 +110,32 @@ export function TaskDueDateModal({
       />
 
       {/* Modal */}
-      <Card className="relative w-full max-w-sm mx-4 bg-slate-900 border-white/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <Card className="relative w-full max-w-sm mx-4 bg-white dark:bg-slate-900 border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
               <Calendar className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-white">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {dateType === "due" ? "設定截止日期" : "設定開始日期"}
               </h2>
-              <p className="text-xs text-white/50 truncate max-w-[200px]">{taskTitle}</p>
+              <p className="text-xs text-gray-500 dark:text-white/50 truncate max-w-[200px]">{taskTitle}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
           >
-            <X className="w-4 h-4 text-white/50" />
+            <X className="w-4 h-4 text-gray-400 dark:text-white/50" />
           </button>
         </div>
 
         {/* Content */}
         <div className="p-4">
           {error && (
-            <div className="mb-4 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+            <div className="mb-4 p-2 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs">
               {error}
             </div>
           )}
@@ -152,7 +152,7 @@ export function TaskDueDateModal({
                   variant="outline"
                   size="sm"
                   onClick={() => handleDateSelect(new Date())}
-                  className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white text-xs"
+                  className="bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-white/70 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white text-xs"
                 >
                   今天
                 </Button>
@@ -164,7 +164,7 @@ export function TaskDueDateModal({
                     tomorrow.setDate(tomorrow.getDate() + 1);
                     handleDateSelect(tomorrow);
                   }}
-                  className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white text-xs"
+                  className="bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-white/70 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white text-xs"
                 >
                   明天
                 </Button>
@@ -176,14 +176,14 @@ export function TaskDueDateModal({
                     nextWeek.setDate(nextWeek.getDate() + 7);
                     handleDateSelect(nextWeek);
                   }}
-                  className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white text-xs"
+                  className="bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-white/70 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white text-xs"
                 >
                   下週
                 </Button>
               </div>
 
               {/* 日曆 */}
-              <div className="border border-white/10 rounded-lg overflow-hidden">
+              <div className="border border-gray-200 dark:border-white/10 rounded-lg overflow-hidden">
                 <CalendarComponent
                   mode="single"
                   selected={selectedDate}
@@ -195,14 +195,14 @@ export function TaskDueDateModal({
               {/* 當前日期顯示 & 清除按鈕 */}
               {selectedDate && (
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="text-sm text-white/70">
+                  <span className="text-sm text-gray-600 dark:text-white/70">
                     已選擇：{format(selectedDate, "yyyy/MM/dd (EEEE)", { locale: zhTW })}
                   </span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleClearDate}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10"
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
                     清除

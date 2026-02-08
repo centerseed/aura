@@ -6,7 +6,6 @@ enum MilestoneStatus {
   inProgress,
   completed,
   delayed,
-  cancelled,
 }
 
 /// Milestone 關聯實體類型
@@ -77,7 +76,7 @@ class Milestone extends Equatable {
 
   /// 是否為活躍狀態（可顯示在列表中）
   bool get isActive =>
-      status != MilestoneStatus.completed && status != MilestoneStatus.cancelled;
+      status != MilestoneStatus.completed;
 
   /// 取得關聯實體名稱（根據 entityType）
   String? get relatedEntityName {
@@ -137,8 +136,6 @@ extension MilestoneStatusExtension on MilestoneStatus {
         return '已完成';
       case MilestoneStatus.delayed:
         return '延遲';
-      case MilestoneStatus.cancelled:
-        return '已取消';
     }
   }
 
@@ -153,8 +150,6 @@ extension MilestoneStatusExtension on MilestoneStatus {
         return 'completed';
       case MilestoneStatus.delayed:
         return 'delayed';
-      case MilestoneStatus.cancelled:
-        return 'cancelled';
     }
   }
 
@@ -169,8 +164,6 @@ extension MilestoneStatusExtension on MilestoneStatus {
         return MilestoneStatus.completed;
       case 'delayed':
         return MilestoneStatus.delayed;
-      case 'cancelled':
-        return MilestoneStatus.cancelled;
       default:
         return MilestoneStatus.planned;
     }

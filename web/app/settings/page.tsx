@@ -1,16 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, User, Mail, Shield, Loader2, ArrowLeft, Wrench, RotateCcw, Eye, Link2 } from "lucide-react";
+import { LogOut, User, Mail, Shield, Loader2, ArrowLeft, Wrench, RotateCcw, Eye, Link2, Calendar, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-client";
+import {
+  OAuthProvider,
+  OAuthStatus,
+  getOAuthStatus,
+  disconnectOAuth,
+  OAUTH_PROVIDER_NAMES,
+  OAUTH_PROVIDER_DESCRIPTIONS,
+  OAUTH_PROVIDER_ICONS,
+} from "@/lib/oauth-client";
+import { OAuthConnectDialog } from "@/components/oauth-connect-dialog";
 
-export default function SettingsPage() {
+function SettingsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isResettingOnboarding, setIsResettingOnboarding] = useState(false);
@@ -23,6 +36,13 @@ export default function SettingsPage() {
     auth_provider: string;
   } | null>(null);
 
+  // OAuth 狀態（目前只支援 Google Calendar）
+  const [calendarStatus, setCalendarStatus] = useState<OAuthStatus | null>(null);
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
+  const [showConnectDialog, setShowConnectDialog] = useState(false);
+  const [oauthMessage, setOauthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [userToken, setUserToken] = useState<string>('');
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (!firebaseUser) {
@@ -32,6 +52,8 @@ export default function SettingsPage() {
 
       try {
         const token = await firebaseUser.getIdToken();
+        setUserToken(token); // 存儲 token 供其他組件使用
+
         const userRes = await fetch(`${API_BASE_URL}/api/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -41,6 +63,9 @@ export default function SettingsPage() {
           const data = await userRes.json();
           setUserData(data);
         }
+
+        // 載入 Google Calendar 狀態
+        await loadCalendarStatus(token);
       } catch (error) {
         console.error("載入用戶資料失敗:", error);
       } finally {
@@ -50,6 +75,96 @@ export default function SettingsPage() {
 
     return () => unsubscribe();
   }, [router]);
+
+  // 處理 OAuth callback（URL 參數）
+  useEffect(() => {
+    const oauthSuccess = searchParams.get('oauth_success');
+    const oauthError = searchParams.get('oauth_error');
+    const provider = searchParams.get('provider');
+
+    // 如果是在 popup 中，通知父視窗後關閉
+    if (window.opener && (oauthSuccess || oauthError)) {
+      if (oauthSuccess === 'true') {
+        window.opener.postMessage(
+          { type: 'oauth-success', provider },
+          window.location.origin
+        );
+      } else if (oauthError) {
+        window.opener.postMessage(
+          { type: 'oauth-error', error: decodeURIComponent(oauthError) },
+          window.location.origin
+        );
+      }
+      window.close();
+      return;
+    }
+
+    // 正常頁面中的處理（非 popup）
+    if (oauthSuccess === 'true' && provider === 'google_calendar') {
+      setOauthMessage({
+        type: 'success',
+        text: '✅ Google Calendar 已成功連接！',
+      });
+
+      // 重新載入 Calendar 狀態
+      auth.currentUser?.getIdToken().then(loadCalendarStatus);
+
+      // 3 秒後清除訊息
+      setTimeout(() => setOauthMessage(null), 3000);
+    } else if (oauthError) {
+      setOauthMessage({
+        type: 'error',
+        text: `❌ 授權失敗：${decodeURIComponent(oauthError)}`,
+      });
+
+      // 5 秒後清除訊息
+      setTimeout(() => setOauthMessage(null), 5000);
+    }
+  }, [searchParams]);
+
+  // 載入 Google Calendar 狀態
+  const loadCalendarStatus = async (token: string) => {
+    setLoadingCalendar(true);
+    try {
+      const status = await getOAuthStatus('google_calendar', token);
+      setCalendarStatus(status);
+    } catch (error) {
+      console.error('Failed to load calendar status:', error);
+      setCalendarStatus(null);
+    } finally {
+      setLoadingCalendar(false);
+    }
+  };
+
+  // 處理解除 Google Calendar 連接
+  const handleDisconnectCalendar = async () => {
+    const confirmed = confirm(
+      '確定要解除 Google Calendar 的連接嗎？\n\n這將撤銷 Zentropy 的日曆授權。'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+
+      await disconnectOAuth('google_calendar', token);
+
+      setOauthMessage({
+        type: 'success',
+        text: '✅ Google Calendar 已解除連接',
+      });
+
+      // 重新載入狀態
+      await loadCalendarStatus(token);
+
+      setTimeout(() => setOauthMessage(null), 3000);
+    } catch (error) {
+      console.error('Disconnect failed:', error);
+      alert(`解除連接失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
+  };
+
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -211,49 +326,28 @@ export default function SettingsPage() {
                 <User className="w-5 h-5 mr-2 text-indigo-400" />
                 個人資訊
               </CardTitle>
-              <CardDescription className="text-slate-400">
-                你的基本帳號資訊
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* 名稱 */}
-              <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-slate-400" />
-                  <div>
-                    <p className="text-sm text-slate-400">名稱</p>
-                    <p className="text-white font-medium">
-                      {userData?.displayName || "未設定"}
-                    </p>
-                  </div>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-400">名稱</span>
+                  <span className="text-white font-medium">
+                    {userData?.displayName || "未設定"}
+                  </span>
                 </div>
-              </div>
-
-              {/* Email */}
-              <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-slate-400" />
-                  <div>
-                    <p className="text-sm text-slate-400">Email</p>
-                    <p className="text-white font-medium">
-                      {userData?.email || "未設定"}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-400">Email</span>
+                  <span className="text-white font-medium">
+                    {userData?.email || "未設定"}
+                  </span>
                 </div>
-              </div>
-
-              {/* 認證方式 */}
-              <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-slate-400" />
-                  <div>
-                    <p className="text-sm text-slate-400">認證方式</p>
-                    <p className="text-white font-medium">
-                      {userData?.auth_provider === "GOOGLE" && "Google"}
-                      {userData?.auth_provider === "ANONYMOUS" && "訪客"}
-                      {userData?.auth_provider === "EMAIL" && "Email"}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-400">登入方式</span>
+                  <Badge variant="outline" className="border-slate-600 text-slate-300">
+                    {userData?.auth_provider === "GOOGLE" && "Google"}
+                    {userData?.auth_provider === "ANONYMOUS" && "訪客"}
+                    {userData?.auth_provider === "EMAIL" && "Email"}
+                  </Badge>
                 </div>
               </div>
             </CardContent>
@@ -298,15 +392,9 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          {/* 帳號操作卡片 */}
+          {/* 帳號操作 */}
           <Card className="bg-slate-900 border-slate-800">
-            <CardHeader>
-              <CardTitle className="text-white">帳號操作</CardTitle>
-              <CardDescription className="text-slate-400">
-                管理你的帳號登入狀態
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <Button
                 onClick={handleSignOut}
                 disabled={isSigningOut}
@@ -375,22 +463,126 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* 其他設定預留區 */}
+          {/* OAuth 訊息提示 */}
+          {oauthMessage && (
+            <Alert className={oauthMessage.type === 'success' ? 'bg-emerald-950/50 border-emerald-500/30' : 'bg-red-950/50 border-red-500/30'}>
+              {oauthMessage.type === 'success' ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-red-400" />
+              )}
+              <AlertDescription className="text-white">
+                {oauthMessage.text}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Google Calendar 連接 */}
           <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
-              <CardTitle className="text-white">偏好設定</CardTitle>
+              <CardTitle className="flex items-center text-white">
+                <Calendar className="w-5 h-5 mr-2 text-indigo-400" />
+                Google Calendar
+              </CardTitle>
               <CardDescription className="text-slate-400">
-                即將推出...
+                查看可用時間、創建會議並自動生成 Google Meet 連結
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-500 text-sm">
-                更多設定選項正在開發中
-              </p>
+              {loadingCalendar ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                </div>
+              ) : calendarStatus?.authorized ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                      <div>
+                        <p className="text-white font-medium">已連接</p>
+                        {calendarStatus.authorized_email && (
+                          <p className="text-sm text-slate-400 mt-0.5">
+                            {calendarStatus.authorized_email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDisconnectCalendar}
+                      className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                    >
+                      解除連接
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    已授權的權限：查看日曆、創建活動、編輯活動
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
+                    <p className="text-slate-300 text-sm mb-3">
+                      連接 Google Calendar 後，你可以：
+                    </p>
+                    <ul className="space-y-2 text-sm text-slate-400">
+                      <li className="flex items-start">
+                        <span className="text-emerald-400 mr-2">✓</span>
+                        在 Zentropy 中直接查看空閒時間
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-emerald-400 mr-2">✓</span>
+                        創建會議並自動生成 Google Meet 連結
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-emerald-400 mr-2">✓</span>
+                        設定會議提醒
+                      </li>
+                    </ul>
+                  </div>
+                  <Button
+                    onClick={() => setShowConnectDialog(true)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    連接 Google Calendar
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* OAuth Connect Dialog */}
+          {showConnectDialog && userToken && (
+            <OAuthConnectDialog
+              open={showConnectDialog}
+              onOpenChange={setShowConnectDialog}
+              provider="google_calendar"
+              token={userToken}
+              onSuccess={async () => {
+                const token = await auth.currentUser?.getIdToken();
+                if (token) {
+                  setUserToken(token);
+                  await loadCalendarStatus(token);
+                }
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    }>
+      <SettingsContent />
+    </Suspense>
   );
 }

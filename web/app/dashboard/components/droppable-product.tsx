@@ -103,7 +103,7 @@ export function DroppableProduct({
   // 篩選此 Product 的所有里程碑（支援多個，排除已過期）
   const productMilestones = (Array.isArray(milestones) ? milestones : [])
     .filter((m) => m.entity_type === 'PRODUCT' && m.entity_id === productId)
-    .filter((m) => m.status !== 'completed' && m.status !== 'cancelled')
+    .filter((m) => m.status !== 'completed')
     .filter((m) => {
       // 排除已過期的 milestone
       const daysRemaining = Math.ceil(

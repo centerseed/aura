@@ -143,6 +143,11 @@ export class Task {
   changeStatus(newStatus: TaskStatus): void {
     const newStatusVO = TaskStatusVO.fromString(newStatus)
 
+    // 同狀態不需要轉換
+    if (this._status.equals(newStatusVO)) {
+      return
+    }
+
     // 檢查是否允許轉換
     if (!this._status.canTransitionTo(newStatusVO)) {
       throw new ConflictException(

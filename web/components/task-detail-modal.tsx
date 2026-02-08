@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle } from "lucide-react";
+import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2 } from "lucide-react";
+import type { DrawerStatus } from "@/types";
 import {
   DndContext,
   DragOverlay,
@@ -41,6 +42,10 @@ interface TaskDetailModalProps {
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onComplete?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
+  onStatusChange?: (taskId: string, newStatus: DrawerStatus) => void;
+  onAddToCalendar?: (taskId: string) => Promise<{ eventLink: string; meetLink?: string } | null>;
+  onSetReminder?: (taskId: string, reminderType: "calendar" | "notification", minutesBefore: number) => Promise<boolean>;
+  isCalendarConnected?: boolean;
 }
 
 // 可拖拽的子項目組件
@@ -170,6 +175,10 @@ export function TaskDetailModal({
   onDeleteReference,
   onComplete,
   onDelete,
+  onStatusChange,
+  onAddToCalendar,
+  onSetReminder,
+  isCalendarConnected,
 }: TaskDetailModalProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -187,6 +196,11 @@ export function TaskDetailModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [subItems, setSubItems] = useState<SubItem[]>(task.sub_items || []);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
+  const [calendarEventLink, setCalendarEventLink] = useState<string | null>(null);
+  const [showReminderOptions, setShowReminderOptions] = useState(false);
+  const [isSettingReminder, setIsSettingReminder] = useState(false);
 
   // 拖拽設置
   const sensors = useSensors(
@@ -320,6 +334,54 @@ export function TaskDetailModal({
               <span>→</span>
               <span>{task.tag.topic}</span>
             </div>
+            {/* Status Badge */}
+            {onStatusChange && (
+              <div className="relative mt-3">
+                <button
+                  onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    {
+                      INBOX: "bg-amber-500/20 text-amber-400 border border-amber-500/30",
+                      ACTIVE: "bg-blue-500/20 text-blue-400 border border-blue-500/30",
+                      MAINTAIN: "bg-purple-500/20 text-purple-400 border border-purple-500/30",
+                      REFERENCE: "bg-green-500/20 text-green-400 border border-green-500/30",
+                      ARCHIVE: "bg-slate-500/20 text-slate-400 border border-slate-500/30",
+                    }[task.drawer]
+                  }`}
+                >
+                  {({ INBOX: ClipboardList, ACTIVE: Rocket, MAINTAIN: RefreshCw, REFERENCE: BookOpen, ARCHIVE: Archive } as Record<string, typeof ClipboardList>)[task.drawer] &&
+                    (() => { const Icon = ({ INBOX: ClipboardList, ACTIVE: Rocket, MAINTAIN: RefreshCw, REFERENCE: BookOpen, ARCHIVE: Archive } as Record<string, typeof ClipboardList>)[task.drawer]; return <Icon className="w-3.5 h-3.5" />; })()}
+                  {{ INBOX: "規劃中", ACTIVE: "進行中", MAINTAIN: "維護中", REFERENCE: "參考資料", ARCHIVE: "已歸檔" }[task.drawer]}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showStatusDropdown && (
+                  <div className="absolute top-full left-0 mt-1 z-10 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+                    {([
+                      { id: "INBOX" as DrawerStatus, label: "規劃中", icon: ClipboardList, color: "text-amber-400" },
+                      { id: "ACTIVE" as DrawerStatus, label: "進行中", icon: Rocket, color: "text-blue-400" },
+                      { id: "MAINTAIN" as DrawerStatus, label: "維護中", icon: RefreshCw, color: "text-purple-400" },
+                      { id: "REFERENCE" as DrawerStatus, label: "參考資料", icon: BookOpen, color: "text-green-400" },
+                      { id: "ARCHIVE" as DrawerStatus, label: "已歸檔", icon: Archive, color: "text-slate-400" },
+                    ]).map(({ id, label, icon: StatusIcon, color }) => (
+                      <button
+                        key={id}
+                        onClick={() => {
+                          if (id !== task.drawer) onStatusChange(task.id, id);
+                          setShowStatusDropdown(false);
+                        }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                          id === task.drawer ? "bg-white/5 font-medium" : ""
+                        }`}
+                      >
+                        <StatusIcon className={`w-4 h-4 ${color}`} />
+                        <span className="text-white/80">{label}</span>
+                        {id === task.drawer && <CheckCircle className="w-3.5 h-3.5 ml-auto text-indigo-400" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -360,6 +422,114 @@ export function TaskDetailModal({
                 </button>
               </div>
             </div>
+
+            {/* Calendar & Reminder Actions */}
+            {(onAddToCalendar || onSetReminder) && (
+              <div className="flex gap-3">
+                {onAddToCalendar && (
+                  <div className="flex-1">
+                    {calendarEventLink ? (
+                      <a
+                        href={calendarEventLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors text-sm"
+                      >
+                        <Link2 className="w-4 h-4" />
+                        查看日曆事件
+                      </a>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          if (!task.start_date && !task.due_date) {
+                            alert("請先設定開始日期或截止日期");
+                            return;
+                          }
+                          if (!isCalendarConnected) {
+                            alert("請先在設定頁面連接 Google Calendar");
+                            return;
+                          }
+                          setIsAddingToCalendar(true);
+                          try {
+                            const result = await onAddToCalendar(task.id);
+                            if (result) {
+                              setCalendarEventLink(result.eventLink);
+                            }
+                          } catch {
+                            alert("加入日曆失敗，請稍後再試");
+                          } finally {
+                            setIsAddingToCalendar(false);
+                          }
+                        }}
+                        disabled={isAddingToCalendar}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-blue-400/50 hover:bg-white/10 transition-colors text-sm text-white/80 disabled:opacity-50"
+                      >
+                        {isAddingToCalendar ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CalendarPlus className="w-4 h-4 text-blue-400" />
+                        )}
+                        {isAddingToCalendar ? "加入中..." : "加入日曆"}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {onSetReminder && (
+                  <div className="relative flex-1">
+                    <button
+                      onClick={() => setShowReminderOptions(!showReminderOptions)}
+                      disabled={isSettingReminder}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-amber-400/50 hover:bg-white/10 transition-colors text-sm text-white/80 disabled:opacity-50"
+                    >
+                      {isSettingReminder ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Bell className="w-4 h-4 text-amber-400" />
+                      )}
+                      {isSettingReminder ? "設定中..." : "設定提醒"}
+                    </button>
+                    {showReminderOptions && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden">
+                        {[
+                          { label: "15 分鐘前", minutes: 15 },
+                          { label: "1 小時前", minutes: 60 },
+                          { label: "1 天前", minutes: 1440 },
+                        ].map(({ label, minutes }) => (
+                          <button
+                            key={minutes}
+                            onClick={async () => {
+                              if (!task.due_date) {
+                                alert("請先設定截止日期");
+                                return;
+                              }
+                              setIsSettingReminder(true);
+                              setShowReminderOptions(false);
+                              try {
+                                const success = await onSetReminder(
+                                  task.id,
+                                  isCalendarConnected ? "calendar" : "notification",
+                                  minutes
+                                );
+                                if (success) {
+                                  alert("提醒已設定");
+                                }
+                              } catch {
+                                alert("設定提醒失敗");
+                              } finally {
+                                setIsSettingReminder(false);
+                              }
+                            }}
+                            className="w-full px-3 py-2 text-sm text-white/80 hover:bg-white/10 transition-colors text-left"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Narrative */}
             <div>

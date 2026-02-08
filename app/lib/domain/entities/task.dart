@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/utils/date_utils.dart' as utils;
 
@@ -175,3 +176,30 @@ class SubItem extends Equatable {
 
 /// Task 狀態枚舉
 enum TaskStatus { inbox, active, maintain, reference, archive }
+
+/// Task 狀態顯示擴展
+extension TaskStatusDisplay on TaskStatus {
+  String get displayName => switch (this) {
+    TaskStatus.inbox => '規劃中',
+    TaskStatus.active => '進行中',
+    TaskStatus.maintain => '維護中',
+    TaskStatus.reference => '參考資料',
+    TaskStatus.archive => '已歸檔',
+  };
+
+  Color get color => switch (this) {
+    TaskStatus.inbox => const Color(0xFFF59E0B),
+    TaskStatus.active => const Color(0xFF3B82F6),
+    TaskStatus.maintain => const Color(0xFF8B5CF6),
+    TaskStatus.reference => const Color(0xFF22C55E),
+    TaskStatus.archive => const Color(0xFF64748B),
+  };
+
+  IconData get icon => switch (this) {
+    TaskStatus.inbox => Icons.assignment_outlined,
+    TaskStatus.active => Icons.rocket_launch_outlined,
+    TaskStatus.maintain => Icons.sync_outlined,
+    TaskStatus.reference => Icons.menu_book_outlined,
+    TaskStatus.archive => Icons.archive_outlined,
+  };
+}

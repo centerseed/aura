@@ -429,7 +429,7 @@ describe('UpdateTaskUseCase', () => {
           dueDate: null,
         })
       )
-      expect(result.message).toBe('已清除截止日期，狀態自動變更為收件匣')
+      expect(result.message).toBe('已清除截止日期，狀態自動變更為規劃中')
     })
 
     it('設定 due_date 但目前是 MAINTAIN → 不改變狀態', async () => {

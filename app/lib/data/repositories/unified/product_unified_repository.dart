@@ -226,6 +226,33 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
   }
 
   @override
+  Future<Either<Failure, Reference>> updateProductReference({
+    required String productId,
+    required String referenceId,
+    required String content,
+    String? title,
+    String? taskId,
+  }) async {
+    try {
+      final referenceModel = await _apiClient.updateProductReference(
+        productId: productId,
+        referenceId: referenceId,
+        content: content,
+        title: title,
+        taskId: taskId,
+      );
+      final reference = referenceModel.toEntity();
+
+      // Reference 變更也需要刷新 Product 快取
+      await silentRefresh(force: true);
+
+      return Right(reference);
+    } catch (e) {
+      return Left(handleDioError(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> deleteProductReference({
     required String productId,
     required String referenceId,

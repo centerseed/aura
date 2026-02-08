@@ -10,6 +10,7 @@ import '../../../../domain/entities/area.dart';
 import '../../../../domain/entities/reference.dart';
 import '../../../../application/use_cases/add_product_reference_use_case.dart';
 import '../../../../application/use_cases/delete_product_reference_use_case.dart';
+import '../../../../application/use_cases/update_product_reference_use_case.dart';
 import '../../../../application/use_cases/reorganize_product_topics_use_case.dart';
 import '../../../../application/use_cases/apply_reorganization_use_case.dart';
 import '../../../providers/dashboard_provider.dart';
@@ -783,6 +784,39 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('已新增 Reference'),
+                    backgroundColor: Color(0xFF4ADE80),
+                  ),
+                );
+              },
+            );
+          },
+          onEditReference: (referenceId, content, title) async {
+            final updateUseCase = ref.read(updateProductReferenceUseCaseProvider);
+            final result = await updateUseCase(
+              UpdateProductReferenceParams(
+                productId: product.id,
+                referenceId: referenceId,
+                content: content,
+                title: title,
+              ),
+            );
+
+            if (!mounted) return;
+
+            result.fold(
+              (failure) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('更新失敗：${failure.message}'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              },
+              (_) {
+                ref.read(referenceCachedRepositoryProvider(product.id)).silentRefresh();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已更新 Reference'),
                     backgroundColor: Color(0xFF4ADE80),
                   ),
                 );
