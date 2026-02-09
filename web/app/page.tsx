@@ -327,7 +327,7 @@ export default function HomeDemo() {
           }`}
           title={isDark ? "切換淺色模式" : "切換深色模式"}
         >
-          {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
         <button
           onClick={() => {

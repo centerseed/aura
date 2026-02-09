@@ -16,6 +16,7 @@ import {
   MessageCircle,
   ArrowRight,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { API } from "@/lib/api-client";
 import {
   Sheet,
@@ -248,7 +249,7 @@ export function CoachAgent() {
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent
           side="right"
-          className="w-[420px] sm:max-w-[420px] bg-[#0f1729] border-white/10 p-0 flex flex-col"
+          className="w-[420px] sm:max-w-[420px] bg-white dark:bg-[#0f1729] border-slate-200 dark:border-white/10 p-0 flex flex-col"
         >
           <SheetTitle className="sr-only">營運顧問簡報</SheetTitle>
           <SheetDescription className="sr-only">AI 營運顧問的每日簡報與建議</SheetDescription>
@@ -331,21 +332,21 @@ function CoachDrawerContent({
 
   // ---- Header with tabs ----
   const header = (
-    <div className="border-b border-white/5">
+    <div className="border-b border-slate-200 dark:border-white/5">
       <div className="px-5 pt-5 pb-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
           <Sparkles className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-white">營運顧問</h2>
-          <p className="text-xs text-white/40">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">營運顧問</h2>
+          <p className="text-xs text-slate-500 dark:text-white/40">
             {briefing ? briefing.briefing_date : "每日簡報"}
           </p>
         </div>
         <button
           onClick={() => onGenerate(activeTab)}
           disabled={isGenerating}
-          className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition-all disabled:opacity-50"
+          className="p-1.5 rounded-lg text-slate-400 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 transition-all disabled:opacity-50"
           title="重新生成"
         >
           {isGenerating ? (
@@ -362,25 +363,25 @@ function CoachDrawerContent({
           onClick={() => onTabChange("MORNING")}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors ${
             activeTab === "MORNING"
-              ? "bg-white/5 text-amber-300 border-b-2 border-amber-400"
-              : "text-white/40 hover:text-white/60"
+              ? "bg-amber-50 dark:bg-white/5 text-amber-700 dark:text-amber-300 border-b-2 border-amber-500 dark:border-amber-400"
+              : "text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/60"
           }`}
         >
           <Sun className="w-3.5 h-3.5" />
           晨報
-          {morningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+          {morningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />}
         </button>
         <button
           onClick={() => onTabChange("EVENING")}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors ${
             activeTab === "EVENING"
-              ? "bg-white/5 text-indigo-300 border-b-2 border-indigo-400"
-              : "text-white/40 hover:text-white/60"
+              ? "bg-indigo-50 dark:bg-white/5 text-indigo-700 dark:text-indigo-300 border-b-2 border-indigo-500 dark:border-indigo-400"
+              : "text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/60"
           }`}
         >
           <Moon className="w-3.5 h-3.5" />
           晚報
-          {eveningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
+          {eveningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />}
         </button>
       </div>
     </div>
@@ -393,8 +394,8 @@ function CoachDrawerContent({
         {header}
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-3">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mx-auto" />
-            <p className="text-sm text-white/40">載入中...</p>
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-500 dark:text-indigo-400 mx-auto" />
+            <p className="text-sm text-slate-500 dark:text-white/40">載入中...</p>
           </div>
         </div>
       </>
@@ -408,11 +409,11 @@ function CoachDrawerContent({
         {header}
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center space-y-3">
-            <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
-            <p className="text-sm text-red-300">{error}</p>
+            <AlertTriangle className="w-6 h-6 text-red-500 dark:text-red-400 mx-auto" />
+            <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
             <button
               onClick={onRefresh}
-              className="text-sm text-white/60 hover:text-white underline"
+              className="text-sm text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white underline"
             >
               重試
             </button>
@@ -429,12 +430,12 @@ function CoachDrawerContent({
         {header}
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto">
-              <Sparkles className="w-6 h-6 text-indigo-400" />
+            <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center mx-auto">
+              <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-white/70">尚未生成今日簡報</p>
-              <p className="text-xs text-white/40">讓教練幫你整理今天的狀況</p>
+              <p className="text-sm text-slate-700 dark:text-white/70">尚未生成今日簡報</p>
+              <p className="text-xs text-slate-500 dark:text-white/40">讓教練幫你整理今天的狀況</p>
             </div>
             <button
               onClick={() => onGenerate(activeTab)}
@@ -470,8 +471,8 @@ function CoachDrawerContent({
       <div className="flex-1 overflow-y-auto">
         {/* Conversational Summary */}
         <div className="px-5 py-4">
-          <div className="bg-white/5 rounded-2xl rounded-tl-sm p-4 border border-white/5">
-            <p className="text-sm text-white/85 leading-relaxed">
+          <div className="bg-slate-100 dark:bg-white/5 rounded-2xl rounded-tl-sm p-4 border border-slate-300 dark:border-white/5 shadow-sm dark:shadow-none">
+            <p className="text-sm text-slate-800 dark:text-white/85 leading-relaxed">
               {briefing.summary}
             </p>
           </div>
@@ -481,19 +482,19 @@ function CoachDrawerContent({
         {(hasConflicts || hasOverdue) && (
           <div className="px-5 pb-3 flex gap-2 flex-wrap">
             {hasOverdue && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-orange-500/15 text-orange-300 border border-orange-500/20">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-orange-100 dark:bg-orange-500/15 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-500/20 shadow-sm dark:shadow-none">
                 <Clock className="w-3 h-3" />
                 {briefing.overdue_tasks.length} 逾期
               </span>
             )}
             {hasConflicts && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-red-500/15 text-red-300 border border-red-500/20">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-300 border border-red-300 dark:border-red-500/20 shadow-sm dark:shadow-none">
                 <AlertTriangle className="w-3 h-3" />
                 {briefing.conflicts.length} 衝突
               </span>
             )}
             {hasStagnation && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-yellow-500/15 text-yellow-300 border border-yellow-500/20">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-yellow-100 dark:bg-yellow-500/15 text-yellow-800 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-500/20 shadow-sm dark:shadow-none">
                 <TrendingDown className="w-3 h-3" />
                 {briefing.stagnations.length} 停滯
               </span>
@@ -504,29 +505,29 @@ function CoachDrawerContent({
         {/* Top Actions (Recommendations) */}
         {briefing.recommendations.length > 0 && (
           <div className="px-5 pb-4">
-            <h3 className="text-xs font-medium text-white/40 uppercase tracking-wider mb-2.5">
+            <h3 className="text-xs font-medium text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2.5">
               下一步行動
             </h3>
             <div className="space-y-2">
               {briefing.recommendations.map((rec, i) => (
                 <div
                   key={i}
-                  className="flex gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] transition-colors"
+                  className="flex gap-3 p-3 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-slate-300 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/[0.06] transition-colors shadow-sm dark:shadow-none"
                 >
                   <span
                     className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       rec.priority === 1
-                        ? "bg-red-500/20 text-red-300"
+                        ? "bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/30"
                         : rec.priority === 2
-                        ? "bg-amber-500/20 text-amber-300"
-                        : "bg-blue-500/20 text-blue-300"
+                        ? "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+                        : "bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
                     }`}
                   >
                     {rec.priority}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-white/80 leading-snug">{rec.action}</p>
-                    <p className="text-xs text-white/35 mt-1">{rec.reasoning}</p>
+                    <p className="text-sm text-slate-800 dark:text-white/80 leading-snug font-medium">{rec.action}</p>
+                    <p className="text-xs text-slate-600 dark:text-white/35 mt-1">{rec.reasoning}</p>
                   </div>
                 </div>
               ))}
@@ -535,9 +536,9 @@ function CoachDrawerContent({
         )}
 
         {/* Collapsible Detail Sections */}
-        <div className="border-t border-white/5">
+        <div className="border-t border-slate-200 dark:border-white/5">
           <div className="px-5 pt-3 pb-1">
-            <h3 className="text-xs font-medium text-white/30 uppercase tracking-wider">
+            <h3 className="text-xs font-medium text-slate-400 dark:text-white/30 uppercase tracking-wider">
               詳細資訊
             </h3>
           </div>
