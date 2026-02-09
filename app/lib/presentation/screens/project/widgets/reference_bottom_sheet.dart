@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../../../../domain/entities/reference.dart';
 import '../../../providers/product_reference_provider.dart';
 
@@ -40,6 +41,8 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   ReferenceType _selectedType = ReferenceType.note;
   bool _isLoading = false;
   String? _editingReferenceId;
+  final Set<String> _expandedReferenceIds = {}; // 追蹤展開的卡片
+  bool _isFormVisible = false; // 控制新增表單顯示/隱藏
 
   @override
   void dispose() {
@@ -71,6 +74,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
       _contentController.clear();
       _titleController.clear();
       _editingReferenceId = null;
+      _isFormVisible = false; // 提交後隱藏表單
       FocusScope.of(context).unfocus();
       HapticFeedback.mediumImpact();
     } finally {
@@ -86,6 +90,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
       _selectedType = reference.type;
       _titleController.text = reference.title ?? '';
       _contentController.text = reference.content;
+      _isFormVisible = true; // 編輯時顯示表單
     });
   }
 
@@ -94,6 +99,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
       _editingReferenceId = null;
       _titleController.clear();
       _contentController.clear();
+      _isFormVisible = false; // 取消時隱藏表單
     });
     FocusScope.of(context).unfocus();
   }
@@ -135,13 +141,32 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
         child: BackdropFilter(
           filter: dart_ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: referencesAsync.when(
-            data: (references) => Column(
+            data: (references) => Stack(
               children: [
-                _buildHeader(references.length),
-                Expanded(
-                  child: _buildReferenceList(references),
+                Column(
+                  children: [
+                    _buildHeader(references.length),
+                    Expanded(
+                      child: _buildReferenceList(references),
+                    ),
+                    if (_isFormVisible || _editingReferenceId != null)
+                      _buildAddReferenceForm(),
+                  ],
                 ),
-                _buildAddReferenceForm(),
+                // 浮動新增按鈕（僅在表單隱藏時顯示）
+                if (!_isFormVisible && _editingReferenceId == null)
+                  Positioned(
+                    right: 20,
+                    bottom: 20,
+                    child: FloatingActionButton(
+                      onPressed: () {
+                        setState(() => _isFormVisible = true);
+                        HapticFeedback.mediumImpact();
+                      },
+                      backgroundColor: const Color(0xFF6C63FF),
+                      child: const Icon(Icons.add, color: Colors.white),
+                    ),
+                  ),
               ],
             ),
             loading: () => Column(
@@ -154,7 +179,6 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     ),
                   ),
                 ),
-                _buildAddReferenceForm(),
               ],
             ),
             error: (error, stack) => Column(
@@ -168,7 +192,6 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     ),
                   ),
                 ),
-                _buildAddReferenceForm(),
               ],
             ),
           ),
@@ -238,15 +261,20 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   }
 
   Widget _buildReferenceList(List<Reference> references) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      children: [
-        // Reference List
-        if (references.isEmpty)
-          _buildEmptyState()
-        else
-          ...references.map((ref) => _buildReferenceItem(ref)),
-      ],
+    return GestureDetector(
+      // 點擊空白區域關閉鍵盤
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.translucent,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        children: [
+          // Reference List
+          if (references.isEmpty)
+            _buildEmptyState()
+          else
+            ...references.map((ref) => _buildReferenceItem(ref)),
+        ],
+      ),
     );
   }
 
@@ -275,77 +303,209 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
 
   Widget _buildReferenceItem(Reference reference) {
     final isUrl = reference.type == ReferenceType.url;
+    final isExpanded = _expandedReferenceIds.contains(reference.id);
+    final isLongContent = reference.content.length > 150 || reference.content.split('\n').length > 3;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon
-          Icon(
-            isUrl ? Icons.link : Icons.note_outlined,
-            color: isUrl ? const Color(0xFF6C63FF) : const Color(0xFF4ADE80),
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          // Content
-          Expanded(
-            child: Column(
+          // Header Row
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (reference.title != null) ...[
-                  Text(
-                    reference.title!,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                // Icon
+                Icon(
+                  isUrl ? Icons.link : Icons.note_outlined,
+                  color: isUrl ? const Color(0xFF6C63FF) : const Color(0xFF4ADE80),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                // Title
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (reference.title != null) ...[
+                        Text(
+                          reference.title!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          isUrl ? '連結' : '備註',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                ],
-                GestureDetector(
-                  onTap: isUrl ? () => _handleOpenUrl(reference.content) : null,
-                  child: Text(
-                    reference.content,
-                    style: TextStyle(
-                      color: isUrl
-                          ? const Color(0xFF6C63FF)
-                          : Colors.white.withValues(alpha: 0.7),
-                      fontSize: 13,
-                      decoration: isUrl ? TextDecoration.underline : null,
+                ),
+                // Action Buttons
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Edit Button
+                    IconButton(
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        color: Colors.white.withValues(alpha: 0.3),
+                        size: 18,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: _isLoading ? null : () => _startEditing(reference),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    // Delete Button
+                    IconButton(
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Colors.white.withValues(alpha: 0.3),
+                        size: 18,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: _isLoading
+                          ? null
+                          : () => _handleDeleteReference(reference.id),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          // Edit Button
-          IconButton(
-            icon: Icon(
-              Icons.edit_outlined,
-              color: Colors.white.withValues(alpha: 0.3),
-              size: 20,
+
+          // Content Area
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            constraints: BoxConstraints(
+              maxHeight: isExpanded ? 400 : 120, // 折疊時最高 120，展開時最高 400
             ),
-            onPressed: _isLoading ? null : () => _startEditing(reference),
-          ),
-          // Delete Button
-          IconButton(
-            icon: Icon(
-              Icons.delete_outline,
-              color: Colors.white.withValues(alpha: 0.3),
-              size: 20,
+            child: SingleChildScrollView(
+              physics: isExpanded ? const AlwaysScrollableScrollPhysics() : const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(48, 0, 16, 16),
+              child: isUrl
+                  ? GestureDetector(
+                      onTap: () => _handleOpenUrl(reference.content),
+                      child: Text(
+                        reference.content,
+                        style: const TextStyle(
+                          color: Color(0xFF6C63FF),
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                        ),
+                        maxLines: isExpanded ? null : 3,
+                        overflow: isExpanded ? null : TextOverflow.ellipsis,
+                      ),
+                    )
+                  : MarkdownBody(
+                      data: reference.content,
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                        h1: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h2: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h3: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        code: TextStyle(
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          color: const Color(0xFF4ADE80),
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        listBullet: const TextStyle(
+                          color: Color(0xFF4ADE80),
+                          fontSize: 13,
+                        ),
+                        blockquote: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        ),
+                        blockquoteDecoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: const Color(0xFF4ADE80).withValues(alpha: 0.5),
+                              width: 3,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
             ),
-            onPressed: _isLoading
-                ? null
-                : () => _handleDeleteReference(reference.id),
           ),
+
+          // Expand/Collapse Button
+          if (isLongContent)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(48, 0, 16, 12),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedReferenceIds.remove(reference.id);
+                    } else {
+                      _expandedReferenceIds.add(reference.id);
+                    }
+                  });
+                  HapticFeedback.selectionClick();
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isExpanded ? '收起' : '展開更多',
+                      style: const TextStyle(
+                        color: Color(0xFF6C63FF),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: const Color(0xFF6C63FF),
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

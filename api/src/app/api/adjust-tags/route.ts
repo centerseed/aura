@@ -7,7 +7,8 @@
 import { NextRequest } from "next/server"
 import { prisma } from "@/lib/db"
 import { authenticateRequest } from "@/lib/auth-middleware"
-import { ApiResponseBuilder, catchDomainException } from "@/lib/api-response"
+import { ApiResponseBuilder, ValidationException, catchDomainException } from "@/lib/api-response"
+import { sanitizeText } from "@/domain/constants/validation"
 import { AnalyzeAdjustmentIntentUseCase } from "@/application/use-cases/adjust-tags/analyze-adjustment-intent"
 import { ExecuteAdjustmentUseCase, type ExecuteAdjustmentRequest } from "@/application/use-cases/adjust-tags/execute-adjustment"
 
@@ -17,7 +18,18 @@ export async function POST(request: NextRequest) {
     const startTotal = Date.now()
     const userId = await authenticateRequest(request, prisma)
     const body = await request.json() as any
-    const { text, preview = false, confirmed = false, logId = null } = body
+    const { preview = false, confirmed = false, logId = null } = body
+
+    // 輸入清理與驗證
+    let text: string
+    try {
+      text = sanitizeText(body.text, { fieldName: "text" })
+    } catch (e) {
+      throw new ValidationException(
+        e instanceof Error ? e.message : "text is required",
+        "text"
+      )
+    }
 
     // 1. 分析意圖
     const analyzeUseCase = new AnalyzeAdjustmentIntentUseCase()

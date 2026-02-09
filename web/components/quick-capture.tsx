@@ -582,7 +582,9 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }
 
       if (!res.ok) {
-        throw new Error("AI 處理失敗");
+        const errorBody = await res.json().catch(() => null);
+        const errorMsg = errorBody?.error?.message || "AI 處理失敗";
+        throw new Error(errorMsg);
       }
 
       const response = await res.json();
@@ -623,12 +625,13 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }, 5000);
     } catch (err) {
       console.error("Quick capture failed:", err);
+      const detail = err instanceof Error ? err.message : "未知錯誤";
       // 添加錯誤訊息到聊天記錄
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         type: 'ai',
         timestamp: new Date(),
-        content: '抱歉，處理失敗了。請稍後再試。',
+        content: `抱歉，處理失敗了：${detail}`,
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {

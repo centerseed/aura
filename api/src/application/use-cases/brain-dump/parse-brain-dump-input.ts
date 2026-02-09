@@ -9,6 +9,7 @@
 import { prisma } from "@/lib/db"
 import { ValidationException } from "@/lib/api-response"
 import { understandImage, formatExtractedItemsAsText, validateImage } from "@/lib/image-understanding"
+import { sanitizeText } from "@/domain/constants/validation"
 
 // ============================================================================
 // DTOs
@@ -78,8 +79,14 @@ export class ParseBrainDumpInputUseCase {
       text = request.jsonBody?.text
     }
 
-    if (!text) {
-      throw new ValidationException("text is required", "text")
+    // 統一清理與驗證
+    try {
+      text = sanitizeText(text, { fieldName: "text" })
+    } catch (e) {
+      throw new ValidationException(
+        e instanceof Error ? e.message : "text is required",
+        "text"
+      )
     }
 
     // 解析 @Product 標記
