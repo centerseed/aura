@@ -25,7 +25,7 @@ interface AreaModalProps {
 const PRESET_SUGGESTIONS = [
   {
     name: "事業",
-    scope: "職涯發展、創業經營、技能提升、事業規劃",
+    scope: "職涯發展、專案管理、技能提升、事業規劃",
   },
   {
     name: "個人",
@@ -262,7 +262,7 @@ export function AreaModal({
             <textarea
               value={scope}
               onChange={(e) => setScope(e.target.value)}
-              placeholder="例如：職涯發展、創業經營、技能提升..."
+              placeholder="例如：職涯發展、專案管理、技能提升..."
               rows={3}
               className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
             />
