@@ -78,6 +78,7 @@ import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CoachAgent } from "@/components/coach-briefing-card";
 
 // 視圖類型
 type ViewMode = "structure" | "timeline" | "load";
@@ -3101,6 +3102,9 @@ function DashboardContent() {
                 <span className="text-sm font-medium">負載視圖</span>
               </button>
             </div>
+
+              {/* Coach 教練按鈕 */}
+              <CoachAgent />
 
               {/* 設定按鈕 */}
               <button

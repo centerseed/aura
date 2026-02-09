@@ -27,6 +27,7 @@ model User {
   topics               Topic[]
   evaluation_logs      SystemEvaluationLog[]
   oauth_tokens         OAuthToken[]
+  coach_briefings      CoachBriefing[]
 
   @@index([auth_provider_id])
   @@index([auth_provider, auth_provider_id])
@@ -356,4 +357,42 @@ enum ReminderType {
   LOCAL_NOTIFICATION
 
   @@map("remindertypeenum")
+}
+
+enum BriefingType {
+  MORNING
+  EVENING
+
+  @@map("briefingtypeenum")
+}
+
+model CoachBriefing {
+  id                String       @id @default(uuid()) @db.Uuid
+  created_at        DateTime     @default(now()) @db.Timestamp(6)
+  updated_at        DateTime     @updatedAt @db.Timestamp(6)
+  user_id           String       @db.Uuid
+  type              BriefingType
+  briefing_date     DateTime     @db.Date
+
+  // 聚合資料快照 (JSON)
+  calendar_events   Json         @default("[]") @db.Json
+  overdue_tasks     Json         @default("[]") @db.Json
+  approaching_tasks Json         @default("[]") @db.Json
+  conflicts         Json         @default("[]") @db.Json
+  stagnations       Json         @default("[]") @db.Json
+  completed_tasks   Json         @default("[]") @db.Json
+  remaining_tasks   Json         @default("[]") @db.Json
+  tomorrow_preview  Json         @default("[]") @db.Json
+
+  // AI 生成內容
+  summary           String       @db.Text
+  recommendations   Json         @default("[]") @db.Json
+  defer_suggestions Json         @default("[]") @db.Json
+
+  user              User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, type, briefing_date])
+  @@index([user_id, briefing_date])
+  @@index([user_id, type, created_at])
+  @@map("coach_briefings")
 }

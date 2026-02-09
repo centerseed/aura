@@ -305,4 +305,14 @@ export const API = {
     suggestProduct: (data: any) => postAPI('/api/suggest-product', data),
     reorganize: (data: any) => postAPI('/api/reorganize', data),
   },
+
+  // Coach Agent
+  coach: {
+    generateBriefing: (data: { type: 'MORNING' | 'EVENING'; date?: string; timezone?: string }) =>
+      postAPI('/api/coach/briefing', data),
+    getLatestBriefing: (params?: { type?: 'MORNING' | 'EVENING' }) => {
+      const qs = params?.type ? `?type=${params.type}` : ''
+      return getAPI(`/api/coach/briefing/latest${qs}`)
+    },
+  },
 }

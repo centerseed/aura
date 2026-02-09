@@ -13,7 +13,7 @@
 - POC Librarian 微服務（System 1/2 架構、K-means 群聚、規則蒸餾）
 - 107 個測試 + 安全機制
 - Flutter 行動 App（基礎功能）
-- Image OCR（已完成，分支待合併）
+- Image OCR（已完成，已合併至 main）
 
 ### 最大缺口
 - **Coach Agent**：完全未實作（晨晚報、衝突偵測、心理閉環）
@@ -41,11 +41,11 @@
 - [x] `api/src/lib/image-understanding.ts` 已實作 ✅
 - [x] `api/tests/unit/lib/image-understanding.test.ts` 已有測試 ✅
 - [x] Brain Dump route 已整合 `understandImage` ✅
-- [ ] `dev/ocr` 分支尚未合併到 main ❌
+- [x] `dev/ocr` 分支已合併到 main（commit `cf0158c`）✅
 
 ### M0 結論（2026-02-09 代碼驗證）
-**完成度接近 100%**。4 個 route 全部重構完成，Librarian 微服務整合完成，Image OCR 功能完成並整合到 brain-dump pipeline。
-唯一剩餘：`dev/ocr` 分支尚未合併到 main。
+**✅ M0 全部完成。** 4 個 route 全部重構完成，Librarian 微服務整合完成，Image OCR 功能完成並整合到 brain-dump pipeline，`dev/ocr` 分支已合併。
+**下一步：進入 M1 — The Coach。**
 
 ---
 
@@ -186,7 +186,7 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 
 | Milestone | 時長 | 累計 | 核心交付 |
 |-----------|------|------|---------|
-| **M0: Cleanup** | 2 週 | 2 週 | 技術債清零 + Librarian 整合 |
+| **M0: Cleanup** ✅ | 2 週 | 2 週 | 技術債清零 + Librarian 整合 |
 | **M1: Coach** | 6 週 | 8 週 | 晨晚報 + 衝突偵測 + 停滯偵測 |
 | **M2: Intake** | 4 週 | 12 週 | 語音/圖片/多模態零摩擦輸入 |
 | **M3: Governance** | 4 週 | 16 週 | 自動排程治理 + 主動關聯 |
