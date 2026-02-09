@@ -5,13 +5,23 @@ import { Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="w-9 h-9" />;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const isDark = resolvedTheme === "dark";
+  // 在 hydration 完成前，顯示預設的深色圖示（避免閃爍）
+  if (!mounted) {
+    return (
+      <div className="p-2 rounded-lg text-white/60">
+        <Sun className="w-5 h-5" />
+      </div>
+    );
+  }
+
+  const isDark = theme === "dark";
 
   return (
     <button
