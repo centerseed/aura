@@ -42,6 +42,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   bool _isLoading = false;
   String? _editingReferenceId;
   final Set<String> _expandedReferenceIds = {}; // 追蹤展開的卡片
+  bool _isFormVisible = false; // 控制新增表單顯示/隱藏
 
   @override
   void dispose() {
@@ -73,6 +74,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
       _contentController.clear();
       _titleController.clear();
       _editingReferenceId = null;
+      _isFormVisible = false; // 提交後隱藏表單
       FocusScope.of(context).unfocus();
       HapticFeedback.mediumImpact();
     } finally {
@@ -88,6 +90,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
       _selectedType = reference.type;
       _titleController.text = reference.title ?? '';
       _contentController.text = reference.content;
+      _isFormVisible = true; // 編輯時顯示表單
     });
   }
 
@@ -96,6 +99,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
       _editingReferenceId = null;
       _titleController.clear();
       _contentController.clear();
+      _isFormVisible = false; // 取消時隱藏表單
     });
     FocusScope.of(context).unfocus();
   }
@@ -137,13 +141,32 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
         child: BackdropFilter(
           filter: dart_ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: referencesAsync.when(
-            data: (references) => Column(
+            data: (references) => Stack(
               children: [
-                _buildHeader(references.length),
-                Expanded(
-                  child: _buildReferenceList(references),
+                Column(
+                  children: [
+                    _buildHeader(references.length),
+                    Expanded(
+                      child: _buildReferenceList(references),
+                    ),
+                    if (_isFormVisible || _editingReferenceId != null)
+                      _buildAddReferenceForm(),
+                  ],
                 ),
-                _buildAddReferenceForm(),
+                // 浮動新增按鈕（僅在表單隱藏時顯示）
+                if (!_isFormVisible && _editingReferenceId == null)
+                  Positioned(
+                    right: 20,
+                    bottom: 20,
+                    child: FloatingActionButton(
+                      onPressed: () {
+                        setState(() => _isFormVisible = true);
+                        HapticFeedback.mediumImpact();
+                      },
+                      backgroundColor: const Color(0xFF6C63FF),
+                      child: const Icon(Icons.add, color: Colors.white),
+                    ),
+                  ),
               ],
             ),
             loading: () => Column(
@@ -156,7 +179,6 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     ),
                   ),
                 ),
-                _buildAddReferenceForm(),
               ],
             ),
             error: (error, stack) => Column(
@@ -170,7 +192,6 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     ),
                   ),
                 ),
-                _buildAddReferenceForm(),
               ],
             ),
           ),
