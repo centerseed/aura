@@ -176,3 +176,11 @@ dist/
 .DS_Store
 Thumbs.db
 Aura_Vault/
+
+# Remotion Video Studio
+video-studio/node_modules/
+video-studio/out/
+video-studio/.remotion/
+video-studio/public/*.mp4
+video-studio/public/*.mov
+video-studio/public/*.webm

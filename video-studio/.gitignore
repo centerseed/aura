@@ -1,0 +1,23 @@
+# Remotion specific
+node_modules/
+out/
+.remotion/
+public/
+
+# Rendered videos
+*.mp4
+*.mov
+*.webm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,26 @@
+{
+  "name": "naruvia-video-studio",
+  "version": "1.0.0",
+  "description": "Remotion video production studio for Naruvia product demos",
+  "private": true,
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion render",
+    "render": "remotion render HelloWorld out/video.mp4",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.272",
+    "@remotion/player": "^4.0.272",
+    "remotion": "^4.0.272",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config": "^4.0.272",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.6.0"
+  }
+}
