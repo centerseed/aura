@@ -23,7 +23,7 @@ import { API } from "@/lib/api-client";
 const PRESET_AREAS = [
   {
     name: "事業",
-    scope: "職涯發展、創業經營、技能提升、事業規劃",
+    scope: "職涯發展、專案管理、技能提升、事業規劃",
     icon: Briefcase,
     color: "from-blue-500 to-cyan-500",
   },

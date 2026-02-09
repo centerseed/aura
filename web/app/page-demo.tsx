@@ -171,7 +171,7 @@ export default function HomeDemo() {
                 讓一切井然有序
               </p>
               <p className="text-base md:text-lg text-white/50 leading-relaxed font-light">
-                為創業者設計的運營管理系統。碎片化的想法在此化為秩序，混亂的決策在此變得清晰。
+                你的 AI 營運長——讓一人多角的你，不再害怕漏掉任何事。
               </p>
             </div>
           </div>
@@ -436,7 +436,7 @@ export default function HomeDemo() {
       <footer className="relative border-t border-white/5 py-12 px-6">
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-xs uppercase tracking-widest text-white/30 font-mono">
-            資訊熵減系統 · 為創業者設計
+            你的 AI 營運長 · 讓一切井然有序
           </p>
         </div>
       </footer>

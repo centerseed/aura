@@ -765,7 +765,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              '為創業者設計的「不失控」營運管理系統',
+              '你的 AI 營運長——讓一切井然有序',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.5),
                 fontSize: 13,

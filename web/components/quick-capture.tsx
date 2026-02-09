@@ -17,6 +17,8 @@ import {
   Merge,
   FileText,
   Clock,
+  Camera,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/firebase";
@@ -167,6 +169,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   } | null>(null);
   const [selectedOperationIds, setSelectedOperationIds] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 圖片上傳狀態
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // 聊天訊息歷史
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -469,22 +476,72 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     );
   };
 
+  // 處理圖片選擇
+  const handleImageSelect = (file: File) => {
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      alert("不支援的圖片格式，請使用 JPEG、PNG 或 WEBP");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("圖片大小超過 10MB 限制");
+      return;
+    }
+    setSelectedImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // 處理拖拽上傳
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+      handleImageSelect(file);
+    }
+  };
+
+  // 處理剪貼簿貼上圖片
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) handleImageSelect(file);
+        return;
+      }
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!userId || !input.trim()) return;
+    if (!userId || (!input.trim() && !selectedImage)) return;
 
     const userInput = input.trim();
+    const hasImage = !!selectedImage;
 
     // 添加用戶訊息到聊天記錄
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       type: 'user',
       timestamp: new Date(),
-      content: userInput,
+      content: hasImage
+        ? `${userInput ? userInput + "\n" : ""}[📷 ${selectedImage!.name}]`
+        : userInput,
     };
     setMessages(prev => [...prev, userMessage]);
 
     setProcessingCount(prev => prev + 1);
     setInput("");
+    const imageToSend = selectedImage;
+    handleRemoveImage();
     // 保持焦點，讓用戶可以繼續輸入
     setTimeout(() => inputRef.current?.focus(), 0);
 
@@ -496,14 +553,33 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }
       const token = await user.getIdToken();
 
-      const res = await fetch(`${API_BASE_URL}/api/brain-dump`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ text: userInput, userId }),
-      });
+      let res: Response;
+
+      if (imageToSend) {
+        // 圖片模式：使用 multipart/form-data
+        const formData = new FormData();
+        formData.append("image", imageToSend);
+        formData.append("input_type", userInput ? "image_with_text" : "image");
+        if (userInput) formData.append("text", userInput);
+
+        res = await fetch(`${API_BASE_URL}/api/brain-dump`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+          body: formData,
+        });
+      } else {
+        // 文字模式：使用 JSON
+        res = await fetch(`${API_BASE_URL}/api/brain-dump`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ text: userInput, userId }),
+        });
+      }
 
       if (!res.ok) {
         throw new Error("AI 處理失敗");
@@ -593,7 +669,8 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         });
 
         if (res.ok) {
-          const data = await res.json();
+          const response = await res.json();
+          const data = response.data ?? response; // 相容新舊格式
           setAdjustmentResult(data);
           setInput("");
           onItemsCreated();
@@ -727,18 +804,40 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
 
             {/* 輸入區域 */}
             <div className="p-5">
-              <div className="relative">
+              {/* 圖片預覽 */}
+              {imagePreview && (
+                <div className="mb-3 relative inline-block">
+                  <img
+                    src={imagePreview}
+                    alt="預覽"
+                    className="max-h-32 rounded-lg border border-white/20"
+                  />
+                  <button
+                    onClick={handleRemoveImage}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-400 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
+              <div
+                className="relative"
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+              >
                 <textarea
                   ref={inputRef}
                   value={input}
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                   onCompositionStart={() => setIsComposing(true)}
                   onCompositionEnd={() => {
                     // 延遲設置以確保 keydown 事件先處理完
                     setTimeout(() => setIsComposing(false), 0);
                   }}
-                  placeholder="輸入任何想法..."
+                  placeholder={selectedImage ? "可選：補充說明圖片內容..." : "輸入任何想法..."}
                   rows={4}
                   className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white text-base placeholder:text-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
                 />
@@ -754,11 +853,30 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                 </p>
               </div>
 
-              <div className="flex items-center justify-end mt-4">
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageSelect(file);
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2.5 rounded-lg bg-white/5 border border-white/20 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                    title="上傳圖片（支援拖拽或 Ctrl+V 貼上）"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </button>
+                </div>
                 <Button
                   size="lg"
                   onClick={handleSubmit}
-                  disabled={!input.trim()}
+                  disabled={!input.trim() && !selectedImage}
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-6"
                 >
                   <Send className="w-5 h-5 mr-2" />
@@ -1329,22 +1447,43 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
 
           {/* 輸入區域 */}
           <div className="p-3">
-          <div className="relative">
+          {/* 圖片預覽 - 浮動面板 */}
+          {imagePreview && (
+            <div className="mb-2 relative inline-block">
+              <img
+                src={imagePreview}
+                alt="預覽"
+                className="max-h-24 rounded-lg border border-white/10"
+              />
+              <button
+                onClick={handleRemoveImage}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-400 transition-colors"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          )}
+
+          <div
+            className="relative"
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+          >
             <textarea
               ref={inputRef}
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => {
                 // 延遲設置以確保 keydown 事件先處理完
                 setTimeout(() => setIsComposing(false), 0);
               }}
-              placeholder="輸入任何想法... 用 @ 快速指定專案"
+              placeholder={selectedImage ? "可選：補充說明..." : "輸入任何想法... 用 @ 快速指定專案"}
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
             />
-
           </div>
 
           {/* Sub-items 使用提示 */}
@@ -1357,11 +1496,30 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             </p>
           </div>
 
-          <div className="flex items-center justify-end mt-2 gap-2">
+          <div className="flex items-center justify-between mt-2 gap-2">
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageSelect(file);
+                }}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                title="上傳圖片"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+            </div>
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!input.trim()}
+              disabled={!input.trim() && !selectedImage}
               className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
             >
               <Send className="w-4 h-4 mr-1" />

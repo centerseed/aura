@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, Loader2, LogIn, Zap, RefreshCw, BookOpen, Sparkles, Check, ListTodo, Wand2 } from "lucide-react";
+import { ArrowRight, Loader2, LogIn, Zap, RefreshCw, BookOpen, Sparkles, Check, ListTodo, Wand2, Sun, Moon } from "lucide-react";
 import { auth, googleProvider, signInWithPopup, signInAnonymously } from "@/lib/firebase";
 
 export default function HomeDemo() {
@@ -14,7 +14,21 @@ export default function HomeDemo() {
   const [isEntering, setIsEntering] = useState(false);
   const [authMethod, setAuthMethod] = useState<"select" | "name">("select");
   const [showAuthPanel, setShowAuthPanel] = useState(false);
-  const [isDark] = useState(true);
+  const [isDark, setIsDark] = useState(true);
+
+  // 同步 html 的 dark class，控制 globals.css 的 :root:not(.dark) 規則
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    return () => {
+      // 離開首頁時移除 dark class（讓其他頁面自行管理）
+      document.documentElement.classList.remove("dark");
+    };
+  }, [isDark]);
+
   const [activeDemoTab, setActiveDemoTab] = useState(0);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [currentUser, setCurrentUser] = useState<{ uid: string; email?: string; name?: string } | null>(null);
@@ -94,20 +108,20 @@ export default function HomeDemo() {
     : {
       bg: "bg-white",
       text: "text-slate-900",
-      textMuted: "text-slate-600",
-      textMutedDarker: "text-slate-500",
+      textMuted: "text-slate-500",
+      textMutedDarker: "text-slate-400",
       textMutedLighter: "text-slate-700",
       textMutedAlt: "text-slate-800",
-      border: "border-indigo-200/50",
-      borderLight: "border-indigo-100/50",
-      borderHover: "border-emerald-400/60",
-      card: "bg-indigo-50/40",
-      cardHover: "bg-indigo-100/50",
+      border: "border-slate-200",
+      borderLight: "border-slate-100",
+      borderHover: "border-indigo-400",
+      card: "bg-slate-50",
+      cardHover: "bg-slate-100",
       cardBg: "bg-white",
-      accent: "text-emerald-600",
-      accentBg: "bg-emerald-100/60",
-      accentBorder: "border-emerald-400/60",
-      shadow: "shadow-emerald-300/30",
+      accent: "text-indigo-600",
+      accentBg: "bg-indigo-50",
+      accentBorder: "border-indigo-400",
+      shadow: "shadow-indigo-200/40",
     };
 
   // 演示場景組 - 三個不同功能的演示（每個只保留一個場景）
@@ -288,14 +302,14 @@ export default function HomeDemo() {
   // 如果正在檢查認證狀態，顯示加載畫面
   if (isCheckingAuth) {
     return (
-      <main className={`min-h-screen ${isDark ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-50"} flex items-center justify-center`}>
+      <main className={`min-h-screen ${isDark ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-white via-slate-50 to-indigo-50/40"} flex items-center justify-center`}>
         <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
       </main>
     );
   }
 
   return (
-    <main className={`min-h-screen ${isDark ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-50"} ${theme.text} overflow-hidden transition-colors duration-300`}>
+    <main className={`min-h-screen ${isDark ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-white via-slate-50 to-indigo-50/40"} ${theme.text} overflow-hidden transition-colors duration-300`}>
       {/* 優雅背景 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className={`absolute -top-40 -right-40 w-80 h-80 ${isDark ? "bg-indigo-500/20" : "bg-indigo-300/15"} rounded-full blur-3xl ${isDark ? "animate-pulse" : ""}`} />
@@ -306,23 +320,32 @@ export default function HomeDemo() {
       {/* 右上角操作按鈕 */}
       <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
         <button
+          onClick={() => setIsDark(!isDark)}
+          className={`p-2.5 rounded-xl transition-all duration-300 ${isDark
+            ? "bg-white/10 hover:bg-white/20 text-white/70 hover:text-white border border-white/10"
+            : "bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200"
+          }`}
+          title={isDark ? "切換淺色模式" : "切換深色模式"}
+        >
+          {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        </button>
+        <button
           onClick={() => {
             if (currentUser) {
-              // 已登入，直接進入儀表板
               if (hasLibraryData) {
                 router.push("/dashboard");
               } else {
                 router.push("/onboarding");
               }
             } else {
-              // 未登入，開啟登入面板
               setShowAuthPanel(!showAuthPanel);
             }
           }}
-          className="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl
-            bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
-            text-white font-medium text-sm transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/30
-            border border-emerald-400/40 hover:border-emerald-400/80"
+          className={`group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 hover:shadow-lg ${isDark
+            ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 hover:shadow-indigo-500/30 border border-emerald-400/40 hover:border-emerald-400/80"
+            : "border border-indigo-700/20 shadow-md"
+          }`}
+          style={isDark ? {} : { background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "#fff" }}
         >
           <LogIn className="w-4 h-4" />
           {currentUser ? "進入儀表板" : "登入"}
@@ -336,7 +359,7 @@ export default function HomeDemo() {
           {/* Logo & Title */}
           <div className="text-center mb-16 space-y-8">
             <div className="space-y-4">
-              <h1 className={`text-7xl md:text-8xl font-bold mb-6 ${isDark ? "bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent" : "bg-gradient-to-r from-indigo-600 via-slate-900 to-slate-900 bg-clip-text text-transparent"}`}>
+              <h1 className={`text-7xl md:text-8xl font-bold mb-6 ${isDark ? "bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent" : "text-slate-800"}`}>
                 Zentropy
               </h1>
               <div className={`h-1 w-24 bg-gradient-to-r ${isDark ? "from-indigo-500 via-emerald-400" : "from-indigo-600 via-emerald-500"} to-transparent mx-auto mt-8`} />
@@ -347,14 +370,17 @@ export default function HomeDemo() {
                 讓一切井然有序
               </p>
               <p className={`text-base md:text-lg ${theme.textMuted} leading-relaxed`}>
-                為創業者設計的運營管理系統。碎片化的想法在此化為秩序，混亂的決策在此變得清晰。
+                你的 AI 營運長——讓一人多角的你，不再害怕漏掉任何事。
               </p>
             </div>
           </div>
 
           {/* 🎯 互動式演示區 - Brain Dump 體驗 */}
           <div className="max-w-5xl w-full mb-20">
-            <div className={`relative p-8 md:p-12 border ${theme.border} ${theme.card} rounded-3xl backdrop-blur-xl overflow-hidden shadow-2xl ${isDark ? "shadow-indigo-500/10" : "shadow-indigo-300/10"}`}>
+            <div
+              className={`relative p-8 md:p-12 rounded-3xl overflow-hidden ${isDark ? "border border-white/20 bg-white/5 backdrop-blur-xl shadow-2xl shadow-indigo-500/10" : ""}`}
+              style={isDark ? {} : { background: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 25px 60px -15px rgba(0,0,0,0.08), 0 10px 25px -10px rgba(0,0,0,0.04)" }}
+            >
               {/* 裝飾性光暈 */}
               <div className={`absolute -top-20 -right-20 w-40 h-40 ${isDark ? "bg-indigo-500/20" : "bg-indigo-300/20"} rounded-full blur-3xl`} />
               <div className={`absolute -bottom-20 -left-20 w-40 h-40 ${isDark ? "bg-emerald-500/20" : "bg-emerald-300/20"} rounded-full blur-3xl`} />
@@ -746,7 +772,8 @@ export default function HomeDemo() {
             ].map((item, i) => (
               <div
                 key={i}
-                className={`group p-5 text-center border ${theme.border} ${theme.card} hover:${theme.cardHover} rounded-xl transition-all hover:scale-110 hover:shadow-lg ${isDark ? "hover:shadow-emerald-500/20" : "hover:shadow-emerald-300/20"}`}
+                className={`group p-5 text-center rounded-xl transition-all hover:scale-110 hover:shadow-lg ${isDark ? "border border-white/20 bg-white/5 hover:shadow-emerald-500/20" : ""}`}
+                style={isDark ? {} : { background: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 4px 16px -4px rgba(0,0,0,0.06)" }}
               >
                 <div className="text-4xl mb-3 group-hover:scale-125 transition-transform">{item.icon}</div>
                 <div className={`text-sm font-semibold ${theme.text} mb-1`}>{item.text}</div>
@@ -759,10 +786,13 @@ export default function HomeDemo() {
           {!showAuthPanel && (
             <button
               onClick={() => setShowAuthPanel(true)}
-              className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl
-                bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
-                text-white font-semibold text-lg transition-all duration-300 hover:gap-4 hover:scale-105
-                border-2 border-emerald-400/40 hover:border-emerald-400/80 hover:shadow-2xl hover:shadow-indigo-500/30"
+              className={`group inline-flex items-center gap-3 px-8 py-4 rounded-xl
+                font-semibold text-lg transition-all duration-300 hover:gap-4 hover:scale-105
+                hover:shadow-2xl hover:shadow-indigo-500/30 ${isDark
+                  ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white border-2 border-emerald-400/40 hover:border-emerald-400/80"
+                  : "border-2 border-indigo-700/20 shadow-lg"
+                }`}
+              style={isDark ? {} : { background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "#fff" }}
             >
               立即開始體驗
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
@@ -822,12 +852,17 @@ export default function HomeDemo() {
                   return (
                     <div
                       key={i}
-                      className={`group relative p-8 border-2 ${item.borderColor} bg-gradient-to-br ${item.bgGradient} rounded-2xl transition-all hover:scale-105 hover:shadow-2xl ${item.color === "amber"
+                      className={`group relative p-8 rounded-2xl transition-all hover:scale-105 hover:shadow-2xl ${isDark ? `border-2 ${item.borderColor} bg-gradient-to-br ${item.bgGradient}` : ""} ${item.color === "amber"
                         ? isDark ? "hover:shadow-amber-500/20" : "hover:shadow-amber-300/20"
                         : item.color === "blue"
                           ? isDark ? "hover:shadow-blue-500/20" : "hover:shadow-blue-300/20"
                           : isDark ? "hover:shadow-emerald-500/20" : "hover:shadow-emerald-300/20"
                         }`}
+                      style={isDark ? {} : {
+                        background: "#fff",
+                        border: `2px solid ${item.color === "amber" ? "#fbbf24" : item.color === "blue" ? "#60a5fa" : "#34d399"}`,
+                        boxShadow: "0 8px 30px -8px rgba(0,0,0,0.06)"
+                      }}
                     >
                       {/* Icon */}
                       <div className={`w-16 h-16 rounded-2xl ${item.color === "amber"
@@ -937,12 +972,16 @@ export default function HomeDemo() {
                 ].map((plan, i) => (
                   <div
                     key={i}
-                    className={`relative p-8 rounded-2xl border-2 transition-all hover:scale-105 ${plan.highlight
-                      ? isDark
-                        ? "border-indigo-500/60 bg-gradient-to-br from-indigo-500/20 to-transparent shadow-2xl shadow-indigo-500/30"
-                        : "border-emerald-500 bg-gradient-to-br from-indigo-50 to-white shadow-2xl shadow-emerald-400/30"
-                      : `${theme.border} ${theme.card} hover:shadow-xl ${isDark ? "hover:shadow-emerald-500/20" : "hover:shadow-emerald-300/20"}`
-                      }`}
+                    className={`relative p-8 rounded-2xl transition-all hover:scale-105 ${isDark
+                      ? plan.highlight
+                        ? "border-2 border-indigo-500/60 bg-gradient-to-br from-indigo-500/20 to-transparent shadow-2xl shadow-indigo-500/30"
+                        : "border-2 border-white/20 bg-white/5 hover:shadow-xl hover:shadow-emerald-500/20"
+                      : ""
+                    }`}
+                    style={isDark ? {} : plan.highlight
+                      ? { background: "linear-gradient(to bottom right, #eef2ff, #fff)", border: "2px solid #6366f1", boxShadow: "0 25px 60px -15px rgba(99,102,241,0.15)" }
+                      : { background: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 8px 30px -8px rgba(0,0,0,0.06)" }
+                    }
                   >
                     {plan.highlight && (
                       <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-full text-xs font-bold text-white shadow-lg">
@@ -982,11 +1021,14 @@ export default function HomeDemo() {
                       {/* CTA */}
                       <button
                         className={`w-full py-3.5 rounded-xl font-semibold transition-all hover:scale-105 ${plan.highlight
-                          ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-lg"
+                          ? isDark
+                            ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-lg"
+                            : "shadow-lg"
                           : isDark
                             ? "border-2 border-white/20 text-white hover:border-emerald-400/50 hover:bg-white/5"
                             : "border-2 border-slate-300 text-slate-900 hover:border-emerald-500 hover:bg-indigo-50"
                           }`}
+                        style={plan.highlight && !isDark ? { background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "#fff" } : {}}
                       >
                         {plan.cta}
                       </button>
@@ -1012,17 +1054,17 @@ export default function HomeDemo() {
             onClick={() => setShowAuthPanel(false)}
           />
 
-          <Card className="relative w-full max-w-md bg-slate-900/98 border border-emerald-500/40 backdrop-blur-xl p-8 rounded-lg shadow-2xl shadow-black/50">
+          <Card className={`relative w-full max-w-md backdrop-blur-xl p-8 rounded-lg shadow-2xl ${isDark ? "bg-slate-900/98 border border-emerald-500/40 shadow-black/50" : "bg-white border border-slate-200 shadow-slate-300/50"}`}>
             <button
               onClick={() => setShowAuthPanel(false)}
-              className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+              className={`absolute top-4 right-4 transition-colors ${isDark ? "text-white/50 hover:text-white" : "text-slate-400 hover:text-slate-600"}`}
             >
               ✕
             </button>
 
             {authMethod === "select" ? (
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-white mb-6">選擇登入方式</h2>
+                <h2 className={`text-xl font-semibold ${isDark ? "text-white" : "text-slate-900"} mb-6`}>選擇登入方式</h2>
 
                 <Button
                   onClick={handleGoogleSignIn}
@@ -1057,16 +1099,16 @@ export default function HomeDemo() {
                 </Button>
 
                 <div className="relative flex items-center py-2">
-                  <div className="flex-1 border-t border-white/10"></div>
-                  <span className="px-3 text-sm text-white/40">或</span>
-                  <div className="flex-1 border-t border-white/10"></div>
+                  <div className={`flex-1 border-t ${isDark ? "border-white/10" : "border-slate-200"}`}></div>
+                  <span className={`px-3 text-sm ${isDark ? "text-white/40" : "text-slate-400"}`}>或</span>
+                  <div className={`flex-1 border-t ${isDark ? "border-white/10" : "border-slate-200"}`}></div>
                 </div>
 
                 <Button
                   onClick={() => setAuthMethod("name")}
                   disabled={isEntering}
                   variant="outline"
-                  className="w-full h-12 border-white/20 bg-white/5 hover:bg-white/10 text-white"
+                  className={`w-full h-12 ${isDark ? "border-white/20 bg-white/5 hover:bg-white/10 text-white" : "border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700"}`}
                 >
                   使用名稱登入
                 </Button>
@@ -1074,7 +1116,7 @@ export default function HomeDemo() {
             ) : (
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-2">
+                  <label className={`block text-sm font-medium ${isDark ? "text-white/70" : "text-slate-600"} mb-2`}>
                     如何稱呼你？
                   </label>
                   <input
@@ -1083,7 +1125,10 @@ export default function HomeDemo() {
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleNameSignIn()}
                     placeholder="輸入你的名字"
-                    className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50"
+                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 ${isDark
+                      ? "bg-white/5 border border-white/10 text-white placeholder:text-white/30"
+                      : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400"
+                    }`}
                     autoFocus
                   />
                 </div>
@@ -1102,7 +1147,7 @@ export default function HomeDemo() {
 
                 <button
                   onClick={() => setAuthMethod("select")}
-                  className="w-full text-sm text-white/50 hover:text-white/70"
+                  className={`w-full text-sm ${isDark ? "text-white/50 hover:text-white/70" : "text-slate-400 hover:text-slate-600"}`}
                 >
                   ← 返回其他方式
                 </button>
@@ -1113,29 +1158,20 @@ export default function HomeDemo() {
       )}
 
       {/* 頁腳 */}
-      <footer className="relative border-t border-white/5 py-12 px-6">
+      <footer className={`relative border-t ${isDark ? "border-white/5" : "border-slate-200"} py-12 px-6`}>
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col items-center gap-4">
-            {/* 連結 */}
             <div className="flex items-center gap-6 text-sm">
-              <a
-                href="/privacy"
-                className="text-white/50 hover:text-white/80 transition-colors"
-              >
+              <a href="/privacy" className={`${isDark ? "text-white/50 hover:text-white/80" : "text-slate-400 hover:text-slate-600"} transition-colors`}>
                 隱私政策 Privacy Policy
               </a>
-              <span className="text-white/20">·</span>
-              <a
-                href="/terms"
-                className="text-white/50 hover:text-white/80 transition-colors"
-              >
+              <span className={isDark ? "text-white/20" : "text-slate-300"}>·</span>
+              <a href="/terms" className={`${isDark ? "text-white/50 hover:text-white/80" : "text-slate-400 hover:text-slate-600"} transition-colors`}>
                 服務條款 Terms of Service
               </a>
             </div>
-
-            {/* 標語 */}
-            <p className="text-xs uppercase tracking-widest text-white/30 font-mono">
-              資訊熵減系統 · 為創業者設計
+            <p className={`text-xs uppercase tracking-widest ${isDark ? "text-white/30" : "text-slate-300"} font-mono`}>
+              你的 AI 營運長 · 讓一切井然有序
             </p>
           </div>
         </div>

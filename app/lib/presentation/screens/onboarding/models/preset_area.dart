@@ -18,7 +18,7 @@ class PresetArea {
   static const List<PresetArea> defaults = [
     PresetArea(
       name: '事業',
-      scope: '職涯發展、創業經營、技能提升、事業規劃',
+      scope: '職涯發展、專案管理、技能提升、事業規劃',
       icon: Icons.work_outline,
       color: Color(0xFF3B82F6), // Blue
     ),

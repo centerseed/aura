@@ -1,115 +1,185 @@
-
 # Zentropy Product Definition (產品白皮書)
 
-**Ver 2.0 - 讓一切井然有序的高效能智慧作業系統**
+**Ver 3.0 — 一人多角時代的 AI 營運長**
 
-Zentropy 不僅僅是一個筆記軟體或待辦清單，它是一個具備「治理智慧」的第二大腦作業系統。旨在透過 AI 代理（Agents）的協作，自動對抗資訊熵（Information Entropy），將創辦人與高階專業人士從混亂的資訊洪流中解放出來。
-
----
-
-## 1. 核心哲學 (Transformation Philosophy)
-
-### Problem: The Entropy of Success
-隨著個人的成長，責任（Inputs）是指數級增加的。傳統工具（Notion, Linear, Google Tasks）是被動的容器，它們不會自己整理。結果是：**越成功的專業人士，其數位生活越像一個堆滿雜物的倉庫**。這導致了決策疲勞與潛在焦慮。
-
-### Solution: Active Governance (主動治理)
-Zentropy 的核心假設是：**只有「主動治理」才能對抗熵增**。
-系統必須像一個訓練有素的幕僚團隊，不僅僅是「儲存」資料，而是主動進行：
-1.  **聚合 (Aggregation)**: 將碎料拼湊成完整敘事。
-2.  **定位 (Triangulation)**: 識別資訊屬於哪個人生面向。
-3.  **歸位 (Transition)**: 根據動能將資訊放入正確的狀態抽屜。
+Zentropy 是為「一人分飾多角」的現代人打造的 AI 營運系統。它不是又一個筆記軟體或待辦清單，而是一組具備主動治理能力的虛擬幕僚團隊——自動接收、分類、歸檔、預警——讓你在角色切換的日常中，不再害怕漏掉任何事。
 
 ---
 
-## 2. 系統本體論 (The System Ontology)
+## 1. 核心哲學：主動治理對抗熵增
 
-Zentropy 透過嚴謹的三層架構來映射用戶的多重身分與資產：
+### 問題：成功帶來的熵增 (The Entropy of Success)
 
-| Layer | Concept | Definition | Example |
-| :--- | :--- | :--- | :--- |
-| **L1** | **Area (Identity)** | **"Who am I?"**<br>長期身分認同與責任邊界。是協作與隱私的容器。 | `02_Employee_Google`<br>`05_Founder_Zentropy`<br>`01_Life_Personal` |
-| **L2** | **Product (Asset)** | **"What am I building?"**<br>具備產出價值或需持續維護的資產實體。 | `Zentropy_Backend_System`<br>`My_Physical_Health`<br>`Q3_Financial_Report` |
-| **L3** | **Topic (Nature)** | **"How am I doing it?"**<br>工作性質與行動類型的聚類屬性。 | `Feature_Dev`, `Bugfix`<br>`Strategic_Planning`<br>`Routine_Check` |
+現代人的生活越來越「多角化」：
 
----
+- 上班是工程師，下班是自媒體創作者，週末是社群活動召集人
+- 白天管三個客戶專案，晚上處理自己的 Side Project
+- 同時是創業者、產品經理、財務、業務、客服
 
-## 3. 虛擬幕僚鐵三角 (The Agent Triangle)
+每多一個角色，資訊輸入就指數增長。研究顯示：
 
-Zentropy 透過三位專職 Agent 分工合作，實現全自動化的資訊後勤 (Information Logistics)：
+- **Context switching 每次消耗約 20% 認知容量**，重新聚焦需要 23 分鐘
+- 工具碎片化 + 頻繁切換可**吞噬 40% 生產力**
+- 多任務處理者完成任務**慢 25%、錯誤多 50%**
 
-### 3.1 The Gatekeeper (守門人)
-*   **職責**: **NLU Ingestion (感知與初步解析)**
-*   **任務**: 24小時待命，接收來自 Line, Web, Voice 的碎料。負責將非結構化雜訊轉化為結構化資料，並阻絕無意義的干擾。
+傳統工具（Notion、ClickUp、Google Tasks）是被動容器——它們不會自己整理。結果是：**越忙碌的人，數位生活越像一個堆滿雜物的倉庫**，帶來決策疲勞與「怕漏掉什麼」的潛在焦慮。
 
-### 3.2 The Librarian (圖書管理員) - *核心大腦*
-*   **職責**: **Entropy Reduction (熵減與歸檔)**
-*   **任務**:
-    *   **Rolling Memory**: 維護每個 Area 的長期記憶摘要。
-    *   **Auto-Classification**: 基於 L1-L3 架構自動歸類。
-    *   **Tag Renovation**: 定期修剪過度生長的標籤叢林。
+### 解答：主動治理 (Active Governance)
 
-### 3.3 The Coach (教練)
-*   **職責**: **Executive Function (執行控制與心理閉環)**
-*   **任務**:
-    *   **Approval**: 審核 Librarian 的重大變更提案 (Proposals)。
-    *   **Psychological Closure**: 透過晨報與晚報，確保用戶對系統狀態有掌控感 (Sense of Control)，消除睡前焦慮。
+Zentropy 的核心假設：**只有「主動治理」才能對抗熵增。**
+
+系統必須像一個訓練有素的幕僚團隊，不只「儲存」資料，而是主動進行：
+
+1. **聚合 (Aggregation)**：將碎片化的輸入拼湊成完整敘事
+2. **定位 (Triangulation)**：識別資訊屬於你的哪個角色、哪個專案
+3. **歸位 (Transition)**：根據事務的急迫性與性質，放入正確的狀態抽屜
 
 ---
 
-## 4. 目標用戶 (Target Audience)
+## 2. 目標用戶：一人多角的營運者
 
-Zentropy 專為 **"High-Context Individuals" (高語境個體)** 設計：
-*   **Founders**: 同時身兼產品經理、募資者與團隊領袖。
-*   **Creators**: 同時處理靈感輸入與作品輸出。
-*   **Polymaths**: 在不同專業領域間頻繁切換身分的人。
+### 核心 Persona
 
-他們需要的不是更多功能，而是**更少的操作**與**更高的訊噪比**。
+> **同時扮演多重角色、手上跑 3+ 個平行事務線、沒有專職助理或 PM 的人。**
+
+他們最大的痛點不是「缺功能」，而是：
+
+- **腦中同時跑太多事，怕漏掉**
+- **沒時間整理資訊，但不整理就失控**
+- **需要有人幫他看全局、抓衝突**
+
+### 具體用戶畫像
+
+| 類型 | 典型樣貌 | 核心痛點 |
+|:---|:---|:---|
+| **微型創業者** | 1-5 人團隊負責人，同時管產品、財務、業務 | 沒有 PM 幫他兜底，事情掉了沒人接 |
+| **斜槓工作者** | 白天上班、晚上接案或經營副業 | 角色切換時資訊混在一起，公私不分 |
+| **自由工作者** | 同時服務 3+ 個客戶的設計師/開發者/顧問 | 每個客戶一套溝通方式，context 碎片化 |
+| **多重身分者** | 工程師 + 社群經營 + 投資理財 + 家庭 | 生活面向太多，永遠覺得什麼沒處理到 |
+| **AI-Native 建造者** | 用 Cursor/Claude 工作，需要被 AI 讀取的知識庫 | 現有工具無法與 AI 工作流深度整合 |
+
+### 為什麼不是「所有忙碌的人」？
+
+| 維度 | 一般忙碌上班族 | 一人多角的營運者 |
+|:---|:---|:---|
+| 痛點強度 | 中（有組織幫他兜底） | **極高**（沒人幫他兜底） |
+| 付費意願 | 低（公司買單 or 免費工具夠用） | **高**（省下的時間直接 = 收入或生活品質） |
+| Notion/ClickUp 能解決？ | 大部分能 | **不能**——花更多時間設計模板，而非實際工作 |
+| Zentropy 的差異化 | 模糊 | **清晰**——開箱即用的 AI 幕僚團隊 |
+
+---
+
+## 3. 系統本體論 (The System Ontology)
+
+Zentropy 透過三層架構映射用戶的多重角色與資產：
+
+| 層級 | 概念 | 定義 | 範例 |
+|:---|:---|:---|:---|
+| **L1** | **Area (角色)** | **「我是誰？」** — 長期身分認同與責任邊界，也是隱私隔離的容器。 | `工程師@公司`、`創辦人@副業`、`個人生活` |
+| **L2** | **Product (資產)** | **「我在經營什麼？」** — 具備產出價值或需持續維護的資產實體。 | `後端系統`、`健康管理`、`Q3 財報` |
+| **L3** | **Topic (性質)** | **「這是什麼類型的事？」** — 行動類型的聚類屬性。 | `功能開發`、`Bug 修復`、`策略規劃`、`例行檢查` |
+
+這套架構的核心價值：**讓你的每個角色互不干擾，但又能在需要時交叉引用。**
 
 ---
 
-## 5. 成功指標 (Success Metrics)
+## 4. 虛擬幕僚鐵三角 (The Agent Triangle)
 
-1.  **Zero Manual Sorting**: 用戶不再需要手動拖拉檔案或整理標籤。
-2.  **Identity Separation**: 在工作時完全不被家庭瑣事打擾，反之亦然。
-3.  **Active Recall**: 系統能在用戶進行某項任務時，主動推送相關的歷史記憶（而非讓用戶去搜尋）。
+Zentropy 的核心差異化：不是給你更多功能，而是給你**三位 AI 幕僚**。
+
+### 4.1 The Gatekeeper (守門人) — 你的收件助理
+
+- **職責**：NLU 感知與初步解析
+- **運作**：24 小時待命，接收來自文字、語音、照片的碎片化輸入
+- **價值**：你只管「丟進來」，它負責理解你在說什麼、分到哪個角色、判斷緊急程度
+- **解決的痛點**：不用花時間思考「這個該放哪裡」
+
+### 4.2 The Librarian (圖書管理員) — 你的檔案專員
+
+- **職責**：熵減與智慧歸檔
+- **運作**：
+  - **Rolling Memory**：維護每個角色 (Area) 的長期記憶摘要
+  - **Auto-Classification**：基於 L1-L3 架構自動歸類
+  - **Cross-Reference**：自動檢索並推薦相關的歷史資訊
+- **價值**：資訊自動歸位，再也不會「我記得有這份資料但找不到」
+- **解決的痛點**：不用花時間整理，但資訊永遠井然有序
+
+### 4.3 The Coach (教練) — 你的營運總監
+
+- **職責**：全局監控與心理閉環
+- **運作**：
+  - **衝突偵測**：掃描行事曆與任務，預警時間衝突或資源撞車
+  - **晨報 / 晚報**：每天兩次主動摘要，確保你對全局有掌控感
+  - **審核機制**：重大變更需你確認，系統不會擅自行動
+- **價值**：你不用自己「盯全局」，有人幫你看著
+- **解決的痛點**：消除「是不是忘了什麼」的睡前焦慮
 
 ---
 
-## 6. MCP 產品定位 (MCP Product Positioning)
+## 5. 競品定位
 
-Zentropy 是一個 **"Headless Governance Protocol" (無頭治理協議)**。
-它不僅是一個 App，更是一套透過 MCP (Model Context Protocol) 為所有 AI Agents 提供「上下文」與「治理能力」的底層系統。
+| | Notion | ClickUp | Zentropy |
+|:---|:---|:---|:---|
+| **核心理念** | 你來搭建系統 | 我給你所有功能 | **AI 幫你營運** |
+| **上手成本** | 高（空白畫布焦慮） | 中（功能過載） | **低**（語音/文字丟進來就好） |
+| **AI 角色** | 輔助寫作 | 輔助排程 | **主動管理**（分類、歸檔、預警） |
+| **最適合** | 喜歡建系統的人 | 有 PM 的團隊 | **沒時間建系統的多角色營運者** |
+| **關鍵差異** | 被動容器 | 被動容器 + 自動化 | **主動治理 + 心理閉環** |
 
-**Vision**: To be the **"Operating System for Personal Agency"** in the AI era.
-在 AI 時代，個人不再需要管理檔案，而是管理「意圖」與「資產」。Zentropy 是這個新秩序的 Kernel。
+---
+
+## 6. 核心價值主張
+
+### 一句話
+
+> **「你的 AI 營運長——讓一人多角的你，擁有三人幕僚團隊的掌控力。」**
+
+### 三個承諾
+
+1. **Zero Manual Sorting**：你不再需要手動拖拉檔案或整理標籤。丟進來，系統自己歸位。
+2. **Identity Separation**：你的每個角色互不干擾。工作時不被私事打斷，反之亦然。
+3. **Active Recall**：系統在你處理某件事時，主動推送相關的歷史脈絡——而非讓你自己去搜尋。
+
+### 成功指標
+
+- 用戶每天花在「整理」上的時間 < 5 分鐘
+- 「怕漏掉什麼」的焦慮感顯著降低（NPS / 用戶訪談驗證）
+- 跨角色的資訊檢索時間減少 80%
 
 ---
 
-## 7. 生態系整合 (Ecosystem Integration via MCP)
+## 7. MCP 產品定位：無頭治理協議
 
-Zentropy 不試圖取代你的所有工具，而是透過 **MCP (Model Context Protocol)** 成為它們的 **"Context Backbone"**：
+Zentropy 不僅是一個 App，更是一套透過 **MCP (Model Context Protocol)** 為所有 AI Agents 提供上下文與治理能力的底層系統。
 
-| Role | Function | Example Scenario |
-| :--- | :--- | :--- |
-| **Context Provider** | 透過 `zentropy://` URI 暴露資料 | 在 Cursor 中寫代碼時，AI 自動讀取 Zentropy 裡的 `009_Librarian_Engine_Spec.md` 作為參考。 |
-| **Action Handler** | 提供 `capture_thought` 等 Tools | 在 Claude Desktop 裡聊出一個 Idea，一鍵呼叫 Tool 存回 Zentropy 的 Inbox。 |
-| **Governance Engine** | 提供 `reorganize` 能力 | 讓外部 Agent 也能觸發 Zentropy 的整理邏輯，維護知識整潔。 |
+| 角色 | 功能 | 情境範例 |
+|:---|:---|:---|
+| **Context Provider** | 透過 `zentropy://` URI 暴露資料 | 在 Cursor 中寫程式時，AI 自動讀取 Zentropy 的 Spec 文件作為參考 |
+| **Action Handler** | 提供 `capture_thought` 等 Tools | 在 Claude Desktop 聊出一個 Idea，一鍵存回 Zentropy 的 Inbox |
+| **Governance Engine** | 提供 `reorganize` 能力 | 讓外部 Agent 也能觸發 Zentropy 的整理邏輯，維護知識整潔 |
+
+**Vision**：To be the **"Operating System for Personal Agency"** in the AI era.
 
 ---
-*Zentropy 不是另一個筆記軟體，它是你數位人生的 **Headless Backend**。*
 
-## 8. 目標用戶 (Target Audience) - AI-Native 擴展
+## 8. 商業模式 (The Entropy Series)
 
-Zentropy 專為 **"High-Context Individuals" (高語境個體)** 設計，特別是那些已經在使用 AI 輔助工作的開拓者：
-*   **AI-Native Builders**: 習慣使用 Cursor/Claude 寫程式，需要一個能「被 AI 讀取」的 Spec 庫。
-*   **Founders**: 同時身兼產品經理、募資者與團隊領袖，需要 L1 Area 來隔離不同身分的焦慮。
-*   **Polymaths**: 在不同專業領域間頻繁切換身分的人。
-*   **PM/Designers**: 需要管理大量非結構化靈感，並轉化為結構化資產的人。
+Zentropy 採用 **"Governance-as-a-Service"** 模式，依據用戶需要的秩序量級收費：
 
-## 9. 商業模式 (The Entropy Series)
+| 方案 | 定價 | 內容 |
+|:---|:---|:---|
+| **Atom (原子)** | Free | 基礎建設。每月 50 則整理、單一角色、文字輸入 |
+| **Fusion (融合)** | Paid | 無限能量。無限整理、多重角色、多模態輸入、行事曆整合 |
+| **Nexus (樞紐)** | Premium | 生態中樞。多人協作、Headless MCP 支援、API 存取 |
 
-Zentropy 採用 **"Governance-as-a-Service"** 模式，依據用戶需要的「秩序量級」收費：
+---
 
-1.  **Atom (原子)** - *Free*: 基礎建設。每月限量 50 則整理，單一身分。
-2.  **Fusion (融合)** - *Paid*: 無限能量。無限整理、多重身分、多模態輸入與 Slack/Calendar 整合。
-3.  **Nexus (樞紐)** - *Premium*: 生態中樞。多人協作、Headless MCP 支援與 API 存取。
+## 9. 近期發展優先序
+
+1. **驗證 TA**：訪談 5-10 位符合 Persona 的用戶，確認「怕漏掉」和「沒時間整理」是前三大痛點
+2. **MVP 聚焦 Gatekeeper**：語音/文字 → 結構化，這是最小可驗證的核心價值
+3. **Vertical 深耕**：先選一個垂直場景（如自由接案者管多客戶）做到極致，再擴展
+
+---
+
+*Zentropy 不是另一個筆記軟體，它是你數位人生的 **AI 營運長**。*
