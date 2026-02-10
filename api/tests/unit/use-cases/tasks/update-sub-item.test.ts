@@ -13,8 +13,20 @@ vi.mock('@/lib/db', () => ({
     task: {
       update: vi.fn(),
     },
+    subTask: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
   },
 }))
+
+// Mock sub-task-sync
+vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
+  syncSubTasksToJson: vi.fn(),
+  getSubTasksMeta: vi.fn(),
+}))
+
+import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -35,8 +47,6 @@ describe('UpdateSubItemUseCase', () => {
   beforeEach(() => {
     useCase = new UpdateSubItemUseCase(mockRepository as any)
     vi.clearAllMocks()
-    mockFindById.mockReset()
-    vi.mocked(prisma.task.update).mockReset()
   })
 
   describe('驗證邏輯', () => {
@@ -97,25 +107,8 @@ describe('UpdateSubItemUseCase', () => {
     })
 
     it('應該拋出錯誤當 Sub-item 不存在', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      mockFindById.mockResolvedValue(existingTask)
+      mockFindById.mockResolvedValue({ id: 'task-123' })
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue(null)
 
       await expect(
         useCase.execute({
@@ -129,36 +122,27 @@ describe('UpdateSubItemUseCase', () => {
   })
 
   describe('成功情況', () => {
-    it('應該成功更新 sub-item 的 completed 狀態', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [
-          {
-            id: 'sub-1',
-            content: 'Sub-item 1',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 0,
-          },
-        ],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+    const existingTask = {
+      id: 'task-123',
+      userId: 'user-123',
+      productId: 'product-123',
+      content: 'Test Task',
+      status: 'ACTIVE',
+    }
 
+    const now = new Date()
+
+    it('應該成功更新 sub-item 的 completed 狀態', async () => {
       mockFindById.mockResolvedValue(existingTask)
-      vi.mocked(prisma.task.update).mockResolvedValue(existingTask as any)
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue({
+        id: 'sub-1', content: 'Sub-item 1', completed: false,
+        created_at: now, completed_at: null, order: 0,
+      } as any)
+      vi.mocked(prisma.subTask.update).mockResolvedValue({
+        id: 'sub-1', content: 'Sub-item 1', completed: true,
+        created_at: now, completed_at: now, order: 0,
+      } as any)
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 1, completionRate: 1 })
 
       const result = await useCase.execute({
         taskId: 'task-123',
@@ -173,39 +157,20 @@ describe('UpdateSubItemUseCase', () => {
       expect(result.meta.completionRate).toBe(1)
       expect(result.taskCompleted).toBe(true)
       expect(result.message).toBe('Sub-item updated successfully')
-      expect(prisma.task.update).toHaveBeenCalled()
+      expect(syncSubTasksToJson).toHaveBeenCalledWith('task-123')
     })
 
     it('應該成功更新 sub-item 的 content', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [
-          {
-            id: 'sub-1',
-            content: 'Old content',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 0,
-          },
-        ],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
       mockFindById.mockResolvedValue(existingTask)
-      vi.mocked(prisma.task.update).mockResolvedValue(existingTask as any)
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue({
+        id: 'sub-1', content: 'Old content', completed: false,
+        created_at: now, completed_at: null, order: 0,
+      } as any)
+      vi.mocked(prisma.subTask.update).mockResolvedValue({
+        id: 'sub-1', content: 'New content', completed: false,
+        created_at: now, completed_at: null, order: 0,
+      } as any)
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 0, completionRate: 0 })
 
       const result = await useCase.execute({
         taskId: 'task-123',
@@ -218,43 +183,16 @@ describe('UpdateSubItemUseCase', () => {
     })
 
     it('應該正確計算 taskCompleted 狀態', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [
-          {
-            id: 'sub-1',
-            content: 'Item 1',
-            completed: true,
-            createdAt: new Date(),
-            completedAt: new Date(),
-            order: 0,
-          },
-          {
-            id: 'sub-2',
-            content: 'Item 2',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 1,
-          },
-        ],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
       mockFindById.mockResolvedValue(existingTask)
-      vi.mocked(prisma.task.update).mockResolvedValue(existingTask as any)
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue({
+        id: 'sub-2', content: 'Item 2', completed: false,
+        created_at: now, completed_at: null, order: 1,
+      } as any)
+      vi.mocked(prisma.subTask.update).mockResolvedValue({
+        id: 'sub-2', content: 'Item 2', completed: true,
+        created_at: now, completed_at: now, order: 1,
+      } as any)
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 2, completed: 2, completionRate: 1 })
 
       const result = await useCase.execute({
         taskId: 'task-123',
@@ -270,35 +208,16 @@ describe('UpdateSubItemUseCase', () => {
     })
 
     it('應該正確處理未完成狀態', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [
-          {
-            id: 'sub-1',
-            content: 'Item 1',
-            completed: true,
-            createdAt: new Date(),
-            completedAt: new Date(),
-            order: 0,
-          },
-        ],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
       mockFindById.mockResolvedValue(existingTask)
-      vi.mocked(prisma.task.update).mockResolvedValue(existingTask as any)
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue({
+        id: 'sub-1', content: 'Item 1', completed: true,
+        created_at: now, completed_at: now, order: 0,
+      } as any)
+      vi.mocked(prisma.subTask.update).mockResolvedValue({
+        id: 'sub-1', content: 'Item 1', completed: false,
+        created_at: now, completed_at: null, order: 0,
+      } as any)
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 0, completionRate: 0 })
 
       const result = await useCase.execute({
         taskId: 'task-123',

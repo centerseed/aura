@@ -106,18 +106,18 @@ export async function POST(
     // 4. 構建上下文資訊
     const currentTopics = [...new Set(tasks.map((t) => t.topic?.name).filter((name): name is string => Boolean(name)))];
 
-    // 構建 Tasks 資訊 (給 AI)
-    const tasksData = tasks.map((t) => {
+    // 構建 Tasks 資訊 (給 AI) — 從 sub_tasks 表讀取
+    const tasksData = await Promise.all(tasks.map(async (t) => {
       const aiAnalysis = t.ai_analysis as { narrative?: string } | null;
-      const subItems = (t as any).sub_items as Array<{
-        id: string;
-        content: string;
-        completed: boolean;
-      }> | null;
 
-      // 分離已完成和未完成的 sub_items
-      const completedSubItems = subItems?.filter(s => s.completed) || [];
-      const pendingSubItems = subItems?.filter(s => !s.completed) || [];
+      // 從 sub_tasks 表讀取（取代 JSON）
+      const subTaskRows = await prisma.subTask.findMany({
+        where: { task_id: t.id, deleted_at: null },
+        orderBy: { order: 'asc' },
+      });
+
+      const completedSubItems = subTaskRows.filter(s => s.completed);
+      const pendingSubItems = subTaskRows.filter(s => !s.completed);
 
       return {
         id: t.id,
@@ -126,12 +126,11 @@ export async function POST(
         current_topic: t.topic?.name || "未分類",
         status: t.status,
         current_due_date: t.due_date?.toISOString() || null,
-        // ✅ 新增：sub_items 資訊
-        has_sub_items: (subItems?.length || 0) > 0,
+        has_sub_items: subTaskRows.length > 0,
         completed_sub_items: completedSubItems.map(s => s.content),
         pending_sub_items: pendingSubItems.map(s => ({ id: s.id, content: s.content })),
       };
-    });
+    }));
 
     // 構建 Milestones 資訊 (給 AI)
     const milestonesData = milestones.map((m) => ({
@@ -188,24 +187,19 @@ export async function POST(
         displayTitle = displayTitle.slice(0, 77) + "...";
       }
 
-      // 處理 sub_items (與 L112-120 相同邏輯)
-      const subItems = (t as any).sub_items as Array<{
-        id: string;
-        content: string;
-        completed: boolean;
-      }> | null;
-      const completedSubItems = subItems?.filter(s => s.completed) || [];
-      const pendingSubItems = subItems?.filter(s => !s.completed) || [];
+      // 從 tasksData 取得已查詢的 sub_tasks 資料（避免重複查詢）
+      const taskData = tasksData.find(td => td.id === t.id);
 
       return {
         id: t.id,
         title: displayTitle,
         current_topic: t.topic?.name || "未分類",
         current_due_date: t.due_date?.toISOString() || null,
-        c_role: consolidationMap.get(t.id), // 新增: 標記是 parent 或 sub
-        // ✅ 新增: sub_items 資訊（給前端計算總項目數用）
-        pending_sub_items: pendingSubItems.map(s => ({ id: s.id, content: s.content })),
-        completed_sub_items: completedSubItems.map(s => ({ id: s.id, content: s.content })),
+        c_role: consolidationMap.get(t.id),
+        pending_sub_items: taskData?.pending_sub_items || [],
+        completed_sub_items: (taskData?.completed_sub_items || []).map(c =>
+          typeof c === 'string' ? { id: '', content: c } : c
+        ),
       };
     });
 

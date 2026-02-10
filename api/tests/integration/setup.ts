@@ -61,6 +61,11 @@ export async function cleanupIntegrationTests() {
       return // 沒有需要清理的資料
     }
 
+    // 0. 刪除所有測試用戶的 sub_tasks
+    await prisma.subTask.deleteMany({
+      where: { user_id: { in: testUserIds } },
+    })
+
     // 1. 刪除所有測試用戶的任務（包含關聯的 sub-items 和 references）
     await prisma.task.deleteMany({
       where: { user_id: { in: testUserIds } },

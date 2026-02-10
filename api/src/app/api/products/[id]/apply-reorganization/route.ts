@@ -4,6 +4,7 @@ import { authenticateRequest } from "@/lib/auth-middleware";
 import { isValidUUID } from "@/domain/constants/validation";
 import type { Reference } from "@/domain/entities/task.entity";
 import { mergeReferences } from "@/application/use-cases/merge-references";
+import { syncSubTasksToJson } from "@/infrastructure/repositories/sub-task-sync";
 
 interface ReorganizeProposal {
   product_id: string;
@@ -165,30 +166,29 @@ export async function POST(
             },
           });
 
-          // ✅ 保留 parent task 原有的 sub_items（包含已完成的項目）
-          const existingSubItems = ((parentTask as any).sub_items as Array<{
-            id: string;
-            content: string;
-            completed: boolean;
-            created_at: string;
-            completed_at: string | null;
-            order: number;
-          }>) || [];
+          // ✅ 從 sub_tasks 表取得目前最大 order
+          const maxOrderResult = await tx.subTask.aggregate({
+            where: { task_id: consolidation.parent_task_id, deleted_at: null },
+            _max: { order: true },
+          });
+          const startOrder = (maxOrderResult._max.order ?? -1) + 1;
 
-          // 計算新 sub_items 的起始 order（接在原有的後面）
-          const startOrder = existingSubItems.length > 0
-            ? Math.max(...existingSubItems.map(s => s.order ?? 0)) + 1
-            : 0;
-
-          // 構建新的 sub_items 陣列（來自被整合的 tasks）
-          const newSubItems = subTasks.map((subTask, idx) => ({
-            id: subTask.id, // 使用原 Task ID 作為 sub-item ID
-            content: subTask.content,
-            completed: false,
-            created_at: new Date().toISOString(),
-            completed_at: null,
-            order: startOrder + idx,
-          }));
+          // 在 sub_tasks 表建立新記錄（來自被整合的 tasks）
+          for (let idx = 0; idx < subTasks.length; idx++) {
+            const subTask = subTasks[idx];
+            await tx.subTask.create({
+              data: {
+                id: crypto.randomUUID(),
+                task_id: consolidation.parent_task_id,
+                user_id: userId,
+                content: subTask.content,
+                completed: false,
+                order: startOrder + idx,
+                source: 'reorganize',
+                original_task_id: subTask.id,
+              },
+            });
+          }
 
           // ✅ 合併所有 sub tasks 的 references 到 parent task（使用統一去重函數）
           const parentReferences = ((parentTask as any).references as Reference[]) || [];
@@ -210,23 +210,19 @@ export async function POST(
             ? new Date(Math.max(...allDueDates.map(d => d.getTime())))
             : null;
 
-          // ✅ 合併：原有的 sub_items（包含已完成狀態）+ 新的 sub_items
-          const enrichedSubItems = [...existingSubItems, ...newSubItems];
-
-          // 更新 parent task
+          // 更新 parent task（不直接寫 sub_items，由 syncSubTasksToJson 處理）
           const parentAnalysis = (parentTask.ai_analysis as Record<string, unknown>) || {};
           await tx.task.update({
             where: { id: consolidation.parent_task_id },
             data: {
               content: consolidation.consolidated_title,
-              due_date: latestDueDate, // ✅ 取所有被整合 tasks 中最晚的 due_date
-              sub_items: enrichedSubItems as any,
+              due_date: latestDueDate,
               references: mergedReferences as any,
               ai_analysis: {
                 ...parentAnalysis,
                 consolidation_reasoning: consolidation.reasoning,
                 consolidated_at: new Date().toISOString(),
-                consolidated_task_count: validSubTaskIds.length + 1, // parent + subs
+                consolidated_task_count: validSubTaskIds.length + 1,
               },
             },
           });
@@ -256,15 +252,26 @@ export async function POST(
         }
       }
 
+      // 收集需要 sync 的 parent task IDs
+      const parentTaskIds = (proposal.task_consolidations || [])
+        .map(c => c.parent_task_id)
+        .filter(id => isValidUUID(id));
+
       return {
         updated_topics: proposal.proposed_clusters.length,
         updated_tasks: updatedTasksCount,
         consolidated_tasks: consolidatedCount,
+        parentTaskIds,
       };
     }, {
-      maxWait: 30000, // 最多等待 30 秒獲取交易鎖
-      timeout: 30000,  // 交易執行超時 30 秒
+      maxWait: 30000,
+      timeout: 30000,
     });
+
+    // 雙寫：同步 sub_tasks → JSON（在 transaction 外執行）
+    for (const taskId of result.parentTaskIds) {
+      await syncSubTasksToJson(taskId);
+    }
 
     // 更新評估 Log 狀態為 APPLIED (如果有提供 logId)
     if (proposal.logId) {

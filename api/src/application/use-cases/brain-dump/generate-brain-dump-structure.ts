@@ -227,7 +227,7 @@ export class GenerateBrainDumpStructureUseCase {
           rt.id::text as task_id,
           rt.content as task_content,
           rt.status::text as task_status,
-          rt.sub_items as task_sub_items,
+          NULL::json as task_sub_items,
           rt.updated_at as task_updated_at,
           rt.due_date as task_due_date,
           NULL::text as milestone_id,
@@ -385,15 +385,47 @@ export class GenerateBrainDumpStructureUseCase {
 
         if (row.task_id && row.task_content) {
           if (!product.tasks.some(t => t.id === row.task_id)) {
-            const rawSubItems = (row.task_sub_items || []) as Array<any>
             product.tasks.push({
               id: row.task_id,
               content: row.task_content,
               status: row.task_status || 'INBOX',
-              sub_items: rawSubItems.slice(0, 2),
+              sub_items: [], // populated below from sub_tasks table
               updated_at: row.task_updated_at || new Date(),
               due_date: row.task_due_date,
             })
+          }
+        }
+      }
+    }
+
+    // Batch query sub_tasks for all collected task IDs
+    const allTaskIds: string[] = []
+    for (const area of areaMap.values()) {
+      for (const product of area.products.values()) {
+        for (const task of product.tasks) {
+          allTaskIds.push(task.id)
+        }
+      }
+    }
+
+    if (allTaskIds.length > 0) {
+      const subTasks = await prisma.subTask.findMany({
+        where: { task_id: { in: allTaskIds }, deleted_at: null },
+        orderBy: { order: 'asc' },
+        select: { task_id: true, id: true, content: true, completed: true },
+      })
+
+      const subTasksByTaskId = new Map<string, typeof subTasks>()
+      for (const st of subTasks) {
+        const list = subTasksByTaskId.get(st.task_id) || []
+        list.push(st)
+        subTasksByTaskId.set(st.task_id, list)
+      }
+
+      for (const area of areaMap.values()) {
+        for (const product of area.products.values()) {
+          for (const task of product.tasks) {
+            task.sub_items = (subTasksByTaskId.get(task.id) || []).slice(0, 2)
           }
         }
       }

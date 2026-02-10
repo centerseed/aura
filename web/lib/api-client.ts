@@ -272,6 +272,8 @@ export const API = {
       add: (taskId: string, data: any) => postAPI(`/api/tasks/${taskId}/sub-items`, data),
       update: (taskId: string, subItemId: string, data: any) => patchAPI(`/api/tasks/${taskId}/sub-items/${subItemId}`, data),
       delete: (taskId: string, subItemId: string) => deleteAPI(`/api/tasks/${taskId}/sub-items/${subItemId}`),
+      move: (taskId: string, subItemId: string, targetTaskId: string) => postAPI(`/api/tasks/${taskId}/sub-items/${subItemId}/move`, { target_task_id: targetTaskId }),
+      promote: (taskId: string, subItemId: string) => postAPI(`/api/tasks/${taskId}/sub-items/${subItemId}/promote`, {}),
     },
 
     // 參考資料

@@ -2,7 +2,7 @@
  * AddSubItemUseCase - 新增任務子項目
  *
  * Application Layer Use Case
- * 處理新增任務 sub-item 的業務邏輯
+ * 寫入 sub_tasks 表 + 雙寫 JSON（過渡期相容）
  */
 
 import type {
@@ -11,6 +11,7 @@ import type {
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
+import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -66,57 +67,51 @@ export class AddSubItemUseCase {
       throw new NotFoundException('Task')
     }
 
-    // 3. 獲取現有的 sub-items
-    const existingSubItems = (task.subItems || []).map((item) => ({
-      id: item.id,
-      content: item.content,
-      completed: item.completed,
-      created_at: this.safeToISOString(item.createdAt) || new Date().toISOString(),
-      completed_at: this.safeToISOString(item.completedAt),
-      order: item.order,
-    }))
+    // 3. 取得目前最大 order
+    const maxOrderResult = await prisma.subTask.aggregate({
+      where: { task_id: request.taskId, deleted_at: null },
+      _max: { order: true },
+    })
+    const nextOrder = (maxOrderResult._max.order ?? -1) + 1
 
-    // 4. 創建新的 sub-item
-    const now = new Date().toISOString()
-    const newSubItem: SubItemData = {
-      id: crypto.randomUUID(),
-      content: request.content.trim(),
-      completed: false,
-      created_at: now,
-      completed_at: null,
-      order: existingSubItems.length, // 新增在最後
-    }
+    // 4. 建立 sub_task 記錄
+    const now = new Date()
+    const newId = crypto.randomUUID()
 
-    // 5. 更新資料庫
-    const updatedSubItems = [...existingSubItems, newSubItem]
-
-    await prisma.task.update({
-      where: { id: request.taskId },
+    await prisma.subTask.create({
       data: {
-        sub_items: updatedSubItems as any,
-        updated_at: new Date(),
+        id: newId,
+        task_id: request.taskId,
+        user_id: request.userId,
+        content: request.content.trim(),
+        completed: false,
+        order: nextOrder,
+        source: 'user',
       },
     })
 
+    // 5. 雙寫：同步到 JSON
+    await syncSubTasksToJson(request.taskId)
+
     // 6. 計算統計資訊
-    const total = updatedSubItems.length
-    const completedCount = updatedSubItems.filter((item) => item.completed).length
-    const completionRate = total > 0 ? completedCount / total : 0
+    const meta = await getSubTasksMeta(request.taskId)
+
+    const newSubItem: SubItemData = {
+      id: newId,
+      content: request.content.trim(),
+      completed: false,
+      created_at: now.toISOString(),
+      completed_at: null,
+      order: nextOrder,
+    }
 
     return {
       subItem: newSubItem,
-      meta: {
-        total,
-        completed: completedCount,
-        completionRate,
-      },
+      meta,
       message: 'Sub-item added successfully',
     }
   }
 
-  /**
-   * 驗證請求資料
-   */
   private validateRequest(request: AddSubItemRequest): void {
     if (!request.taskId) {
       throw new ValidationException('Task ID is required', 'taskId')
@@ -132,16 +127,5 @@ export class AddSubItemUseCase {
         'content'
       )
     }
-  }
-
-  /**
-   * 安全的日期轉換為 ISO 字串
-   * 處理 Invalid Date 或 null/undefined 的情況
-   */
-  private safeToISOString(date: Date | null | undefined): string | null {
-    if (!date) return null
-    if (!(date instanceof Date)) return null
-    if (isNaN(date.getTime())) return null
-    return date.toISOString()
   }
 }

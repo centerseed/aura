@@ -2,13 +2,14 @@
  * PromoteSubItemUseCase - 將 sub-item 升級為獨立任務
  *
  * Application Layer Use Case
- * 處理將 sub-item 升級為獨立 Task 的業務邏輯
+ * 從 sub_tasks 表讀取、soft-delete、建立新 Task + 雙寫 JSON（過渡期相容）
  */
 
 import type { ITaskRepository } from '@/domain/interfaces/task-repository'
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
+import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -77,53 +78,33 @@ export class PromoteSubItemUseCase {
       throw new NotFoundException('Parent task')
     }
 
-    // 3. 在 sub_items 中找到目標 sub-item
-    const existingSubItems = (parentTask.subItems || []).map((item) => ({
-      id: item.id,
-      content: item.content,
-      completed: item.completed,
-      created_at: this.safeToISOString(item.createdAt) || new Date().toISOString(),
-      completed_at: this.safeToISOString(item.completedAt),
-      order: item.order,
-      original_task_id: (item as any).original_task_id,
-    }))
+    // 3. 從 sub_tasks 表查詢目標
+    const subTask = await prisma.subTask.findFirst({
+      where: { id: request.subItemId, task_id: request.taskId, deleted_at: null },
+    })
 
-    const targetSubItem = existingSubItems.find(
-      (item) => item.id === request.subItemId
-    )
-
-    if (!targetSubItem) {
+    if (!subTask) {
       throw new NotFoundException('Sub-item')
     }
 
     // 4. 準備新 Task 資料
     const now = new Date()
     const newTaskId = crypto.randomUUID()
-    const newTaskStatus = targetSubItem.completed ? 'ARCHIVE' : 'INBOX'
-    const newTaskContent = this.truncateContent(targetSubItem.content)
+    const newTaskStatus = subTask.completed ? 'ARCHIVE' : 'INBOX'
+    const newTaskContent = this.truncateContent(subTask.content)
 
-    // 5. 準備 ai_analysis 用於追蹤來源
     const aiAnalysis = {
       promoted_from: {
         parent_task_id: request.taskId,
         sub_item_id: request.subItemId,
-        ...(targetSubItem.original_task_id && {
-          original_task_id: targetSubItem.original_task_id,
+        ...(subTask.original_task_id && {
+          original_task_id: subTask.original_task_id,
         }),
       },
     }
 
-    // 6. 從 parent task 移除 sub-item 並重新排序
-    const updatedSubItems = existingSubItems
-      .filter((item) => item.id !== request.subItemId)
-      .map((item, index) => ({
-        ...item,
-        order: index,
-      }))
-
-    // 7. 使用 transaction 確保原子性
+    // 5. Transaction: 建立新 Task + soft-delete sub_task
     const [createdTask] = await prisma.$transaction([
-      // 創建新 Task
       prisma.task.create({
         data: {
           id: newTaskId,
@@ -139,20 +120,34 @@ export class PromoteSubItemUseCase {
           updated_at: now,
         },
       }),
-      // 更新 parent Task (移除 sub-item)
-      prisma.task.update({
-        where: { id: request.taskId },
-        data: {
-          sub_items: updatedSubItems as any,
-          updated_at: now,
-        },
+      prisma.subTask.update({
+        where: { id: request.subItemId },
+        data: { deleted_at: now },
       }),
     ])
 
+    // 6. 重新排序剩餘 sub_tasks
+    const remaining = await prisma.subTask.findMany({
+      where: { task_id: request.taskId, deleted_at: null },
+      orderBy: { order: 'asc' },
+    })
+
+    if (remaining.length > 0) {
+      await prisma.$transaction(
+        remaining.map((st, index) =>
+          prisma.subTask.update({
+            where: { id: st.id },
+            data: { order: index },
+          })
+        )
+      )
+    }
+
+    // 7. 雙寫：同步到 JSON
+    await syncSubTasksToJson(request.taskId)
+
     // 8. 計算統計資訊
-    const total = updatedSubItems.length
-    const completedCount = updatedSubItems.filter((item) => item.completed).length
-    const completionRate = total > 0 ? completedCount / total : 0
+    const meta = await getSubTasksMeta(request.taskId)
 
     return {
       newTask: {
@@ -166,18 +161,11 @@ export class PromoteSubItemUseCase {
       },
       parentTaskId: request.taskId,
       removedSubItemId: request.subItemId,
-      meta: {
-        total,
-        completed: completedCount,
-        completionRate,
-      },
+      meta,
       message: `Sub-item "${newTaskContent}" 已升級為獨立任務`,
     }
   }
 
-  /**
-   * 驗證請求資料
-   */
   private validateRequest(request: PromoteSubItemRequest): void {
     if (!request.taskId) {
       throw new ValidationException('Task ID is required', 'taskId')
@@ -188,25 +176,11 @@ export class PromoteSubItemUseCase {
     }
   }
 
-  /**
-   * 截斷內容以符合 Task 標題長度限制
-   */
   private truncateContent(content: string): string {
     const trimmed = content.trim()
     if (trimmed.length <= PromoteSubItemUseCase.MAX_TASK_CONTENT_LENGTH) {
       return trimmed
     }
     return trimmed.substring(0, PromoteSubItemUseCase.MAX_TASK_CONTENT_LENGTH - 3) + '...'
-  }
-
-  /**
-   * 安全的日期轉換為 ISO 字串
-   * 處理 Invalid Date 或 null/undefined 的情況
-   */
-  private safeToISOString(date: Date | null | undefined): string | null {
-    if (!date) return null
-    if (!(date instanceof Date)) return null
-    if (isNaN(date.getTime())) return null
-    return date.toISOString()
   }
 }

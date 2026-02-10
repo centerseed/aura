@@ -13,8 +13,22 @@ vi.mock('@/lib/db', () => ({
     task: {
       update: vi.fn(),
     },
+    subTask: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
+    $transaction: vi.fn(),
   },
 }))
+
+// Mock sub-task-sync
+vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
+  syncSubTasksToJson: vi.fn(),
+  getSubTasksMeta: vi.fn(),
+}))
+
+import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -35,8 +49,6 @@ describe('DeleteSubItemUseCase', () => {
   beforeEach(() => {
     useCase = new DeleteSubItemUseCase(mockRepository as any)
     vi.clearAllMocks()
-    mockFindById.mockReset()
-    vi.mocked(prisma.task.update).mockReset()
   })
 
   describe('驗證邏輯', () => {
@@ -73,25 +85,8 @@ describe('DeleteSubItemUseCase', () => {
     })
 
     it('應該拋出錯誤當 Sub-item 不存在', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      mockFindById.mockResolvedValue(existingTask)
+      mockFindById.mockResolvedValue({ id: 'task-123' })
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue(null)
 
       await expect(
         useCase.execute({
@@ -104,44 +99,25 @@ describe('DeleteSubItemUseCase', () => {
   })
 
   describe('成功情況', () => {
-    it('應該成功刪除 sub-item', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [
-          {
-            id: 'sub-1',
-            content: 'Item 1',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 0,
-          },
-          {
-            id: 'sub-2',
-            content: 'Item 2',
-            completed: true,
-            createdAt: new Date(),
-            completedAt: new Date(),
-            order: 1,
-          },
-        ],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+    const existingTask = {
+      id: 'task-123',
+      userId: 'user-123',
+      productId: 'product-123',
+      content: 'Test Task',
+      status: 'ACTIVE',
+    }
 
+    it('應該成功刪除 sub-item', async () => {
       mockFindById.mockResolvedValue(existingTask)
-      vi.mocked(prisma.task.update).mockResolvedValue(existingTask as any)
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue({
+        id: 'sub-1', content: 'Item 1', completed: false, order: 0,
+      } as any)
+      vi.mocked(prisma.subTask.update).mockResolvedValue({} as any)
+      vi.mocked(prisma.subTask.findMany).mockResolvedValue([
+        { id: 'sub-2', content: 'Item 2', completed: true, order: 0 },
+      ] as any)
+      vi.mocked(prisma.$transaction).mockResolvedValue([])
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 1, completionRate: 1 })
 
       const result = await useCase.execute({
         taskId: 'task-123',
@@ -154,55 +130,25 @@ describe('DeleteSubItemUseCase', () => {
       expect(result.meta.completed).toBe(1)
       expect(result.meta.completionRate).toBe(1)
       expect(result.message).toBe('Sub-item deleted successfully')
-      expect(prisma.task.update).toHaveBeenCalled()
+      expect(prisma.subTask.update).toHaveBeenCalledWith({
+        where: { id: 'sub-1' },
+        data: { deleted_at: expect.any(Date) },
+      })
+      expect(syncSubTasksToJson).toHaveBeenCalledWith('task-123')
     })
 
-    it('應該重新計算 order', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [
-          {
-            id: 'sub-1',
-            content: 'Item 1',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 0,
-          },
-          {
-            id: 'sub-2',
-            content: 'Item 2',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 1,
-          },
-          {
-            id: 'sub-3',
-            content: 'Item 3',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 2,
-          },
-        ],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
+    it('應該重新排序剩餘 sub_tasks', async () => {
       mockFindById.mockResolvedValue(existingTask)
-      vi.mocked(prisma.task.update).mockResolvedValue(existingTask as any)
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue({
+        id: 'sub-2', content: 'Item 2', completed: false, order: 1,
+      } as any)
+      vi.mocked(prisma.subTask.update).mockResolvedValue({} as any)
+      vi.mocked(prisma.subTask.findMany).mockResolvedValue([
+        { id: 'sub-1', order: 0 },
+        { id: 'sub-3', order: 2 },
+      ] as any)
+      vi.mocked(prisma.$transaction).mockResolvedValue([])
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 2, completed: 0, completionRate: 0 })
 
       await useCase.execute({
         taskId: 'task-123',
@@ -210,63 +156,21 @@ describe('DeleteSubItemUseCase', () => {
         subItemId: 'sub-2',
       })
 
-      expect(prisma.task.update).toHaveBeenCalledWith({
-        where: { id: 'task-123' },
-        data: expect.objectContaining({
-          sub_items: expect.arrayContaining([
-            expect.objectContaining({ id: 'sub-1', order: 0 }),
-            expect.objectContaining({ id: 'sub-3', order: 1 }),
-          ]),
-        }),
-      })
+      expect(prisma.$transaction).toHaveBeenCalled()
     })
 
     it('應該正確計算 completionRate', async () => {
-      const existingTask = {
-        id: 'task-123',
-        userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
-        content: 'Test Task',
-        status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [],
-        subItems: [
-          {
-            id: 'sub-1',
-            content: 'Item 1',
-            completed: true,
-            createdAt: new Date(),
-            completedAt: new Date(),
-            order: 0,
-          },
-          {
-            id: 'sub-2',
-            content: 'Item 2',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 1,
-          },
-          {
-            id: 'sub-3',
-            content: 'Item 3',
-            completed: false,
-            createdAt: new Date(),
-            completedAt: null,
-            order: 2,
-          },
-        ],
-        startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
       mockFindById.mockResolvedValue(existingTask)
-      vi.mocked(prisma.task.update).mockResolvedValue(existingTask as any)
+      vi.mocked(prisma.subTask.findFirst).mockResolvedValue({
+        id: 'sub-2', content: 'Item 2', completed: false, order: 1,
+      } as any)
+      vi.mocked(prisma.subTask.update).mockResolvedValue({} as any)
+      vi.mocked(prisma.subTask.findMany).mockResolvedValue([
+        { id: 'sub-1', order: 0 },
+        { id: 'sub-3', order: 1 },
+      ] as any)
+      vi.mocked(prisma.$transaction).mockResolvedValue([])
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 2, completed: 1, completionRate: 0.5 })
 
       const result = await useCase.execute({
         taskId: 'task-123',

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2 } from "lucide-react";
+import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight } from "lucide-react";
 import type { DrawerStatus } from "@/types";
 import {
   DndContext,
@@ -38,6 +38,8 @@ interface TaskDetailModalProps {
   onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
   onReorderSubItems?: (taskId: string, subItemIds: string[]) => Promise<void>;
   onPromoteSubItem?: (taskId: string, subItemId: string) => Promise<void>;
+  onMoveSubItem?: (sourceTaskId: string, subItemId: string, targetTaskId: string) => Promise<void>;
+  siblingTasks?: { id: string; title: string }[];
   onAddReference?: (taskId: string, type: "url" | "note", content: string, title?: string) => Promise<void>;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onComplete?: (taskId: string) => void;
@@ -52,19 +54,11 @@ interface TaskDetailModalProps {
 function SortableSubItem({
   item,
   onToggle,
-  onEdit,
-  onDelete,
-  onPromote,
-  isEditing,
-  onStartEdit,
+  onOpenDialog,
 }: {
   item: SubItem;
   onToggle: (id: string, completed: boolean) => void;
-  onEdit: (id: string, content: string) => void;
-  onDelete: (id: string) => void;
-  onPromote?: (id: string) => void;
-  isEditing: boolean;
-  onStartEdit: (id: string, content: string) => void;
+  onOpenDialog: (item: SubItem) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -75,8 +69,6 @@ function SortableSubItem({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-
-  const [editContent, setEditContent] = useState(item.content);
 
   return (
     <div
@@ -92,67 +84,41 @@ function SortableSubItem({
         <GripVertical className="w-4 h-4 text-white/20 group-hover:text-white/40" />
       </div>
 
-      {isEditing ? (
-        <input
-          type="text"
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          onBlur={() => onEdit(item.id, editContent)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onEdit(item.id, editContent);
-            if (e.key === "Escape") setEditContent(item.content);
-          }}
-          autoFocus
-          className="flex-1 px-3 py-2 text-sm rounded-lg border border-indigo-400/50 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
-        />
-      ) : (
-        <>
-          <button
-            onClick={() => onToggle(item.id, !item.completed)}
-            className="flex items-center gap-3 flex-1 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left"
-          >
-            {item.completed ? (
-              <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
-            ) : (
-              <Circle className="w-5 h-5 text-white/30 shrink-0" />
-            )}
-            <span
-              className={`text-sm ${
-                item.completed
-                  ? "line-through text-white/40"
-                  : "text-white/80"
-              }`}
-            >
-              {item.content}
-            </span>
-          </button>
-          <button
-            onClick={() => {
-              onStartEdit(item.id, item.content);
-            }}
-            className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-white/10 text-white/60 hover:text-indigo-300 transition-all"
-            title="編輯"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          {onPromote && (
-            <button
-              onClick={() => onPromote(item.id)}
-              className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-blue-500/20 text-white/60 hover:text-blue-400 transition-all"
-              title="升級為獨立任務"
-            >
-              <ArrowUpCircle className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={() => onDelete(item.id)}
-            className="opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all"
-            title="刪除"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </>
-      )}
+      {/* Checkbox toggle */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(item.id, !item.completed);
+        }}
+        className="shrink-0 p-1"
+      >
+        {item.completed ? (
+          <CheckCircle className="w-5 h-5 text-green-400" />
+        ) : (
+          <Circle className="w-5 h-5 text-white/30 hover:text-white/50 transition-colors" />
+        )}
+      </button>
+
+      {/* Content - click to open dialog */}
+      <button
+        onClick={() => onOpenDialog(item)}
+        className="flex-1 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors text-left"
+      >
+        <span
+          className={`text-sm ${
+            item.completed
+              ? "line-through text-white/40"
+              : "text-white/80"
+          }`}
+        >
+          {item.content}
+        </span>
+      </button>
+
+      {/* Edit icon hint */}
+      <div className="opacity-0 group-hover:opacity-100 p-1 text-white/30 transition-all">
+        <Edit2 className="w-3.5 h-3.5" />
+      </div>
     </div>
   );
 }
@@ -171,6 +137,8 @@ export function TaskDetailModal({
   onEditSubItem,
   onReorderSubItems,
   onPromoteSubItem,
+  onMoveSubItem,
+  siblingTasks,
   onAddReference,
   onDeleteReference,
   onComplete,
@@ -201,6 +169,12 @@ export function TaskDetailModal({
   const [calendarEventLink, setCalendarEventLink] = useState<string | null>(null);
   const [showReminderOptions, setShowReminderOptions] = useState(false);
   const [isSettingReminder, setIsSettingReminder] = useState(false);
+  const [editDialogSubItem, setEditDialogSubItem] = useState<SubItem | null>(null);
+  const [editDialogContent, setEditDialogContent] = useState("");
+  const [editDialogTab, setEditDialogTab] = useState<"edit" | "move">("edit");
+  const [moveTargetTaskId, setMoveTargetTaskId] = useState<string>("");
+  const [isMoving, setIsMoving] = useState(false);
+  const [isPromoting, setIsPromoting] = useState(false);
 
   // 拖拽設置
   const sensors = useSensors(
@@ -597,18 +571,12 @@ export function TaskDetailModal({
                           key={item.id}
                           item={item}
                           onToggle={(id, completed) => onToggleSubItem?.(task.id, id, completed)}
-                          onEdit={(id, content) => {
-                            onEditSubItem?.(task.id, id, content);
-                            setEditingSubItemId(null);
-                            setEditSubItemContent("");
+                          onOpenDialog={(subItem) => {
+                            setEditDialogSubItem(subItem);
+                            setEditDialogContent(subItem.content);
+                            setEditDialogTab("edit");
+                            setMoveTargetTaskId("");
                           }}
-                          onDelete={(id) => onDeleteSubItem?.(task.id, id)}
-                          onPromote={onPromoteSubItem ? (id) => onPromoteSubItem(task.id, id) : undefined}
-                          onStartEdit={(id, content) => {
-                            setEditingSubItemId(id);
-                            setEditSubItemContent(content);
-                          }}
-                          isEditing={editingSubItemId === item.id}
                         />
                       ))
                     ) : (
@@ -855,6 +823,196 @@ export function TaskDetailModal({
           </button>
         </div>
       </div>
+
+      {/* Sub-Item Edit Dialog */}
+      {editDialogSubItem && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setEditDialogSubItem(null)}
+        >
+          <div
+            className="bg-slate-800 rounded-xl shadow-2xl w-full max-w-md border border-white/10 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Dialog Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <h3 className="text-base font-medium text-white">編輯待辦事項</h3>
+              <button
+                onClick={() => setEditDialogSubItem(null)}
+                className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-white/10">
+              <button
+                onClick={() => setEditDialogTab("edit")}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  editDialogTab === "edit"
+                    ? "text-indigo-400 border-b-2 border-indigo-400"
+                    : "text-white/50 hover:text-white/70"
+                }`}
+              >
+                <Edit2 className="w-3.5 h-3.5 inline mr-1.5" />
+                編輯
+              </button>
+              <button
+                onClick={() => setEditDialogTab("move")}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  editDialogTab === "move"
+                    ? "text-indigo-400 border-b-2 border-indigo-400"
+                    : "text-white/50 hover:text-white/70"
+                }`}
+              >
+                <MoveRight className="w-3.5 h-3.5 inline mr-1.5" />
+                移動 / 升級
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-5 space-y-4">
+              {editDialogTab === "edit" ? (
+                <>
+                  {/* Edit Content */}
+                  <div>
+                    <label className="block text-xs font-medium text-white/60 mb-1.5">內容</label>
+                    <input
+                      type="text"
+                      value={editDialogContent}
+                      onChange={(e) => setEditDialogContent(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editDialogContent.trim()) {
+                          onEditSubItem?.(task.id, editDialogSubItem.id, editDialogContent.trim());
+                          setEditDialogSubItem(null);
+                        }
+                        if (e.key === "Escape") setEditDialogSubItem(null);
+                      }}
+                      autoFocus
+                      className="w-full px-3 py-2.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50"
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        if (editDialogContent.trim()) {
+                          onEditSubItem?.(task.id, editDialogSubItem.id, editDialogContent.trim());
+                          setEditDialogSubItem(null);
+                        }
+                      }}
+                      disabled={!editDialogContent.trim()}
+                      className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      儲存
+                    </button>
+                    <button
+                      onClick={() => {
+                        onDeleteSubItem?.(task.id, editDialogSubItem.id);
+                        setEditDialogSubItem(null);
+                      }}
+                      className="px-4 py-2.5 text-sm font-medium rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      刪除
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Move to another task */}
+                  {onMoveSubItem && siblingTasks && siblingTasks.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-white/60 mb-1.5">移動到其他任務</label>
+                      <select
+                        value={moveTargetTaskId}
+                        onChange={(e) => setMoveTargetTaskId(e.target.value)}
+                        className="w-full px-3 py-2.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50 [&>option]:bg-slate-800 [&>option]:text-white"
+                      >
+                        <option value="">選擇目標任務...</option>
+                        {siblingTasks
+                          .filter((t) => t.id !== task.id)
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.title}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        onClick={async () => {
+                          if (!moveTargetTaskId) return;
+                          setIsMoving(true);
+                          try {
+                            await onMoveSubItem(task.id, editDialogSubItem.id, moveTargetTaskId);
+                            setEditDialogSubItem(null);
+                          } finally {
+                            setIsMoving(false);
+                          }
+                        }}
+                        disabled={!moveTargetTaskId || isMoving}
+                        className="mt-2 w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isMoving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <MoveRight className="w-4 h-4" />
+                        )}
+                        {isMoving ? "移動中..." : "移動"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Divider */}
+                  {onMoveSubItem && siblingTasks && siblingTasks.length > 0 && onPromoteSubItem && (
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="flex-1 h-px bg-white/10" />
+                      <span className="text-xs text-white/30">或</span>
+                      <div className="flex-1 h-px bg-white/10" />
+                    </div>
+                  )}
+
+                  {/* Promote to independent task */}
+                  {onPromoteSubItem && (
+                    <div>
+                      <label className="block text-xs font-medium text-white/60 mb-1.5">升級為獨立任務</label>
+                      <button
+                        onClick={async () => {
+                          setIsPromoting(true);
+                          try {
+                            await onPromoteSubItem(task.id, editDialogSubItem.id);
+                            setEditDialogSubItem(null);
+                          } finally {
+                            setIsPromoting(false);
+                          }
+                        }}
+                        disabled={isPromoting}
+                        className="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isPromoting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <ArrowUpCircle className="w-4 h-4" />
+                        )}
+                        {isPromoting ? "升級中..." : "升級為獨立任務"}
+                      </button>
+                      <p className="mt-1.5 text-xs text-white/30">
+                        此待辦事項會從目前任務中移除，並建立為新的獨立任務
+                      </p>
+                    </div>
+                  )}
+
+                  {/* No actions available */}
+                  {!onMoveSubItem && !onPromoteSubItem && (
+                    <p className="text-sm text-white/40 italic text-center py-4">目前無可用操作</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

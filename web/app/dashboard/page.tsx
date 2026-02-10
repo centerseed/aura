@@ -2336,6 +2336,45 @@ function DashboardContent() {
     }
   };
 
+  // 移動 sub-item 到另一個 task
+  const handleMoveSubItem = async (sourceTaskId: string, subItemId: string, targetTaskId: string) => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks/${sourceTaskId}/sub-items/${subItemId}/move`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ target_task_id: targetTaskId })
+      });
+
+      if (!res.ok) {
+        throw new Error("移動失敗");
+      }
+
+      // 移動成功後重新載入數據
+      if (userId) {
+        const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          const cleaned = cleanLibraryData(libraryData.data?.areas || []);
+          setAreas(cleaned);
+
+          // 更新 selectedTask
+          if (selectedTask) {
+            const updatedTask = cleaned
+              .flatMap(a => a.products.flatMap(p => p.tasks))
+              .find(t => t?.id === selectedTask.id);
+            if (updatedTask) setSelectedTask(updatedTask);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to move sub-item:", err);
+    }
+  };
+
   // 編輯 sub-item 內容
   const handleEditSubItem = async (taskId: string, subItemId: string, newContent: string) => {
     try {
@@ -3642,6 +3681,14 @@ function DashboardContent() {
             onAddSubItem={handleAddSubItem}
             onDeleteSubItem={handleDeleteSubItem}
             onPromoteSubItem={handlePromoteSubItem}
+            onMoveSubItem={handleMoveSubItem}
+            siblingTasks={
+              areas
+                .flatMap(a => a.products)
+                .find(p => p.tasks?.some(t => t?.id === selectedTask?.id))
+                ?.tasks?.filter(t => t != null && t.id !== selectedTask?.id)
+                .map(t => ({ id: t.id, title: t.title })) || []
+            }
             onEditSubItem={handleEditSubItem}
             onReorderSubItems={handleReorderSubItems}
             onAddReference={handleAddReference}
