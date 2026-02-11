@@ -40,6 +40,8 @@ export interface SubItem {
   created_at: string
   completed_at: string | null
   order: number
+  start_date?: string | null
+  due_date?: string | null
 }
 
 /**

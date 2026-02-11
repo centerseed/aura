@@ -203,6 +203,7 @@ function DraggableTaskItem({
   onAddSubItem,
   onDeleteReference,
   onOpenDetail,
+  onOpenSubItemDetail,
   isDropTarget = false,
 }: {
   task: TaskCard;
@@ -216,6 +217,7 @@ function DraggableTaskItem({
   onAddSubItem?: (taskId: string, content: string) => void;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onOpenDetail?: () => void;
+  onOpenSubItemDetail?: (subItemId: string) => void;
   isDropTarget?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -505,17 +507,33 @@ function DraggableTaskItem({
                           <div className="w-3 h-3 rounded-full border border-white/30 shrink-0 hover:border-white/50" />
                         )}
                         <span
-                          className={`text-white/60 truncate text-left cursor-text ${subItem.completed ? "line-through text-white/40" : ""}`}
+                          className={`text-white/60 truncate text-left cursor-pointer ${subItem.completed ? "line-through text-white/40" : ""}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
-                            setEditingSubItemId(subItem.id);
-                            setEditSubItemContent(subItem.content);
+                            onOpenSubItemDetail?.(subItem.id);
                           }}
                           title="點擊編輯"
                         >
                           {subItem.content}
                         </span>
+                        {subItem.due_date && (() => {
+                          const dueInfo = getRelativeTimeDesc(new Date(subItem.due_date!));
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-0.5 px-1 py-0 rounded text-[10px] shrink-0
+                                ${dueInfo.isOverdue
+                                  ? "bg-red-500/20 text-red-400"
+                                  : dueInfo.isUrgent
+                                    ? "bg-orange-500/20 text-orange-400"
+                                    : "bg-blue-500/20 text-blue-400"
+                                }`}
+                            >
+                              {dueInfo.isOverdue ? <AlertCircle className="w-2.5 h-2.5" /> : <Calendar className="w-2.5 h-2.5" />}
+                              {dueInfo.text}
+                            </span>
+                          );
+                        })()}
                       </button>
                       <button
                         type="button"
@@ -773,6 +791,7 @@ function DroppableProduct({
   onAddSubItem,
   onDeleteReference,
   onOpenTaskDetail,
+  onOpenSubItemDetail,
   onRename,
   onEdit,
   onShowReferences,
@@ -800,6 +819,7 @@ function DroppableProduct({
   onAddSubItem?: (taskId: string, content: string) => void;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onOpenTaskDetail?: (task: TaskCard) => void;
+  onOpenSubItemDetail?: (task: TaskCard, subItemId: string) => void;
   onRename?: (productId: string, newName: string) => void;
   onEdit?: (product: { id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string }) => void;
   onShowReferences?: (product: { id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string }) => void;
@@ -1013,7 +1033,7 @@ function DroppableProduct({
               // 兩個都有 due_date，按日期排序（早的在前）
               return new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime();
             })
-            .map((task) => <DraggableTaskItem key={task.id} task={task} onSetDueDate={onSetDueDate} onComplete={onComplete} onToggleSubItem={onToggleSubItem} onDeleteSubItem={onDeleteSubItem} onPromoteSubItem={onPromoteSubItem} onEditTitle={onEditTaskTitle} onEditSubItem={onEditSubItem} onAddSubItem={onAddSubItem} onDeleteReference={onDeleteReference} onOpenDetail={() => onOpenTaskDetail?.(task)} />)
+            .map((task) => <DraggableTaskItem key={task.id} task={task} onSetDueDate={onSetDueDate} onComplete={onComplete} onToggleSubItem={onToggleSubItem} onDeleteSubItem={onDeleteSubItem} onPromoteSubItem={onPromoteSubItem} onEditTitle={onEditTaskTitle} onEditSubItem={onEditSubItem} onAddSubItem={onAddSubItem} onDeleteReference={onDeleteReference} onOpenDetail={() => onOpenTaskDetail?.(task)} onOpenSubItemDetail={(subItemId) => onOpenSubItemDetail?.(task, subItemId)} />)
         )}
       </div>
     </div>
@@ -1104,6 +1124,7 @@ function DashboardContent() {
   const [dateModalType, setDateModalType] = useState<"due" | "start">("due");
   const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskCard | null>(null);
+  const [initialEditSubItemId, setInitialEditSubItemId] = useState<string | null>(null);
   const [showProductSuggestionModal, setShowProductSuggestionModal] = useState(false);
   const [productSuggestion, setProductSuggestion] = useState<{
     taskId: string;
@@ -2337,8 +2358,50 @@ function DashboardContent() {
     }
   };
 
+  // 移動 sub-item 到另一個 task
+  const handleMoveSubItem = async (sourceTaskId: string, subItemId: string, targetTaskId: string) => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks/${sourceTaskId}/sub-items/${subItemId}/move`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ target_task_id: targetTaskId })
+      });
+
+      if (!res.ok) {
+        throw new Error("移動失敗");
+      }
+
+      // 移動成功後重新載入數據
+      if (userId) {
+        const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          const cleaned = cleanLibraryData(libraryData.data?.areas || []);
+          setAreas(cleaned);
+
+          // 更新 selectedTask
+          if (selectedTask) {
+            const updatedTask = cleaned
+              .flatMap(a => a.products.flatMap(p => p.tasks))
+              .find(t => t?.id === selectedTask.id);
+            if (updatedTask) setSelectedTask(updatedTask);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to move sub-item:", err);
+    }
+  };
+
   // 編輯 sub-item 內容
-  const handleEditSubItem = async (taskId: string, subItemId: string, newContent: string) => {
+  const handleEditSubItem = async (taskId: string, subItemId: string, updates: string | { content?: string; start_date?: string | null; due_date?: string | null }) => {
+    // 支援舊的 string 格式（僅更新 content）和新的物件格式
+    const updatePayload = typeof updates === 'string' ? { content: updates } : updates;
+
     try {
       // Optimistic update: 先更新 UI
       setAreas(prevAreas => {
@@ -2349,7 +2412,7 @@ function DashboardContent() {
             tasks: product.tasks?.filter(task => task != null).map((task: TaskCard) => {
               if (task.id === taskId && task.sub_items) {
                 const updatedSubItems = task.sub_items.filter((item: SubItem) => item != null).map((item: SubItem) =>
-                  item.id === subItemId ? { ...item, content: newContent } : item
+                  item.id === subItemId ? { ...item, ...updatePayload } : item
                 );
 
                 const updatedTask = {
@@ -2378,7 +2441,7 @@ function DashboardContent() {
           "Content-Type": "application/json",
           ...authHeaders
         },
-        body: JSON.stringify({ content: newContent }),
+        body: JSON.stringify(updatePayload),
       });
 
       if (!res.ok) {
@@ -2416,7 +2479,7 @@ function DashboardContent() {
       }
 
       const result = await res.json();
-      const newSubItem = result.sub_item;
+      const newSubItem = result.data?.subItem || result.sub_item;
 
       // 更新 UI
       setAreas(prevAreas => {
@@ -3394,6 +3457,12 @@ function DashboardContent() {
                               }}
                               onEditTaskTitle={handleEditTaskTitle}
                               onOpenTaskDetail={(task) => {
+                                setInitialEditSubItemId(null);
+                                setSelectedTask(task);
+                                setIsTaskDetailModalOpen(true);
+                              }}
+                              onOpenSubItemDetail={(task: TaskCard, subItemId: string) => {
+                                setInitialEditSubItemId(subItemId);
                                 setSelectedTask(task);
                                 setIsTaskDetailModalOpen(true);
                               }}
@@ -3624,9 +3693,11 @@ function DashboardContent() {
           <TaskDetailModal
             task={selectedTask}
             isOpen={isTaskDetailModalOpen}
+            initialEditSubItemId={initialEditSubItemId}
             onClose={() => {
               setIsTaskDetailModalOpen(false);
               setSelectedTask(null);
+              setInitialEditSubItemId(null);
             }}
             onEditTitle={handleEditTaskTitle}
             onEditNarrative={handleEditNarrative}
@@ -3646,6 +3717,14 @@ function DashboardContent() {
             onAddSubItem={handleAddSubItem}
             onDeleteSubItem={handleDeleteSubItem}
             onPromoteSubItem={handlePromoteSubItem}
+            onMoveSubItem={handleMoveSubItem}
+            siblingTasks={
+              areas
+                .flatMap(a => a.products)
+                .find(p => p.tasks?.some(t => t?.id === selectedTask?.id))
+                ?.tasks?.filter(t => t != null && t.id !== selectedTask?.id)
+                .map(t => ({ id: t.id, title: t.title })) || []
+            }
             onEditSubItem={handleEditSubItem}
             onReorderSubItems={handleReorderSubItems}
             onAddReference={handleAddReference}

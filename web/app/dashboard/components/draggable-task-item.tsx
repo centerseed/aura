@@ -57,6 +57,7 @@ export interface DraggableTaskItemProps {
   onAddSubItem?: (taskId: string, content: string) => void
   onDeleteReference?: (taskId: string, referenceId: string) => void
   onOpenDetail?: () => void
+  onOpenSubItemDetail?: (subItemId: string) => void
   isDropTarget?: boolean
   defaultExpandAllSubItems?: boolean
 }
@@ -73,6 +74,7 @@ export function DraggableTaskItem({
   onAddSubItem,
   onDeleteReference,
   onOpenDetail,
+  onOpenSubItemDetail,
   defaultExpandAllSubItems = false,
 }: DraggableTaskItemProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -358,17 +360,33 @@ export function DraggableTaskItem({
                           <div className="w-3 h-3 rounded-full border border-white/30 shrink-0 hover:border-white/50" />
                         )}
                         <span
-                          className={`text-white/60 truncate text-left cursor-text ${subItem.completed ? 'line-through text-white/40' : ''}`}
+                          className={`text-white/60 truncate text-left cursor-pointer ${subItem.completed ? 'line-through text-white/40' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             e.preventDefault()
-                            setEditingSubItemId(subItem.id)
-                            setEditSubItemContent(subItem.content)
+                            onOpenSubItemDetail?.(subItem.id) || onOpenDetail?.()
                           }}
                           title="點擊編輯"
                         >
                           {subItem.content}
                         </span>
+                        {subItem.due_date && (() => {
+                          const info = getRelativeTimeDesc(new Date(subItem.due_date!))
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-0.5 px-1 py-0 rounded text-[10px] shrink-0
+                                ${info.isOverdue
+                                  ? 'bg-red-500/20 text-red-400'
+                                  : info.isUrgent
+                                    ? 'bg-orange-500/20 text-orange-400'
+                                    : 'bg-blue-500/20 text-blue-400'
+                                }`}
+                            >
+                              {info.isOverdue ? <AlertCircle className="w-2.5 h-2.5" /> : <Calendar className="w-2.5 h-2.5" />}
+                              {info.text}
+                            </span>
+                          )
+                        })()}
                       </button>
                       {onPromoteSubItem && (
                         <button

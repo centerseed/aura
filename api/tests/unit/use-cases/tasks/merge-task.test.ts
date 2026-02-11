@@ -14,6 +14,10 @@ vi.mock('@/lib/db', () => ({
     task: {
       update: vi.fn(),
     },
+    subTask: {
+      aggregate: vi.fn(),
+      create: vi.fn(),
+    },
   },
 }))
 
@@ -21,6 +25,14 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/application/use-cases/merge-references', () => ({
   mergeReferences: vi.fn((target, source) => [...target, ...source]),
 }))
+
+// Mock sub-task-sync
+vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
+  syncSubTasksToJson: vi.fn(),
+  getSubTasksMeta: vi.fn(),
+}))
+
+import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -41,8 +53,6 @@ describe('MergeTaskUseCase', () => {
   beforeEach(() => {
     useCase = new MergeTaskUseCase(mockRepository as any)
     vi.clearAllMocks()
-    mockFindById.mockReset()
-    vi.mocked(prisma.$transaction).mockReset()
   })
 
   describe('驗證邏輯', () => {
@@ -92,19 +102,11 @@ describe('MergeTaskUseCase', () => {
       const sourceTask = {
         id: 'source-123',
         userId: 'user-123',
-        productId: 'product-123',
-        topicId: null,
         content: 'Source Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
         references: [],
         subItems: [],
         startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       mockFindById.mockResolvedValueOnce(sourceTask)
@@ -126,41 +128,30 @@ describe('MergeTaskUseCase', () => {
         id: 'source-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Source Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
         references: [],
         subItems: [],
         startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       const targetTask = {
         id: 'target-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Target Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
         references: [],
         subItems: [],
         startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       mockFindById.mockResolvedValueOnce(sourceTask)
       mockFindById.mockResolvedValueOnce(targetTask)
+      vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: null } } as any)
+      vi.mocked(prisma.subTask.create).mockResolvedValue({} as any)
       vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}])
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 0, completionRate: 0 })
 
       const result = await useCase.execute({
         sourceTaskId: 'source-123',
@@ -176,6 +167,8 @@ describe('MergeTaskUseCase', () => {
       expect(result.meta.total).toBe(1)
       expect(result.meta.completed).toBe(0)
       expect(result.meta.completionRate).toBe(0)
+      expect(prisma.subTask.create).toHaveBeenCalled()
+      expect(syncSubTasksToJson).toHaveBeenCalledWith('target-123')
       expect(prisma.$transaction).toHaveBeenCalled()
     })
 
@@ -184,41 +177,30 @@ describe('MergeTaskUseCase', () => {
         id: 'source-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Source Task',
         status: 'ARCHIVE',
-        aiAnalysis: null,
         references: [],
         subItems: [],
         startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       const targetTask = {
         id: 'target-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Target Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
         references: [],
         subItems: [],
         startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       mockFindById.mockResolvedValueOnce(sourceTask)
       mockFindById.mockResolvedValueOnce(targetTask)
+      vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: null } } as any)
+      vi.mocked(prisma.subTask.create).mockResolvedValue({} as any)
       vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}])
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 1, completionRate: 1 })
 
       const result = await useCase.execute({
         sourceTaskId: 'source-123',
@@ -237,57 +219,30 @@ describe('MergeTaskUseCase', () => {
         id: 'source-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Source Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [
-          {
-            id: 'ref-1',
-            type: 'url' as const,
-            content: 'https://source.com',
-            title: 'Source',
-            createdAt: new Date(),
-          },
-        ],
+        references: [{ id: 'ref-1', type: 'url', content: 'https://source.com', title: 'Source', createdAt: new Date() }],
         subItems: [],
         startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       const targetTask = {
         id: 'target-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Target Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
-        references: [
-          {
-            id: 'ref-2',
-            type: 'url' as const,
-            content: 'https://target.com',
-            title: 'Target',
-            createdAt: new Date(),
-          },
-        ],
+        references: [{ id: 'ref-2', type: 'url', content: 'https://target.com', title: 'Target', createdAt: new Date() }],
         subItems: [],
         startDate: null,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       mockFindById.mockResolvedValueOnce(sourceTask)
       mockFindById.mockResolvedValueOnce(targetTask)
+      vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: null } } as any)
+      vi.mocked(prisma.subTask.create).mockResolvedValue({} as any)
       vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}])
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 0, completionRate: 0 })
 
       await useCase.execute({
         sourceTaskId: 'source-123',
@@ -306,41 +261,30 @@ describe('MergeTaskUseCase', () => {
         id: 'source-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Source Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
         references: [],
         subItems: [],
         startDate: earlierDate,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       const targetTask = {
         id: 'target-123',
         userId: 'user-123',
         productId: 'product-123',
-        topicId: null,
         content: 'Target Task',
         status: 'ACTIVE',
-        aiAnalysis: null,
         references: [],
         subItems: [],
         startDate: laterDate,
-        dueDate: null,
-        timeConfidence: null,
-        inferredFromMilestone: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       mockFindById.mockResolvedValueOnce(sourceTask)
       mockFindById.mockResolvedValueOnce(targetTask)
+      vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: null } } as any)
+      vi.mocked(prisma.subTask.create).mockResolvedValue({} as any)
       vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}])
+      vi.mocked(getSubTasksMeta).mockResolvedValue({ total: 1, completed: 0, completionRate: 0 })
 
       await useCase.execute({
         sourceTaskId: 'source-123',
@@ -348,7 +292,6 @@ describe('MergeTaskUseCase', () => {
         userId: 'user-123',
       })
 
-      // 驗證 transaction 被調用,且應該合併較早的 startDate
       expect(prisma.$transaction).toHaveBeenCalled()
     })
   })

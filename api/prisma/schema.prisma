@@ -28,6 +28,7 @@ model User {
   evaluation_logs      SystemEvaluationLog[]
   oauth_tokens         OAuthToken[]
   coach_briefings      CoachBriefing[]
+  sub_tasks            SubTask[]
 
   @@index([auth_provider_id])
   @@index([auth_provider, auth_provider_id])
@@ -142,6 +143,7 @@ model Task {
   ai_metadata             TaskAIMetadata?
   calendar_events         CalendarEvent[]
   reminders               ReminderConfig[]
+  sub_tasks               SubTask[]
 
   @@index([product_id, deleted_at, status])
   @@index([user_id, deleted_at, status])
@@ -350,6 +352,32 @@ model ReminderConfig {
   @@index([remind_at])
   @@index([user_id, reminder_type, remind_at])
   @@map("reminder_configs")
+}
+
+model SubTask {
+  id                String    @id @default(uuid()) @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamp(6)
+  updated_at        DateTime  @updatedAt @db.Timestamp(6)
+  deleted_at        DateTime? @db.Timestamp(6)
+  task_id           String    @db.Uuid
+  user_id           String    @db.Uuid
+  content           String    @db.VarChar
+  completed         Boolean   @default(false)
+  completed_at      DateTime? @db.Timestamp(6)
+  order             Int       @default(0)
+  start_date        DateTime? @db.Timestamp(6)
+  due_date          DateTime? @db.Timestamp(6)
+  estimated_minutes Int?
+  source            String    @default("user") @db.VarChar(20)
+  original_task_id  String?   @db.Uuid
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user User @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([task_id, deleted_at, order])
+  @@index([user_id, deleted_at, due_date])
+  @@index([user_id, deleted_at, completed])
+  @@map("sub_tasks")
 }
 
 enum ReminderType {

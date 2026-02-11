@@ -95,7 +95,8 @@ export class PrismaTaskRepository implements ITaskRepository {
       ORDER BY t.updated_at DESC
     `
 
-    return rawTasks.map((row) => this.rawToDomain(row))
+    const tasks = rawTasks.map((row) => this.rawToDomain(row))
+    return this.enrichWithSubTasks(tasks)
   }
 
   async findById(id: string, userId: string): Promise<TaskData | null> {
@@ -134,7 +135,9 @@ export class PrismaTaskRepository implements ITaskRepository {
         AND t.deleted_at IS NULL
     `
 
-    return rawTasks.length > 0 ? this.rawToDomain(rawTasks[0]) : null
+    if (rawTasks.length === 0) return null
+    const tasks = await this.enrichWithSubTasks([this.rawToDomain(rawTasks[0])])
+    return tasks[0]
   }
 
   async findByIds(ids: string[], userId: string): Promise<TaskData[]> {
@@ -175,7 +178,8 @@ export class PrismaTaskRepository implements ITaskRepository {
         AND t.deleted_at IS NULL
     `
 
-    return rawTasks.map((row) => this.rawToDomain(row))
+    const tasks = rawTasks.map((row) => this.rawToDomain(row))
+    return this.enrichWithSubTasks(tasks)
   }
 
   // ============================================================================
@@ -350,7 +354,6 @@ export class PrismaTaskRepository implements ITaskRepository {
    */
   private rawToDomain(row: RawTaskRow): TaskData {
     const analysis = (row.ai_analysis as Record<string, unknown>) || {}
-    const subItems = (row.sub_items as Array<any>) || []
     const references = (row.references as Array<any>) || []
 
     return {
@@ -374,14 +377,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         title: r.title,
         createdAt: r.created_at ? new Date(r.created_at) : row.created_at,
       })),
-      subItems: subItems.map((s) => ({
-        id: s.id,
-        content: s.content,
-        completed: s.completed,
-        createdAt: s.created_at ? new Date(s.created_at) : row.created_at,
-        completedAt: s.completed_at ? new Date(s.completed_at) : null,
-        order: s.order,
-      })),
+      subItems: [], // populated by enrichWithSubTasks() from sub_tasks table
       startDate: row.start_date,
       dueDate: row.due_date,
       timeConfidence: row.time_confidence,
@@ -413,6 +409,42 @@ export class PrismaTaskRepository implements ITaskRepository {
           }
         : undefined,
     }
+  }
+
+  /**
+   * 批次查詢 sub_tasks 表，替換每個 task 的 subItems
+   */
+  private async enrichWithSubTasks(tasks: TaskData[]): Promise<TaskData[]> {
+    if (tasks.length === 0) return tasks
+
+    const taskIds = tasks.map((t) => t.id)
+    const subTasks = await prisma.subTask.findMany({
+      where: { task_id: { in: taskIds }, deleted_at: null },
+      orderBy: { order: 'asc' },
+    })
+
+    const grouped = new Map<string, typeof subTasks>()
+    for (const st of subTasks) {
+      const list = grouped.get(st.task_id) || []
+      list.push(st)
+      grouped.set(st.task_id, list)
+    }
+
+    for (const task of tasks) {
+      const items = grouped.get(task.id) || []
+      task.subItems = items.map((s) => ({
+        id: s.id,
+        content: s.content,
+        completed: s.completed,
+        createdAt: s.created_at,
+        completedAt: s.completed_at,
+        order: s.order,
+        startDate: s.start_date,
+        dueDate: s.due_date,
+      }))
+    }
+
+    return tasks
   }
 
   /**
@@ -545,7 +577,6 @@ export class PrismaTaskRepository implements ITaskRepository {
    */
   private toDomain(prismaTask: any): TaskData {
     const analysis = (prismaTask.ai_analysis as Record<string, unknown>) || {}
-    const subItems = (prismaTask.sub_items as Array<any>) || []
     const references = (prismaTask.references as Array<any>) || []
 
     return {
@@ -569,14 +600,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         title: r.title,
         createdAt: r.created_at ? new Date(r.created_at) : prismaTask.created_at,
       })),
-      subItems: subItems.map((s) => ({
-        id: s.id,
-        content: s.content,
-        completed: s.completed,
-        createdAt: s.created_at ? new Date(s.created_at) : prismaTask.created_at,
-        completedAt: s.completed_at ? new Date(s.completed_at) : null,
-        order: s.order,
-      })),
+      subItems: [], // populated by enrichWithSubTasks() from sub_tasks table
       startDate: prismaTask.start_date,
       dueDate: prismaTask.due_date,
       timeConfidence: prismaTask.time_confidence,

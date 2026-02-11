@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { syncSubTasksToJson } from "@/infrastructure/repositories/sub-task-sync";
 
 // POST /api/products/[id]/restore-recent-tasks - 恢復最近被刪除的 Tasks
 export async function POST(
@@ -59,37 +60,28 @@ export async function POST(
       },
     });
 
-    // 同時清空可能包含這些 tasks 的 parent task 的 sub_items
+    // 從 sub_tasks 表 soft-delete 被恢復 tasks 對應的 sub_task 記錄
     // (因為這些 tasks 現在恢復為獨立 tasks 了)
-    const parentTasks = await prisma.task.findMany({
+    const restoredTaskIds = deletedTasks.map((t) => t.id);
+    const affectedSubTasks = await prisma.subTask.findMany({
       where: {
         user_id: userId,
-        product_id: productId,
+        original_task_id: { in: restoredTaskIds },
         deleted_at: null,
-        sub_items: {
-          not: { equals: [] }, // 有 sub_items 的 tasks
-        },
       },
+      select: { id: true, task_id: true },
     });
 
-    for (const parentTask of parentTasks) {
-      const subItems = (parentTask.sub_items as Array<{ id: string; original_task_id?: string }>) || [];
+    if (affectedSubTasks.length > 0) {
+      await prisma.subTask.updateMany({
+        where: { id: { in: affectedSubTasks.map(s => s.id) } },
+        data: { deleted_at: new Date() },
+      });
 
-      // 過濾掉被恢復的 tasks 對應的 sub_items
-      const restoredTaskIds = new Set(deletedTasks.map((t) => t.id));
-      const filteredSubItems = subItems.filter(
-        (item) => !restoredTaskIds.has(item.original_task_id || item.id)
-      );
-
-      // 如果 sub_items 有變化,更新 parent task
-      if (filteredSubItems.length !== subItems.length) {
-        await prisma.task.update({
-          where: { id: parentTask.id },
-          data: {
-            sub_items: filteredSubItems as any,
-            updated_at: new Date(),
-          },
-        });
+      // 雙寫：sync 受影響的 parent tasks 的 JSON
+      const affectedParentIds = [...new Set(affectedSubTasks.map(s => s.task_id))];
+      for (const parentId of affectedParentIds) {
+        await syncSubTasksToJson(parentId);
       }
     }
 

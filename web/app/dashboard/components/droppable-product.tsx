@@ -41,6 +41,7 @@ export interface DroppableProductProps {
   onAddSubItem?: (taskId: string, content: string) => void
   onDeleteReference?: (taskId: string, referenceId: string) => void
   onOpenTaskDetail?: (task: TaskCard) => void
+  onOpenSubItemDetail?: (task: TaskCard, subItemId: string) => void
   onRename?: (productId: string, newName: string) => void
   onEdit?: (product: { id: string; name: string; description?: string | null; lifecycle: 'FINITE' | 'PERPETUAL'; status: string }) => void
   onShowReferences?: (product: { id: string; name: string; description?: string | null; lifecycle: 'FINITE' | 'PERPETUAL'; status: string }) => void
@@ -71,6 +72,7 @@ export function DroppableProduct({
   onAddSubItem,
   onDeleteReference,
   onOpenTaskDetail,
+  onOpenSubItemDetail,
   onEdit,
   onShowReferences,
   onOpenTasks,
@@ -295,6 +297,7 @@ export function DroppableProduct({
                 onAddSubItem={onAddSubItem}
                 onDeleteReference={onDeleteReference}
                 onOpenDetail={() => onOpenTaskDetail?.(task)}
+                onOpenSubItemDetail={(subItemId) => onOpenSubItemDetail?.(task, subItemId)}
               />
             ))
         )}

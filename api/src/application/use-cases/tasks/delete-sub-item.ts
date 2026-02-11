@@ -2,7 +2,7 @@
  * DeleteSubItemUseCase - 刪除任務子項目
  *
  * Application Layer Use Case
- * 處理從任務中刪除 sub-item 的業務邏輯
+ * 操作 sub_tasks 表（soft delete）+ 雙寫 JSON（過渡期相容）
  */
 
 import type {
@@ -11,6 +11,7 @@ import type {
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
+import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -57,61 +58,51 @@ export class DeleteSubItemUseCase {
       throw new NotFoundException('Task')
     }
 
-    // 3. 獲取現有的 sub-items
-    const existingSubItems = (task.subItems || []).map((item) => ({
-      id: item.id,
-      content: item.content,
-      completed: item.completed,
-      created_at: this.safeToISOString(item.createdAt) || new Date().toISOString(),
-      completed_at: this.safeToISOString(item.completedAt),
-      order: item.order,
-    }))
+    // 3. 從 sub_tasks 表查詢目標
+    const subTask = await prisma.subTask.findFirst({
+      where: { id: request.subItemId, task_id: request.taskId, deleted_at: null },
+    })
 
-    // 4. 檢查 sub-item 是否存在
-    const subItemExists = existingSubItems.some(
-      (item) => item.id === request.subItemId
-    )
-
-    if (!subItemExists) {
+    if (!subTask) {
       throw new NotFoundException('Sub-item')
     }
 
-    // 5. 過濾掉要刪除的 sub-item 並重新計算 order
-    const updatedSubItems = existingSubItems
-      .filter((item) => item.id !== request.subItemId)
-      .map((item, index) => ({
-        ...item,
-        order: index, // 重新計算順序
-      }))
-
-    // 6. 更新資料庫
-    await prisma.task.update({
-      where: { id: request.taskId },
-      data: {
-        sub_items: updatedSubItems as any,
-        updated_at: new Date(),
-      },
+    // 4. Soft delete sub_task
+    await prisma.subTask.update({
+      where: { id: request.subItemId },
+      data: { deleted_at: new Date() },
     })
 
+    // 5. 重新排序剩餘的 sub_tasks
+    const remaining = await prisma.subTask.findMany({
+      where: { task_id: request.taskId, deleted_at: null },
+      orderBy: { order: 'asc' },
+    })
+
+    if (remaining.length > 0) {
+      await prisma.$transaction(
+        remaining.map((st, index) =>
+          prisma.subTask.update({
+            where: { id: st.id },
+            data: { order: index },
+          })
+        )
+      )
+    }
+
+    // 6. 雙寫：同步到 JSON
+    await syncSubTasksToJson(request.taskId)
+
     // 7. 計算統計資訊
-    const total = updatedSubItems.length
-    const completedCount = updatedSubItems.filter((item) => item.completed).length
-    const completionRate = total > 0 ? completedCount / total : 0
+    const meta = await getSubTasksMeta(request.taskId)
 
     return {
       subItemId: request.subItemId,
-      meta: {
-        total,
-        completed: completedCount,
-        completionRate,
-      },
+      meta,
       message: 'Sub-item deleted successfully',
     }
   }
 
-  /**
-   * 驗證請求資料
-   */
   private validateRequest(request: DeleteSubItemRequest): void {
     if (!request.taskId) {
       throw new ValidationException('Task ID is required', 'taskId')
@@ -120,16 +111,5 @@ export class DeleteSubItemUseCase {
     if (!request.subItemId) {
       throw new ValidationException('Sub-item ID is required', 'subItemId')
     }
-  }
-
-  /**
-   * 安全的日期轉換為 ISO 字串
-   * 處理 Invalid Date 或 null/undefined 的情況
-   */
-  private safeToISOString(date: Date | null | undefined): string | null {
-    if (!date) return null
-    if (!(date instanceof Date)) return null
-    if (isNaN(date.getTime())) return null
-    return date.toISOString()
   }
 }

@@ -245,6 +245,21 @@ export function useTaskOperations({
   )
 
   /**
+   * 移動子項目到另一個 Task
+   */
+  const handleSubItemMove = useCallback(
+    async (sourceTaskId: string, subItemId: string, targetTaskId: string) => {
+      try {
+        await API.tasks.subItems.move(sourceTaskId, subItemId, targetTaskId)
+        await refreshData()
+      } catch (error) {
+        console.error('Failed to move sub-item:', error)
+      }
+    },
+    [refreshData]
+  )
+
+  /**
    * 刪除參考資料
    */
   const handleReferenceDelete = useCallback(
@@ -323,6 +338,7 @@ export function useTaskOperations({
     handleSubItemDelete,
     handleSubItemEdit,
     handleSubItemAdd,
+    handleSubItemMove,
     handleReferenceDelete,
     handleTaskDueDateUpdate,
   }

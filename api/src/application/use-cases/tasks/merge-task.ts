@@ -2,7 +2,7 @@
  * MergeTaskUseCase - 合併任務
  *
  * Application Layer Use Case
- * 處理將來源任務合併為目標任務的 sub-item 的業務邏輯
+ * 將來源任務合併為目標任務的 sub_task + 雙寫 JSON（過渡期相容）
  */
 
 import type {
@@ -13,6 +13,7 @@ import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
 import { mergeReferences } from '@/application/use-cases/merge-references'
 import type { Reference } from '@/domain/entities/task.entity'
+import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -81,94 +82,91 @@ export class MergeTaskUseCase {
       throw new NotFoundException('Target task')
     }
 
-    // 4. 準備合併資料
-    const existingSubItems = (targetTask.subItems || []).map((item) => ({
-      id: item.id,
-      content: item.content,
-      completed: item.completed,
-      created_at: this.safeToISOString(item.createdAt) || new Date().toISOString(),
-      completed_at: this.safeToISOString(item.completedAt),
-      order: item.order,
-    }))
+    // 4. 取得目前最大 order
+    const maxOrderResult = await prisma.subTask.aggregate({
+      where: { task_id: request.targetTaskId, deleted_at: null },
+      _max: { order: true },
+    })
+    const nextOrder = (maxOrderResult._max.order ?? -1) + 1
 
-    // 5. 創建新的 sub-item (從來源 Task)
-    const now = new Date().toISOString()
+    // 5. 建立 sub_task 記錄
+    const now = new Date()
     const isCompleted = sourceTask.status === 'ARCHIVE'
-    const newSubItem: SubItemData = {
-      id: crypto.randomUUID(),
-      content: sourceTask.content,
-      completed: isCompleted,
-      created_at: now,
-      completed_at: isCompleted ? now : null,
-      order: existingSubItems.length,
-      original_task_id: request.sourceTaskId,
-    }
+    const newId = crypto.randomUUID()
 
-    // 6. 更新 sub_items
-    const updatedSubItems = [...existingSubItems, newSubItem]
+    await prisma.subTask.create({
+      data: {
+        id: newId,
+        task_id: request.targetTaskId,
+        user_id: request.userId,
+        content: sourceTask.content,
+        completed: isCompleted,
+        completed_at: isCompleted ? now : null,
+        order: nextOrder,
+        source: 'reorganize',
+        original_task_id: request.sourceTaskId,
+      },
+    })
 
-    // 7. 計算合併後的 start_date (取最早的開始時間)
+    // 6. 計算合併後的 start_date
     let mergedStartDate = targetTask.startDate
 
     if (sourceTask.startDate && targetTask.startDate) {
-      // 兩者都有值,取較早的
       mergedStartDate =
         sourceTask.startDate < targetTask.startDate
           ? sourceTask.startDate
           : targetTask.startDate
     } else if (sourceTask.startDate && !targetTask.startDate) {
-      // 只有來源有值
       mergedStartDate = sourceTask.startDate
     }
 
-    // 8. 合併 references (使用統一去重函數)
+    // 7. 合併 references
     const sourceReferences = (sourceTask.references || []) as unknown as Reference[]
     const targetReferences = (targetTask.references || []) as unknown as Reference[]
     const mergedReferences = mergeReferences(targetReferences, sourceReferences)
 
-    // 9. 使用 transaction 確保原子性
+    // 8. 雙寫 JSON + 更新 target task + 軟刪除 source task
+    await syncSubTasksToJson(request.targetTaskId)
+
     await prisma.$transaction([
-      // 更新目標 Task
       prisma.task.update({
         where: { id: request.targetTaskId },
         data: {
-          sub_items: updatedSubItems as any,
           start_date: mergedStartDate,
           references: mergedReferences as any,
-          updated_at: new Date(),
         },
       }),
-      // 軟刪除來源 Task
       prisma.task.update({
         where: { id: request.sourceTaskId },
         data: {
-          deleted_at: new Date(),
-          updated_at: new Date(),
+          deleted_at: now,
+          updated_at: now,
         },
       }),
     ])
 
-    // 10. 計算統計資訊
-    const total = updatedSubItems.length
-    const completedCount = updatedSubItems.filter((item) => item.completed).length
-    const completionRate = total > 0 ? completedCount / total : 0
+    // 9. 計算統計資訊
+    const meta = await getSubTasksMeta(request.targetTaskId)
+
+    const newSubItem: SubItemData = {
+      id: newId,
+      content: sourceTask.content,
+      completed: isCompleted,
+      created_at: now.toISOString(),
+      completed_at: isCompleted ? now.toISOString() : null,
+      order: nextOrder,
+      original_task_id: request.sourceTaskId,
+    }
 
     return {
       sourceTaskId: request.sourceTaskId,
       targetTaskId: request.targetTaskId,
       newSubItem,
-      meta: {
-        total,
-        completed: completedCount,
-        completionRate,
-      },
+      meta,
       message: `Task "${sourceTask.content}" 已合併為 "${targetTask.content}" 的待辦事項`,
     }
   }
 
-  /**
-   * 驗證請求資料
-   */
   private validateRequest(request: MergeTaskRequest): void {
     if (!request.sourceTaskId) {
       throw new ValidationException('Source task ID is required', 'sourceTaskId')
@@ -184,16 +182,5 @@ export class MergeTaskUseCase {
         'targetTaskId'
       )
     }
-  }
-
-  /**
-   * 安全的日期轉換為 ISO 字串
-   * 處理 Invalid Date 或 null/undefined 的情況
-   */
-  private safeToISOString(date: Date | null | undefined): string | null {
-    if (!date) return null
-    if (!(date instanceof Date)) return null
-    if (isNaN(date.getTime())) return null
-    return date.toISOString()
   }
 }

@@ -36,7 +36,7 @@ export async function PATCH(
     // 2. 解析參數
     const { taskId, subItemId } = await params
     const body = await request.json() as any
-    const { completed, content } = body
+    const { completed, content, start_date, due_date } = body
 
     // 3. 執行 Use Case
     const useCase = new UpdateSubItemUseCase()
@@ -46,6 +46,8 @@ export async function PATCH(
       subItemId,
       completed,
       content,
+      startDate: start_date,
+      dueDate: due_date,
     })
 
     // 4. 統一回應格式

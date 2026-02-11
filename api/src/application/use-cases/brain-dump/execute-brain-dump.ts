@@ -150,33 +150,41 @@ export class ExecuteBrainDumpUseCase {
         )
       }
 
-      const existingSubItems = (targetTask.sub_items as Array<{
-        id: string
-        content: string
-        completed: boolean
-        created_at: string
-        completed_at: string | null
-        order: number
-      }>) || []
+      // 取得目前最大 order
+      const maxOrderResult = await prisma.subTask.aggregate({
+        where: { task_id: result.target_task_id, deleted_at: null },
+        _max: { order: true },
+      })
+      const startOrder = (maxOrderResult._max.order ?? -1) + 1
 
-      const now = new Date().toISOString()
+      const now = new Date()
       const newSubItems = result.sub_items.map((sub, idx) => ({
         id: crypto.randomUUID(),
         content: sub.content,
         completed: false,
-        created_at: now,
+        created_at: now.toISOString(),
         completed_at: null,
-        order: existingSubItems.length + idx,
+        order: startOrder + idx,
       }))
 
-      const updatedSubItems = [...existingSubItems, ...newSubItems]
-      await prisma.task.update({
-        where: { id: result.target_task_id },
-        data: {
-          sub_items: updatedSubItems as any,
-          updated_at: new Date(),
-        },
-      })
+      // 寫入 sub_tasks 表
+      for (const subItem of newSubItems) {
+        await prisma.subTask.create({
+          data: {
+            id: subItem.id,
+            task_id: result.target_task_id,
+            user_id: request.userId,
+            content: subItem.content,
+            completed: false,
+            order: subItem.order,
+            source: 'user',
+          },
+        })
+      }
+
+      // 雙寫：同步到 JSON
+      const { syncSubTasksToJson } = await import('@/infrastructure/repositories/sub-task-sync')
+      await syncSubTasksToJson(result.target_task_id)
 
       await prisma.systemEvaluationLog.create({
         data: {
@@ -352,24 +360,16 @@ export class ExecuteBrainDumpUseCase {
           aiAnalysis.due_date_source = item.due_date_source
         }
 
-        let taskSubItems: Array<{
-          id: string
-          content: string
-          completed: boolean
-          created_at: string
-          completed_at: string | null
-          order: number
-        }> = []
+        // 準備 sub_items 資料（先暫存，建 Task 後再寫入 sub_tasks 表）
+        const pendingSubItems: Array<{ id: string; content: string; order: number }> = []
         if (item.sub_items && item.sub_items.length > 0) {
-          const now = new Date().toISOString()
-          taskSubItems = item.sub_items.map((sub, idx) => ({
-            id: crypto.randomUUID(),
-            content: sub.content,
-            completed: false,
-            created_at: now,
-            completed_at: null,
-            order: idx,
-          }))
+          for (let idx = 0; idx < item.sub_items.length; idx++) {
+            pendingSubItems.push({
+              id: crypto.randomUUID(),
+              content: item.sub_items[idx].content,
+              order: idx,
+            })
+          }
         }
 
         const { dueDate, inferredFromMilestone, timeConfidence } = calculateDueDate(
@@ -378,6 +378,7 @@ export class ExecuteBrainDumpUseCase {
           result.items
         )
 
+        // 建立 Task（sub_items JSON 暫時為空，稍後由 syncSubTasksToJson 填入）
         const task = await tx.task.create({
           data: {
             user_id: request.userId,
@@ -388,10 +389,45 @@ export class ExecuteBrainDumpUseCase {
             due_date: dueDate,
             inferred_from_milestone: inferredFromMilestone,
             time_confidence: timeConfidence,
-            sub_items: taskSubItems as any,
+            sub_items: [] as any,
             ai_analysis: aiAnalysis,
           },
         })
+
+        // 寫入 sub_tasks 表
+        for (const subItem of pendingSubItems) {
+          await tx.subTask.create({
+            data: {
+              id: subItem.id,
+              task_id: task.id,
+              user_id: request.userId,
+              content: subItem.content,
+              completed: false,
+              order: subItem.order,
+              source: 'user',
+            },
+          })
+        }
+
+        // 雙寫：同步 sub_tasks → JSON
+        if (pendingSubItems.length > 0) {
+          const subTaskRows = await tx.subTask.findMany({
+            where: { task_id: task.id, deleted_at: null },
+            orderBy: { order: 'asc' },
+          })
+          const jsonSubItems = subTaskRows.map((st) => ({
+            id: st.id,
+            content: st.content,
+            completed: st.completed,
+            created_at: st.created_at.toISOString(),
+            completed_at: st.completed_at?.toISOString() ?? null,
+            order: st.order,
+          }))
+          await tx.task.update({
+            where: { id: task.id },
+            data: { sub_items: jsonSubItems as any },
+          })
+        }
 
         const formattedDueDate = dueDate ? dueDate.toISOString() : null
 
