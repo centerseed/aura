@@ -23,6 +23,8 @@ export interface UpdateSubItemRequest {
   subItemId: string
   completed?: boolean
   content?: string
+  startDate?: string | null
+  dueDate?: string | null
 }
 
 export interface SubItemData {
@@ -32,6 +34,8 @@ export interface SubItemData {
   created_at: string
   completed_at: string | null
   order: number
+  start_date: string | null
+  due_date: string | null
 }
 
 export interface UpdateSubItemResponse {
@@ -92,6 +96,30 @@ export class UpdateSubItemUseCase {
       updateData.completed_at = request.completed ? now : null
     }
 
+    if (request.startDate !== undefined) {
+      updateData.start_date = request.startDate ? new Date(request.startDate) : null
+    }
+
+    if (request.dueDate !== undefined) {
+      if (request.dueDate) {
+        const subDueDate = new Date(request.dueDate)
+        // 驗證：sub-item dueDate 不能晚於 task 的 due_date
+        const taskDueDate = (task as any).due_date || (task as any).dueDate
+        if (taskDueDate) {
+          const taskDue = typeof taskDueDate === 'string' ? new Date(taskDueDate) : taskDueDate
+          if (subDueDate > taskDue) {
+            throw new ValidationException(
+              'Sub-item due date cannot be later than the task due date',
+              'dueDate'
+            )
+          }
+        }
+        updateData.due_date = subDueDate
+      } else {
+        updateData.due_date = null
+      }
+    }
+
     const updated = await prisma.subTask.update({
       where: { id: request.subItemId },
       data: updateData,
@@ -111,6 +139,8 @@ export class UpdateSubItemUseCase {
       created_at: updated.created_at.toISOString(),
       completed_at: updated.completed_at?.toISOString() ?? null,
       order: updated.order,
+      start_date: (updated as any).start_date?.toISOString() ?? null,
+      due_date: (updated as any).due_date?.toISOString() ?? null,
     }
 
     return {
@@ -130,9 +160,14 @@ export class UpdateSubItemUseCase {
       throw new ValidationException('Sub-item ID is required', 'subItemId')
     }
 
-    if (request.completed === undefined && request.content === undefined) {
+    if (
+      request.completed === undefined &&
+      request.content === undefined &&
+      request.startDate === undefined &&
+      request.dueDate === undefined
+    ) {
       throw new ValidationException(
-        'Either completed or content field is required',
+        'At least one field (completed, content, startDate, dueDate) is required',
         'body'
       )
     }

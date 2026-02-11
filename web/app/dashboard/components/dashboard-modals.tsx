@@ -73,7 +73,7 @@ export interface DashboardModalsProps {
   onToggleSubItem: (taskId: string, subItemId: string, completed: boolean) => void
   onAddSubItem: (taskId: string, content: string) => void
   onDeleteSubItem: (taskId: string, subItemId: string) => void
-  onEditSubItem: (taskId: string, subItemId: string, content: string) => void
+  onEditSubItem: (taskId: string, subItemId: string, updates: string | { content?: string; start_date?: string | null; due_date?: string | null }) => void
   onReorderSubItems: (taskId: string, subItemIds: string[]) => Promise<void>
   onAddReference: (taskId: string, type: 'url' | 'note', content: string, title?: string) => Promise<void>
   onDeleteReference: (taskId: string, referenceId: string) => void

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Calendar, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Calendar, AlertCircle, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight } from "lucide-react";
 import type { DrawerStatus } from "@/types";
 import {
   DndContext,
@@ -35,7 +35,7 @@ interface TaskDetailModalProps {
   onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void;
   onAddSubItem?: (taskId: string, content: string) => void;
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
-  onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
+  onEditSubItem?: (taskId: string, subItemId: string, updates: string | { content?: string; start_date?: string | null; due_date?: string | null }) => void;
   onReorderSubItems?: (taskId: string, subItemIds: string[]) => Promise<void>;
   onPromoteSubItem?: (taskId: string, subItemId: string) => Promise<void>;
   onMoveSubItem?: (sourceTaskId: string, subItemId: string, targetTaskId: string) => Promise<void>;
@@ -48,6 +48,25 @@ interface TaskDetailModalProps {
   onAddToCalendar?: (taskId: string) => Promise<{ eventLink: string; meetLink?: string } | null>;
   onSetReminder?: (taskId: string, reminderType: "calendar" | "notification", minutesBefore: number) => Promise<boolean>;
   isCalendarConnected?: boolean;
+  initialEditSubItemId?: string | null;
+}
+
+// 計算相對時間描述（與 draggable-task-item 相同邏輯）
+function getRelativeTimeDesc(dueDate: Date): { text: string; isOverdue: boolean; isUrgent: boolean } {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+  const diffMs = due.getTime() - now.getTime()
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return { text: `逾期 ${Math.abs(diffDays)} 天`, isOverdue: true, isUrgent: true }
+  if (diffDays === 0) return { text: '今天', isOverdue: false, isUrgent: true }
+  if (diffDays === 1) return { text: '明天', isOverdue: false, isUrgent: true }
+  if (diffDays <= 3) return { text: `${diffDays} 天後`, isOverdue: false, isUrgent: true }
+  if (diffDays <= 7) return { text: `${diffDays} 天後`, isOverdue: false, isUrgent: false }
+  if (diffDays <= 14) return { text: '下週', isOverdue: false, isUrgent: false }
+  if (diffDays <= 30) return { text: `${Math.floor(diffDays / 7)} 週後`, isOverdue: false, isUrgent: false }
+  return { text: `${Math.floor(diffDays / 30)} 個月後`, isOverdue: false, isUrgent: false }
 }
 
 // 可拖拽的子項目組件
@@ -113,6 +132,23 @@ function SortableSubItem({
         >
           {item.content}
         </span>
+        {item.due_date && (() => {
+          const info = getRelativeTimeDesc(new Date(item.due_date!))
+          return (
+            <span
+              className={`ml-2 inline-flex items-center gap-0.5 px-1.5 py-0 rounded text-[10px] shrink-0
+                ${info.isOverdue
+                  ? 'bg-red-500/20 text-red-400'
+                  : info.isUrgent
+                    ? 'bg-orange-500/20 text-orange-400'
+                    : 'bg-blue-500/20 text-blue-400'
+                }`}
+            >
+              {info.isOverdue ? <AlertCircle className="w-2.5 h-2.5" /> : <Calendar className="w-2.5 h-2.5" />}
+              {info.text}
+            </span>
+          )
+        })()}
       </button>
 
       {/* Edit icon hint */}
@@ -147,6 +183,7 @@ export function TaskDetailModal({
   onAddToCalendar,
   onSetReminder,
   isCalendarConnected,
+  initialEditSubItemId,
 }: TaskDetailModalProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -171,10 +208,28 @@ export function TaskDetailModal({
   const [isSettingReminder, setIsSettingReminder] = useState(false);
   const [editDialogSubItem, setEditDialogSubItem] = useState<SubItem | null>(null);
   const [editDialogContent, setEditDialogContent] = useState("");
+  const [editDialogStartDate, setEditDialogStartDate] = useState("");
+  const [editDialogDueDate, setEditDialogDueDate] = useState("");
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const dueDateRef = useRef<HTMLInputElement>(null);
   const [editDialogTab, setEditDialogTab] = useState<"edit" | "move">("edit");
   const [moveTargetTaskId, setMoveTargetTaskId] = useState<string>("");
   const [isMoving, setIsMoving] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
+
+  // 從外部直接打開某個 sub-item 的編輯對話框
+  useEffect(() => {
+    if (initialEditSubItemId && isOpen) {
+      const subItem = subItems.find((s) => s.id === initialEditSubItemId);
+      if (subItem) {
+        setEditDialogSubItem(subItem);
+        setEditDialogContent(subItem.content);
+        setEditDialogStartDate(subItem.start_date ? subItem.start_date.slice(0, 10) : "");
+        setEditDialogDueDate(subItem.due_date ? subItem.due_date.slice(0, 10) : "");
+        setMoveTargetTaskId("");
+      }
+    }
+  }, [initialEditSubItemId, isOpen]);
 
   // 拖拽設置
   const sensors = useSensors(
@@ -561,7 +616,7 @@ export function TaskDetailModal({
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={subItems.map((item) => item.id)}
+                  items={subItems.filter((item) => item?.id).map((item) => item.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-2">
@@ -574,6 +629,8 @@ export function TaskDetailModal({
                           onOpenDialog={(subItem) => {
                             setEditDialogSubItem(subItem);
                             setEditDialogContent(subItem.content);
+                            setEditDialogStartDate(subItem.start_date ? subItem.start_date.slice(0, 10) : "");
+                            setEditDialogDueDate(subItem.due_date ? subItem.due_date.slice(0, 10) : "");
                             setEditDialogTab("edit");
                             setMoveTargetTaskId("");
                           }}
@@ -845,138 +902,199 @@ export function TaskDetailModal({
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-white/10">
-              <button
-                onClick={() => setEditDialogTab("edit")}
-                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  editDialogTab === "edit"
-                    ? "text-indigo-400 border-b-2 border-indigo-400"
-                    : "text-white/50 hover:text-white/70"
-                }`}
-              >
-                <Edit2 className="w-3.5 h-3.5 inline mr-1.5" />
-                編輯
-              </button>
-              <button
-                onClick={() => setEditDialogTab("move")}
-                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  editDialogTab === "move"
-                    ? "text-indigo-400 border-b-2 border-indigo-400"
-                    : "text-white/50 hover:text-white/70"
-                }`}
-              >
-                <MoveRight className="w-3.5 h-3.5 inline mr-1.5" />
-                移動 / 升級
-              </button>
-            </div>
-
-            {/* Tab Content */}
+            {/* Content */}
             <div className="p-5 space-y-4">
-              {editDialogTab === "edit" ? (
+              {/* Edit Content */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1.5">內容</label>
+                <input
+                  type="text"
+                  value={editDialogContent}
+                  onChange={(e) => setEditDialogContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setEditDialogSubItem(null);
+                  }}
+                  autoFocus
+                  className="w-full px-3 py-2.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50"
+                />
+              </div>
+
+              {/* Date Fields */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Start Date */}
+                <div className="inline-flex items-center">
+                  <input
+                    ref={startDateRef}
+                    type="date"
+                    value={editDialogStartDate}
+                    onChange={(e) => setEditDialogStartDate(e.target.value)}
+                    className="absolute opacity-0 pointer-events-none [color-scheme:dark]"
+                    tabIndex={-1}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => startDateRef.current?.showPicker()}
+                    className="cursor-pointer"
+                  >
+                    {editDialogStartDate ? (() => {
+                      const d = new Date(editDialogStartDate)
+                      const now = new Date()
+                      now.setHours(0,0,0,0)
+                      const diff = Math.ceil((d.getTime() - now.getTime()) / (1000*60*60*24))
+                      const text = diff < 0 ? `已開始 ${Math.abs(diff)} 天` : diff === 0 ? '今天開始' : `${diff} 天後開始`
+                      return (
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">
+                          <Calendar className="w-3 h-3" />
+                          {text}
+                        </span>
+                      )
+                    })() : (
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-white/5 text-white/40 border border-dashed border-white/20 hover:bg-white/10 hover:text-white/60 transition-colors">
+                        <CalendarPlus className="w-3 h-3" />
+                        開始日期
+                      </span>
+                    )}
+                  </button>
+                  {editDialogStartDate && (
+                    <button
+                      type="button"
+                      onClick={() => setEditDialogStartDate("")}
+                      className="ml-1 w-5 h-5 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center flex-shrink-0"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Due Date */}
+                <div className="inline-flex items-center">
+                  <input
+                    ref={dueDateRef}
+                    type="date"
+                    value={editDialogDueDate}
+                    max={task.due_date ? task.due_date.slice(0, 10) : undefined}
+                    onChange={(e) => setEditDialogDueDate(e.target.value)}
+                    className="absolute opacity-0 pointer-events-none [color-scheme:dark]"
+                    tabIndex={-1}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => dueDateRef.current?.showPicker()}
+                    className="cursor-pointer"
+                  >
+                    {editDialogDueDate ? (() => {
+                      const info = getRelativeTimeDesc(new Date(editDialogDueDate))
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs transition-colors
+                          ${info.isOverdue
+                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                            : info.isUrgent
+                              ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
+                              : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                          }`}
+                        >
+                          {info.isOverdue ? <AlertCircle className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
+                          {info.text}
+                        </span>
+                      )
+                    })() : (
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-white/5 text-white/40 border border-dashed border-white/20 hover:bg-white/10 hover:text-white/60 transition-colors">
+                        <CalendarPlus className="w-3 h-3" />
+                        截止日期
+                      </span>
+                    )}
+                  </button>
+                  {editDialogDueDate && (
+                    <button
+                      type="button"
+                      onClick={() => setEditDialogDueDate("")}
+                      className="ml-1 w-5 h-5 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center flex-shrink-0"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Save / Delete */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (editDialogContent.trim()) {
+                      onEditSubItem?.(task.id, editDialogSubItem.id, {
+                        content: editDialogContent.trim(),
+                        start_date: editDialogStartDate || null,
+                        due_date: editDialogDueDate || null,
+                      });
+                      setEditDialogSubItem(null);
+                    }
+                  }}
+                  disabled={!editDialogContent.trim()}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  儲存
+                </button>
+                <button
+                  onClick={() => {
+                    onDeleteSubItem?.(task.id, editDialogSubItem.id);
+                    setEditDialogSubItem(null);
+                  }}
+                  className="px-4 py-2.5 text-sm font-medium rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  刪除
+                </button>
+              </div>
+
+              {/* Move / Promote Section */}
+              {(onMoveSubItem || onPromoteSubItem) && (
                 <>
-                  {/* Edit Content */}
-                  <div>
-                    <label className="block text-xs font-medium text-white/60 mb-1.5">內容</label>
-                    <input
-                      type="text"
-                      value={editDialogContent}
-                      onChange={(e) => setEditDialogContent(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && editDialogContent.trim()) {
-                          onEditSubItem?.(task.id, editDialogSubItem.id, editDialogContent.trim());
-                          setEditDialogSubItem(null);
-                        }
-                        if (e.key === "Escape") setEditDialogSubItem(null);
-                      }}
-                      autoFocus
-                      className="w-full px-3 py-2.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50"
-                    />
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-xs text-white/30">移動 / 升級</span>
+                    <div className="flex-1 h-px bg-white/10" />
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={() => {
-                        if (editDialogContent.trim()) {
-                          onEditSubItem?.(task.id, editDialogSubItem.id, editDialogContent.trim());
-                          setEditDialogSubItem(null);
-                        }
-                      }}
-                      disabled={!editDialogContent.trim()}
-                      className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      儲存
-                    </button>
-                    <button
-                      onClick={() => {
-                        onDeleteSubItem?.(task.id, editDialogSubItem.id);
-                        setEditDialogSubItem(null);
-                      }}
-                      className="px-4 py-2.5 text-sm font-medium rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors flex items-center gap-1.5"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      刪除
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Move to another task */}
-                  {onMoveSubItem && siblingTasks && siblingTasks.length > 0 && (
-                    <div>
-                      <label className="block text-xs font-medium text-white/60 mb-1.5">移動到其他任務</label>
-                      <select
-                        value={moveTargetTaskId}
-                        onChange={(e) => setMoveTargetTaskId(e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white focus:outline-none focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/50 [&>option]:bg-slate-800 [&>option]:text-white"
-                      >
-                        <option value="">選擇目標任務...</option>
-                        {siblingTasks
-                          .filter((t) => t.id !== task.id)
-                          .map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.title}
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        onClick={async () => {
-                          if (!moveTargetTaskId) return;
-                          setIsMoving(true);
-                          try {
-                            await onMoveSubItem(task.id, editDialogSubItem.id, moveTargetTaskId);
-                            setEditDialogSubItem(null);
-                          } finally {
-                            setIsMoving(false);
-                          }
-                        }}
-                        disabled={!moveTargetTaskId || isMoving}
-                        className="mt-2 w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                      >
-                        {isMoving ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <MoveRight className="w-4 h-4" />
-                        )}
-                        {isMoving ? "移動中..." : "移動"}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    {/* Move */}
+                    {onMoveSubItem && siblingTasks && siblingTasks.length > 0 && (
+                      <div className="flex-1 flex gap-1.5">
+                        <select
+                          value={moveTargetTaskId}
+                          onChange={(e) => setMoveTargetTaskId(e.target.value)}
+                          className="flex-1 min-w-0 px-2.5 py-2 text-xs rounded-lg bg-white/5 border border-white/20 text-white focus:outline-none focus:border-indigo-400/50 [&>option]:bg-slate-800 [&>option]:text-white"
+                        >
+                          <option value="">移動到...</option>
+                          {siblingTasks
+                            .filter((t) => t.id !== task.id)
+                            .map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.title}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          onClick={async () => {
+                            if (!moveTargetTaskId) return;
+                            setIsMoving(true);
+                            try {
+                              await onMoveSubItem(task.id, editDialogSubItem.id, moveTargetTaskId);
+                              setEditDialogSubItem(null);
+                            } finally {
+                              setIsMoving(false);
+                            }
+                          }}
+                          disabled={!moveTargetTaskId || isMoving}
+                          className="px-3 py-2 text-xs font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1 shrink-0"
+                        >
+                          {isMoving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MoveRight className="w-3.5 h-3.5" />}
+                          {isMoving ? "移動中" : "移動"}
+                        </button>
+                      </div>
+                    )}
 
-                  {/* Divider */}
-                  {onMoveSubItem && siblingTasks && siblingTasks.length > 0 && onPromoteSubItem && (
-                    <div className="flex items-center gap-3 py-1">
-                      <div className="flex-1 h-px bg-white/10" />
-                      <span className="text-xs text-white/30">或</span>
-                      <div className="flex-1 h-px bg-white/10" />
-                    </div>
-                  )}
-
-                  {/* Promote to independent task */}
-                  {onPromoteSubItem && (
-                    <div>
-                      <label className="block text-xs font-medium text-white/60 mb-1.5">升級為獨立任務</label>
+                    {/* Promote */}
+                    {onPromoteSubItem && (
                       <button
                         onClick={async () => {
                           setIsPromoting(true);
@@ -988,25 +1106,13 @@ export function TaskDetailModal({
                           }
                         }}
                         disabled={isPromoting}
-                        className="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
+                        className="px-3 py-2 text-xs font-medium rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center gap-1 shrink-0"
                       >
-                        {isPromoting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <ArrowUpCircle className="w-4 h-4" />
-                        )}
-                        {isPromoting ? "升級中..." : "升級為獨立任務"}
+                        {isPromoting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
+                        {isPromoting ? "升級中" : "升級"}
                       </button>
-                      <p className="mt-1.5 text-xs text-white/30">
-                        此待辦事項會從目前任務中移除，並建立為新的獨立任務
-                      </p>
-                    </div>
-                  )}
-
-                  {/* No actions available */}
-                  {!onMoveSubItem && !onPromoteSubItem && (
-                    <p className="text-sm text-white/40 italic text-center py-4">目前無可用操作</p>
-                  )}
+                    )}
+                  </div>
                 </>
               )}
             </div>

@@ -39,6 +39,8 @@ export interface TaskData {
     createdAt: Date
     completedAt: Date | null
     order: number
+    startDate: Date | null
+    dueDate: Date | null
   }>
   startDate: Date | null
   dueDate: Date | null

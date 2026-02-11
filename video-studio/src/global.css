@@ -1,0 +1,24 @@
+/* 全局動畫定義 */
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 重置默認樣式 */
+* {
+  box-sizing: border-box;
+}

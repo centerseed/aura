@@ -27,6 +27,8 @@ export interface SubItem {
   createdAt: Date
   completedAt: Date | null
   order: number
+  startDate: Date | null
+  dueDate: Date | null
 }
 
 export interface AIAnalysis {
@@ -300,6 +302,8 @@ export class Task {
       createdAt: new Date(),
       completedAt: null,
       order: this.subItems.length,
+      startDate: null,
+      dueDate: null,
     }
 
     this.subItems.push(newSubItem)

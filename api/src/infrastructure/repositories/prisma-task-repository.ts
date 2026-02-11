@@ -439,6 +439,8 @@ export class PrismaTaskRepository implements ITaskRepository {
         createdAt: s.created_at,
         completedAt: s.completed_at,
         order: s.order,
+        startDate: s.start_date,
+        dueDate: s.due_date,
       }))
     }
 

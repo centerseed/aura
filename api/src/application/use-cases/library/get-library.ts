@@ -44,6 +44,8 @@ export interface TaskData {
     created_at: string
     completed_at: string | null
     order: number
+    start_date: string | null
+    due_date: string | null
   }>
   sub_items_meta: {
     total: number
@@ -229,6 +231,8 @@ export class GetLibraryUseCase {
         created_at: item.created_at || new Date().toISOString(),
         completed_at: item.completed_at || null,
         order: Number(item.order) || 0,
+        start_date: item.start_date || null,
+        due_date: item.due_date || null,
       }))
 
     const subItemsMeta =
