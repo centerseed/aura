@@ -21,6 +21,7 @@ import {
   detectStuckTasks,
 } from '@/application/services/coach-detection'
 import { CoachAIGenerator } from '@/application/services/coach-ai-generator'
+import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
 
@@ -108,7 +109,24 @@ export class GenerateBriefingUseCase {
     })
     timings.ai = Date.now() - start
 
-    // 7. 儲存（幂等：同 user+type+date 覆蓋）
+    // 7. 晨報時同步生成每日計畫
+    if (request.type === 'MORNING') {
+      try {
+        start = Date.now()
+        const planUseCase = new GeneratePlanUseCase()
+        await planUseCase.execute({
+          userId: request.userId,
+          date: request.date,
+          timezone,
+        })
+        timings.plan = Date.now() - start
+      } catch (err) {
+        console.error('[GenerateBriefing] Plan generation failed (non-blocking):', err)
+        timings.plan_error = 1
+      }
+    }
+
+    // 8. 儲存（幂等：同 user+type+date 覆蓋）
     start = Date.now()
     const createData: CreateCoachBriefingData = {
       userId: request.userId,

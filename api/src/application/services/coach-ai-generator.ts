@@ -202,6 +202,13 @@ export class CoachAIGenerator {
       sections.push('')
     }
 
+    // 今日計畫提示（晨報）
+    if (isMorning) {
+      sections.push('## 今日計畫')
+      sections.push('系統已同步生成每日行動計畫（「今日計畫」頁面），請在 summary 中提醒用戶查看。')
+      sections.push('')
+    }
+
     sections.push('---')
     sections.push('')
     sections.push('## 回應要求')

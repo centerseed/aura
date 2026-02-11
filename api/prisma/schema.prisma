@@ -29,6 +29,7 @@ model User {
   oauth_tokens         OAuthToken[]
   coach_briefings      CoachBriefing[]
   sub_tasks            SubTask[]
+  daily_plans          DailyPlan[]
 
   @@index([auth_provider_id])
   @@index([auth_provider, auth_provider_id])
@@ -144,6 +145,7 @@ model Task {
   calendar_events         CalendarEvent[]
   reminders               ReminderConfig[]
   sub_tasks               SubTask[]
+  daily_plan_items        DailyPlanItem[]
 
   @@index([product_id, deleted_at, status])
   @@index([user_id, deleted_at, status])
@@ -371,8 +373,9 @@ model SubTask {
   source            String    @default("user") @db.VarChar(20)
   original_task_id  String?   @db.Uuid
 
-  task Task @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  user User @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  task             Task            @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user             User            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  daily_plan_items DailyPlanItem[]
 
   @@index([task_id, deleted_at, order])
   @@index([user_id, deleted_at, due_date])
@@ -423,4 +426,51 @@ model CoachBriefing {
   @@index([user_id, briefing_date])
   @@index([user_id, type, created_at])
   @@map("coach_briefings")
+}
+
+model DailyPlan {
+  id                String          @id @default(uuid()) @db.Uuid
+  created_at        DateTime        @default(now()) @db.Timestamp(6)
+  updated_at        DateTime        @updatedAt @db.Timestamp(6)
+  user_id           String          @db.Uuid
+  plan_date         DateTime        @db.Date
+  coach_message     String?         @db.Text
+  capacity_note     String?         @db.Text
+  available_minutes Int?
+  meeting_minutes   Int?
+  planned_minutes   Int?
+
+  user              User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  items             DailyPlanItem[]
+
+  @@unique([user_id, plan_date])
+  @@index([user_id, plan_date])
+  @@map("daily_plans")
+}
+
+model DailyPlanItem {
+  id                String    @id @default(uuid()) @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamp(6)
+  updated_at        DateTime  @updatedAt @db.Timestamp(6)
+  plan_id           String    @db.Uuid
+  task_id           String    @db.Uuid
+  sub_task_id       String?   @db.Uuid
+  content           String    @db.VarChar
+  area_name         String    @db.VarChar
+  product_name      String    @db.VarChar
+  estimated_minutes Int?
+  due_date          DateTime? @db.Timestamp(6)
+  order             Int
+  reasoning         String?   @db.Text
+  completed         Boolean   @default(false)
+  completed_at      DateTime? @db.Timestamp(6)
+  pinned            Boolean   @default(false)
+  deferred          Boolean   @default(false)
+
+  plan              DailyPlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  task              Task      @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sub_task          SubTask?  @relation(fields: [sub_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([plan_id, order])
+  @@map("daily_plan_items")
 }
