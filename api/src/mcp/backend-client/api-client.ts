@@ -5,10 +5,12 @@
  * this client calls localhost routes. This reuses existing route handlers
  * with their full validation, auth, and error handling.
  *
- * The access token from the MCP client is passed through directly,
- * so API routes authenticate the user via Firebase as usual.
+ * Authentication: Uses HMAC-based internal auth (X-MCP-Internal / X-MCP-User-Id)
+ * instead of Firebase tokens, since the MCP layer already verified the user's
+ * identity via OAuth 2.1 JWT.
  */
 
+import { signInternalAuth } from "../oauth/jwt";
 import type {
   BackendTaskResponse,
   BackendKnowledgeResponse,
@@ -33,7 +35,7 @@ export class BackendApiClient {
   }
 
   async captureThought(
-    userToken: string,
+    userId: string,
     params: {
       content: string;
       source: string;
@@ -42,13 +44,13 @@ export class BackendApiClient {
   ): Promise<BackendTaskResponse> {
     return this.post<BackendTaskResponse>(
       "/api/brain-dump",
-      userToken,
+      userId,
       { text: params.content, source: params.source, context_hint: params.context_hint },
     );
   }
 
   async appendToKnowledge(
-    userToken: string,
+    userId: string,
     params: {
       product_name: string;
       topic_name: string;
@@ -58,13 +60,13 @@ export class BackendApiClient {
   ): Promise<BackendKnowledgeResponse> {
     return this.post<BackendKnowledgeResponse>(
       "/api/library/knowledge",
-      userToken,
+      userId,
       params,
     );
   }
 
   async queryMemory(
-    userToken: string,
+    userId: string,
     params: {
       query: string;
       scope?: string;
@@ -72,40 +74,52 @@ export class BackendApiClient {
   ): Promise<BackendSearchResponse> {
     return this.post<BackendSearchResponse>(
       "/api/library/search",
-      userToken,
+      userId,
       params,
     );
   }
 
   async getKnowledgeAsset(
-    userToken: string,
+    userId: string,
     area: string,
     product: string,
     topic: string,
   ): Promise<{ content: string; metadata: Record<string, unknown> }> {
     const path = `/api/library/${encodeURIComponent(area)}/${encodeURIComponent(product)}/${encodeURIComponent(topic)}`;
-    return this.get(path, userToken);
+    return this.get(path, userId);
   }
 
   async getRollingSaga(
-    userToken: string,
+    userId: string,
     productId: string,
   ): Promise<{ content: string; level: string }> {
     return this.get(
       `/api/products/${encodeURIComponent(productId)}`,
-      userToken,
+      userId,
     );
   }
 
   async getUserPreferences(
-    userToken: string,
+    userId: string,
   ): Promise<{ bias_vector: Record<string, unknown>; negative_prompts: string[] }> {
-    return this.get("/api/me", userToken);
+    return this.get("/api/me", userId);
+  }
+
+  /**
+   * Build internal auth headers. These are verified by authenticateRequest()
+   * in the API auth middleware, bypassing Firebase token verification.
+   */
+  private getInternalAuthHeaders(userId: string): Record<string, string> {
+    const hmac = signInternalAuth(userId);
+    return {
+      "X-MCP-Internal": hmac,
+      "X-MCP-User-Id": userId,
+    };
   }
 
   private async post<T>(
     path: string,
-    userToken: string,
+    userId: string,
     body: unknown,
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
@@ -113,7 +127,7 @@ export class BackendApiClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${userToken}`,
+        ...this.getInternalAuthHeaders(userId),
       },
       body: JSON.stringify(body),
     });
@@ -126,12 +140,12 @@ export class BackendApiClient {
     return response.json() as Promise<T>;
   }
 
-  private async get<T>(path: string, userToken: string): Promise<T> {
+  private async get<T>(path: string, userId: string): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${userToken}`,
+        ...this.getInternalAuthHeaders(userId),
       },
     });
 

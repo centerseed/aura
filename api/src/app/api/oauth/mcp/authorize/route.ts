@@ -107,6 +107,9 @@ function errorResponse(error: string, description: string) {
  * 1. Shows "Sign in with Google" to authorize Zentropy MCP access
  * 2. Uses Firebase Auth JS SDK for the sign-in flow
  * 3. Posts the Firebase ID token to our callback endpoint
+ *
+ * Security: All dynamic values are injected via a JSON data block and
+ * read by JS at runtime, avoiding inline interpolation in HTML/JS context.
  */
 function buildSignInPage(callbackUrl: string, encodedState: string): string {
   const firebaseConfig = process.env.NEXT_PUBLIC_FIREBASE_CONFIG
@@ -116,6 +119,18 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
         authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
         projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
       });
+
+  // Inject all dynamic values as a single JSON blob in a <script type="application/json">.
+  // This avoids XSS from string interpolation inside executable JS context.
+  const pageData = JSON.stringify({
+    callbackUrl,
+    encodedState,
+    firebaseConfig: JSON.parse(
+      typeof firebaseConfig === "string" && firebaseConfig.startsWith("{")
+        ? firebaseConfig
+        : `{"apiKey":"","authDomain":"","projectId":""}`,
+    ),
+  });
 
   return `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -167,12 +182,14 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
     <p id="error" class="error"></p>
   </div>
 
+  <script id="page-data" type="application/json">${escapeJsonForHtml(pageData)}</script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
-    const firebaseConfig = ${firebaseConfig};
-    const app = initializeApp(firebaseConfig);
+    const pageData = JSON.parse(document.getElementById("page-data").textContent);
+    const app = initializeApp(pageData.firebaseConfig);
     const auth = getAuth(app);
 
     window.startSignIn = async function() {
@@ -192,7 +209,7 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
         // POST the Firebase ID token to our callback endpoint
         const form = document.createElement("form");
         form.method = "POST";
-        form.action = "${callbackUrl}";
+        form.action = pageData.callbackUrl;
 
         const tokenInput = document.createElement("input");
         tokenInput.type = "hidden";
@@ -203,7 +220,7 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
         const stateInput = document.createElement("input");
         stateInput.type = "hidden";
         stateInput.name = "oauth_state";
-        stateInput.value = "${encodedState}";
+        stateInput.value = pageData.encodedState;
         form.appendChild(stateInput);
 
         document.body.appendChild(form);
@@ -218,4 +235,12 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
   </script>
 </body>
 </html>`;
+}
+
+/**
+ * Escape a JSON string for safe embedding inside a <script type="application/json"> tag.
+ * The only dangerous sequence is `</script` which would terminate the tag early.
+ */
+function escapeJsonForHtml(json: string): string {
+  return json.replace(/<\//g, "<\\/");
 }

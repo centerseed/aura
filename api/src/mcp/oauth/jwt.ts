@@ -8,7 +8,7 @@
  * Refresh tokens are long-lived (30 days) and stored in DB for revocation.
  */
 
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 const ALG = "HS256";
 const ACCESS_TOKEN_TTL = 3600; // 1 hour
@@ -43,6 +43,16 @@ function getSecret(): string {
 function base64url(input: string | Buffer): string {
   const buf = typeof input === "string" ? Buffer.from(input) : input;
   return buf.toString("base64url");
+}
+
+/**
+ * Timing-safe string comparison.
+ * Both strings are hashed first to ensure equal length for timingSafeEqual.
+ */
+function safeEqual(a: string, b: string): boolean {
+  const bufA = createHash("sha256").update(a).digest();
+  const bufB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(bufA, bufB);
 }
 
 function sign(payload: string, secret: string): string {
@@ -94,7 +104,8 @@ export function generateRefreshToken(): {
   expiresAt: Date;
 } {
   const raw = randomBytes(48).toString("base64url");
-  const hash = createHmac("sha256", "refresh-salt")
+  const secret = getSecret();
+  const hash = createHmac("sha256", secret)
     .update(raw)
     .digest("hex");
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL * 1000);
@@ -106,7 +117,8 @@ export function generateRefreshToken(): {
  * Hash a refresh token for DB lookup.
  */
 export function hashRefreshToken(raw: string): string {
-  return createHmac("sha256", "refresh-salt").update(raw).digest("hex");
+  const secret = getSecret();
+  return createHmac("sha256", secret).update(raw).digest("hex");
 }
 
 /**
@@ -124,19 +136,24 @@ export function verifyAccessToken(token: string): McpTokenPayload {
   const [header, body, signature] = parts;
   const data = `${header}.${body}`;
 
-  // Verify signature
+  // Verify signature (timing-safe)
   const expectedSig = createHmac("sha256", secret)
     .update(data)
     .digest("base64url");
 
-  if (signature !== expectedSig) {
+  if (!safeEqual(signature, expectedSig)) {
     throw new Error("Invalid token signature");
   }
 
-  // Decode payload
-  const payload: McpTokenPayload = JSON.parse(
-    Buffer.from(body, "base64url").toString("utf-8"),
-  );
+  // Decode payload (with crash protection for truncated/malformed tokens)
+  let payload: McpTokenPayload;
+  try {
+    payload = JSON.parse(
+      Buffer.from(body, "base64url").toString("utf-8"),
+    );
+  } catch {
+    throw new Error("Malformed token payload");
+  }
 
   // Check expiry
   const now = Math.floor(Date.now() / 1000);
@@ -157,15 +174,37 @@ export function generateAuthCode(): string {
 /**
  * Verify PKCE code_verifier against code_challenge (S256 method).
  * S256: BASE64URL(SHA256(code_verifier)) === code_challenge
+ * Uses timing-safe comparison.
  */
 export function verifyPkce(
   codeVerifier: string,
   codeChallenge: string,
 ): boolean {
-  const { createHash } = require("node:crypto") as typeof import("node:crypto");
   const computed = createHash("sha256")
     .update(codeVerifier)
     .digest("base64url");
 
-  return computed === codeChallenge;
+  return safeEqual(computed, codeChallenge);
+}
+
+/**
+ * Generate an HMAC for internal service authentication.
+ * Used by BackendApiClient for same-process API calls.
+ */
+export function signInternalAuth(userId: string): string {
+  const secret = getSecret();
+  return createHmac("sha256", secret)
+    .update(`internal:${userId}`)
+    .digest("hex");
+}
+
+/**
+ * Verify an internal service auth HMAC.
+ */
+export function verifyInternalAuth(userId: string, hmac: string): boolean {
+  const secret = getSecret();
+  const expected = createHmac("sha256", secret)
+    .update(`internal:${userId}`)
+    .digest("hex");
+  return safeEqual(hmac, expected);
 }

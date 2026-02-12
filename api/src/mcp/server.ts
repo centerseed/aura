@@ -81,9 +81,8 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
       authContext: AuthContext,
       input: Record<string, unknown>,
       sanitized: boolean,
-      accessToken: string,
     ) => Promise<unknown>,
-    /** The raw access token from the MCP client, passed through to API routes */
+    /** The raw access token from the MCP client, used for auth verification */
     accessToken?: string,
   ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
     const startTime = Date.now();
@@ -125,7 +124,6 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         authContext,
         sanitization.sanitizedInput,
         sanitizationApplied,
-        accessToken || "",
       );
 
       // Step 7: Output Sanitization
@@ -345,7 +343,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         "zentropy://knowledge/",
         "zentropy://",
       );
-      const result = await readKnowledgeAsset(apiClient, "", fullUri);
+      const result = await readKnowledgeAsset(apiClient, authContext.userId, fullUri);
       const sanitized = sanitizeOutput(result, authContext.scopes);
 
       return {
@@ -370,7 +368,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
       const authContext = authenticateMcpRequest();
       checkResourceScope(authContext, "saga");
 
-      const result = await readRollingSaga(apiClient, "", uri.href);
+      const result = await readRollingSaga(apiClient, authContext.userId, uri.href);
       const sanitized = sanitizeOutput(result, authContext.scopes);
 
       return {
@@ -395,7 +393,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
       const authContext = authenticateMcpRequest();
       checkResourceScope(authContext, "profile");
 
-      const result = await readUserPreferences(apiClient, "");
+      const result = await readUserPreferences(apiClient, authContext.userId);
       const sanitized = sanitizeOutput(result, authContext.scopes);
 
       return {

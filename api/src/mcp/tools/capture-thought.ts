@@ -24,13 +24,12 @@ export interface CaptureThoughtResult {
 
 export async function handleCaptureThought(
   apiClient: BackendApiClient,
-  _authContext: AuthContext,
+  authContext: AuthContext,
   input: Record<string, unknown>,
   sanitized: boolean,
-  accessToken: string,
 ): Promise<CaptureThoughtResult> {
   const params = input as unknown as CaptureThoughtInput;
-  const response = await apiClient.captureThought(accessToken, {
+  const response = await apiClient.captureThought(authContext.userId, {
     content: params.content,
     source: params.source,
     context_hint: params.context_hint,

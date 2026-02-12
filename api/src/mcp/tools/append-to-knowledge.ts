@@ -26,13 +26,12 @@ export interface AppendToKnowledgeResult {
 
 export async function handleAppendToKnowledge(
   apiClient: BackendApiClient,
-  _authContext: AuthContext,
+  authContext: AuthContext,
   input: Record<string, unknown>,
   sanitized: boolean,
-  accessToken: string,
 ): Promise<AppendToKnowledgeResult> {
   const params = input as unknown as AppendToKnowledgeInput;
-  const response = await apiClient.appendToKnowledge(accessToken, {
+  const response = await apiClient.appendToKnowledge(authContext.userId, {
     product_name: params.product_name,
     topic_name: params.topic_name,
     title: params.title,

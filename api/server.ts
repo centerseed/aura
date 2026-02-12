@@ -24,16 +24,39 @@ const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
 const port = parseInt(process.env.PORT || "3002", 10);
 
+/**
+ * Session management for MCP connections.
+ * Each session gets its own McpServer + transport pair because
+ * McpServer.connect() replaces the previous transport (no concurrency support).
+ */
+const mcpSessions = new Map<
+  string,
+  { transport: StreamableHTTPServerTransport; createdAt: number }
+>();
+
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+function cleanupStaleSessions() {
+  const now = Date.now();
+  for (const [id, session] of mcpSessions) {
+    if (now - session.createdAt > SESSION_TTL_MS) {
+      session.transport.close?.();
+      mcpSessions.delete(id);
+    }
+  }
+}
+
 async function main() {
   // 1. Prepare Next.js
   const app = next({ dev, hostname, port });
   const handleNextRequest = app.getRequestHandler();
   await app.prepare();
 
-  // 2. Create MCP server (singleton)
-  const mcpServer = createMcpServer({ port });
+  console.log(`[server] Starting Zentropy API + MCP Server...`);
 
-  console.log(`🚀 [server] Starting Zentropy API + MCP Server...`);
+  // Periodic session cleanup (every 5 minutes)
+  const cleanupInterval = setInterval(cleanupStaleSessions, 5 * 60 * 1000);
+  cleanupInterval.unref();
 
   // 3. Create unified HTTP server
   const httpServer = createHttpServer(async (req, res) => {
@@ -49,6 +72,7 @@ async function main() {
             status: "ok",
             service: "zentropy-api",
             mcp: true,
+            activeSessions: mcpSessions.size,
             timestamp: new Date().toISOString(),
           }),
         );
@@ -57,12 +81,37 @@ async function main() {
 
       // ── MCP Endpoint (Streamable HTTP) ────────────────
       if (pathname === "/mcp") {
-        // Each request gets its own transport for stateless handling
+        // Check for existing session
+        const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+        if (sessionId && mcpSessions.has(sessionId)) {
+          // Reuse existing session's transport
+          const session = mcpSessions.get(sessionId)!;
+          await session.transport.handleRequest(req, res);
+          return;
+        }
+
+        // New session: create dedicated McpServer + transport
+        const mcpServer = createMcpServer({ port });
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => crypto.randomUUID(),
         });
+
+        // Clean up when transport closes
+        transport.onclose = () => {
+          const sid = transport.sessionId;
+          if (sid) mcpSessions.delete(sid);
+          mcpServer.close();
+        };
+
         await mcpServer.connect(transport);
         await transport.handleRequest(req, res);
+
+        // Store session for reuse
+        const sid = transport.sessionId;
+        if (sid) {
+          mcpSessions.set(sid, { transport, createdAt: Date.now() });
+        }
         return;
       }
 
@@ -104,14 +153,19 @@ async function main() {
   });
 
   httpServer.listen(port, () => {
-    console.log(`✅ [server] Zentropy API ready on http://${hostname}:${port}`);
-    console.log(`   📡 MCP endpoint: http://${hostname}:${port}/mcp`);
-    console.log(`   🏥 Health check: http://${hostname}:${port}/health`);
+    console.log(`[server] Zentropy API ready on http://${hostname}:${port}`);
+    console.log(`   MCP endpoint: http://${hostname}:${port}/mcp`);
+    console.log(`   Health check: http://${hostname}:${port}/health`);
   });
 
   // Graceful shutdown
   const shutdown = () => {
-    console.log("\n🛑 [server] Shutting down...");
+    console.log("\n[server] Shutting down...");
+    // Close all MCP sessions
+    for (const [id, session] of mcpSessions) {
+      session.transport.close?.();
+      mcpSessions.delete(id);
+    }
     httpServer.close(() => {
       process.exit(0);
     });
@@ -124,6 +178,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("❌ [server] Fatal error:", error);
+  console.error("[server] Fatal error:", error);
   process.exit(1);
 });

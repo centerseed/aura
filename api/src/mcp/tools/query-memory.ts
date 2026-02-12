@@ -29,13 +29,12 @@ export interface QueryMemoryResult {
 
 export async function handleQueryMemory(
   apiClient: BackendApiClient,
-  _authContext: AuthContext,
+  authContext: AuthContext,
   input: Record<string, unknown>,
   sanitized: boolean,
-  accessToken: string,
 ): Promise<QueryMemoryResult> {
   const params = input as unknown as QueryMemoryInput;
-  const response = await apiClient.queryMemory(accessToken, {
+  const response = await apiClient.queryMemory(authContext.userId, {
     query: params.query,
     scope: params.scope,
   });
