@@ -16,6 +16,8 @@ import {
   applyRuleAging,
   findMergeCandidates,
   calculateRuleHealthScore,
+  archiveRule,
+  archiveJunkRules,
 } from '../core/vector-store.js';
 import type { Rule, Cluster, CorrectionWithEmbedding, RuleValidationResult } from '../core/types.js';
 
@@ -24,7 +26,6 @@ import type { Rule, Cluster, CorrectionWithEmbedding, RuleValidationResult } fro
 // ============================================================================
 
 const DEFAULT_DISTILL_THRESHOLD = 10;
-const WARM_DISTILL_THRESHOLD = 3;
 
 // ============================================================================
 // Rule Distiller
@@ -33,18 +34,15 @@ const WARM_DISTILL_THRESHOLD = 3;
 export class RuleDistiller {
   private clusteringEngine: AdaptiveClusteringEngine;
   private distillThreshold: number;
-  private warmThreshold: number;
   private domain: string;
 
   constructor(options: {
     domain?: string;
     similarityThreshold?: number;
     distillThreshold?: number;
-    warmThreshold?: number;
   } = {}) {
     this.clusteringEngine = new AdaptiveClusteringEngine(options.similarityThreshold);
     this.distillThreshold = options.distillThreshold ?? DEFAULT_DISTILL_THRESHOLD;
-    this.warmThreshold = options.warmThreshold ?? WARM_DISTILL_THRESHOLD;
     this.domain = options.domain ?? 'naruvia';
   }
 
@@ -161,10 +159,17 @@ export class RuleDistiller {
         }
 
         if (conflict.conflictType === 'similar') {
-          // 相似規則 → 合併統計到現有規則
-          console.log(`      🔗 合併到相似規則: "${conflict.rule.description}"`);
-          mergedCount++;
-          continue;
+          if (distillResult.confidence > conflict.rule.confidence) {
+            // 新規則信心度更高 → archive 舊的 Instant Rule，儲存新蒸餾規則
+            console.log(`      🔄 新規則信心度更高，archive 舊規則: "${conflict.rule.description}"`);
+            await archiveRule(conflict.rule.id);
+            // 不 continue，繼續走下面的儲存流程
+          } else {
+            // 現有規則信心度更高 → 合併統計
+            console.log(`      🔗 合併到相似規則: "${conflict.rule.description}"`);
+            mergedCount++;
+            continue;
+          }
         }
       }
 
@@ -202,6 +207,12 @@ export class RuleDistiller {
     // ========== Stage 4: 標記已處理 ==========
     const processedIds = clusters.flatMap(c => c.corrections.map(corr => corr.id));
     await markCorrectionsProcessed(processedIds);
+
+    // ========== Stage 4.5: 清理垃圾規則 ==========
+    const junked = await archiveJunkRules(userId, 0.5, this.domain);
+    if (junked > 0) {
+      console.log(`   🗑️ 清理 ${junked} 條垃圾規則（confidence < 0.5 且從未使用）`);
+    }
 
     // ========== 報告 ==========
     console.log('\n📋 蒸餾報告:');
@@ -247,89 +258,6 @@ export class RuleDistiller {
       merged: mergedCount,
       cleaned: cleanedCount,
     };
-  }
-
-  /**
-   * Warm Path: 低閾值快速蒸餾
-   *
-   * 當未處理修正達到 WARM_DISTILL_THRESHOLD (3) 但未達完整蒸餾閾值時，
-   * 嘗試直接用 LLM 歸納 1 條規則（跳過分群），降低冷啟動延遲。
-   */
-  async warmDistill(userId: string): Promise<Rule | null> {
-    const corrections = await getUnprocessedCorrections(userId, this.domain);
-
-    if (corrections.length < this.warmThreshold) {
-      return null;
-    }
-
-    // 已達完整蒸餾閾值，交給 Cold Path
-    if (corrections.length >= this.distillThreshold) {
-      return null;
-    }
-
-    console.log(`\n⚡ Warm Path 蒸餾 (${corrections.length} 筆修正)...`);
-
-    // 跳過分群，直接對所有修正歸納 1 條規則
-    const distillResult = await distillRule(corrections);
-
-    if (!distillResult) {
-      console.log('   ⚠️ Warm Path 無法歸納規則');
-      return null;
-    }
-
-    const ruleEmbedding = await getEmbedding(distillResult.ruleDescription);
-
-    // 檢查衝突
-    const conflictCheck = await checkRuleConflicts(
-      userId,
-      distillResult.ruleDescription,
-      distillResult.resultAction,
-      ruleEmbedding,
-      this.domain
-    );
-
-    if (conflictCheck.hasConflict) {
-      const conflict = conflictCheck.conflictingRules[0];
-      if (conflict.conflictType === 'duplicate' || conflict.conflictType === 'similar') {
-        console.log(`   ⏭️ 與現有規則重複/相似，跳過`);
-        return null;
-      }
-    }
-
-    // 儲存新規則
-    const ruleId = await storeRule({
-      userId,
-      domain: this.domain,
-      description: distillResult.ruleDescription,
-      triggerConditions: distillResult.triggerConditions,
-      resultAction: distillResult.resultAction,
-      confidence: distillResult.confidence * 0.9,
-      embedding: ruleEmbedding,
-      isActive: true,
-    });
-
-    // 標記已處理
-    const processedIds = corrections.map(c => c.id);
-    await markCorrectionsProcessed(processedIds);
-
-    const rule: Rule = {
-      id: ruleId,
-      userId,
-      domain: this.domain,
-      description: distillResult.ruleDescription,
-      triggerConditions: distillResult.triggerConditions,
-      resultAction: distillResult.resultAction,
-      confidence: distillResult.confidence * 0.9,
-      timesApplied: 0,
-      timesCorrect: 0,
-      embedding: ruleEmbedding,
-      isActive: true,
-      createdAt: new Date(),
-    };
-
-    console.log(`   ✅ Warm Path 規則: "${rule.description}" (信心度: ${(rule.confidence * 100).toFixed(0)}%)`);
-
-    return rule;
   }
 
   /**
