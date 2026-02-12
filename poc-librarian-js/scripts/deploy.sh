@@ -27,12 +27,16 @@ cd "$PROJECT_DIR"
 # ============================================================================
 SERVICE_NAME="${SERVICE_NAME:-librarian-service}"
 REGION="${REGION:-asia-east1}"
+REQUIRED_PROJECT="zentropy-4f7a5"
+
+# 🚨 強制 project 檢查 — 只允許部署到 zentropy-4f7a5
 PROJECT_ID=$(gcloud config get-value project 2>/dev/null || echo "")
 
-if [ -z "$PROJECT_ID" ]; then
-  echo "❌ 未設定 GCP project，請先執行："
-  echo "   gcloud config set project YOUR_PROJECT_ID"
-  exit 1
+if [ "$PROJECT_ID" != "$REQUIRED_PROJECT" ]; then
+  echo "🚨 當前 GCP project 是 '$PROJECT_ID'，不是 '$REQUIRED_PROJECT'"
+  echo "   自動切換..."
+  gcloud config set project "$REQUIRED_PROJECT"
+  PROJECT_ID="$REQUIRED_PROJECT"
 fi
 
 IMAGE="gcr.io/$PROJECT_ID/$SERVICE_NAME"
