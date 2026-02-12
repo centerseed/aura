@@ -155,39 +155,25 @@ export class GenerateBrainDumpStructureUseCase {
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + 90)
 
-    // Step 1: 計算 embedding + Librarian recall（並行執行）
-    let userEmbedding: number[] | null = null
-    let embeddingTime = 0
-    let librarianRules: LibrarianRule[] = []
+    // Step 1: embedding + Librarian recall + 巨型 SQL（盡量並行）
+    const startParallel = Date.now()
 
-    {
-      const embeddingPromise = request.explicitProductId
-        ? Promise.resolve(null)
-        : getEmbedding(request.cleanedText)
+    // embedding（如果有 explicitProductId 則跳過）
+    const embeddingPromise = request.explicitProductId
+      ? Promise.resolve(null)
+      : getEmbedding(request.cleanedText)
 
-      const recallPromise = librarianRecall({
-        userId: request.userId,
-        input: request.cleanedText,
-      })
+    // librarian rules（直接查 DB，不走 HTTP）
+    const recallPromise = librarianRecall({ userId: request.userId })
 
-      const t1 = Date.now()
-      const [embeddingResult, recallResult] = await Promise.all([embeddingPromise, recallPromise])
-      embeddingTime = Date.now() - t1
+    // 等 embedding 完成後才能跑 main SQL（需要 vector）
+    const userEmbedding = await embeddingPromise
+    timings["embedding"] = Date.now() - startParallel
 
-      userEmbedding = embeddingResult
-      librarianRules = recallResult
-
-      if (librarianRules.length > 0) {
-        console.log(`📚 [brain-dump] Librarian recalled ${librarianRules.length} rules`)
-      }
-    }
-    timings["embedding_and_recall"] = embeddingTime
-
-    // Step 2: 巨型 SQL 查詢
-    const startDbParallel = Date.now()
     const vectorStr = userEmbedding ? `[${userEmbedding.join(",")}]` : null
 
-    const combinedResults = await prisma.$queryRaw<CombinedResult[]>`
+    // main SQL + librarian recall 並行（recall 可能已完成或仍在跑）
+    const mainQueryPromise = prisma.$queryRaw<CombinedResult[]>`
       WITH
       relevant_products AS (
         SELECT
@@ -279,6 +265,14 @@ export class GenerateBrainDumpStructureUseCase {
       ORDER BY data_type DESC, product_similarity DESC NULLS LAST, area_name, product_name
     `
 
+    // 等待 main SQL + librarian recall 並行完成
+    const [combinedResults, librarianRules] = await Promise.all([mainQueryPromise, recallPromise])
+    timings["db_and_recall_parallel"] = Date.now() - startParallel
+
+    if (librarianRules.length > 0) {
+      console.log(`📚 [brain-dump] Librarian recalled ${librarianRules.length} rules`)
+    }
+
     // 解析合併結果
     const rawStructure: Array<{
       area_id: string
@@ -337,7 +331,7 @@ export class GenerateBrainDumpStructureUseCase {
 
     if (relevantProducts.length > 0 && !request.explicitProductId) {
       console.log(
-        `🔍 [brain-dump] Found ${relevantProducts.length} relevant Products (${embeddingTime}ms embedding):`,
+        `🔍 [brain-dump] Found ${relevantProducts.length} relevant Products (${timings["embedding"]}ms embedding):`,
         relevantProducts.map(r => `${r.name} (${(r.similarity * 100).toFixed(0)}%)`).join(", ")
       )
     }
@@ -456,7 +450,7 @@ export class GenerateBrainDumpStructureUseCase {
       }]
     }
 
-    timings["db_parallel"] = Date.now() - startDbParallel
+    // timings already recorded above in db_and_recall_parallel
 
     // Step 3: 動態預算分配
     const MAX_CONTEXT_ITEMS = 100

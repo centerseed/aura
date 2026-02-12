@@ -45,7 +45,7 @@ interface TaskDetailModalProps {
   onComplete?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
   onStatusChange?: (taskId: string, newStatus: DrawerStatus) => void;
-  onAddToCalendar?: (taskId: string) => Promise<{ eventLink: string; meetLink?: string } | null>;
+  onAddToCalendar?: (taskId: string, options?: { startTime?: string; durationMinutes?: number; eventId?: string }) => Promise<{ eventLink: string; meetLink?: string; eventId?: string } | null>;
   onSetReminder?: (taskId: string, reminderType: "calendar" | "notification", minutesBefore: number) => Promise<boolean>;
   isCalendarConnected?: boolean;
   initialEditSubItemId?: string | null;
@@ -204,6 +204,10 @@ export function TaskDetailModal({
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [calendarEventLink, setCalendarEventLink] = useState<string | null>(null);
+  const [calendarEventId, setCalendarEventId] = useState<string | null>(null);
+  const [calendarStartTime, setCalendarStartTime] = useState("09:00");
+  const [calendarDuration, setCalendarDuration] = useState(60);
+  const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [showReminderOptions, setShowReminderOptions] = useState(false);
   const [isSettingReminder, setIsSettingReminder] = useState(false);
   const [editDialogSubItem, setEditDialogSubItem] = useState<SubItem | null>(null);
@@ -424,50 +428,59 @@ export function TaskDetailModal({
         <div className="flex-1 overflow-hidden flex">
           {/* Left Column - Main Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Dates */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-white/80 mb-2">開始日期</h3>
+            {/* Dates & Calendar */}
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="min-w-[120px]">
+                <h3 className="text-xs text-white/50 mb-1">開始日期</h3>
                 <button
                   onClick={() => onSetStartDate?.(task.id)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-indigo-400/50 hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 border border-white/10 hover:border-indigo-400/50 hover:bg-white/10 transition-colors text-sm text-white/80"
                 >
-                  <Calendar className="w-4 h-4 text-white/60" />
-                  <span className="text-sm text-white/80">
-                    {task.start_date ? new Date(task.start_date).toLocaleDateString('zh-TW') : "設定日期"}
-                  </span>
+                  <Calendar className="w-3.5 h-3.5 text-white/50" />
+                  {task.start_date ? new Date(task.start_date).toLocaleDateString('zh-TW') : "設定日期"}
                 </button>
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-white/80 mb-2">截止日期</h3>
+              <div className="min-w-[120px]">
+                <h3 className="text-xs text-white/50 mb-1">截止日期</h3>
                 <button
                   onClick={() => onSetDueDate?.(task.id)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-indigo-400/50 hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 border border-white/10 hover:border-indigo-400/50 hover:bg-white/10 transition-colors text-sm text-white/80"
                 >
-                  <Calendar className="w-4 h-4 text-white/60" />
-                  <span className="text-sm text-white/80">
-                    {task.due_date ? new Date(task.due_date).toLocaleDateString('zh-TW') : "設定日期"}
-                  </span>
+                  <Calendar className="w-3.5 h-3.5 text-white/50" />
+                  {task.due_date ? new Date(task.due_date).toLocaleDateString('zh-TW') : "設定日期"}
                 </button>
               </div>
-            </div>
 
-            {/* Calendar & Reminder Actions */}
-            {(onAddToCalendar || onSetReminder) && (
-              <div className="flex gap-3">
-                {onAddToCalendar && (
-                  <div className="flex-1">
-                    {calendarEventLink ? (
-                      <a
-                        href={calendarEventLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors text-sm"
-                      >
-                        <Link2 className="w-4 h-4" />
-                        查看日曆事件
-                      </a>
-                    ) : (
+              {/* Google Calendar - inline */}
+              {onAddToCalendar && (
+                <>
+                  {showCalendarOptions ? (
+                    <div className="flex items-end gap-2">
+                      <div>
+                        <label className="text-xs text-white/50 mb-1 block">時間</label>
+                        <input
+                          type="time"
+                          value={calendarStartTime}
+                          onChange={(e) => setCalendarStartTime(e.target.value)}
+                          className="px-2 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm text-white/80 focus:border-blue-400/50 focus:outline-none w-[130px] [&::-webkit-calendar-picker-indicator]:invert"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-white/50 mb-1 block">時長</label>
+                        <select
+                          value={calendarDuration}
+                          onChange={(e) => setCalendarDuration(Number(e.target.value))}
+                          className="px-2 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm text-white/80 focus:border-blue-400/50 focus:outline-none appearance-none w-[110px]"
+                        >
+                          <option value={10}>10 分鐘</option>
+                          <option value={20}>20 分鐘</option>
+                          <option value={30}>30 分鐘</option>
+                          <option value={60}>1 小時</option>
+                          <option value={90}>1.5 小時</option>
+                          <option value={120}>2 小時</option>
+                          <option value={180}>3 小時</option>
+                        </select>
+                      </div>
                       <button
                         onClick={async () => {
                           if (!task.start_date && !task.due_date) {
@@ -480,9 +493,14 @@ export function TaskDetailModal({
                           }
                           setIsAddingToCalendar(true);
                           try {
-                            const result = await onAddToCalendar(task.id);
+                            const result = await onAddToCalendar(task.id, {
+                              startTime: calendarStartTime,
+                              durationMinutes: calendarDuration,
+                              eventId: calendarEventId || undefined,
+                            });
                             if (result) {
                               setCalendarEventLink(result.eventLink);
+                              if (result.eventId) setCalendarEventId(result.eventId);
                             }
                           } catch {
                             alert("加入日曆失敗，請稍後再試");
@@ -491,74 +509,55 @@ export function TaskDetailModal({
                           }
                         }}
                         disabled={isAddingToCalendar}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-blue-400/50 hover:bg-white/10 transition-colors text-sm text-white/80 disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-500/15 border border-blue-500/30 text-blue-400 hover:bg-blue-500/25 transition-colors text-sm disabled:opacity-50 whitespace-nowrap"
                       >
-                        {isAddingToCalendar ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <CalendarPlus className="w-4 h-4 text-blue-400" />
-                        )}
-                        {isAddingToCalendar ? "加入中..." : "加入日曆"}
+                        {isAddingToCalendar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarPlus className="w-3.5 h-3.5" />}
+                        {isAddingToCalendar ? "加入中..." : calendarEventLink ? "更新" : "確認"}
                       </button>
-                    )}
-                  </div>
-                )}
-                {onSetReminder && (
-                  <div className="relative flex-1">
-                    <button
-                      onClick={() => setShowReminderOptions(!showReminderOptions)}
-                      disabled={isSettingReminder}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-amber-400/50 hover:bg-white/10 transition-colors text-sm text-white/80 disabled:opacity-50"
-                    >
-                      {isSettingReminder ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Bell className="w-4 h-4 text-amber-400" />
+                      {calendarEventLink && (
+                        <a
+                          href={calendarEventLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-md text-green-400 hover:text-green-300 hover:bg-green-500/10 transition-colors"
+                          title="查看日曆事件"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
                       )}
-                      {isSettingReminder ? "設定中..." : "設定提醒"}
+                      <button
+                        onClick={() => setShowCalendarOptions(false)}
+                        className="p-1.5 rounded-md text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : calendarEventLink ? (
+                    <button
+                      onClick={() => setShowCalendarOptions(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors text-sm"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" />
+                      已加入日曆
                     </button>
-                    {showReminderOptions && (
-                      <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden">
-                        {[
-                          { label: "15 分鐘前", minutes: 15 },
-                          { label: "1 小時前", minutes: 60 },
-                          { label: "1 天前", minutes: 1440 },
-                        ].map(({ label, minutes }) => (
-                          <button
-                            key={minutes}
-                            onClick={async () => {
-                              if (!task.due_date) {
-                                alert("請先設定截止日期");
-                                return;
-                              }
-                              setIsSettingReminder(true);
-                              setShowReminderOptions(false);
-                              try {
-                                const success = await onSetReminder(
-                                  task.id,
-                                  isCalendarConnected ? "calendar" : "notification",
-                                  minutes
-                                );
-                                if (success) {
-                                  alert("提醒已設定");
-                                }
-                              } catch {
-                                alert("設定提醒失敗");
-                              } finally {
-                                setIsSettingReminder(false);
-                              }
-                            }}
-                            className="w-full px-3 py-2 text-sm text-white/80 hover:bg-white/10 transition-colors text-left"
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (!task.start_date && !task.due_date) {
+                          alert("請先設定開始日期或截止日期");
+                          return;
+                        }
+                        setShowCalendarOptions(true);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 border border-white/10 hover:border-blue-400/50 hover:bg-white/10 transition-colors text-sm text-white/60 hover:text-blue-400"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" />
+                      加入日曆
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* Narrative */}
             <div>
