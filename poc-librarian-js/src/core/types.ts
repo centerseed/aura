@@ -209,6 +209,8 @@ export interface ObserveEvent {
   input: string;
   aiPrediction: Record<string, unknown>;
   userCorrection: Record<string, unknown>;
+  originalTopic?: string | null;
+  correctedTopic?: string | null;
   phaseNumber?: number;
 }
 

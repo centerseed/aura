@@ -1,9 +1,9 @@
 # 架構設計：Universal Librarian Engine (通用記憶引擎)
 > **一個可跨專案復用的 AI 記憶與學習微服務**
 
-**狀態**: 設計中 (Design)
-**版本**: 2.0
-**日期**: 2026-01-30
+**狀態**: 已實作 (Implemented)
+**版本**: 3.0
+**日期**: 2026-02-12 (更新)
 
 ---
 
@@ -256,6 +256,49 @@ LibrarianAdapter {
 
 ---
 
+## 5.3 規則觸發策略（三層架構 v2 — 2026-02-12 更新）
+
+原始設計為 Hot / Warm / Cold 三層，實際運行後發現 Warm Path（累積 3 筆觸發 1 次 LLM）效益不彰：
+- Instant Rule（直接從單次修正建規則，0 次 LLM）已能覆蓋「改一次就學會」的場景
+- Warm Path 的 LLM 呼叫在 3 筆資料下品質不穩定
+- Cold Path 蒸餾會合併/升級 Instant Rules，形成完整生命週期
+
+**現行架構**：
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  Hot Path（每次修正 · 0 次 LLM · <50ms）                       │
+│  比對修正結果是否與現有規則一致 → boost confidence              │
+│  支援多欄位匹配：product / topic / category                     │
+├────────────────────────────────────────────────────────────────┤
+│  Instant Rule（每次修正 · 0 次 LLM · <100ms）                  │
+│  Hot Path 未匹配時，直接從修正內容建立低信心度規則（0.7）        │
+│  支援同時建立 product + topic 兩條規則                          │
+│  建立後 correction 標記 processed: true（避免 Cold Path 重複）   │
+├────────────────────────────────────────────────────────────────┤
+│  Cold Path（累積 10 筆未處理修正 · N 次 LLM）                   │
+│  完整蒸餾：分群 → 歸納規則 → 驗證衝突 → 儲存                   │
+│  蒸餾後：archive 被取代的 Instant Rules + 清理垃圾規則          │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**規則生命週期**：
+
+```
+修正 → Instant Rule (confidence: 0.7)
+  ↓ 被使用 → Hot Path boost (+0.02/次，上限 0.98)
+  ↓ 未被使用 → 30 天後 aging 降權 50%
+  ↓ Cold Path 蒸餾 → 產出更通用的規則 (confidence: 0.8+)
+      → 若新規則 confidence > 舊 Instant Rule → archive 舊規則
+      → 若舊規則更強 → 合併統計到舊規則
+  ↓ confidence < 0.5 且 timesApplied = 0 → 蒸餾後被清理
+  ↓ 60 天未使用 → 自動歸檔 (is_active = false)
+```
+
+**Aging 觸發時機**：每次 `observe()` 結尾都會執行 `applyRuleAging()`（2 個 UPDATE SQL，<5ms），不再依賴 Cold Path 蒸餾才觸發。
+
+---
+
 ## 6. 部署架構
 
 ### 6.1 微服務模式 (生產環境)
@@ -326,25 +369,28 @@ LibrarianAdapter {
 
 ## 8. 實作階段
 
-### Phase 1: 核心引擎 (2 週)
-- [ ] 定義核心介面 (observe/recall/reflect)
-- [ ] 實作 LLM 蒸餾工作流
-- [ ] 建立 API 框架
+### Phase 1: 核心引擎 ✅ 已完成
+- [x] 定義核心介面 (observe/recall/reflect)
+- [x] 實作 LLM 蒸餾工作流（多階段：分群→蒸餾→驗證）
+- [x] 建立 Express HTTP API 框架
 
-### Phase 2: Naruvia Adapter (1 週)
-- [ ] 實作 PostgreSQL + pgvector Adapter
-- [ ] 規則蒸餾邏輯
-- [ ] POC 驗證（見 032 文件）
+### Phase 2: Naruvia Adapter ✅ 已完成
+- [x] 實作 PostgreSQL + pgvector Adapter（Neon DB）
+- [x] 規則蒸餾邏輯（Hot Path + Instant Rule + Cold Path）
+- [x] POC 驗證（見 032 文件）
+- [x] 規則生命週期（aging、archive、junk cleanup）
+- [x] 支援多欄位修正（product + topic）
 
-### Phase 3: Havital Adapter (1 週)
+### Phase 3: Havital Adapter (未開始)
 - [ ] 實作 Firestore Adapter
 - [ ] 對話壓縮邏輯
 - [ ] 整合到 Rizo Agent
 
-### Phase 4: 生產部署 (1 週)
-- [ ] Docker 容器化
-- [ ] Cloud Run 部署
-- [ ] 監控與日誌
+### Phase 4: 生產部署 ✅ 已完成
+- [x] Docker 容器化
+- [x] Cloud Run 部署（zentropy-4f7a5 project）
+- [x] API Key 認證中介層
+- [ ] 監控與告警（待完善）
 
 ---
 
@@ -400,11 +446,14 @@ LibrarianAdapter {
 | 規則有效性 | > 90% | 人工抽檢 |
 | 成本控制 | < $1/用戶/月 | LLM 成本 |
 
-### 11.2 規則老化機制
+### 11.2 規則老化機制（已實作）
 
 防止過時規則污染：
-- 30 天未使用 → 降權 50%
-- 60 天未使用 → 歸檔
+- 每次 `observe()` 自動觸發 aging（不再依賴蒸餾）
+- 30 天未使用 → 降權 50%（confidence *= 0.5）
+- 60 天未使用 → 歸檔（is_active = false）
+- 蒸餾後清理：confidence < 0.5 且 timesApplied = 0 的垃圾規則
+- 規則上限 20 條/用戶，超過歸檔 confidence 最低的
 - 用戶明確否定 → 立即刪除
 
 ---

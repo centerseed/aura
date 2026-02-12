@@ -1,10 +1,10 @@
 # 實作計畫：Librarian Engine JS POC
 > **使用 Node.js (TypeScript) 驗證 Universal Memory Architecture 的輕量級 POC**
 
-**狀態**: 規劃中 (Planning)
-**版本**: 2.1
-**日期**: 2026-01-30
-**預計時程**: 1 週
+**狀態**: 已完成並持續迭代 (Completed & Iterating)
+**版本**: 3.0
+**日期**: 2026-02-12 (更新)
+**預計時程**: 1 週（實際已完成）
 
 ---
 
@@ -654,20 +654,29 @@ npm run poc:report       # 生成報告
 
 | 改進 | 狀態 | 說明 |
 |------|------|------|
-| **規則驗證迴圈** | ✅ | 新規則與現有規則衝突檢測 |
-| **規則合併** | ✅ | 相似規則自動合併 |
-| **使用頻率衰減** | ✅ | 30/60 天未使用降權/歸檔 |
-| **多階段蒸餾** | ✅ | 先歸納、再抽象、最後驗證 |
+| **規則驗證迴圈** | ✅ | 新規則與現有規則衝突檢測（duplicate/similar/conflict） |
+| **規則合併** | ✅ | 相似規則自動合併統計 |
+| **使用頻率衰減** | ✅ | 30/60 天未使用降權/歸檔，每次 observe 自動觸發 |
+| **多階段蒸餾** | ✅ | Stage 0 aging → Stage 1 分群 → Stage 2 蒸餾 → Stage 3 驗證 → Stage 4 標記 → Stage 4.5 清理 |
 | **Silhouette Score** | ✅ | 分群品質驗證 |
+| **Instant Rule** | ✅ | 單次修正直接建立低信心度規則，下次 recall 即可用（取代 Warm Path） |
+| **多欄位修正** | ✅ | 支援 product + topic 同時建立 Instant Rules |
+| **Hot Path 通用化** | ✅ | 支援 product/topic/category 等多欄位匹配 |
+| **Corrections 標記** | ✅ | Instant Rule 建立成功 → correction 標記 processed，避免 Cold Path 重複蒸餾 |
+| **蒸餾後清理** | ✅ | Cold Path 蒸餾時 archive 被取代的 Instant Rules + 清理垃圾規則 |
+| **規則上限** | ✅ | 每用戶 20 條 active 規則上限，超過歸檔 confidence 最低的 |
+| ~~Warm Path~~ | 🗑️ 已移除 | 被 Instant Rule 取代，死碼已清理 |
 
 ### 12.3 未來可選實作
 
 | 改進 | 優先級 | 複雜度 | 說明 |
 |------|--------|--------|------|
 | **P-RLHF User Model** | 中 | 高 | 需要訓練輕量級模型 |
-| **Implicit Feedback** | 高 | 中 | 從用戶行為推斷偏好 |
-| **Memory Decay (ACT-R)** | 中 | 低 | 公式化的遺忘機制 |
+| **Implicit Feedback** | 高 | 中 | 從用戶行為推斷偏好（不需要明確修正） |
+| ~~Memory Decay (ACT-R)~~ | ~~中~~ | ~~低~~ | ✅ 已實作：30/60 天 aging + 垃圾規則清理 |
 | **Logic Verification** | 低 | 高 | 需要符號系統整合 |
+| **Recall 語意過濾** | 低 | 中 | 目前 20 條上限夠小，暫不需要 |
+| **Cloud Scheduler** | 低 | 低 | aging 已在 observe 時順便跑，不需獨立排程 |
 
 ---
 
@@ -679,6 +688,11 @@ npm run poc:report       # 生成報告
 4. ✅ 實作 Simulation Runner
 5. ✅ 執行驗證並產出報告
 6. ✅ 加入 System 2 改進（規則驗證、合併、老化）
+7. ✅ 部署為 HTTP 微服務（Cloud Run + API Key 認證）
+8. ✅ 整合到 Naruvia API（librarian-client: observe + recall）
+9. ✅ 完善規則生命週期（Instant Rule、multi-field、aging、cleanup）
+10. 🔜 監控與告警（規則品質追蹤、蒸餾成功率）
+11. 🔜 用戶端規則庫 UI（查看/編輯/停用規則）
 
 ---
 

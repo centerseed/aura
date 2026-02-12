@@ -633,6 +633,60 @@ export async function getUnmatchedCorrectionCount(userId: string, domain: string
 }
 
 /**
+ * 強制規則數量上限
+ *
+ * 超過 maxRules 時，歸檔 confidence 最低的規則。
+ */
+export async function enforceRuleLimit(
+  userId: string,
+  maxRules: number = 20,
+  domain: string = 'naruvia'
+): Promise<number> {
+  const result = await queryInSchema<{ id: string }>(
+    `UPDATE rules SET is_active = false
+     WHERE id IN (
+       SELECT id FROM rules
+       WHERE user_id = $1 AND domain = $2 AND is_active = true
+       ORDER BY confidence DESC
+       OFFSET $3
+     )
+     RETURNING id`,
+    [userId, domain, maxRules]
+  );
+  return result.rowCount || 0;
+}
+
+/**
+ * 歸檔單條規則（設為 is_active = false）
+ */
+export async function archiveRule(ruleId: string): Promise<void> {
+  await queryInSchema(
+    `UPDATE rules SET is_active = false WHERE id = $1`,
+    [ruleId]
+  );
+}
+
+/**
+ * 歸檔所有低品質垃圾規則（confidence < threshold 且從未被使用）
+ */
+export async function archiveJunkRules(
+  userId: string,
+  confidenceThreshold: number = 0.5,
+  domain: string = 'naruvia'
+): Promise<number> {
+  const result = await queryInSchema<{ id: string }>(
+    `UPDATE rules SET is_active = false
+     WHERE user_id = $1 AND domain = $2
+       AND is_active = true
+       AND confidence < $3
+       AND times_applied = 0
+     RETURNING id`,
+    [userId, domain, confidenceThreshold]
+  );
+  return result.rowCount || 0;
+}
+
+/**
  * 檢查新規則是否與現有規則衝突
  */
 export async function checkRuleConflicts(

@@ -10,11 +10,15 @@ import { RuleDistiller } from '../intelligence/distiller.js';
 import {
   getEmbedding,
   storeCorrection,
+  storeRule,
   searchSimilarRules,
   updateRuleUsage,
   getUserRules,
   boostRuleConfidence,
+  checkRuleConflicts,
+  enforceRuleLimit,
   getUnmatchedCorrectionCount,
+  applyRuleAging,
 } from '../core/vector-store.js';
 import { classifyTask } from '../core/llm-client.js';
 import type {
@@ -44,7 +48,6 @@ export class NaruviaAdapter extends BaseLibrarianAdapter {
     options: {
       domain?: string;
       distillThreshold?: number;
-      warmThreshold?: number;
       similarityThreshold?: number;
       categories?: string[] | null;
     } = {}
@@ -54,7 +57,6 @@ export class NaruviaAdapter extends BaseLibrarianAdapter {
     this.distiller = new RuleDistiller({
       domain: this.domain,
       distillThreshold: options.distillThreshold,
-      warmThreshold: options.warmThreshold,
       similarityThreshold: options.similarityThreshold,
     });
 
@@ -80,6 +82,9 @@ export class NaruviaAdapter extends BaseLibrarianAdapter {
     console.log(`📝 記錄修正: "${event.input}"`);
     console.log(`   AI 預測: ${JSON.stringify(event.aiPrediction)}`);
     console.log(`   用戶修正: ${JSON.stringify(event.userCorrection)}`);
+    if (event.correctedTopic) {
+      console.log(`   Topic 修正: ${event.originalTopic} → ${event.correctedTopic}`);
+    }
 
     // 計算 embedding
     const embedding = await getEmbedding(this.formatCorrectionText(event));
@@ -87,7 +92,17 @@ export class NaruviaAdapter extends BaseLibrarianAdapter {
     // ========== Hot Path: 即時比對現有規則 ==========
     const matchedRule = await this.hotPathMatch(event, embedding);
 
-    // 儲存修正（Hot Path 匹配到的標記為已處理）
+    if (matchedRule) {
+      console.log(`   ⚡ Hot Path: 匹配規則 "${matchedRule.description}"，已 boost confidence`);
+    }
+
+    // ========== Instant Rule: 立即建立 raw rule，下次 brain dump 就能用 ==========
+    let instantRuleCreated = false;
+    if (!matchedRule) {
+      instantRuleCreated = await this.createInstantRule(event, embedding);
+    }
+
+    // 儲存修正（Hot Path 匹配到 或 Instant Rule 建立成功 → 標記已處理）
     await storeCorrection({
       userId: event.userId,
       domain: this.domain,
@@ -96,30 +111,103 @@ export class NaruviaAdapter extends BaseLibrarianAdapter {
       userCorrection: event.userCorrection,
       correctedField: 'category',
       embedding,
-      processed: matchedRule !== null,
+      processed: matchedRule !== null || instantRuleCreated,
       phaseNumber: event.phaseNumber,
     });
 
-    if (matchedRule) {
-      console.log(`   ⚡ Hot Path: 匹配規則 "${matchedRule.description}"，已 boost confidence`);
-      return;
+    if (!matchedRule && !instantRuleCreated) {
+      console.log('   ✅ 修正已記錄（未匹配現有規則）');
     }
 
-    console.log('   ✅ 修正已記錄（未匹配現有規則）');
-
-    // ========== 檢查觸發條件 ==========
+    // ========== 檢查觸發條件（Cold Path 完整蒸餾） ==========
     const summary = await this.distiller.getDistillationSummary(event.userId);
 
     if (summary.readyToDistill) {
-      // Cold Path
       console.log(`   🔔 Cold Path: 已達蒸餾閾值 (${summary.pendingCorrections}/${summary.threshold})`);
-    } else if (summary.pendingCorrections >= 3) {
-      // Warm Path
-      console.log(`   ⚡ Warm Path: 嘗試快速蒸餾 (${summary.pendingCorrections} 筆)...`);
-      const warmRule = await this.distiller.warmDistill(event.userId);
-      if (warmRule) {
-        console.log(`   ✅ Warm Path 產出規則: "${warmRule.description}"`);
+    }
+
+    // ========== 順便跑 aging（輕量 SQL，不影響延遲） ==========
+    await applyRuleAging(event.userId, this.domain);
+  }
+
+  /**
+   * Instant Rule: 從單次修正直接建立低信心度規則
+   *
+   * 不經 LLM，直接用修正內容建規則。
+   * 讓用戶「改一次就學會」— 下次 brain dump recall 就能撈到。
+   * Cold Path 蒸餾時會合併/升級這些 raw rules。
+   */
+  private async createInstantRule(
+    event: ObserveEvent,
+    embedding: number[]
+  ): Promise<boolean> {
+    try {
+      const userCorr = typeof event.userCorrection === 'string'
+        ? event.userCorrection
+        : (event.userCorrection as Record<string, unknown>)?.value as string
+          ?? JSON.stringify(event.userCorrection);
+
+      const description = event.input;
+      const rulesToCreate: Array<{ field: string; value: string }> = [];
+
+      // Product 修正
+      if (userCorr && userCorr !== JSON.stringify(event.aiPrediction)) {
+        rulesToCreate.push({ field: 'product', value: userCorr });
       }
+
+      // Topic 修正
+      if (event.correctedTopic) {
+        rulesToCreate.push({ field: 'topic', value: event.correctedTopic });
+      }
+
+      if (rulesToCreate.length === 0) return false;
+
+      let created = false;
+      for (const resultAction of rulesToCreate) {
+        // 檢查是否與現有規則重複
+        const conflictCheck = await checkRuleConflicts(
+          event.userId,
+          description,
+          resultAction,
+          embedding,
+          this.domain
+        );
+
+        if (conflictCheck.hasConflict) {
+          const conflict = conflictCheck.conflictingRules[0];
+          if (conflict.conflictType === 'duplicate' || conflict.conflictType === 'similar') {
+            console.log(`   ⏭️ Instant Rule 跳過（${resultAction.field}）：與現有規則重複/相似`);
+            continue;
+          }
+        }
+
+        const ruleId = await storeRule({
+          userId: event.userId,
+          domain: this.domain,
+          description,
+          triggerConditions: [],
+          resultAction,
+          confidence: 0.7,
+          embedding,
+          isActive: true,
+        });
+
+        console.log(`   ⚡ Instant Rule 已建立: "${description}" → ${resultAction.field}: ${resultAction.value} (id: ${ruleId}, 信心度: 70%)`);
+        created = true;
+      }
+
+      if (created) {
+        // 強制上限 20 條，超過歸檔 confidence 最低的
+        const archived = await enforceRuleLimit(event.userId, 20, this.domain);
+        if (archived > 0) {
+          console.log(`   🗄️ 規則上限清理: 歸檔 ${archived} 條低信心度規則`);
+        }
+      }
+
+      return created;
+    } catch (error) {
+      console.warn('   ⚠️ Instant Rule 建立失敗:', error instanceof Error ? error.message : error);
+      return false;
     }
   }
 
@@ -139,9 +227,12 @@ export class NaruviaAdapter extends BaseLibrarianAdapter {
 
     for (const rule of similarRules) {
       // 檢查修正結果是否與規則一致
-      const ruleValue = (rule.resultAction as { value?: string })?.value;
-      const correctionValue = (event.userCorrection as { value?: string })?.value
-        ?? (event.userCorrection as { category?: string })?.category;
+      const ruleAction = rule.resultAction as { field?: string; value?: string };
+      const ruleValue = ruleAction?.value;
+      const correction = event.userCorrection as Record<string, unknown>;
+      const correctionValue = typeof event.userCorrection === 'string'
+        ? event.userCorrection
+        : (correction?.value ?? correction?.category ?? correction?.topic ?? (ruleAction?.field ? correction?.[ruleAction.field] : undefined)) as string | undefined;
 
       if (ruleValue && correctionValue && ruleValue === correctionValue) {
         // 修正方向一致 → boost confidence
@@ -269,7 +360,6 @@ export function createNaruviaAdapter(
   options?: {
     domain?: string;
     distillThreshold?: number;
-    warmThreshold?: number;
     similarityThreshold?: number;
     categories?: string[] | null;
   }
