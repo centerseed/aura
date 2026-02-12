@@ -68,15 +68,13 @@ async function main() {
 
       // ── OAuth Discovery (for MCP clients) ─────────────
       if (pathname === "/.well-known/oauth-authorization-server-metadata") {
-        const issuer =
-          process.env.ZENTROPY_OAUTH_ISSUER || "https://auth.zentropy.app";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || `http://${hostname}:${port}`;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
-            issuer,
-            authorization_endpoint: `${issuer}/authorize`,
-            token_endpoint: `${issuer}/token`,
-            registration_endpoint: `${issuer}/register`,
+            issuer: baseUrl,
+            authorization_endpoint: `${baseUrl}/api/oauth/mcp/authorize`,
+            token_endpoint: `${baseUrl}/api/oauth/mcp/token`,
             scopes_supported: [
               "read:tasks",
               "read:knowledge",
@@ -88,10 +86,7 @@ async function main() {
             response_types_supported: ["code"],
             grant_types_supported: ["authorization_code", "refresh_token"],
             code_challenge_methods_supported: ["S256"],
-            token_endpoint_auth_methods_supported: [
-              "client_secret_basic",
-              "none",
-            ],
+            token_endpoint_auth_methods_supported: ["none"],
           }),
         );
         return;

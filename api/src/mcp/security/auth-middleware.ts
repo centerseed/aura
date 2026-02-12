@@ -1,12 +1,12 @@
 /**
  * MCP Authentication Middleware (Section 2.2)
  *
- * Validates access tokens from MCP clients.
- * In the integrated server, MCP clients authenticate with Firebase ID tokens
- * (same as the web app). The token is passed through to internal API calls.
+ * Validates MCP access tokens (JWTs signed by our OAuth token endpoint).
+ * Falls back to dev context when ZENTROPY_MCP_JWT_SECRET is not set.
  */
 
 import type { AuthContext, OAuthScope } from "../types";
+import { verifyAccessToken, type McpTokenPayload } from "../oauth/jwt";
 
 export class AuthenticationError extends Error {
   constructor(message: string) {
@@ -18,11 +18,20 @@ export class AuthenticationError extends Error {
 /**
  * Authenticate an MCP request from the Authorization header.
  *
- * In production, this verifies the Firebase ID token.
- * For the MVP, we decode JWT claims and trust the token
- * (actual verification happens when the token is passed to API routes).
+ * Production: Verifies the JWT signature and extracts user context.
+ * Development: Falls back to dev context if JWT secret is not configured.
  */
 export function authenticateMcpRequest(authHeader?: string): AuthContext {
+  // If no JWT secret configured, use dev context (local development)
+  if (!process.env.ZENTROPY_MCP_JWT_SECRET) {
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      // Try to extract user info from token even without verification
+      return decodeTokenUnsafe(authHeader.slice("Bearer ".length));
+    }
+    return createDevContext();
+  }
+
+  // Production: require and verify Bearer token
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     throw new AuthenticationError(
       "Missing or invalid Authorization header. Expected: Bearer <token>",
@@ -34,14 +43,32 @@ export function authenticateMcpRequest(authHeader?: string): AuthContext {
     throw new AuthenticationError("Empty access token.");
   }
 
-  return decodeToken(token);
+  try {
+    const payload = verifyAccessToken(token);
+    return payloadToAuthContext(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid token";
+    throw new AuthenticationError(message);
+  }
 }
 
-function decodeToken(token: string): AuthContext {
+function payloadToAuthContext(payload: McpTokenPayload): AuthContext {
+  const scopes = parseScopes(payload.scope);
+  return {
+    userId: payload.sub,
+    clientId: payload.azp,
+    scopes: scopes.length > 0 ? scopes : getAllScopes(),
+    tokenExpiry: payload.exp,
+  };
+}
+
+/**
+ * Decode token without signature verification (dev mode only).
+ */
+function decodeTokenUnsafe(token: string): AuthContext {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) {
-      // Not a JWT — in dev mode, return a default context
       return createDevContext();
     }
 
@@ -49,16 +76,13 @@ function decodeToken(token: string): AuthContext {
       Buffer.from(parts[1], "base64url").toString("utf-8"),
     );
 
-    const scopes = parseScopes(payload.scope || payload.scp || "");
-
     return {
-      userId: payload.sub || payload.user_id || "unknown",
-      clientId: payload.azp || payload.client_id || "unknown",
-      scopes: scopes.length > 0 ? scopes : getAllScopes(),
-      tokenExpiry: payload.exp || 0,
+      userId: payload.sub || payload.user_id || "dev-user",
+      clientId: payload.azp || payload.client_id || "dev-client",
+      scopes: parseScopes(payload.scope || payload.scp || "") || getAllScopes(),
+      tokenExpiry: payload.exp || Math.floor(Date.now() / 1000) + 3600,
     };
   } catch {
-    // If token decoding fails, provide dev context for local testing
     return createDevContext();
   }
 }
