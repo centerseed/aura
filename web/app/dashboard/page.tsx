@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
+import { getOAuthStatus } from "@/lib/oauth-client";
 
 // Helper function to get auth headers
 async function getAuthHeaders() {
@@ -1134,6 +1135,7 @@ function DashboardContent() {
     reasoning: string;
     alternatives: string[];
   } | null>(null);
+  const [calendarConnected, setCalendarConnected] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [isReorganizeModalOpen, setIsReorganizeModalOpen] = useState(false);
   const [reorganizeProposal, setReorganizeProposal] = useState<ReorganizeProposal | null>(null);
@@ -1288,6 +1290,23 @@ function DashboardContent() {
       setIsWelcomeMode(!hasTasks);
     }
   }, [isLoading, userId, hasTasks]);
+
+  // 檢查 Google Calendar 連線狀態
+  useEffect(() => {
+    if (!userId) return;
+    const checkCalendar = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+        const status = await getOAuthStatus('google_calendar', token);
+        setCalendarConnected(status.authorized);
+      } catch {
+        // 忽略錯誤，預設未連線
+      }
+    };
+    checkCalendar();
+  }, [userId]);
 
   // 獲取今天的日期範圍
   const getTodayDateRange = () => {
@@ -1992,6 +2011,75 @@ function DashboardContent() {
         const libraryData = await libraryRes.json();
         setAreas(cleanLibraryData(libraryData.data?.areas || []));
       }
+    }
+  };
+
+  // 加入 / 更新 Google Calendar
+  const handleAddToCalendar = async (taskId: string, options?: { startTime?: string; durationMinutes?: number; eventId?: string }): Promise<{ eventLink: string; meetLink?: string; eventId?: string } | null> => {
+    const task = areas
+      .flatMap((a) => a.products.flatMap((p) => p.tasks))
+      .filter((t) => t != null)
+      .find((t) => t.id === taskId);
+    if (!task) return null;
+
+    try {
+      const headers = await getAuthHeaders();
+      const durationMinutes = options?.durationMinutes || 60;
+      const startTime = options?.startTime || "09:00";
+
+      const dateStr = task.due_date || task.start_date;
+      const date = dateStr ? new Date(dateStr) : new Date();
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const start = new Date(date);
+      start.setHours(hours, minutes, 0, 0);
+      const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+
+      const startDateTime = start.toISOString();
+      const endDateTime = end.toISOString();
+
+      // 已有 eventId → 更新；否則建立
+      if (options?.eventId) {
+        const response = await fetch(`${API_BASE_URL}/api/calendar/update-event`, {
+          method: 'PUT',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId: options.eventId,
+            summary: task.title,
+            startDateTime,
+            endDateTime,
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to update calendar event');
+        const data = await response.json();
+        return {
+          eventLink: data.data?.eventLink || '',
+          meetLink: data.data?.meetLink,
+          eventId: options.eventId,
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/calendar/create-event`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary: task.title,
+          description: task.narrative || '',
+          startDateTime,
+          endDateTime,
+          generateMeetLink: false,
+          taskId,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to create calendar event');
+      const data = await response.json();
+      return {
+        eventLink: data.data?.eventLink || '',
+        meetLink: data.data?.meetLink,
+        eventId: data.data?.eventId,
+      };
+    } catch (err) {
+      console.error('Failed to add/update calendar:', err);
+      return null;
     }
   };
 
@@ -3728,6 +3816,8 @@ function DashboardContent() {
             onComplete={handleCompleteTask}
             onDelete={handleDeleteTask}
             onStatusChange={handleTaskStatusChange}
+            onAddToCalendar={handleAddToCalendar}
+            isCalendarConnected={calendarConnected}
           />
         )}
 
