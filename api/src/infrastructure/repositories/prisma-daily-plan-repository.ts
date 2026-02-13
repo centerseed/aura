@@ -59,6 +59,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
             create: data.items.map(item => ({
               task_id: item.taskId,
               sub_task_id: item.subTaskId,
+              item_type: item.subTaskId ? 'subtask' : 'task',
               content: item.content,
               area_name: item.areaName,
               product_name: item.productName,
@@ -160,6 +161,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     return {
       id: row.id,
       planId: row.plan_id,
+      itemType: row.item_type || (row.sub_task_id ? 'subtask' : 'task'),
       taskId: row.task_id,
       subTaskId: row.sub_task_id,
       content: row.content,

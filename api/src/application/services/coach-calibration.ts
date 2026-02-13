@@ -5,7 +5,8 @@
  * 計算個人校準係數，供 AI 估時參考。
  */
 
-import { prisma } from '@/lib/db'
+import type { PrismaClient } from '@prisma/client'
+import { prisma as defaultPrisma } from '@/lib/db'
 
 interface CalibrationData {
   areaName: string
@@ -22,6 +23,8 @@ interface CalibrationResult {
 const MIN_SAMPLES = 3
 
 export class CoachCalibration {
+  constructor(private readonly db: PrismaClient = defaultPrisma) {}
+
   /**
    * 取得用戶的個人校準資訊
    * 回傳可注入 prompt 的文字描述，冷啟動回傳 null
@@ -50,7 +53,7 @@ export class CoachCalibration {
   }
 
   private async calculate(userId: string): Promise<CalibrationResult> {
-    const items = await prisma.$queryRaw<Array<{
+    const items = await this.db.$queryRaw<Array<{
       area_name: string
       estimated_minutes: number
       actual_minutes: number

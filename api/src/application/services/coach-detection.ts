@@ -15,15 +15,12 @@ import type {
   ConflictItem,
   StagnationItem,
 } from '@/domain/entities/coach-briefing.entity'
-
-// ============================================================================
-// 常數
-// ============================================================================
-
-const WORK_HOURS_PER_DAY = 8
-const ESTIMATED_MINUTES_PER_TASK = 60
-const STAGNANT_PRODUCT_THRESHOLD_DAYS = 7
-const STUCK_TASK_THRESHOLD_DAYS = 5
+import {
+  WORK_HOURS_PER_DAY,
+  ESTIMATED_MINUTES_PER_TASK,
+  STAGNANT_PRODUCT_THRESHOLD_DAYS,
+  STUCK_TASK_THRESHOLD_DAYS,
+} from '@/lib/coach-constants'
 
 // ============================================================================
 // 衝突偵測

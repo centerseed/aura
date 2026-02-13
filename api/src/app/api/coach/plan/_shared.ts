@@ -10,7 +10,7 @@ export function formatPlanItem(item: DailyPlanItemData) {
     plan_id: item.planId,
     task_id: item.taskId,
     sub_task_id: item.subTaskId,
-    item_type: item.subTaskId ? 'subtask' : 'task',
+    item_type: item.itemType,
     content: item.content,
     area_name: item.areaName,
     product_name: item.productName,

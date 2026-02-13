@@ -8,9 +8,12 @@
 // Domain Types (camelCase)
 // ============================================================================
 
+export type PlanItemType = 'task' | 'subtask'
+
 export interface DailyPlanItemData {
   id: string
   planId: string
+  itemType: PlanItemType
   taskId: string
   subTaskId: string | null
   content: string

@@ -459,7 +459,8 @@ model DailyPlanItem {
   area_name         String    @db.VarChar
   product_name      String    @db.VarChar
   estimated_minutes Int?
-  due_date          DateTime? @db.Timestamp(6)
+  item_type         String    @default("subtask") @db.VarChar(10)
+  due_date          DateTime? @db.Date
   order             Int
   reasoning         String?   @db.Text
   completed         Boolean   @default(false)

@@ -16,6 +16,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { getStartOfDay, getEndOfDay } from '@/lib/timezone-utils'
+import { WORK_HOURS_PER_DAY } from '@/lib/coach-constants'
 
 // ============================================================================
 // Types
@@ -92,9 +93,6 @@ interface RawSubTask {
 // ============================================================================
 // Collector
 // ============================================================================
-
-const WORK_HOURS_PER_DAY = 8
-
 
 export class PlanCandidateCollector {
   async collect(userId: string, date: Date, timezone: string): Promise<CollectedData> {
