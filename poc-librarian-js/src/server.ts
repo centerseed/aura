@@ -27,7 +27,6 @@ async function createAdapterForDomain(userId: string, domain: string) {
   return createNaruviaAdapter(userId, {
     domain,
     distillThreshold: config.distillThreshold,
-    warmThreshold: config.warmThreshold,
     similarityThreshold: config.similarityThreshold,
     categories: config.categories,
   });
@@ -42,7 +41,7 @@ async function createAdapterForDomain(userId: string, domain: string) {
  */
 app.post('/api/observe', async (req, res) => {
   try {
-    const { userId, domain, type, input, aiPrediction, userCorrection } = req.body;
+    const { userId, domain, type, input, aiPrediction, userCorrection, originalTopic, correctedTopic } = req.body;
 
     if (!userId || !domain || !input) {
       res.status(400).json({ error: 'Missing required fields: userId, domain, input' });
@@ -57,6 +56,8 @@ app.post('/api/observe', async (req, res) => {
       input,
       aiPrediction: aiPrediction ?? {},
       userCorrection: userCorrection ?? {},
+      originalTopic: originalTopic ?? null,
+      correctedTopic: correctedTopic ?? null,
     });
 
     res.json({ ok: true });

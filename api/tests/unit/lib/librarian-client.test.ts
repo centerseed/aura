@@ -5,8 +5,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { librarianObserve, librarianRecall } from '@/lib/librarian-client'
 
-// Mock global fetch
+// Mock global fetch (for observe)
 global.fetch = vi.fn()
+
+// Mock prisma (for recall)
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    $queryRaw: vi.fn(),
+  },
+}))
+import { prisma } from '@/lib/db'
 
 describe('Librarian Client', () => {
   const originalEnv = process.env
@@ -165,68 +173,39 @@ describe('Librarian Client', () => {
   })
 
   describe('librarianRecall', () => {
-    it('應該正確發送 recall 請求', async () => {
-      const mockFetch = global.fetch as any
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          rules: [
-            { id: '1', pattern: 'test', correction: 'result', confidence: 0.9 },
-          ],
-        }),
-      })
+    it('應該直接查 DB 並返回格式化的規則', async () => {
+      const mockQueryRaw = prisma.$queryRaw as any
+      mockQueryRaw.mockResolvedValue([
+        {
+          id: '1',
+          description: '當輸入包含牛奶時',
+          result_action: { field: 'product', value: '生活雜務' },
+          confidence: 0.9,
+        },
+      ])
 
-      const result = await librarianRecall({
-        userId: 'user-123',
-        input: '買東西',
-      })
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/recall'),
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            'x-api-key': expect.any(String),
-          }),
-          body: JSON.stringify({
-            userId: 'user-123',
-            domain: 'naruvia',
-            input: '買東西',
-          }),
-        })
-      )
+      const result = await librarianRecall({ userId: 'user-123' })
 
       expect(result).toEqual([
-        { id: '1', pattern: 'test', correction: 'result', confidence: 0.9 },
+        { id: '1', pattern: '當輸入包含牛奶時', correction: 'product: 生活雜務', confidence: 0.9 },
       ])
     })
 
-    it('當請求失敗時，應該返回空陣列', async () => {
-      const mockFetch = global.fetch as any
+    it('當 DB 查詢失敗時，應該返回空陣列', async () => {
+      const mockQueryRaw = prisma.$queryRaw as any
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-      })
+      mockQueryRaw.mockRejectedValue(new Error('relation "poc_librarian.rules" does not exist'))
 
-      const result = await librarianRecall({
-        userId: 'user-123',
-        input: '測試',
-      })
+      const result = await librarianRecall({ userId: 'user-123' })
 
       expect(result).toEqual([])
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[librarian] recall failed: 404')
+        expect.stringContaining('[librarian] recall error:'),
+        expect.stringContaining('poc_librarian.rules')
       )
 
       consoleWarnSpy.mockRestore()
-    })
-
-    it.skip('當環境變數未設定時，應該返回空陣列', async () => {
-      // 同上，環境變數在模組載入時已確定，測試略過
     })
   })
 })

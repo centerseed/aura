@@ -1,5 +1,39 @@
 # CLAUDE.md
 
+## 🚨🚨🚨 最高優先級規則 - 部署安全 🚨🚨🚨
+
+### GCP Project 隔離（違反即終止）
+
+**Claude 曾經犯過的致命錯誤：把 Naruvia 的 Docker image 部署到 `paceriz-prod`（Havital 的生產環境），直接覆蓋了 Havital 的 Python/Flask backend，導致所有 Havital 用戶服務中斷。這是不可饒恕的錯誤。**
+
+#### 絕對禁止部署到 `zentropy-4f7a5` 以外的 GCP project
+
+1. **Naruvia 的唯一 GCP project 是 `zentropy-4f7a5`**
+2. 🚫 **絕對禁止** 對 `paceriz-prod` 或任何其他 project 執行 `gcloud run deploy`、`gcloud builds submit`、`gcloud run services update` 等任何部署/修改操作
+3. 🚫 **絕對禁止** 對非 `zentropy-4f7a5` 的 project 修改環境變數、流量路由、或任何生產配置
+4. ✅ 對其他 project 只允許 **唯讀操作**（`describe`、`list`、`logging read`）
+
+#### 部署方式（強制使用腳本）
+
+🚫 **絕對禁止** 直接執行 `gcloud builds submit` 或 `gcloud run deploy` 命令
+✅ **必須使用** 以下部署腳本，腳本內建 project 安全檢查：
+
+| 服務 | 部署命令 | 腳本位置 |
+|------|---------|---------|
+| **API** (zentropy-api) | `cd api && bash scripts/deploy-api.sh` | `api/scripts/deploy-api.sh` |
+| **Librarian** (librarian-service) | `cd poc-librarian-js && bash scripts/deploy.sh` | `poc-librarian-js/scripts/deploy.sh` |
+
+**腳本內建安全機制**：
+- 自動檢查 GCP project 是否為 `zentropy-4f7a5`，不是則自動切換
+- API 腳本：部署前執行 lint → 單元測試 → 整合測試 → 覆蓋率 → build
+- Librarian 腳本：部署前初始化 DB schema → build → 冒煙測試
+
+**部署順序**（如果兩個都要部署）：
+1. 先部署 **Librarian**（server 端），確認 health check 通過
+2. 再部署 **API**（client 端），確認能正確呼叫 Librarian
+
+---
+
 ## 🚨🚨🚨 最高優先級規則 - 資料安全 🚨🚨🚨
 
 ### 機密資訊保護（違反即終止）

@@ -1,22 +1,25 @@
 /**
- * Librarian Service HTTP Client
+ * Librarian Service Client
  *
- * 非同步推送用戶修正到 Librarian Service，用於學習分類規則。
- * 設計原則：失敗不影響主流程（fire-and-forget）
+ * - observe: 非同步 HTTP 推送用戶修正到 Librarian Service（fire-and-forget）
+ * - recall: 直接查 Neon DB poc_librarian.rules 表（避免 Cloud Run cold start）
  */
 
-const LIBRARIAN_URL = process.env.LIBRARIAN_URL
-const LIBRARIAN_API_KEY = process.env.LIBRARIAN_API_KEY
+import { prisma } from "@/lib/db"
+
+// 在函數內讀取，避免 Next.js build 時固定為 undefined
+function getLibrarianConfig() {
+  return {
+    url: process.env.LIBRARIAN_URL,
+    apiKey: process.env.LIBRARIAN_API_KEY,
+  }
+}
 
 export interface LibrarianRule {
   id: string
   pattern: string
   correction: string
   confidence: number
-}
-
-interface RecallResponse {
-  rules: LibrarianRule[]
 }
 
 export async function librarianObserve(params: {
@@ -27,6 +30,7 @@ export async function librarianObserve(params: {
   originalTopic?: string | null
   correctedTopic?: string | null
 }): Promise<void> {
+  const { url: LIBRARIAN_URL, apiKey: LIBRARIAN_API_KEY } = getLibrarianConfig()
   if (!LIBRARIAN_URL || !LIBRARIAN_API_KEY) {
     return
   }
@@ -68,35 +72,35 @@ export async function librarianObserve(params: {
   }
 }
 
+/**
+ * 直接查 Neon DB poc_librarian.rules 取得用戶的 active 規則
+ * 避免走 HTTP 到 librarian-service（cold start 3-5s）
+ */
 export async function librarianRecall(params: {
   userId: string
-  input: string
 }): Promise<LibrarianRule[]> {
-  if (!LIBRARIAN_URL || !LIBRARIAN_API_KEY) {
-    return []
-  }
-
   try {
-    const response = await fetch(`${LIBRARIAN_URL}/api/recall`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': LIBRARIAN_API_KEY,
-      },
-      body: JSON.stringify({
-        userId: params.userId,
-        domain: 'naruvia',
-        input: params.input,
-      }),
-    })
+    const rows = await prisma.$queryRaw<Array<{
+      id: string
+      description: string
+      result_action: { field: string; value: string }
+      confidence: number
+    }>>`
+      SELECT id, description, result_action, confidence
+      FROM poc_librarian.rules
+      WHERE user_id = ${params.userId}
+        AND domain = 'naruvia'
+        AND is_active = true
+      ORDER BY confidence DESC
+      LIMIT 20
+    `
 
-    if (!response.ok) {
-      console.warn(`[librarian] recall failed: ${response.status} ${response.statusText}`)
-      return []
-    }
-
-    const data = (await response.json()) as RecallResponse
-    return data.rules ?? []
+    return rows.map(row => ({
+      id: row.id,
+      pattern: row.description,
+      correction: `${row.result_action.field}: ${row.result_action.value}`,
+      confidence: row.confidence,
+    }))
   } catch (error) {
     console.warn('[librarian] recall error:', error instanceof Error ? error.message : error)
     return []

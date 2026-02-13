@@ -151,28 +151,49 @@ echo "${GREEN}========================================${NC}"
 echo "${GREEN}   ✅ 所有檢查通過！${NC}"
 echo "${GREEN}========================================${NC}"
 echo ""
-echo "${GREEN}📦 建置產物位置: .next/${NC}"
-echo "${GREEN}🚀 可以開始部署了！${NC}"
+
+# ============================================================================
+# 部署設定（🚨 只能部署到 zentropy-4f7a5）
+# ============================================================================
+DEPLOY_PROJECT="zentropy-4f7a5"
+DEPLOY_SERVICE="zentropy-api"
+DEPLOY_REGION="asia-east1"
+DEPLOY_IMAGE="gcr.io/${DEPLOY_PROJECT}/${DEPLOY_SERVICE}:latest"
+LIBRARIAN_URL="https://librarian-service-isakqhri2a-de.a.run.app"
+
+# 安全檢查：確認 project
+CURRENT_PROJECT=$(gcloud config get-value project 2>/dev/null)
+if [ "$CURRENT_PROJECT" != "$DEPLOY_PROJECT" ]; then
+  echo "${YELLOW}⚠️  當前 project 是 ${CURRENT_PROJECT}，切換到 ${DEPLOY_PROJECT}...${NC}"
+  gcloud config set project "$DEPLOY_PROJECT"
+fi
+
+echo "${BLUE}🚀 開始部署到 Cloud Run${NC}"
+echo "   Project:  ${DEPLOY_PROJECT}"
+echo "   Service:  ${DEPLOY_SERVICE}"
+echo "   Region:   ${DEPLOY_REGION}"
 echo ""
 
-# 提供部署指令提示
-echo "${BLUE}💡 下一步部署指令：${NC}"
+# Step 1: Build & Push Docker image
+echo "${BLUE}🐳 建置 Docker image...${NC}"
+gcloud builds submit --tag "$DEPLOY_IMAGE" --project "$DEPLOY_PROJECT" .
+
+# Step 2: Deploy to Cloud Run
+echo "${BLUE}☁️  部署到 Cloud Run...${NC}"
+gcloud run deploy "$DEPLOY_SERVICE" \
+  --image "$DEPLOY_IMAGE" \
+  --region "$DEPLOY_REGION" \
+  --project "$DEPLOY_PROJECT" \
+  --platform managed \
+  --allow-unauthenticated \
+  --update-env-vars "LIBRARIAN_URL=${LIBRARIAN_URL}" \
+  --update-secrets "DATABASE_URL=database-url:latest,GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest,FIREBASE_ADMIN_KEY=firebase-admin-key:latest,LIBRARIAN_API_KEY=librarian-api-key:latest,OAUTH_ENCRYPTION_KEY=oauth-encryption-key:latest,GOOGLE_OAUTH_CLIENT_ID=google-oauth-client-id:latest,GOOGLE_OAUTH_CLIENT_SECRET=google-oauth-client-secret:latest"
+
 echo ""
-echo "${YELLOW}   # 部署到 Google Cloud Run (推薦)：${NC}"
-echo "   gcloud run deploy zentropy-api \\"
-echo "     --source . \\"
-echo "     --region asia-east1 \\"
-echo "     --project zentropy-4f7a5 \\"
-echo "     --platform managed \\"
-echo "     --allow-unauthenticated \\"
-echo "     --set-env-vars=\"LIBRARIAN_URL=https://librarian-service-yd7nv64yya-de.a.run.app\" \\"
-echo "     --set-secrets=\"DATABASE_URL=database-url:latest\" \\"
-echo "     --set-secrets=\"GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest\" \\"
-echo "     --set-secrets=\"FIREBASE_ADMIN_KEY=firebase-admin-key:latest\" \\"
-echo "     --set-secrets=\"LIBRARIAN_API_KEY=librarian-api-key:latest\""
-echo ""
-echo "${YELLOW}   # 本地啟動生產模式：${NC}"
-echo "   npm start"
+echo "${GREEN}✅ 部署完成！${NC}"
+SERVICE_URL=$(gcloud run services describe "$DEPLOY_SERVICE" \
+  --region "$DEPLOY_REGION" --project "$DEPLOY_PROJECT" --format 'value(status.url)')
+echo "   URL: ${SERVICE_URL}"
 echo ""
 
 exit 0
