@@ -35,6 +35,7 @@ const mcpSessions = new Map<
 >();
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_SESSIONS = 100;
 
 function cleanupStaleSessions() {
   const now = Date.now();
@@ -89,6 +90,16 @@ async function main() {
           const session = mcpSessions.get(sessionId)!;
           await session.transport.handleRequest(req, res);
           return;
+        }
+
+        // Enforce session limit to prevent resource exhaustion
+        if (mcpSessions.size >= MAX_SESSIONS) {
+          cleanupStaleSessions();
+          if (mcpSessions.size >= MAX_SESSIONS) {
+            res.writeHead(503, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "too_many_sessions", message: "Server session limit reached. Try again later." }));
+            return;
+          }
         }
 
         // New session: create dedicated McpServer + transport

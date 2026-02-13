@@ -106,14 +106,27 @@ export class BackendApiClient {
   }
 
   /**
-   * Build internal auth headers. These are verified by authenticateRequest()
-   * in the API auth middleware, bypassing Firebase token verification.
+   * Build auth headers for internal API calls.
+   *
+   * Production (ZENTROPY_MCP_JWT_SECRET set):
+   *   HMAC-signed X-MCP-Internal + X-MCP-User-Id headers,
+   *   verified by authenticateRequest() in auth-middleware.
+   *
+   * Development (no secret):
+   *   X-Test-User-Id header, accepted by authenticateRequest()
+   *   when DATABASE_URL points to localhost.
    */
   private getInternalAuthHeaders(userId: string): Record<string, string> {
-    const hmac = signInternalAuth(userId);
+    if (process.env.ZENTROPY_MCP_JWT_SECRET) {
+      const hmac = signInternalAuth(userId);
+      return {
+        "X-MCP-Internal": hmac,
+        "X-MCP-User-Id": userId,
+      };
+    }
+    // Dev mode: use test user header (requires local DATABASE_URL)
     return {
-      "X-MCP-Internal": hmac,
-      "X-MCP-User-Id": userId,
+      "X-Test-User-Id": userId,
     };
   }
 

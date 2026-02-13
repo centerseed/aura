@@ -22,10 +22,17 @@ export class AuthenticationError extends Error {
  * Development: Falls back to dev context if JWT secret is not configured.
  */
 export function authenticateMcpRequest(authHeader?: string): AuthContext {
-  // If no JWT secret configured, use dev context (local development)
+  // If no JWT secret configured...
   if (!process.env.ZENTROPY_MCP_JWT_SECRET) {
+    // In production, refuse to start without a secret — silent dev bypass is dangerous
+    if (process.env.NODE_ENV === "production") {
+      throw new AuthenticationError(
+        "ZENTROPY_MCP_JWT_SECRET is not configured. " +
+          "MCP authentication is disabled in production without a secret.",
+      );
+    }
+    // Dev only: use dev context
     if (authHeader && authHeader.startsWith("Bearer ")) {
-      // Try to extract user info from token even without verification
       return decodeTokenUnsafe(authHeader.slice("Bearer ".length));
     }
     return createDevContext();

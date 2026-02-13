@@ -186,7 +186,13 @@ export function sanitizeOutput(
     const sized = enforceResponseSizeLimit(json);
     if (sized.truncated) {
       truncated = true;
-      return { data: JSON.parse(sized.content), redactedSecrets, truncated };
+      // sized.content is no longer valid JSON (ends with truncation marker),
+      // so return a structured object instead of attempting JSON.parse.
+      return {
+        data: { _truncated: true, _message: "Response exceeded 100KB limit" },
+        redactedSecrets,
+        truncated,
+      };
     }
 
     return { data: sanitized, redactedSecrets, truncated };
