@@ -54,12 +54,14 @@ export async function GET(request: NextRequest) {
   // 4. 為每位用戶生成簡報（並發限制 3，避免 Gemini API rate limit）
   const CONCURRENCY_LIMIT = 3
   const useCase = new GenerateBriefingUseCase()
-  const results: PromiseSettledResult<{ userId: string; briefingId: string }>[] = []
+
+  interface CronResult { userId: string; briefingId?: string; error?: unknown }
+  const results: CronResult[] = []
 
   for (let i = 0; i < activeUsers.length; i += CONCURRENCY_LIMIT) {
     const batch = activeUsers.slice(i, i + CONCURRENCY_LIMIT)
     const batchResults = await Promise.allSettled(
-      batch.map(async (user) => {
+      batch.map(async (user): Promise<CronResult> => {
         const result = await useCase.execute({
           userId: user.id,
           type: briefingType,
@@ -68,19 +70,26 @@ export async function GET(request: NextRequest) {
         return { userId: user.id, briefingId: result.briefing.id }
       }),
     )
-    results.push(...batchResults)
+    for (let j = 0; j < batchResults.length; j++) {
+      const r = batchResults[j]
+      if (r.status === 'fulfilled') {
+        results.push(r.value)
+      } else {
+        results.push({ userId: batch[j].id, error: r.reason })
+      }
+    }
   }
 
   // 5. 統計結果
-  const succeeded = results.filter(r => r.status === 'fulfilled').length
-  const failed = results.filter(r => r.status === 'rejected').length
+  const succeeded = results.filter(r => r.briefingId).length
+  const failed = results.filter(r => r.error).length
 
   // Log failures
-  results.forEach((r, i) => {
-    if (r.status === 'rejected') {
-      console.error(`[Cron] Failed to generate briefing for user ${activeUsers[i].id}:`, r.reason)
+  for (const r of results) {
+    if (r.error) {
+      console.error(`[Cron] Failed to generate briefing for user ${r.userId}:`, r.error)
     }
-  })
+  }
 
   return NextResponse.json({
     success: true,

@@ -24,6 +24,7 @@ import { CoachAIGenerator } from '@/application/services/coach-ai-generator'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
+import { resolveTimezone } from '@/lib/timezone-utils'
 
 // ============================================================================
 // DTOs
@@ -60,7 +61,7 @@ export class GenerateBriefingUseCase {
     this.validateRequest(request)
 
     // 2. 取得用戶時區
-    const timezone = await this.resolveTimezone(request)
+    const timezone = await resolveTimezone(request.userId, request.timezone)
 
     // 3. 決定日期
     const briefingDate = request.date
@@ -175,17 +176,6 @@ export class GenerateBriefingUseCase {
     }
   }
 
-  private async resolveTimezone(request: GenerateBriefingRequest): Promise<string> {
-    if (request.timezone) return request.timezone
-
-    // 從 DB 取得用戶時區
-    const user = await prisma.user.findUnique({
-      where: { id: request.userId },
-      select: { timezone: true },
-    })
-
-    return user?.timezone || 'Asia/Taipei'
-  }
 
   private toDateOnly(date: Date, timezone: string): Date {
     const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD

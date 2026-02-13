@@ -114,6 +114,10 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
   }
 
   async updateItem(itemId: string, data: UpdateDailyPlanItemData): Promise<DailyPlanItemData> {
+    return this.updateItemWithTx(prisma, itemId, data)
+  }
+
+  async updateItemWithTx(tx: any, itemId: string, data: UpdateDailyPlanItemData): Promise<DailyPlanItemData> {
     const updateData: any = {}
     if (data.order !== undefined) updateData.order = data.order
     if (data.completed !== undefined) {
@@ -124,7 +128,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     if (data.pinned !== undefined) updateData.pinned = data.pinned
     if (data.deferred !== undefined) updateData.deferred = data.deferred
 
-    const row = await prisma.dailyPlanItem.update({
+    const row = await tx.dailyPlanItem.update({
       where: { id: itemId },
       data: updateData,
     })

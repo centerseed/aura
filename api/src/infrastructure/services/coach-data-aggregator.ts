@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { getStartOfDay, getEndOfDay } from '@/lib/timezone-utils'
 import type { CalendarEventSummary, TaskSummary } from '@/domain/entities/coach-briefing.entity'
 
 // ============================================================================
@@ -72,8 +73,8 @@ export class CoachDataAggregator {
    */
   async aggregate(userId: string, date: Date, timezone: string): Promise<AggregatedData> {
     // 計算日期範圍（根據時區）
-    const todayStart = this.getStartOfDay(date, timezone)
-    const todayEnd = this.getEndOfDay(date, timezone)
+    const todayStart = getStartOfDay(date, timezone)
+    const todayEnd = getEndOfDay(date, timezone)
     const tomorrowStart = new Date(todayEnd.getTime())
     const tomorrowEnd = new Date(tomorrowStart.getTime() + 24 * 60 * 60 * 1000)
     const threeDaysLater = new Date(todayEnd.getTime() + 3 * 24 * 60 * 60 * 1000)
@@ -335,27 +336,4 @@ export class CoachDataAggregator {
     }
   }
 
-  // ============================================================================
-  // 日期工具
-  // ============================================================================
-
-  private getStartOfDay(date: Date, timezone: string): Date {
-    const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone })
-    const midnight = new Date(`${dateStr}T00:00:00`)
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hourCycle: 'h23',
-      timeZoneName: 'longOffset',
-    })
-    const parts = formatter.formatToParts(midnight)
-    const offsetStr = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
-    const offset = offsetStr.replace('GMT', '')
-    return new Date(`${dateStr}T00:00:00.000${offset}`)
-  }
-
-  private getEndOfDay(date: Date, timezone: string): Date {
-    const start = this.getStartOfDay(date, timezone)
-    return new Date(start.getTime() + 24 * 60 * 60 * 1000)
-  }
 }

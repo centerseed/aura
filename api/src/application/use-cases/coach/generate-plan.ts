@@ -15,6 +15,7 @@ import { CoachPlanGenerator, type DailyPlanOutput } from '@/application/services
 import { CoachCalibration } from '@/application/services/coach-calibration'
 import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
+import { resolveTimezone, toDateOnly } from '@/lib/timezone-utils'
 
 // ============================================================================
 // DTOs
@@ -53,9 +54,9 @@ export class GeneratePlanUseCase {
     }
 
     // 2. 解析時區與日期
-    const timezone = await this.resolveTimezone(request)
+    const timezone = await resolveTimezone(request.userId, request.timezone)
     const planDate = request.date ? new Date(request.date) : new Date()
-    const planDateOnly = this.toDateOnly(planDate, timezone)
+    const planDateOnly = toDateOnly(planDate, timezone)
 
     // 3. 收集候選
     start = Date.now()
@@ -130,22 +131,6 @@ export class GeneratePlanUseCase {
   // ============================================================================
   // Private
   // ============================================================================
-
-  private async resolveTimezone(request: GeneratePlanRequest): Promise<string> {
-    if (request.timezone) return request.timezone
-
-    const user = await prisma.user.findUnique({
-      where: { id: request.userId },
-      select: { timezone: true },
-    })
-
-    return user?.timezone || 'Asia/Taipei'
-  }
-
-  private toDateOnly(date: Date, timezone: string): Date {
-    const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone })
-    return new Date(dateStr + 'T00:00:00.000Z')
-  }
 
   /**
    * 回寫 AI 估時到原始 Task/SubTask

@@ -15,6 +15,7 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { getStartOfDay, getEndOfDay } from '@/lib/timezone-utils'
 
 // ============================================================================
 // Types
@@ -97,8 +98,8 @@ const WORK_HOURS_PER_DAY = 8
 
 export class PlanCandidateCollector {
   async collect(userId: string, date: Date, timezone: string): Promise<CollectedData> {
-    const todayStart = this.getStartOfDay(date, timezone)
-    const todayEnd = this.getEndOfDay(date, timezone)
+    const todayStart = getStartOfDay(date, timezone)
+    const todayEnd = getEndOfDay(date, timezone)
     const threeDaysLater = new Date(todayEnd.getTime() + 3 * 24 * 60 * 60 * 1000)
 
     const [candidateTasks, calendarEvents] = await Promise.all([
@@ -313,25 +314,4 @@ export class PlanCandidateCollector {
     return Array.from(byProduct.values())
   }
 
-  private getStartOfDay(date: Date, timezone: string): Date {
-    const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone })
-    // 用 Intl 取得該時區在該日期的實際 UTC offset
-    const midnight = new Date(`${dateStr}T00:00:00`)
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hourCycle: 'h23',
-      timeZoneName: 'longOffset',
-    })
-    const parts = formatter.formatToParts(midnight)
-    const offsetStr = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
-    // offsetStr 格式為 "GMT+08:00" 或 "GMT-05:00"
-    const offset = offsetStr.replace('GMT', '')
-    return new Date(`${dateStr}T00:00:00.000${offset}`)
-  }
-
-  private getEndOfDay(date: Date, timezone: string): Date {
-    const start = this.getStartOfDay(date, timezone)
-    return new Date(start.getTime() + 24 * 60 * 60 * 1000)
-  }
 }
