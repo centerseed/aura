@@ -137,7 +137,8 @@ export class CaptureUseCase {
         for (let i = 0; i < subItems.length; i++) {
           await tx.subTask.create({
             data: {
-              task_id: request.parent_id!,
+              task: { connect: { id: request.parent_id! } },
+              user: { connect: { id: request.userId } },
               content: subItems[i].title,
               estimated_minutes: subItems[i].estimated_minutes ?? null,
               order: i + 1,

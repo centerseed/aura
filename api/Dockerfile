@@ -49,9 +49,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
-# Custom server + MCP source (tsx compiles at runtime)
+# Custom server + source (tsx compiles at runtime)
 COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/src/mcp ./src/mcp
+COPY --from=builder /app/preload.js ./preload.js
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 USER nextjs
 
@@ -61,4 +63,4 @@ ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
 # Custom server: Next.js API + MCP endpoint on same port
-CMD ["node_modules/.bin/tsx", "server.ts"]
+CMD ["node", "--require", "./preload.js", "--require", "tsx/cjs", "server.ts"]
