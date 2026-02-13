@@ -86,6 +86,14 @@ export class UpdateTaskUseCase {
       // 使用 Domain Entity 的業務邏輯驗證狀態轉換
       task.changeStatus(newStatus)
 
+      // 切換為 ACTIVE 且 start_date 為空 → 自動設為今天
+      if (newStatus === TaskStatus.ACTIVE && !existingTaskData.startDate) {
+        const now = new Date()
+        if (!task.dueDate || task.dueDate >= now) {
+          task.setStartDate(now)
+        }
+      }
+
       const newStatusVO = TaskStatusVO.fromString(newStatus)
       const oldStatusVO = TaskStatusVO.fromString(existingTaskData.status)
       statusMessage = oldStatusVO.getTransitionHint(newStatusVO)
@@ -122,6 +130,10 @@ export class UpdateTaskUseCase {
       // 設定 due_date 且目前是 INBOX → 自動改成 ACTIVE
       if (request.dueDate && currentStatus === TaskStatus.INBOX) {
         task.changeStatus(TaskStatus.ACTIVE)
+        // 同步設定 start_date（只在 due_date >= 今天時）
+        if (!existingTaskData.startDate && task.dueDate && task.dueDate >= new Date()) {
+          task.setStartDate(new Date())
+        }
         statusMessage = '已設定截止日期，狀態自動變更為進行中'
         statusChangedByDueDate = true
       }
@@ -152,7 +164,7 @@ export class UpdateTaskUseCase {
     if (request.narrative !== undefined) {
       updateData.narrative = task.narrative
     }
-    if (request.startDate !== undefined) {
+    if (request.startDate !== undefined || (task.startDate && !existingTaskData.startDate)) {
       updateData.startDate = task.startDate
     }
     if (request.dueDate !== undefined) {
