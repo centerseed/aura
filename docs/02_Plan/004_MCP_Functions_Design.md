@@ -1,8 +1,9 @@
 # MCP Functions Design — The Intention-Execution Bridge
 
-**版本**: v2.1
+**版本**: v2.2
 **日期**: 2026-02-13
 **變更紀錄**:
+- v2.2 (2026-02-13): 合併 Phase 1A/1B 為單一 Phase 1（場景驗證顯示舊分期無法覆蓋核心體驗，Phase 1A 僅實現 1/8 場景）
 - v2.1 (2026-02-13): 新增 §12 差距分析、§13 具體實作計畫（基於 Coach 代碼審查）
 - v2.0 (2026-02-13): 從 15 tools CRUD 架構重寫為 5 tools Bridge 架構
 - v1.0 (已棄用): 15 個 CRUD-style Tools
@@ -982,14 +983,15 @@ Claude Code：
 
 ## 10. 實作分期
 
-### Phase 1 — 橋的骨架 (M2)
+### Phase 1 — 完整的橋 (M2)
 
-**目標**：建立完整的 意圖 → 交接 → 回流 閉環。
+**目標**：建立完整的 意圖 → 交接 → 回流 → 閉環。Phase 1 結束時用戶可以體驗 Appendix A 中 **5/8** 的場景（A.1, A.2, A.3, A.5, A.6）。
 
 | 項目 | 類型 | 優先級 | 說明 |
 |:-----|:-----|:-------|:-----|
 | `zentropy://handoff/ready` | Resource | **P0** | 整個 MCP 的靈魂 |
 | `zentropy://context/now` | Resource | **P0** | AI 的環境意識 |
+| `zentropy://memory/bias` | Resource | **P0** | 偏差數據——handoff/ready 的 coach_notes 和 report_done 的回饋都需要 |
 | `zentropy://areas` | Resource | **P0** | AI 理解用戶結構 |
 | `capture` (統一入口) | Tool | **P0** | 取代 capture_thought，支援 3 種 mode |
 | `report_done` | Tool | **P0** | 閉環關鍵 |
@@ -998,17 +1000,34 @@ Claude Code：
 
 **Backend 需新建**：
 - `GET /api/handoff/ready` — Coach + Librarian 組裝交接包
+- `GET /api/context/now` — 全局狀態摘要
+- `GET /api/memory/bias` — 暴露校準數據
+- `GET /api/areas` — 階層結構
 - `POST /api/actions/{id}/done` — Coach 偏差計算 + Librarian 歸檔
 - `POST /api/brain-dump` 擴展 — 支援 execution_plan / result mode
 
 **遷移**：`capture_thought` → `capture`, `query_memory` → `search`, `append_to_knowledge` → `save_knowledge`（保持向後相容，舊名稱標記 deprecated）
 
+**場景覆蓋**：
+
+| 場景 | 核心需求 | Phase 1 覆蓋 |
+|:-----|:--------|:------------|
+| A.1 Claude Code 自動獲得任務脈絡 | `handoff/ready` | ✅ |
+| A.2 Claude Code 拆任務回流 | `handoff/ready` + `capture(execution_plan)` | ✅ |
+| A.3 Claude Desktop 隨手記 | `capture(thought)` | ✅ |
+| A.4 諮詢 Coach 校正估時 | `consult_coach(estimate)` | ❌ Phase 2 |
+| A.5 完成任務追蹤偏差 | `report_done` + `memory/bias` | ✅ |
+| A.6 Cursor 自動參考知識庫 | `knowledge/*` + `handoff/ready` | ✅ |
+| A.7 Coach 挑戰計畫 | `consult_coach(challenge)` | ❌ Phase 2 |
+| A.8 想法深化 | `consult_coach(refine)` | ❌ Phase 2 |
+
 ### Phase 2 — Coach 智慧 (M2 ~ M3)
+
+**目標**：覆蓋剩餘 **3/8** 場景（A.4, A.7, A.8）。
 
 | 項目 | 類型 | 優先級 | 說明 |
 |:-----|:-----|:-------|:-----|
 | `consult_coach` | Tool | **P1** | Refine + Challenge + Estimate 統一介面 |
-| `zentropy://memory/bias` | Resource | **P1** | 偏差數據被動讀取 |
 | `plan-next-actions` | Prompt | **P1** | 行動規劃模板 |
 | `write-decision-record` | Prompt | **P1** | ADR 生成模板 |
 
@@ -1142,11 +1161,21 @@ if (candidate.estimatedMinutes !== null) continue
 
 > 基於 §12 的差距分析，以下是 MCP 層各 function 的具體實作規劃。
 
-### 13.1 Phase 1A — 最小可用橋（1-2 週）
+### 13.1 Phase 1 — 完整的橋（3-4 週）
 
-**目標**：讓外部 AI 工具能讀取 Zentropy 的意圖並回流結果。
+**目標**：建立完整的 意圖 → 交接 → 回流 → 閉環。Phase 1 結束時用戶可體驗 5/8 場景。
 
-#### 13.1.1 `zentropy://context/now` Resource
+> **為什麼不再分 1A/1B**：場景驗證顯示，原 Phase 1A（context/now + memory/bias + areas + report_done）只能實現 A.5 一個場景。用戶最有感的核心體驗「打開工具就知道該做什麼 + 做完自動回流」（A.1 + A.2）需要 `handoff/ready` + `capture` 增強，這些在原 Phase 1B。分開交付意味著用戶要等兩個 sprint 才能感受到 MCP 的價值——這不可接受。
+
+**建議實作順序**：先做基礎層（Week 1-2），再做核心橋（Week 3-4）。基礎層為核心橋提供數據依賴。
+
+---
+
+#### Week 1-2：基礎層
+
+基礎層的 Resource 和 Tool 大多是「包裝已有能力」，實作成本低，且為 Week 3-4 的核心橋提供必要的數據基礎。
+
+##### 13.1.1 `zentropy://context/now` Resource
 
 **為什麼先做**：這是最容易實作的 Resource，因為 `CoachDataAggregator` + `CoachCalibration` 已經能產出所有需要的數據。
 
@@ -1166,9 +1195,9 @@ CoachDataAggregator.aggregate(userId)  // 已有：7 條平行查詢
 
 **新代碼量估計**：~100 行（主要是組裝和格式轉換）
 
-#### 13.1.2 `zentropy://memory/bias` Resource
+##### 13.1.2 `zentropy://memory/bias` Resource
 
-**為什麼同時做**：`CoachCalibration` 已經能算出所有數據，只需暴露。
+**為什麼同時做**：`CoachCalibration` 已經能算出所有數據，只需暴露。且 `handoff/ready` 的 coach_notes 和 `report_done` 的偏差回饋都依賴這個數據。
 
 **後端 endpoint**：`GET /api/memory/bias`
 
@@ -1181,7 +1210,7 @@ CoachCalibration.calculate(userId)  // 已有（需 public 化）
 
 **新代碼量估計**：~50 行
 
-#### 13.1.3 `zentropy://areas` Resource
+##### 13.1.3 `zentropy://areas` Resource
 
 **後端 endpoint**：`GET /api/areas`
 
@@ -1193,9 +1222,9 @@ Prisma 查詢：Areas → Products → Topics（含 active_actions count）
 
 **新代碼量估計**：~80 行
 
-#### 13.1.4 `report_done` Tool
+##### 13.1.4 `report_done` Tool
 
-**為什麼 Phase 1A**：這是閉環的關鍵。沒有它，偏差學習的數據來源就斷了。
+**為什麼不能等**：這是閉環的關鍵。沒有它，偏差學習的數據來源就斷了。A.5 場景的核心。
 
 **後端 endpoint**：`POST /api/actions/:id/done`
 
@@ -1211,17 +1240,32 @@ Prisma 查詢：Areas → Products → Topics（含 active_actions count）
 
 **新代碼量估計**：~200 行（新 Use Case + endpoint）
 
-#### 13.1.5 MCP Server Resource Handler 註冊
+##### 13.1.5 `search` + `save_knowledge` Tool 重新命名
 
-**實作方式**：在 `api/src/mcp/server.ts` 註冊新 Resource handlers，呼叫上述 endpoints。
+**實作方式**：
+- `query_memory` → `search`（新增 alias，保留舊名 deprecated）
+- `append_to_knowledge` → `save_knowledge`（同上）
+- MCP Server 註冊新名稱
+
+**新代碼量估計**：~50 行
+
+##### 13.1.6 MCP Server 基礎層 Handler 註冊
+
+**實作方式**：在 `api/src/mcp/server.ts` 註冊 context/now、memory/bias、areas 的 Resource handlers + report_done Tool handler。
 
 **新代碼量估計**：~150 行
 
-### 13.2 Phase 1B — 意圖交接包（1-2 週）
+**基礎層小計**：~630 行新代碼
 
-#### 13.2.1 `zentropy://handoff/ready` Resource ★
+---
 
-**為什麼需要更多時間**：需要整合多個資料源組裝 context_package。
+#### Week 3-4：核心橋
+
+核心橋是 MCP 最重要的差異化功能——結構化意圖交接（出站）和子任務回流（入站）。這是 A.1 和 A.2 場景的基礎。
+
+##### 13.1.7 `zentropy://handoff/ready` Resource ★
+
+**這是整個 Phase 1 最重要、也最複雜的一個項目。** 需要整合多個資料源組裝 context_package。
 
 **後端 endpoint**：`GET /api/handoff/ready`
 
@@ -1232,16 +1276,18 @@ Prisma 查詢：Areas → Products → Topics（含 active_actions count）
    a. 取 Task 詳情 + Product + Area 脈絡
    b. 取相關知識連結（Librarian 查詢）         ← 需新建
    c. 取相關決策紀錄（Knowledge 查詢）          ← 需新建
-   d. 取 coach_notes（CoachCalibration 偏差）   ← 已有
+   d. 取 coach_notes（CoachCalibration 偏差）   ← 已有（Week 1-2 已暴露）
    e. 取 acceptance_criteria（Task metadata）   ← 需確認 schema
 3. 包裝成 handoff_items[] 格式
 ```
 
-**依賴**：需要 Librarian 的知識檢索能力（語意搜尋 or keyword matching）
+**依賴**：
+- Week 1-2 的 `memory/bias`（提供 coach_notes 的數據）
+- Librarian 的知識檢索能力（語意搜尋 or keyword matching）
 
 **新代碼量估計**：~300 行（新 Use Case + Knowledge 查詢 + 組裝邏輯）
 
-#### 13.2.2 `capture` Tool 增強
+##### 13.1.8 `capture` Tool 增強
 
 **擴展 `POST /api/brain-dump`**：
 
@@ -1255,24 +1301,27 @@ Prisma 查詢：Areas → Products → Topics（含 active_actions count）
   4. Coach 更新估時（校準因子）
 - result（新建）：
   1. 解析 outcome + actual_duration_minutes
-  2. 複用 report_done 邏輯
+  2. 複用 report_done 邏輯（Week 1-2 已實作）
   3. Librarian 歸檔到 History
 ```
 
 **新代碼量估計**：~250 行
 
-#### 13.2.3 `search` + `save_knowledge` Tool 重新命名
+##### 13.1.9 MCP Server 核心橋 Handler 註冊
 
-**實作方式**：
-- `query_memory` → `search`（新增 alias，保留舊名 deprecated）
-- `append_to_knowledge` → `save_knowledge`（同上）
-- MCP Server 註冊新名稱
+**實作方式**：在 `api/src/mcp/server.ts` 註冊 handoff/ready Resource handler + 更新 capture Tool handler 支援新 mode。
 
-**新代碼量估計**：~50 行
+**新代碼量估計**：~100 行
 
-### 13.3 Phase 2 — Coach 智慧（2-3 週）
+**核心橋小計**：~650 行新代碼
 
-#### 13.3.1 `consult_coach` Tool
+**Phase 1 總計**：~1,280 行新代碼
+
+---
+
+### 13.2 Phase 2 — Coach 智慧（2-3 週）
+
+#### 13.2.1 `consult_coach` Tool
 
 **後端 endpoint**：`POST /api/coach/consult`
 
@@ -1286,7 +1335,7 @@ Prisma 查詢：Areas → Products → Topics（含 active_actions count）
 
 **新代碼量估計**：~500 行（新 Use Case + 3 套 prompt + AI 呼叫）
 
-#### 13.3.2 Episodic Memory 增強
+#### 13.2.2 Episodic Memory 增強
 
 **現狀**：CoachCalibration 只按 area 分組，不按 task type 分組。
 
@@ -1298,24 +1347,27 @@ Prisma 查詢：Areas → Products → Topics（含 active_actions count）
 
 **新代碼量估計**：~200 行（擴展 CoachCalibration + migration）
 
-### 13.4 實作優先級總覽
+### 13.3 實作優先級總覽
 
 ```
-Phase 1A（最小可用橋）
-├── context/now Resource ........... 容易（組裝已有數據）
-├── memory/bias Resource ........... 容易（暴露已有計算）
-├── areas Resource ................. 容易（Prisma 查詢）
-├── report_done Tool ............... 中等（新 Use Case）
-└── MCP Server 註冊 ............... 容易（接線）
+Phase 1（完整的橋）— 3-4 週，覆蓋 5/8 場景
+│
+├── Week 1-2：基礎層 ................. ~630 行
+│   ├── context/now Resource .......... 容易（組裝已有數據）
+│   ├── memory/bias Resource .......... 容易（暴露已有計算）
+│   ├── areas Resource ................ 容易（Prisma 查詢）
+│   ├── report_done Tool .............. 中等（新 Use Case）
+│   ├── search/save_knowledge 重命名 .. 容易（alias）
+│   └── MCP Server 基礎層註冊 ........ 容易（接線）
+│
+└── Week 3-4：核心橋 ................. ~650 行
+    ├── handoff/ready Resource ★ ..... 困難（需整合多資料源）
+    ├── capture 增強 ................. 中等（擴展現有 endpoint）
+    └── MCP Server 核心橋註冊 ........ 容易（接線）
 
-Phase 1B（意圖交接）
-├── handoff/ready Resource ★ ...... 困難（需整合多資料源）
-├── capture 增強 .................. 中等（擴展現有 endpoint）
-└── search/save_knowledge 重命名 ... 容易（alias）
-
-Phase 2（Coach 智慧）
-├── consult_coach Tool ............. 困難（3 套 AI prompt）
-└── Episodic Memory 增強 ........... 中等（擴展校準服務）
+Phase 2（Coach 智慧）— 2-3 週，覆蓋 3/8 場景
+├── consult_coach Tool ............... 困難（3 套 AI prompt）
+└── Episodic Memory 增強 ............. 中等（擴展校準服務）
 ```
 
 ---
@@ -1358,6 +1410,16 @@ Phase 2（Coach 智慧）
 - 子任務回流到 Zentropy，掛在父任務下
 - Zentropy 成為所有 AI 工具的「共享記憶」
 - Coach 能追蹤每個子任務的完成情況和偏差
+
+### DDR-004: 為什麼合併 Phase 1A/1B？
+
+**原設計**：Phase 1A（1-2 週）= context/now + memory/bias + areas + report_done；Phase 1B（1-2 週）= handoff/ready + capture 增強。
+
+**問題**：用 Appendix A 的 8 個場景驗證後發現，Phase 1A 只能完整實現 **A.5 一個場景**（1/8）。用戶最有感的核心體驗——「打開工具就知道該做什麼」（A.1）和「做完自動回流」（A.2）——都需要 handoff/ready + capture 增強，這些在 Phase 1B。
+
+**決策**：合併為單一 Phase 1（3-4 週），內部保留 Week 1-2（基礎層）→ Week 3-4（核心橋）的實作順序，因為基礎層是核心橋的數據依賴。
+
+**效果**：Phase 1 覆蓋 5/8 場景（A.1, A.2, A.3, A.5, A.6），Phase 2 覆蓋剩餘 3/8（A.4, A.7, A.8，全部是 consult_coach）。
 
 ---
 
