@@ -71,9 +71,13 @@ describe('Scenario A.5: 完成任務後自動追蹤偏差', () => {
         area_name: 'Work',
       })
 
-      // Mock transaction for completing
+      // Mock transaction to execute callback with fake tx
       mockTransaction.mockImplementation(async (fn: any) => {
-        return { completed: true }
+        const fakeTx = {
+          task: { update: vi.fn().mockResolvedValue({}) },
+          dailyPlanItem: { update: vi.fn().mockResolvedValue({}) },
+        }
+        return fn(fakeTx)
       })
 
       // Mock calibration history
@@ -97,9 +101,9 @@ describe('Scenario A.5: 完成任務後自動追蹤偏差', () => {
       expect(result.status).toBe('completed')
       expect(result.completed_at).toBeDefined()
       expect(result.deviation).toBeDefined()
-      expect(result.deviation.estimated_minutes).toBe(240)
-      expect(result.deviation.actual_minutes).toBe(300)
-      expect(result.deviation.ratio).toBeCloseTo(1.25, 1)
+      expect(result.deviation!.estimated_minutes).toBe(240)
+      expect(result.deviation!.actual_minutes).toBe(300)
+      expect(result.deviation!.ratio).toBeCloseTo(1.25, 1)
       expect(result.coach_feedback).toBeDefined()
       expect(result.coach_feedback.length).toBeGreaterThan(0)
     })
@@ -115,8 +119,13 @@ describe('Scenario A.5: 完成任務後自動追蹤偏差', () => {
 
       mockPlanItemFindFirst.mockResolvedValue(null)
 
+      // Mock transaction to execute callback with fake tx
       mockTransaction.mockImplementation(async (fn: any) => {
-        return { completed: true }
+        const fakeTx = {
+          task: { update: vi.fn().mockResolvedValue({}) },
+          dailyPlanItem: { update: vi.fn().mockResolvedValue({}) },
+        }
+        return fn(fakeTx)
       })
 
       mockQueryRaw.mockResolvedValue([])
@@ -154,9 +163,16 @@ describe('Scenario A.5: 完成任務後自動追蹤偏差', () => {
       })
 
       mockPlanItemFindFirst.mockResolvedValue(null)
+
+      // Mock transaction to execute callback (partial: isCompleted=false, planItem=null)
       mockTransaction.mockImplementation(async (fn: any) => {
-        return { completed: false }
+        const fakeTx = {
+          task: { update: vi.fn().mockResolvedValue({}) },
+          dailyPlanItem: { update: vi.fn().mockResolvedValue({}) },
+        }
+        return fn(fakeTx)
       })
+
       mockQueryRaw.mockResolvedValue([])
 
       const result = await useCase.execute({

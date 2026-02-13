@@ -3,8 +3,13 @@
  *
  * MCP Tool: capture
  * 支援 3 種 mode: thought（預設）、execution_plan、result
+ *
+ * Note: thought mode is a lightweight fallback. The MCP handler routes
+ * thought mode through apiClient.captureThought() (brain-dump pipeline)
+ * for full AI classification + DB persistence.
  */
 
+import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/db'
 import { ValidationException } from '@/lib/api-response'
 
@@ -58,13 +63,16 @@ export class CaptureUseCase {
 
   /**
    * thought mode — 自由文字，Gatekeeper 自動分類
+   *
+   * Lightweight fallback; the MCP handler routes thought mode through
+   * the brain-dump pipeline for full persistence.
    */
   private async handleThought(request: CaptureRequest): Promise<CaptureResponse> {
     // Parse context_hint for filing
     const filedTo = this.parseContextHint(request.context_hint)
 
     return {
-      id: `cap_${Date.now()}`,
+      id: randomUUID(),
       status: 'processed',
       classified_as: 'thought',
       filed_to: filedTo,
@@ -152,7 +160,7 @@ export class CaptureUseCase {
     const productName = parentTask.product?.name ?? 'Unknown'
 
     return {
-      id: `cap_${Date.now()}`,
+      id: randomUUID(),
       status: 'processed',
       classified_as: 'execution_plan',
       filed_to: {
@@ -165,7 +173,7 @@ export class CaptureUseCase {
   }
 
   /**
-   * result mode — 執行結果回報
+   * result mode — 執行結果回報（含 DB 持久化）
    */
   private async handleResult(request: CaptureRequest): Promise<CaptureResponse> {
     if (!request.parent_id) {
@@ -210,8 +218,24 @@ export class CaptureUseCase {
       `Gatekeeper: identified as execution result (${parsedContent.outcome ?? 'completed'})`,
     ]
 
-    // Record actual time if provided
+    // Persist: update daily plan item with actual duration
+    const planItem = await prisma.dailyPlanItem.findFirst({
+      where: {
+        task_id: request.parent_id,
+        plan: { user_id: request.userId },
+      },
+      orderBy: { created_at: 'desc' },
+    })
+
     if (parsedContent.actual_duration_minutes) {
+      if (planItem) {
+        await prisma.dailyPlanItem.update({
+          where: { id: planItem.id },
+          data: {
+            actual_minutes: parsedContent.actual_duration_minutes,
+          },
+        })
+      }
       agentActions.push(
         `Coach: recorded actual time ${parsedContent.actual_duration_minutes}min`,
       )
@@ -225,7 +249,7 @@ export class CaptureUseCase {
     const productName = parentTask.product?.name ?? 'Unknown'
 
     return {
-      id: `cap_${Date.now()}`,
+      id: randomUUID(),
       status: 'processed',
       classified_as: 'result',
       filed_to: {

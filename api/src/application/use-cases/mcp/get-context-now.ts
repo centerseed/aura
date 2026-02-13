@@ -34,7 +34,7 @@ export interface GetContextNowResponse {
   open_loops: number
   due_today: number
   overdue: number
-  top_priorities: string[]
+  top_priorities: Array<{ id: string; title: string }>
   calendar_conflicts: Array<{ description: string; severity: string }>
   stalled_items: ContextNowStalledItem[]
   estimation_bias: {
@@ -101,10 +101,10 @@ export class GetContextNowUseCase {
       }
     }
 
-    // Top priorities: overdue first, then approaching
+    // Top priorities: overdue first, then approaching (with titles for MCP consumers)
     const topPriorities = [
-      ...aggregated.overdueTasks.slice(0, 3).map(t => t.id),
-      ...aggregated.approachingTasks.slice(0, 2).map(t => t.id),
+      ...aggregated.overdueTasks.slice(0, 3).map(t => ({ id: t.id, title: t.content })),
+      ...aggregated.approachingTasks.slice(0, 2).map(t => ({ id: t.id, title: t.content })),
     ].slice(0, 5)
 
     // Count today's due

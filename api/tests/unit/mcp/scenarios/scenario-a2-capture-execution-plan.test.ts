@@ -8,6 +8,7 @@
  * 1. capture 接受 mode=execution_plan + parent_id + 結構化 content
  * 2. Gatekeeper 識別為 execution_plan → 建立 sub_items 掛在 parent 下
  * 3. 回應包含 classified_as, filed_to, parent_id, agent_actions
+ * 4. result 模式持久化 actual_duration_minutes 到 dailyPlanItem
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -22,6 +23,10 @@ vi.mock('@/lib/db', () => ({
       createMany: vi.fn(),
       create: vi.fn(),
     },
+    dailyPlanItem: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
     $transaction: vi.fn(),
     user: {
       findUnique: vi.fn().mockResolvedValue({ timezone: 'Asia/Taipei' }),
@@ -34,6 +39,8 @@ import { prisma } from '@/lib/db'
 
 const mockTaskFindFirst = prisma.task.findFirst as any
 const mockTransaction = prisma.$transaction as any
+const mockPlanItemFindFirst = (prisma.dailyPlanItem as any).findFirst as any
+const mockPlanItemUpdate = (prisma.dailyPlanItem as any).update as any
 
 describe('Scenario A.2: Claude Code 拆任務回流到 Zentropy', () => {
   let useCase: CaptureUseCase
@@ -52,15 +59,14 @@ describe('Scenario A.2: Claude Code 拆任務回流到 Zentropy', () => {
       product: { name: 'Zentropy', area: { name: 'Work' } },
     })
 
-    // Mock transaction to simulate sub-task creation
+    // Mock transaction to execute callback with fake tx
     mockTransaction.mockImplementation(async (fn: any) => {
-      return {
-        createdSubTasks: [
-          { id: 'st-1', content: '將 auth.ts middleware 改為 async' },
-          { id: 'st-2', content: '更新 3 個依賴的 route handler' },
-          { id: 'st-3', content: '修改測試 mock' },
-        ],
+      const fakeTx = {
+        subTask: {
+          create: vi.fn().mockResolvedValue({ id: 'st-1' }),
+        },
       }
+      return fn(fakeTx)
     })
 
     const executionPlanContent = JSON.stringify({
@@ -91,6 +97,9 @@ describe('Scenario A.2: Claude Code 拆任務回流到 Zentropy', () => {
     expect(result.filed_to.product).toBe('Zentropy')
     expect(result.agent_actions).toBeDefined()
     expect(result.agent_actions.length).toBeGreaterThan(0)
+
+    // Verify transaction was called (sub-tasks created)
+    expect(mockTransaction).toHaveBeenCalled()
   })
 
   it('execution_plan 模式缺少 parent_id 應拋錯', async () => {
@@ -119,7 +128,7 @@ describe('Scenario A.2: Claude Code 拆任務回流到 Zentropy', () => {
     ).rejects.toThrow('Parent task not found')
   })
 
-  it('result 模式應記錄執行結果', async () => {
+  it('result 模式應記錄執行結果並持久化到 DB', async () => {
     mockTaskFindFirst.mockResolvedValue({
       id: 'task-1',
       user_id: 'user-1',
@@ -127,9 +136,14 @@ describe('Scenario A.2: Claude Code 拆任務回流到 Zentropy', () => {
       product: { name: 'Zentropy', area: { name: 'Work' } },
     })
 
-    mockTransaction.mockImplementation(async (fn: any) => {
-      return { updated: true }
+    // Mock daily plan item for persistence
+    mockPlanItemFindFirst.mockResolvedValue({
+      id: 'item-1',
+      task_id: 'task-1',
+      estimated_minutes: 180,
     })
+
+    mockPlanItemUpdate.mockResolvedValue({})
 
     const resultContent = JSON.stringify({
       outcome: 'completed',
@@ -149,5 +163,11 @@ describe('Scenario A.2: Claude Code 拆任務回流到 Zentropy', () => {
     expect(result.status).toBe('processed')
     expect(result.classified_as).toBe('result')
     expect(result.parent_id).toBe('task-1')
+
+    // Verify actual_duration_minutes was persisted to dailyPlanItem
+    expect(mockPlanItemUpdate).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: { actual_minutes: 300 },
+    })
   })
 })
