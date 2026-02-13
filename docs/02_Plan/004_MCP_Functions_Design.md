@@ -1,7 +1,12 @@
 # MCP Functions Design — The Intention-Execution Bridge
 
-**版本**: v2.0
+**版本**: v2.1
 **日期**: 2026-02-13
+**變更紀錄**:
+- v2.1 (2026-02-13): 新增 §12 差距分析、§13 具體實作計畫（基於 Coach 代碼審查）
+- v2.0 (2026-02-13): 從 15 tools CRUD 架構重寫為 5 tools Bridge 架構
+- v1.0 (已棄用): 15 個 CRUD-style Tools
+
 **前置文件**:
 - `docs/01_Specification/001_Product_Definition.md` — 產品定義 (L1-L5 + Execute)
 - `docs/01_Specification/010_MCP_Server_Spec.md` — MCP 安全架構 (v2.0)
@@ -1041,9 +1046,283 @@ Claude Code：
 
 ---
 
-## 12. 設計決策記錄
+## 12. 現有 Coach 實作 vs MCP v2.0 差距分析
 
-### 為什麼是 5 個 Tools 而非 15 個？
+> 基於 2026-02-13 merge main 後的代碼審查。
+
+### 12.1 已完整實作的 Coach 能力
+
+以下能力已 production-ready，可直接作為 MCP 層的後端基礎：
+
+| 能力 | 關鍵檔案 | 可支撐的 MCP 功能 |
+|:-----|:---------|:----------------|
+| **晨報/晚報生成** | `generate-briefing.ts` + `coach-ai-generator.ts` | `context/now` Resource |
+| **每日計畫生成** | `generate-plan.ts` + `coach-plan-generator.ts` | `handoff/ready` Resource（部分） |
+| **7 條平行資料聚合** | `coach-data-aggregator.ts` | `context/now` + `handoff/ready` 的數據來源 |
+| **衝突偵測（3 類）** | `coach-detection.ts` | `context/now` 的 conflicts 欄位 |
+| **停滯偵測（2 類）** | `coach-detection.ts` | `context/now` 的 stalled_items 欄位 |
+| **估時偏差追蹤** | `coach-calibration.ts` | `memory/bias` Resource |
+| **校準注入 AI prompt** | `generate-plan.ts` → `coach-plan-generator.ts` | `consult_coach(estimate)` 的基礎 |
+| **Cron 自動排程** | `cron/coach-briefing/route.ts` | 自動化生成 |
+| **計畫項目完成連動** | `update-plan-item.ts` | `report_done` 的基礎 |
+| **actual_minutes 全鏈路** | Schema → Repo → UseCase → Calibration → AI | 偏差學習的完整數據管線 |
+
+### 12.2 關鍵數據管線驗證
+
+**actual_minutes 完整鏈路**（偏差學習的基礎）：
+
+```
+用戶完成任務 → PATCH /api/coach/plan/items/:id {actualMinutes: 300}
+  → UpdatePlanItemUseCase 驗證 (0-1440) 並儲存
+  → daily_plan_items.actual_minutes = 300
+  → 下次 GeneratePlanUseCase 執行時：
+    → CoachCalibration.getCalibrationNote() 查詢最近 100 筆完成紀錄
+    → 計算 sum(actual) / sum(estimated) = overall ratio
+    → 計算 per-area ratios（需 ≥ 3 樣本）
+    → 生成校準建議（如「你在設計類低估 2.1 倍」）
+    → 注入 CoachPlanGenerator 的 AI prompt
+    → AI 調整估時
+```
+
+**計畫重新生成時的數據保護**：
+```typescript
+// prisma-daily-plan-repository.ts
+// 只刪除未完成項目，已完成項目（含 actual_minutes）永遠保留
+await prisma.dailyPlanItem.deleteMany({
+  where: { plan_id: existing.id, completed: false },
+})
+```
+
+**估時回寫保護**：
+```typescript
+// generate-plan.ts
+// 只在原始值為 null 時回寫，不覆蓋用戶手動值
+if (candidate.estimatedMinutes !== null) continue
+```
+
+### 12.3 差距矩陣
+
+| MCP v2.0 需求 | 狀態 | 後端基礎 | 還需要做什麼 |
+|:-------------|:-----|:--------|:-----------|
+| **Resources** | | | |
+| `handoff/ready` ★ | 🟡 部分 | DailyPlan 有結構化數據 + ordering + reasoning | 需組裝 context_package（why, decisions, knowledge links, coach_notes, acceptance_criteria）；需新 endpoint `GET /api/handoff/ready` |
+| `context/now` | 🔴 未實作 | CoachDataAggregator 已能產出所有數據 | 需新 endpoint `GET /api/context/now`，組裝全局摘要 + open_loops + stalled_items + estimation_bias |
+| `memory/bias` | 🔴 未實作 | CoachCalibration 已能計算比率 | 需新 endpoint `GET /api/memory/bias`，暴露現有校準數據 |
+| `areas` | 🔴 未實作 | Prisma 有 Area/Product/Topic 模型 | 需新 endpoint `GET /api/areas`，組裝階層結構 |
+| `knowledge/*` | ✅ 已實作 | — | — |
+| `saga/*` | ✅ 已實作 | — | — |
+| `profile/bias-vector` | ✅ 已實作 | — | — |
+| **Tools** | | | |
+| `capture` (統一入口) | 🟡 部分 | `POST /api/brain-dump` 已存在 | 需擴展支援 mode=execution_plan/result，需處理 parent_id 掛載 |
+| `report_done` | 🔴 未實作 | `UpdatePlanItemUseCase` 有 actualMinutes 和完成連動 | 需新 endpoint `POST /api/actions/:id/done`，整合 Coach 偏差計算 + Librarian 歸檔 |
+| `consult_coach` | 🔴 未實作 | 偵測引擎 + 校準服務已就緒 | 需新 endpoint `POST /api/coach/consult`，需新 AI prompt 模板支援 refine/challenge/estimate |
+| `search` | 🟡 部分 | `query_memory` 已存在 | 重新命名 + 增強語意搜尋 |
+| `save_knowledge` | 🟡 部分 | `append_to_knowledge` 已存在 | 重新命名 |
+
+### 12.4 複用 vs 新建評估
+
+**可直接複用（包裝即可）**：
+- `CoachDataAggregator` → `context/now` 的數據層（7 條平行查詢完全可用）
+- `CoachCalibration` → `memory/bias` 的數據層（計算邏輯完整）
+- `DailyPlan + DailyPlanItem` → `handoff/ready` 的基礎結構
+- `coach-detection.ts` → `context/now` 的衝突/停滯資訊
+- `UpdatePlanItemUseCase` → `report_done` 的完成連動邏輯
+
+**需要新建**：
+- `handoff/ready` 的 context_package 組裝邏輯（需整合 Librarian 的知識連結 + 決策查詢）
+- `consult_coach` 的 3 種 intent AI prompt 模板
+- `consult_coach` 的 similar_history 查詢（需跨知識庫和歷史任務搜尋）
+- `report_done` 的即時偏差回饋生成
+- `capture` 的 execution_plan/result 模式處理邏輯
+- MCP Server 的 Resource handler 註冊
+
+---
+
+## 13. 具體實作計畫：MCP 包裝層
+
+> 基於 §12 的差距分析，以下是 MCP 層各 function 的具體實作規劃。
+
+### 13.1 Phase 1A — 最小可用橋（1-2 週）
+
+**目標**：讓外部 AI 工具能讀取 Zentropy 的意圖並回流結果。
+
+#### 13.1.1 `zentropy://context/now` Resource
+
+**為什麼先做**：這是最容易實作的 Resource，因為 `CoachDataAggregator` + `CoachCalibration` 已經能產出所有需要的數據。
+
+**後端 endpoint**：`GET /api/context/now`
+
+**實作方式**：
+```
+CoachDataAggregator.aggregate(userId)  // 已有：7 條平行查詢
+  + detectTimeOverlaps()               // 已有
+  + detectDeadlineCollisions()          // 已有
+  + detectCapacityOverload()            // 已有
+  + detectStagnantProducts()            // 已有
+  + detectStuckTasks()                  // 已有
+  + CoachCalibration.calculate(userId)  // 已有（需從 private → 暴露）
+  → 組裝成 context/now JSON 格式
+```
+
+**新代碼量估計**：~100 行（主要是組裝和格式轉換）
+
+#### 13.1.2 `zentropy://memory/bias` Resource
+
+**為什麼同時做**：`CoachCalibration` 已經能算出所有數據，只需暴露。
+
+**後端 endpoint**：`GET /api/memory/bias`
+
+**實作方式**：
+```
+CoachCalibration.calculate(userId)  // 已有（需 public 化）
+  → 轉換為 memory/bias JSON 格式
+  → 加上 trend 計算（目前 trend 已計算但未暴露）
+```
+
+**新代碼量估計**：~50 行
+
+#### 13.1.3 `zentropy://areas` Resource
+
+**後端 endpoint**：`GET /api/areas`
+
+**實作方式**：
+```
+Prisma 查詢：Areas → Products → Topics（含 active_actions count）
+  → 組裝階層結構 JSON
+```
+
+**新代碼量估計**：~80 行
+
+#### 13.1.4 `report_done` Tool
+
+**為什麼 Phase 1A**：這是閉環的關鍵。沒有它，偏差學習的數據來源就斷了。
+
+**後端 endpoint**：`POST /api/actions/:id/done`
+
+**實作方式**：
+```
+1. 查找 action（Task 或 SubTask）
+2. 如果是 DailyPlanItem → 複用 UpdatePlanItemUseCase 的完成連動
+3. 計算即時偏差：CoachCalibration.calculate() 取 estimated，對比 actual
+4. 更新 Task/SubTask 狀態為完成
+5. 生成 coach_feedback（AI 或模板）
+6. 返回 deviation + coach_feedback
+```
+
+**新代碼量估計**：~200 行（新 Use Case + endpoint）
+
+#### 13.1.5 MCP Server Resource Handler 註冊
+
+**實作方式**：在 `api/src/mcp/server.ts` 註冊新 Resource handlers，呼叫上述 endpoints。
+
+**新代碼量估計**：~150 行
+
+### 13.2 Phase 1B — 意圖交接包（1-2 週）
+
+#### 13.2.1 `zentropy://handoff/ready` Resource ★
+
+**為什麼需要更多時間**：需要整合多個資料源組裝 context_package。
+
+**後端 endpoint**：`GET /api/handoff/ready`
+
+**組裝邏輯**：
+```
+1. 取今日 DailyPlan（已有 GeneratePlanUseCase）
+2. 對每個 plan item：
+   a. 取 Task 詳情 + Product + Area 脈絡
+   b. 取相關知識連結（Librarian 查詢）         ← 需新建
+   c. 取相關決策紀錄（Knowledge 查詢）          ← 需新建
+   d. 取 coach_notes（CoachCalibration 偏差）   ← 已有
+   e. 取 acceptance_criteria（Task metadata）   ← 需確認 schema
+3. 包裝成 handoff_items[] 格式
+```
+
+**依賴**：需要 Librarian 的知識檢索能力（語意搜尋 or keyword matching）
+
+**新代碼量估計**：~300 行（新 Use Case + Knowledge 查詢 + 組裝邏輯）
+
+#### 13.2.2 `capture` Tool 增強
+
+**擴展 `POST /api/brain-dump`**：
+
+```
+新增 mode 參數處理：
+- thought（已有）：走現有 Gatekeeper 流程
+- execution_plan（新建）：
+  1. 解析 content 中的 sub_items JSON
+  2. 查找 parent_id 對應的 Task
+  3. 建立 SubTask 掛在 parent Task 下
+  4. Coach 更新估時（校準因子）
+- result（新建）：
+  1. 解析 outcome + actual_duration_minutes
+  2. 複用 report_done 邏輯
+  3. Librarian 歸檔到 History
+```
+
+**新代碼量估計**：~250 行
+
+#### 13.2.3 `search` + `save_knowledge` Tool 重新命名
+
+**實作方式**：
+- `query_memory` → `search`（新增 alias，保留舊名 deprecated）
+- `append_to_knowledge` → `save_knowledge`（同上）
+- MCP Server 註冊新名稱
+
+**新代碼量估計**：~50 行
+
+### 13.3 Phase 2 — Coach 智慧（2-3 週）
+
+#### 13.3.1 `consult_coach` Tool
+
+**後端 endpoint**：`POST /api/coach/consult`
+
+**三個 intent 的實作策略**：
+
+| Intent | AI Prompt 策略 | 數據來源 |
+|:-------|:-------------|:--------|
+| `refine` | 新 prompt 模板：假設分析 + 盲點偵測 + 歷史參照 | Task 歷史、Knowledge 搜尋、相關決策 |
+| `challenge` | 新 prompt 模板：反方論述 + 數據支撐 | CoachCalibration 偏差 + 歷史任務 + 衝突偵測 |
+| `estimate` | 擴展現有 CoachCalibration | CoachCalibration + per-area 分佈（需新增 percentile 計算） |
+
+**新代碼量估計**：~500 行（新 Use Case + 3 套 prompt + AI 呼叫）
+
+#### 13.3.2 Episodic Memory 增強
+
+**現狀**：CoachCalibration 只按 area 分組，不按 task type 分組。
+
+**增強方向**：
+- 在 `daily_plan_items` 增加 `task_type` 欄位（或從 task metadata 推斷）
+- CoachCalibration 增加 per-task-type 分組計算
+- 增加 percentile 分佈（p25/p50/p75/p90）
+- 增加 trend 計算（近 10 筆 vs 全部）
+
+**新代碼量估計**：~200 行（擴展 CoachCalibration + migration）
+
+### 13.4 實作優先級總覽
+
+```
+Phase 1A（最小可用橋）
+├── context/now Resource ........... 容易（組裝已有數據）
+├── memory/bias Resource ........... 容易（暴露已有計算）
+├── areas Resource ................. 容易（Prisma 查詢）
+├── report_done Tool ............... 中等（新 Use Case）
+└── MCP Server 註冊 ............... 容易（接線）
+
+Phase 1B（意圖交接）
+├── handoff/ready Resource ★ ...... 困難（需整合多資料源）
+├── capture 增強 .................. 中等（擴展現有 endpoint）
+└── search/save_knowledge 重命名 ... 容易（alias）
+
+Phase 2（Coach 智慧）
+├── consult_coach Tool ............. 困難（3 套 AI prompt）
+└── Episodic Memory 增強 ........... 中等（擴展校準服務）
+```
+
+---
+
+## 14. 設計決策記錄
+
+### DDR-001: 為什麼是 5 個 Tools 而非 15 個？
 
 **v1.0 設計**（已棄用）按功能列了 15 個 Tools（capture_thought, capture_decision, capture_execution_result, list_items, refine_idea, challenge_plan, plan_action, complete_action, update_action, get_daily_plan, estimate_with_history, get_briefing, get_weekly_review, detect_conflicts, proxy_calendar_event）。
 
@@ -1059,14 +1338,14 @@ Claude Code：
 - Coach 能力 → 統一入口 `consult_coach`（intent 參數區分）
 - 閉環 → 獨立的 `report_done`（語意足夠明確且 Coach 處理邏輯完全不同）
 
-### 為什麼 `handoff/ready` 是核心而非 `context/now`？
+### DDR-002: 為什麼 `handoff/ready` 是核心而非 `context/now`？
 
 `context/now` 是「你今天有什麼」——這是所有生產力工具都做的事。
 `handoff/ready` 是「這件事的完整脈絡，拿去就能做」——這是沒有產品做的事。
 
 差距在於：一個 AI 在 Cursor 裡讀到「你有個 auth 重構任務」vs 讀到「auth 重構任務 + 為什麼要做 + 過去的相關決策 + 你在這類任務上的偏差 + 驗收標準」——後者才是真正消除意圖-執行摩擦的交接。
 
-### 為什麼 `capture` 要支援 execution_plan mode？
+### DDR-003: 為什麼 `capture` 要支援 execution_plan mode？
 
 這是「橋」的雙向性的關鍵。沒有 execution_plan mode，資訊只能從 Zentropy 流到工具，不能從工具流回來。
 
