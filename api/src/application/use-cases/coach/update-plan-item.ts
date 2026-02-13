@@ -19,6 +19,7 @@ export interface UpdatePlanItemRequest {
   itemId: string
   order?: number
   completed?: boolean
+  actualMinutes?: number
   pinned?: boolean
   deferred?: boolean
 }
@@ -42,20 +43,7 @@ export class UpdatePlanItemUseCase {
     if (request.completed !== undefined) updateData.completed = request.completed
     if (request.pinned !== undefined) updateData.pinned = request.pinned
     if (request.deferred !== undefined) updateData.deferred = request.deferred
-
-    // 完成時自動計算 actual_minutes（從 plan item 建立到完成的分鐘數）
-    if (request.completed === true) {
-      const existing = await prisma.dailyPlanItem.findUnique({
-        where: { id: request.itemId },
-        select: { created_at: true },
-      })
-      if (existing) {
-        const actualMinutes = Math.round(
-          (Date.now() - existing.created_at.getTime()) / (1000 * 60)
-        )
-        updateData.actualMinutes = actualMinutes
-      }
-    }
+    if (request.actualMinutes !== undefined) updateData.actualMinutes = request.actualMinutes
 
     const item = await this.repository.updateItem(request.itemId, updateData)
 
