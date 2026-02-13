@@ -8,7 +8,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { getStartOfDay, getEndOfDay } from '@/lib/timezone-utils'
-import type { CalendarEventSummary, TaskSummary } from '@/domain/entities/coach-briefing.entity'
+import type { CalendarEventSummary, TaskSummary, SubTaskSummary } from '@/domain/entities/coach-briefing.entity'
 
 // SQL enum 常數 — 避免 raw SQL 中硬編碼字串
 const STATUS_ARCHIVE = Prisma.sql`'ARCHIVE'::"statusenum"`
@@ -36,6 +36,7 @@ interface RawTaskRow {
   content: string
   status: string
   due_date: Date | null
+  start_date: Date | null
   updated_at: Date
   area_name: string
   product_name: string
@@ -43,11 +44,25 @@ interface RawTaskRow {
   estimated_minutes: number | null
 }
 
+interface RawStuckSubTask {
+  id: string
+  content: string
+  task_id: string
+  task_content: string
+  area_name: string
+  product_name: string
+  start_date: Date
+  due_date: Date | null
+  updated_at: Date
+}
+
 interface RawStagnantProduct {
   id: string
   name: string
   area_name: string
+  lifecycle: string
   last_task_updated_at: Date
+  nearest_due_date: Date | null
 }
 
 // ============================================================================
@@ -64,8 +79,11 @@ export interface AggregatedData {
     id: string
     name: string
     area_name: string
+    lifecycle: string
     last_task_updated_at: string
+    nearest_due_date: string | null
   }>
+  stuckSubTasks: SubTaskSummary[]
   tomorrowPreview: CalendarEventSummary[]
 }
 
@@ -94,6 +112,7 @@ export class CoachDataAggregator {
       completedTasks,
       remainingTasks,
       stagnantProducts,
+      stuckSubTasks,
       tomorrowPreview,
     ] = await Promise.all([
       // 1. 今日行事曆
@@ -108,7 +127,9 @@ export class CoachDataAggregator {
       this.queryRemainingTasks(userId),
       // 6. 停滯產品
       this.queryStagnantProducts(userId, sevenDaysAgo),
-      // 7. 明日行事曆
+      // 7. 已開始但未完成的子任務
+      this.queryStuckSubTasks(userId, todayStart),
+      // 8. 明日行事曆
       this.queryTodayCalendarEvents(userId, tomorrowStart, tomorrowEnd),
     ])
 
@@ -119,6 +140,7 @@ export class CoachDataAggregator {
       completedTasks,
       remainingTasks,
       stagnantProducts,
+      stuckSubTasks,
       tomorrowPreview,
     }
   }
@@ -160,6 +182,7 @@ export class CoachDataAggregator {
         t.content,
         t.status::text,
         t.due_date,
+        t.start_date,
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
@@ -191,6 +214,7 @@ export class CoachDataAggregator {
         t.content,
         t.status::text,
         t.due_date,
+        t.start_date,
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
@@ -223,6 +247,7 @@ export class CoachDataAggregator {
         t.content,
         t.status::text,
         t.due_date,
+        t.start_date,
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
@@ -251,6 +276,7 @@ export class CoachDataAggregator {
         t.content,
         t.status::text,
         t.due_date,
+        t.start_date,
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
@@ -278,14 +304,16 @@ export class CoachDataAggregator {
         p.id::text,
         p.name,
         a.name as area_name,
-        MAX(t.updated_at) as last_task_updated_at
+        p.lifecycle::text as lifecycle,
+        MAX(t.updated_at) as last_task_updated_at,
+        MIN(CASE WHEN t.due_date > NOW() THEN t.due_date END) as nearest_due_date
       FROM products p
       JOIN areas a ON a.id = p.area_id
       LEFT JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
       WHERE p.user_id = ${userId}::uuid
         AND p.deleted_at IS NULL
         AND p.status IN (${STATUS_ACTIVE}, ${STATUS_INBOX})
-      GROUP BY p.id, p.name, a.name
+      GROUP BY p.id, p.name, a.name, p.lifecycle
       HAVING MAX(t.updated_at) IS NOT NULL
         AND MAX(t.updated_at) < ${sevenDaysAgo}
       ORDER BY MAX(t.updated_at) ASC
@@ -295,8 +323,62 @@ export class CoachDataAggregator {
       id: row.id,
       name: row.name,
       area_name: row.area_name,
+      lifecycle: row.lifecycle,
       last_task_updated_at: row.last_task_updated_at.toISOString(),
+      nearest_due_date: row.nearest_due_date ? row.nearest_due_date.toISOString() : null,
     }))
+  }
+
+  private async queryStuckSubTasks(
+    userId: string,
+    now: Date,
+  ): Promise<SubTaskSummary[]> {
+    const rows = await prisma.$queryRaw<RawStuckSubTask[]>`
+      SELECT
+        st.id::text,
+        st.content,
+        st.task_id::text,
+        t.content as task_content,
+        a.name as area_name,
+        p.name as product_name,
+        st.start_date,
+        st.due_date,
+        st.updated_at
+      FROM sub_tasks st
+      JOIN tasks t ON t.id = st.task_id
+      JOIN products p ON p.id = t.product_id
+      JOIN areas a ON a.id = p.area_id
+      WHERE st.user_id = ${userId}::uuid
+        AND st.deleted_at IS NULL
+        AND st.completed = false
+        AND st.start_date IS NOT NULL
+        AND st.start_date <= ${now}
+      ORDER BY st.start_date ASC
+    `
+
+    return rows.map(row => {
+      const startDate = new Date(row.start_date)
+      const dueDate = row.due_date ? new Date(row.due_date) : null
+      const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+
+      let daysRemaining: number | null = null
+      if (dueDate) {
+        daysRemaining = Math.floor((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      }
+
+      return {
+        id: row.id,
+        content: row.content,
+        task_id: row.task_id,
+        task_content: row.task_content,
+        area_name: row.area_name,
+        product_name: row.product_name,
+        start_date: startDate.toISOString().substring(0, 10),
+        due_date: dueDate ? dueDate.toISOString().substring(0, 10) : null,
+        days_since_start: daysSinceStart,
+        days_remaining: daysRemaining,
+      }
+    })
   }
 
   // ============================================================================
@@ -318,6 +400,7 @@ export class CoachDataAggregator {
 
   private rawToTaskSummary(row: RawTaskRow, now: Date): TaskSummary {
     const dueDate = row.due_date ? new Date(row.due_date) : null
+    const startDate = row.start_date ? new Date(row.start_date) : null
     const updatedAt = new Date(row.updated_at)
 
     let daysOverdue: number | null = null
@@ -338,6 +421,7 @@ export class CoachDataAggregator {
       content: row.content,
       status: row.status,
       due_date: dueDate ? dueDate.toISOString().substring(0, 10) : null,
+      start_date: startDate ? startDate.toISOString().substring(0, 10) : null,
       area_name: row.area_name || 'Unknown',
       product_name: row.product_name || 'Unknown',
       days_overdue: daysOverdue,

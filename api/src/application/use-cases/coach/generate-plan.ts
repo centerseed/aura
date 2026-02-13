@@ -125,12 +125,58 @@ export class GeneratePlanUseCase {
     const plan = await this.repository.upsert(createData)
     timings.save = Date.now() - start
 
+    // 7. 自動設 start_date（排入計畫 = 開始執行）
+    start = Date.now()
+    await this.setStartDatesForPlannedItems(plannedItems, planDate)
+    timings.setStartDates = Date.now() - start
+
     return { plan, timings }
   }
 
   // ============================================================================
   // Private
   // ============================================================================
+
+  /**
+   * 對排入計畫的項目自動設 start_date（僅首次，不覆蓋已有值）
+   */
+  private async setStartDatesForPlannedItems(
+    items: Array<{ subTaskId: string | null; taskId: string }>,
+    planDate: Date,
+  ): Promise<void> {
+    // SubTask: 設 start_date
+    const subTaskIds = items
+      .filter(i => i.subTaskId)
+      .map(i => i.subTaskId!)
+
+    if (subTaskIds.length > 0) {
+      await prisma.subTask.updateMany({
+        where: {
+          id: { in: subTaskIds },
+          start_date: null,
+        },
+        data: { start_date: planDate },
+      })
+    }
+
+    // Task（無 subtask 的）: 設 start_date + 切 ACTIVE
+    const taskOnlyIds = items
+      .filter(i => !i.subTaskId)
+      .map(i => i.taskId)
+
+    if (taskOnlyIds.length > 0) {
+      await prisma.task.updateMany({
+        where: {
+          id: { in: taskOnlyIds },
+          start_date: null,
+        },
+        data: {
+          start_date: planDate,
+          status: 'ACTIVE',
+        },
+      })
+    }
+  }
 
   /**
    * 回寫 AI 估時到原始 Task/SubTask

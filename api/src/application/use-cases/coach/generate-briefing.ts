@@ -19,6 +19,7 @@ import {
   detectCapacityOverload,
   detectStagnantProducts,
   detectStuckTasks,
+  detectStuckSubTasks,
 } from '@/application/services/coach-detection'
 import { CoachAIGenerator } from '@/application/services/coach-ai-generator'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
@@ -92,7 +93,8 @@ export class GenerateBriefingUseCase {
 
     const stagnantProducts = detectStagnantProducts(aggregatedData.stagnantProducts)
     const stuckTasks = detectStuckTasks(aggregatedData.remainingTasks)
-    const stagnations = [...stagnantProducts, ...stuckTasks]
+    const stuckSubTasks = detectStuckSubTasks(aggregatedData.stuckSubTasks)
+    const stagnations = [...stagnantProducts, ...stuckTasks, ...stuckSubTasks]
     timings.detection = Date.now() - start
 
     // 6. AI 生成摘要 + 建議
