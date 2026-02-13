@@ -168,7 +168,7 @@ export class GeneratePlanUseCase {
     }
 
     if (subTaskUpdates.length > 0) {
-      await Promise.all(
+      await prisma.$transaction(
         subTaskUpdates.map(u =>
           prisma.subTask.update({
             where: { id: u.id },

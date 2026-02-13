@@ -1137,6 +1137,7 @@ function DashboardContent() {
     alternatives: string[];
   } | null>(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
+  const [selectedTaskCalendarEvent, setSelectedTaskCalendarEvent] = useState<{ eventId: string; eventLink: string } | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [isReorganizeModalOpen, setIsReorganizeModalOpen] = useState(false);
   const [reorganizeProposal, setReorganizeProposal] = useState<ReorganizeProposal | null>(null);
@@ -2015,6 +2016,30 @@ function DashboardContent() {
     }
   };
 
+  // 載入 task 已關聯的日曆事件
+  const fetchTaskCalendarEvent = async (taskId: string) => {
+    setSelectedTaskCalendarEvent(null);
+    try {
+      const token = await user?.getIdToken();
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/events`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const events = data.data?.events;
+      if (events && events.length > 0) {
+        const latest = events[events.length - 1];
+        setSelectedTaskCalendarEvent({
+          eventId: latest.calendar_event_id,
+          eventLink: latest.event_link || '',
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // 加入 / 更新 Google Calendar
   const handleAddToCalendar = async (taskId: string, options?: { startTime?: string; durationMinutes?: number; eventId?: string }): Promise<{ eventLink: string; meetLink?: string; eventId?: string } | null> => {
     const task = areas
@@ -2073,11 +2098,15 @@ function DashboardContent() {
       });
       if (!response.ok) throw new Error('Failed to create calendar event');
       const data = await response.json();
-      return {
+      const result = {
         eventLink: data.data?.eventLink || '',
         meetLink: data.data?.meetLink,
         eventId: data.data?.eventId,
       };
+      if (result.eventId) {
+        setSelectedTaskCalendarEvent({ eventId: result.eventId, eventLink: result.eventLink });
+      }
+      return result;
     } catch (err) {
       console.error('Failed to add/update calendar:', err);
       return null;
@@ -3547,12 +3576,16 @@ function DashboardContent() {
                               onOpenTaskDetail={(task) => {
                                 setInitialEditSubItemId(null);
                                 setSelectedTask(task);
+                                setSelectedTaskCalendarEvent(null);
                                 setIsTaskDetailModalOpen(true);
+                                fetchTaskCalendarEvent(task.id);
                               }}
                               onOpenSubItemDetail={(task: TaskCard, subItemId: string) => {
                                 setInitialEditSubItemId(subItemId);
                                 setSelectedTask(task);
+                                setSelectedTaskCalendarEvent(null);
                                 setIsTaskDetailModalOpen(true);
+                                fetchTaskCalendarEvent(task.id);
                               }}
                               isReorganizing={reorganizingProductId === product.id}
                             />
@@ -3822,6 +3855,7 @@ function DashboardContent() {
             onStatusChange={handleTaskStatusChange}
             onAddToCalendar={handleAddToCalendar}
             isCalendarConnected={calendarConnected}
+            calendarEvent={selectedTaskCalendarEvent}
           />
         )}
 

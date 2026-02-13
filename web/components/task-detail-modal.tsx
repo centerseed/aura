@@ -49,6 +49,7 @@ interface TaskDetailModalProps {
   onSetReminder?: (taskId: string, reminderType: "calendar" | "notification", minutesBefore: number) => Promise<boolean>;
   isCalendarConnected?: boolean;
   initialEditSubItemId?: string | null;
+  calendarEvent?: { eventId: string; eventLink: string } | null;
 }
 
 // 計算相對時間描述（與 draggable-task-item 相同邏輯）
@@ -184,6 +185,7 @@ export function TaskDetailModal({
   onSetReminder,
   isCalendarConnected,
   initialEditSubItemId,
+  calendarEvent,
 }: TaskDetailModalProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -203,8 +205,8 @@ export function TaskDetailModal({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
-  const [calendarEventLink, setCalendarEventLink] = useState<string | null>(null);
-  const [calendarEventId, setCalendarEventId] = useState<string | null>(null);
+  const [calendarEventLink, setCalendarEventLink] = useState<string | null>(calendarEvent?.eventLink ?? null);
+  const [calendarEventId, setCalendarEventId] = useState<string | null>(calendarEvent?.eventId ?? null);
   const [calendarStartTime, setCalendarStartTime] = useState("09:00");
   const [calendarDuration, setCalendarDuration] = useState(60);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
@@ -249,6 +251,13 @@ export function TaskDetailModal({
     setNarrative(task.narrative || "");
     setSubItems(task.sub_items || []);
   }, [task.title, task.narrative, task.start_date, task.due_date, task.id, task.sub_items]);
+
+  // 同步 calendarEvent prop
+  useEffect(() => {
+    setCalendarEventId(calendarEvent?.eventId ?? null);
+    setCalendarEventLink(calendarEvent?.eventLink ?? null);
+    setShowCalendarOptions(false);
+  }, [calendarEvent]);
 
   if (!isOpen) return null;
 
