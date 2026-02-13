@@ -28,6 +28,7 @@ model User {
   evaluation_logs      SystemEvaluationLog[]
   oauth_tokens         OAuthToken[]
   sub_tasks            SubTask[]
+  mcp_refresh_tokens   McpRefreshToken[]
 
   @@index([auth_provider_id])
   @@index([auth_provider, auth_provider_id])
@@ -384,4 +385,44 @@ enum ReminderType {
   LOCAL_NOTIFICATION
 
   @@map("remindertypeenum")
+}
+
+// ─── MCP OAuth 2.1 ──────────────────────────────────────────
+
+/// Temporary authorization codes for the MCP OAuth PKCE flow.
+/// Codes are single-use and expire after 10 minutes.
+model McpAuthCode {
+  id                String   @id @default(uuid()) @db.Uuid
+  code              String   @unique @db.VarChar(128)
+  user_id           String   @db.Uuid
+  client_id         String   @db.VarChar(200)
+  redirect_uri      String   @db.VarChar(2000)
+  code_challenge    String   @db.VarChar(128)
+  scope             String   @db.VarChar(500)
+  expires_at        DateTime @db.Timestamp(6)
+  created_at        DateTime @default(now()) @db.Timestamp(6)
+  used              Boolean  @default(false)
+
+  @@index([code])
+  @@index([expires_at])
+  @@map("mcp_auth_codes")
+}
+
+/// Long-lived refresh tokens for MCP clients.
+/// Access tokens are stateless JWTs; refresh tokens are stored for revocation.
+model McpRefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  token_hash   String    @unique @db.VarChar(128)
+  user_id      String    @db.Uuid
+  client_id    String    @db.VarChar(200)
+  scope        String    @db.VarChar(500)
+  expires_at   DateTime  @db.Timestamp(6)
+  created_at   DateTime  @default(now()) @db.Timestamp(6)
+  revoked_at   DateTime? @db.Timestamp(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("mcp_refresh_tokens")
 }
