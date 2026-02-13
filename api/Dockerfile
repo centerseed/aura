@@ -24,8 +24,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 
 RUN npm run build
+
 
 # 3. 運行階段 (custom server: Next.js + MCP on same port)
 FROM base AS runner
@@ -59,4 +61,4 @@ ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
 # Custom server: Next.js API + MCP endpoint on same port
-CMD ["node", "--import", "tsx/esm", "server.ts"]
+CMD ["node_modules/.bin/tsx", "server.ts"]
