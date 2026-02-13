@@ -1,6 +1,6 @@
-# MCP Functions Design — Execution Layer 完整設計
+# MCP Functions Design — The Intention-Execution Bridge
 
-**版本**: v1.0
+**版本**: v2.0
 **日期**: 2026-02-13
 **前置文件**:
 - `docs/01_Specification/001_Product_Definition.md` — 產品定義 (L1-L5 + Execute)
@@ -9,1040 +9,813 @@
 
 ---
 
-## 1. 設計動機
+## 1. 第一性原理：MCP Server 為什麼要存在？
 
-### 1.1 現況
-
-目前 MCP Server 提供 3 Tools + 3 Resources + 2 Prompts，僅覆蓋 L1-L2（Capture + Organize）：
-
-| 現有 | 覆蓋層 | 功能 |
-|:-----|:-------|:-----|
-| `capture_thought` | L1 | 輸入碎片到 Inbox |
-| `append_to_knowledge` | L2 | 寫入知識庫 |
-| `query_memory` | L1-L2 | 語意搜尋 |
-
-**缺口**：L3 Refine、L4 Plan、L5 Review、Execute 邊界 — 全部為零。
-
-### 1.2 Execute 邊界的定位
-
-產品定義明確指出 Execute 不是獨立層，而是 **Zentropy 的輸出邊界**：
+### 1.1 本質問題
 
 ```
-簡單動作 → Zentropy 透過 MCP 直接代勞（建 calendar event、發通知）
-複雜執行 → 用戶在外部工具執行，Zentropy 提供 context
-結果回收 → 執行結果回流 Review 層，形成閉環
+Zentropy 知道你「要做什麼」，但不知道「怎麼做」
+執行工具知道「怎麼做」，但不知道你「要做什麼」
 ```
 
-因此 MCP 必須同時扮演：
-1. **Context Provider** — 向外部 AI 提供完整脈絡（specs、計畫、記憶）
-2. **Action Handler** — 接受外部 AI 觸發的動作（capture、plan、review）
-3. **Execution Proxy** — 代理簡單動作到外部服務（日曆、通知）
-4. **Result Collector** — 收集執行結果回流到 Review
+這個斷裂存在於所有領域：
 
-### 1.3 競品研究洞察
+| 領域 | Zentropy 知道的 | 工具知道的 | 斷點（用戶自己在翻譯） |
+|:-----|:-------------|:---------|:---------------------|
+| 開發 | 「重構 auth 模組，P1，估 4h」 | codebase 結構、依賴、測試覆蓋 | 把意圖翻譯成程式碼動作 |
+| 法律 | 「審閱合約，週五前」 | 合約 PDF 全文、法規資料庫 | 把意圖翻譯成審閱要點 |
+| 財務 | 「完成 Q1 報稅」 | 帳本數據、稅務表單 | 把意圖翻譯成具體操作 |
+| 內容 | 「寫產品更新文」 | 草稿編輯器、過去的文章風格 | 把意圖翻譯成寫作大綱 |
 
-研究了 Heptabase、Todoist、Linear、Notion、Obsidian、Things 3、Roam Research 的 MCP 實作後，關鍵洞察：
+**這個「翻譯」就是摩擦。這個摩擦是很多事情「規劃了但沒執行」的真正原因。**
 
-| 觀察 | 對 Zentropy 的啟發 |
-|:-----|:-----------------|
-| Heptabase 僅 9 tools，寫入限制在 inbox + journal append | 寫入端保守是對的——限制寫入面，降低安全風險 |
-| Todoist community 版 19 tools 覆蓋完整 task lifecycle | 任務生命週期管理（create→update→complete→archive）是必備 |
-| Linear 40+ tools 包含 initiatives→projects→cycles→issues | 階層式目標拆解的 CRUD 很有價值，但 Zentropy 的階層是 Area→Product→Topic |
-| Notion 用 data sources 作為第一級抽象 | Zentropy 可以用 Entity（Area/Product/Topic）作為第一級抽象 |
-| Roam 有 `remember`/`recall` 記憶原語 | **規劃記憶（Episodic Memory）應是 MCP 的原生能力** |
-| Obsidian semantic MCP 把 20+ tools 整合成 5 個語意操作 | 工具數量不是越多越好，語意明確比 CRUD 泛化更重要 |
-| 所有競品都沒有：規劃校正、偏差追蹤、想法深化 | **這是 Zentropy 的差異化空間** |
+不是偷懶，是從「我知道要做什麼」到「打開工具開始做」之間有一道認知落差。而 Zentropy 不可能填補工具端的 context（看不到 codebase、合約、帳本），工具也不可能填補 Zentropy 的全局視角（不知道 3 個專案在跑、deadline 衝突、歷史偏差）。
+
+### 1.2 核心結論
+
+> **MCP Server 的核心價值不是「讓 AI 能 CRUD Zentropy 的資料」，而是：成為「腦中的意圖」和「現實的工具」之間的橋樑，降低兩者之間的摩擦。**
+
+具體來說：
+
+```
+           Zentropy（意圖層）
+           ┌──────────────┐
+           │ 整理好的意圖   │  ← L1-L5 的產出：分類好的任務、
+           │ + 全局 context │    Coach 的偏差校正、相關知識
+           └──────┬───────┘
+                  │
+         ┌────────┴────────┐
+         │   MCP Server    │  ← 橋：把意圖打包成工具能消化的格式
+         │  (The Bridge)   │     把工具的產出回流到意圖層
+         └────────┬────────┘
+                  │
+           ┌──────┴───────┐
+           │ 執行工具       │  ← Claude Code / Cursor / Calendar /
+           │ + domain ctx  │    各種 domain-specific 的工具
+           └──────────────┘
+```
+
+這意味著：
+
+1. **出站（Zentropy → 工具）**：不只給任務標題，要給**完整的意圖包**——why、相關決策、歷史偏差、驗收標準。讓執行工具拿到就能立刻開工。
+2. **入站（工具 → Zentropy）**：執行工具基於 domain context 產生的細節（子任務拆解、執行結果）要能回流。Gatekeeper 接收、Librarian 歸檔、Coach 追蹤。
+3. **Zentropy 不試圖取代工具**：不做日曆 CRUD、不做 Git 操作、不做 code generation。Zentropy 做的是讓這些工具**更知道該做什麼**。
+
+### 1.3 這個定位意味著什麼不做
+
+| 不做 | 為什麼 |
+|:-----|:------|
+| 15 個 CRUD Tools | 那是在做「Todoist API + AI 外掛」，不是橋 |
+| 代理執行所有外部動作 | 不可能跟大廠和 OpenClaw 拼整合數量 |
+| 在 Zentropy 端做 execution-level planning | Zentropy 看不到 codebase/合約/帳本，硬做就是幻覺 |
+| 把 briefing/review 做成 Tool | 環境智慧應該是 Resource（被動注入），不是 Tool（主動觸發） |
 
 ---
 
-## 2. 設計原則
+## 2. 競品研究：為什麼「橋」是差異化
 
-1. **Agent-Mediated, Not Direct CRUD**
-   - 不做 Notion/Linear 式的泛化 CRUD（`create_page`, `update_block`）
-   - 每個 tool 背後都有 Agent 邏輯（Gatekeeper 分類、Librarian 歸檔、Coach 分析）
+### 2.1 研究範圍
+
+研究了 Heptabase（9 tools）、Todoist（19 tools）、Linear（40+ tools）、Notion（19 tools）、Obsidian、Things 3、Roam Research 的 MCP 實作。
+
+### 2.2 關鍵發現
+
+| 產品 MCP | 本質 | 缺什麼 |
+|:---------|:-----|:------|
+| Heptabase | 知識庫的讀寫介面 | 沒有行動管理，沒有意圖交接 |
+| Todoist | 任務資料庫的 CRUD | 沒有智慧——建立任務後用戶仍需自己翻譯成行動 |
+| Linear | 工作流資料庫的 CRUD | 同上，且偏團隊不偏個人 |
+| Notion | 通用資料結構的 CRUD | 太泛化，沒有 domain 邏輯 |
+| Obsidian | 筆記檔案的讀寫 | 沒有 Agent 智慧 |
+| Roam | 知識圖譜 + 記憶原語 | `remember`/`recall` 有啟發，但沒有規劃智慧 |
+
+**所有競品的 MCP 都是「資料端點」——它們暴露的是 database，不是 intelligence。**
+
+沒有任何一個做：
+- 結構化的意圖交接（handoff）
+- 估時偏差校正
+- 想法深化
+- 執行結果回流 + 偏差學習
+
+### 2.3 對設計的啟發
+
+| 從競品學到的 | 應用到 Zentropy |
+|:-----------|:-------------|
+| Heptabase 寫入限制在 inbox + journal append | 入站保守是對的——統一入口，Gatekeeper 判斷 |
+| Roam 的 `remember`/`recall` 記憶原語 | Episodic Memory 應是 Resource，被動可讀 |
+| Obsidian semantic MCP 把 20+ tools 整合成 5 個 | 語意操作 > 原子操作；少即是多 |
+| Todoist 做完整 lifecycle（create→complete→archive） | 閉環是必要的，但由 Agent 驅動而非暴露 CRUD |
+
+---
+
+## 3. 設計原則
+
+1. **Bridge, Not Endpoint**
+   - MCP 是橋，不是 Zentropy 的 API
+   - 核心問題不是「外部能對 Zentropy 做什麼操作」，而是「意圖和執行之間的摩擦如何降到最低」
+
+2. **Resource-First**
+   - 環境智慧透過 Resource 被動注入（AI 開啟 session 就自動有 context）
+   - Tool 只用於「必須往回寫」的場景
+   - 類比：Resource = Zentropy 的感知能力，Tool = Zentropy 的接收能力
+
+3. **Agent-Mediated, Not CRUD**
+   - 不暴露 `createTask` / `updateStatus` / `deleteItem`
+   - 暴露的是 Agent 的能力：Gatekeeper 接收、Coach 諮詢、Librarian 檢索
    - 用戶「丟進來」，Agent「處理好」
 
-2. **語意操作 > 原子操作**
-   - 不暴露 `updateTaskStatus`，而是 `complete_action`（Coach 自動歸檔 + 計算偏差）
-   - 不暴露 `createTask`，而是 `plan_action`（Coach 自動估時 + 排程）
+4. **Structured Handoff**
+   - 出站不是「任務標題 + 到期日」，而是**完整意圖包**（why + 相關知識 + 偏差校正 + 驗收標準）
+   - 入站不只是自由文字，支援結構化回流（子任務拆解、執行結果 + 時間）
 
-3. **Thin Interface, Thick Backend**
+5. **Thin Interface, Thick Backend**
    - MCP Server 只做：認證、驗證、路由、淨化
-   - 複雜邏輯在 Backend API 的 Use Case 層
-
-4. **漸進式暴露**
-   - Phase 1 先做核心（覆蓋完整 L1-L5 最小集）
-   - Phase 2 加強差異化（Episodic Memory、偏差校正）
-   - Phase 3 擴展執行（日曆整合、通知）
-
-5. **單一 Scope 原則**
-   - 每個 tool 只需一個 scope（降低授權複雜度）
-   - 但允許 tool 內部讀取其他資料（透過 Backend API，由 RLS 控制）
+   - 所有 Agent 邏輯在 Backend API 的 Use Case 層
 
 ---
 
-## 3. OAuth Scopes 擴展
-
-### 現有 Scopes（保留）
-
-| Scope | 說明 |
-|:------|:-----|
-| `read:tasks` | 讀取任務與行動項目 |
-| `read:knowledge` | 讀取知識庫 |
-| `read:profile` | 讀取用戶偏好 |
-| `write:inbox` | 寫入 Inbox |
-| `write:knowledge` | 寫入知識庫 |
-| `trigger:librarian` | 觸發 Librarian |
-
-### 新增 Scopes
-
-| Scope | 說明 | 對應新工具 |
-|:------|:-----|:---------|
-| `write:actions` | 建立/更新行動項目 | `plan_action`, `complete_action`, `update_action` |
-| `read:plan` | 讀取計畫與排程 | `get_daily_plan`, 日計畫 Resource |
-| `read:review` | 讀取回顧報告 | `get_briefing`, `get_weekly_review` |
-| `trigger:coach` | 觸發 Coach Agent | `refine_idea`, `challenge_plan`, `detect_conflicts` |
-| `write:execution` | 代理執行外部動作 | `proxy_calendar_event` |
-
-### Scope 組合建議
-
-| 模式 | Scopes | 使用場景 |
-|:-----|:-------|:---------|
-| **唯讀** | `read:tasks read:knowledge read:plan` | Cursor 讀取 context coding |
-| **捕捉** | 唯讀 + `write:inbox` | Claude Desktop 隨手記 |
-| **規劃** | 唯讀 + `write:inbox write:actions trigger:coach` | Claude Desktop 做規劃 |
-| **完整** | 全部 | 完全信任的 client |
-
----
-
-## 4. MCP Tools 完整設計
-
-### 4.0 設計總覽
+## 4. 架構總覽
 
 ```
-L1 Capture          L2 Organize         L3 Refine           L4 Plan             L5 Review           Execute
-─────────────       ─────────────       ─────────────       ─────────────       ─────────────       ─────────────
-capture_thought ✅  append_to_          refine_idea         plan_action         get_briefing        proxy_calendar_
-                    knowledge ✅                                                                    event
-capture_decision    query_memory ✅     challenge_plan      complete_action     get_weekly_review
-                    list_items                              get_daily_plan      detect_conflicts
-capture_execution                                          estimate_with_
-_result                                                    _history
-
-✅ = 已實作
+           ┌─────────────────────────────────┐
+           │         Zentropy Agents          │
+           │  Gatekeeper · Librarian · Coach  │
+           └──────────┬──────────────┬────────┘
+                      │              │
+              ┌───────┴───┐    ┌────┴──────┐
+              │ Resources │    │   Tools   │
+              │  (出站)   │    │  (入站)   │
+              └───────┬───┘    └────┬──────┘
+                      │              │
+    ┌─────────────────┼──────────────┼──────────────────┐
+    │             MCP Server (The Bridge)                │
+    │                                                    │
+    │   出站 (Zentropy → 工具)     入站 (工具 → Zentropy) │
+    │   ─────────────────────     ───────────────────── │
+    │   handoff/ready  ★核心      capture(thought)      │
+    │   knowledge/{path}          capture(exec_plan)    │
+    │   saga/{product}            capture(result)       │
+    │   memory/bias               consult_coach         │
+    │   areas                     search                │
+    │   context/now               save_knowledge        │
+    │                                                    │
+    └─────────────────┬──────────────┬──────────────────┘
+                      │              │
+           ┌──────────┴──────────────┴────────┐
+           │       External AI Tools           │
+           │  Claude Code · Cursor · Desktop   │
+           │  (擁有 domain-specific context)    │
+           └──────────────────────────────────┘
 ```
 
-共計：**15 Tools**（現有 3 + 新增 12）
+**5 Tools（入站）+ 7 Resources（出站）+ 4 Prompts**
 
 ---
 
-### 4.1 L1 Capture — 零摩擦輸入
+## 5. Resources（出站）— Zentropy 的感知層
 
-#### `capture_thought` ✅ 已實作，保留不變
+Resources 是 MCP 的**主角**。它們讓任何外部 AI 在開啟 session 時自動獲得 Zentropy 的全局意識，無需用戶觸發任何動作。
 
-#### `capture_decision`
+### 5.1 `zentropy://handoff/ready` ★ 核心 Resource
 
-記錄一個決策及其上下文。與 `capture_thought` 的區別：決策有明確的結論和理由，會被 Librarian 標記為 Decision Record 而非普通 inbox item。
+**這是整個 MCP 最重要的一個 resource。** 它不是「今日計畫」，而是「準備好被執行的意圖交接包」。
 
 ```yaml
-name: capture_decision
-scope: write:inbox
-arguments:
-  decision:
-    type: string
-    required: true
-    max: 2000
-    description: "決策內容 — 我們決定了什麼"
-  rationale:
-    type: string
-    required: true
-    max: 5000
-    description: "決策理由 — 為什麼這樣決定"
-  context_hint:
-    type: string
-    required: false
-    max: 200
-    description: "語意提示（Area/Product）"
-  alternatives_considered:
-    type: string
-    required: false
-    max: 3000
-    description: "考慮過但放棄的方案"
-backend_endpoint: POST /api/brain-dump (type=decision)
-agent: Gatekeeper → Librarian
-behavior:
-  1. Gatekeeper 解析決策結構
-  2. Librarian 歸檔為 Decision Record
-  3. Librarian 自動關聯相關知識（Cross-Reference）
-response: |
-  {
-    "id": "dec_xxx",
-    "status": "filed",
-    "filed_to": { "area": "Work", "product": "Zentropy", "topic": "Architecture" },
-    "related_items": ["task_123", "dec_045"]
-  }
+uri: "zentropy://handoff/ready"
+scope: read:tasks + read:knowledge
+mime_type: application/json
 ```
 
-**為什麼需要這個（而不是用 capture_thought）**：
-- 決策是知識庫中最高價值的資訊類型
-- 在 Cursor/Claude Code 中做出架構決定時，一鍵記錄
-- Librarian 對決策有特殊處理邏輯：自動建立 ADR 格式、關聯相關任務
+```json
+{
+  "generated_at": "2026-02-13T08:30:00Z",
+  "handoff_items": [
+    {
+      "id": "act_001",
+      "intent": "重構 auth 模組，改用 async middleware",
+      "priority": "high",
+      "due": "2026-02-14",
+      "status": "active",
+      "context_package": {
+        "why": "效能瓶頸，同步呼叫造成 P95 延遲 > 2s",
+        "decisions": [
+          {
+            "id": "dec_045",
+            "summary": "ADR-005: 採用 middleware pattern 而非 decorator",
+            "date": "2026-02-01"
+          }
+        ],
+        "related_knowledge": [
+          "zentropy://knowledge/Work/Zentropy/Architecture/Auth_Design"
+        ],
+        "coach_notes": "你在 refactor 類任務平均低估 1.8 倍，建議預留 7h 而非 4h",
+        "acceptance_criteria": [
+          "P95 延遲 < 500ms",
+          "現有測試全過",
+          "不改變外部 API 介面"
+        ]
+      },
+      "execution_hints": {
+        "suggested_tool": "claude_code",
+        "suggested_first_step": "先讀 auth 相關檔案，理解現狀後再拆子任務"
+      }
+    },
+    {
+      "id": "act_002",
+      "intent": "Review PR #45: Librarian 規則引擎重構",
+      "priority": "medium",
+      "due": "2026-02-13",
+      "context_package": {
+        "why": "阻擋 M2 開發，PR 已等待 3 天",
+        "related_knowledge": [
+          "zentropy://knowledge/Work/Zentropy/Architecture/Librarian_Engine"
+        ],
+        "coach_notes": "code review 你通常估得準（偏差 1.1x）",
+        "acceptance_criteria": [
+          "確認規則衝突解析邏輯正確",
+          "確認測試覆蓋率 > 80%"
+        ]
+      }
+    }
+  ]
+}
+```
 
-#### `capture_execution_result`
+**為什麼這是核心**：
 
-將執行結果回流到 Zentropy，**形成閉環**。這是 Execute 邊界的「回收站」。
+與「今日計畫」的差異：
+
+| | 傳統的「今日計畫」 | `handoff/ready` |
+|:--|:-------------|:--------------|
+| 格式 | 給人看的摘要 | 給 AI agent 消化的結構化包 |
+| 內容 | 任務標題 + 到期日 | 完整意圖：why + 相關決策 + 知識連結 + 偏差校正 + 驗收標準 |
+| AI 拿到後 | 只知道「有個任務叫 X」 | 能理解全局脈絡，結合自身 domain context 立刻開工 |
+| 類比 | 便利貼 | 工作交接文件 |
+
+**使用場景**：
+
+```
+1. 用戶開啟 Claude Code session
+2. Claude Code 自動讀取 zentropy://handoff/ready
+3. AI 看到 act_001（重構 auth）的完整 context_package
+4. AI 結合 codebase 實際狀況，拆出具體子任務
+5. 用戶不需要把 Zentropy 的任務手動複製貼上 — 橋已經接好了
+```
+
+**Backend 生成邏輯**：
+- Coach Agent 每日或按需生成
+- 篩選條件：status=active, priority=high/medium, 且有足夠 context
+- context_package 由 Librarian 組裝（拉取相關知識和決策）
+- coach_notes 由 Coach 基於 Episodic Memory 生成
+
+### 5.2 `zentropy://context/now`
+
+Coach 生成的全局狀態感知。外部 AI 的「環境意識」。
 
 ```yaml
-name: capture_execution_result
-scope: write:inbox
-arguments:
-  action_id:
-    type: string
-    required: true
-    description: "對應的行動項目 ID"
-  outcome:
-    type: enum
-    values: [completed, partial, blocked, cancelled]
-    required: true
-    description: "執行結果狀態"
-  actual_duration_minutes:
-    type: number
-    required: false
-    description: "實際花費時間（分鐘）— 用於偏差校準"
-  notes:
-    type: string
-    required: false
-    max: 5000
-    description: "執行筆記 — 遇到什麼、學到什麼"
-backend_endpoint: POST /api/actions/{action_id}/result
-agent: Coach
-behavior:
-  1. 驗證 action_id 存在且屬於該用戶
-  2. 記錄 outcome + actual_duration
-  3. Coach 計算 estimated vs actual 偏差
-  4. 更新 Episodic Memory（個人偏差因子）
-  5. 如果 outcome=blocked，Coach 標記需要關注
-response: |
-  {
-    "action_id": "act_xxx",
-    "outcome": "completed",
-    "deviation": {
-      "estimated_minutes": 120,
-      "actual_minutes": 180,
-      "ratio": 1.5,
-      "running_average_for_type": 1.3
+uri: "zentropy://context/now"
+scope: read:tasks
+mime_type: application/json
+```
+
+```json
+{
+  "generated_at": "2026-02-13T08:30:00Z",
+  "summary": "今天有 2 項到期，1 項 overdue。開發類任務佔 70% 精力。",
+  "open_loops": 5,
+  "due_today": 2,
+  "overdue": 1,
+  "top_priorities": ["act_001", "act_002"],
+  "calendar_conflicts": [],
+  "stalled_items": [
+    {
+      "id": "act_032",
+      "title": "聯繫法律顧問",
+      "stalled_days": 16
+    }
+  ],
+  "coach_message": "MCP 設計文件是最高優先。你在設計任務上低估 2.1 倍，今天預留足夠時間。",
+  "estimation_bias": {
+    "overall": 1.4,
+    "by_type": {
+      "design": 2.1,
+      "development": 1.0,
+      "review": 1.1
     }
   }
+}
 ```
 
-**為什麼需要這個**：
-- 閉環是 L5 Review 的基礎
-- 沒有實際結果數據，Episodic Memory 就是空的
-- 這是 Reference Class Forecasting 的數據來源
-- 競品完全沒有這個功能
+**與 `handoff/ready` 的分工**：
+- `context/now` = 「全局儀表板」— 知道世界的狀態
+- `handoff/ready` = 「工作交接包」— 知道接下來要做的每件事的完整脈絡
 
----
+### 5.3 `zentropy://knowledge/{area}/{product}/{topic}` ✅ 已實作
 
-### 4.2 L2 Organize — 智慧歸檔
+知識庫文件。保留不變。
 
-#### `append_to_knowledge` ✅ 已實作，保留不變
+### 5.4 `zentropy://saga/{product_id}` ✅ 已實作
 
-#### `query_memory` ✅ 已實作，保留不變
+Rolling Saga（前情提要）。保留不變。
 
-#### `list_items`
+### 5.5 `zentropy://memory/bias`
 
-列出用戶的項目（任務、決策、知識），支援 Entity 階層和狀態篩選。
+個人估時偏差數據。讓外部 AI 在協助用戶估時時自動校正。
 
 ```yaml
-name: list_items
+uri: "zentropy://memory/bias"
+scope: read:profile
+mime_type: application/json
+```
+
+```json
+{
+  "overall_bias_ratio": 1.4,
+  "by_type": {
+    "design":      { "bias": 2.1, "sample_size": 8,  "trend": "stable" },
+    "development": { "bias": 1.0, "sample_size": 15, "trend": "improving" },
+    "review":      { "bias": 1.1, "sample_size": 12, "trend": "stable" },
+    "meeting":     { "bias": 1.3, "sample_size": 10, "trend": "stable" },
+    "writing":     { "bias": 1.6, "sample_size": 5,  "trend": "insufficient_data" }
+  },
+  "insight": "設計任務持續低估，建議預設乘以 2x。開發類已校準。"
+}
+```
+
+### 5.6 `zentropy://areas`
+
+用戶的角色/資產/主題階層結構。讓外部 AI 理解「這個用戶是誰」。
+
+```yaml
+uri: "zentropy://areas"
 scope: read:tasks
-arguments:
-  area:
-    type: string
-    required: false
-    description: "篩選 Area（如 'Work', 'Personal'）"
-  product:
-    type: string
-    required: false
-    description: "篩選 Product（如 'Zentropy'）"
-  topic:
-    type: string
-    required: false
-    description: "篩選 Topic（如 'Architecture'）"
-  status:
-    type: enum
-    values: [active, maintain, reference, inbox, all]
-    required: false
-    default: active
-    description: "篩選狀態軸"
-  item_type:
-    type: enum
-    values: [action, decision, note, all]
-    required: false
-    default: all
-    description: "篩選項目類型"
-  limit:
-    type: number
-    required: false
-    default: 20
-    max: 50
-    description: "回傳筆數上限"
-  cursor:
-    type: string
-    required: false
-    description: "分頁游標"
-backend_endpoint: GET /api/items
-agent: 無（直接查詢，RLS 控制權限）
-response: |
-  {
-    "items": [
-      {
-        "id": "act_xxx",
-        "type": "action",
-        "title": "完成 MCP Functions 設計",
-        "status": "active",
-        "area": "Work",
-        "product": "Zentropy",
-        "topic": "Architecture",
-        "due_date": "2026-02-14",
-        "estimated_minutes": 120
-      }
-    ],
-    "next_cursor": "abc123",
-    "total_count": 42
-  }
+mime_type: application/json
 ```
 
-**為什麼需要這個**：
-- 外部 AI 需要知道「用戶現在手上有什麼」才能提供有意義的建議
-- Cursor 中寫程式時，AI 需要讀取相關 active tasks 來理解優先級
-- 這是所有 task management MCP 的標配（Todoist, Linear, Things 全有）
-
----
-
-### 4.3 L3 Refine — 思考夥伴
-
-這是 Zentropy 最大的差異化。目前市場上**沒有任何 MCP** 提供「想法深化」工具。
-
-#### `refine_idea`
-
-提交一個模糊想法，Coach Agent 會分析、補盲點、提出結構化的行動路徑。
-
-```yaml
-name: refine_idea
-scope: trigger:coach
-arguments:
-  idea:
-    type: string
-    required: true
-    max: 5000
-    description: "模糊的想法或概念"
-  area:
-    type: string
-    required: false
-    description: "相關的 Area（幫助 Coach 載入正確 context）"
-  depth:
-    type: enum
-    values: [quick, thorough]
-    required: false
-    default: quick
-    description: |
-      quick: 1-2 段落的快速回饋（< 10 秒）
-      thorough: 完整分析含盲點、風險、行動路徑（可能需 30+ 秒）
-backend_endpoint: POST /api/coach/refine
-agent: Coach
-behavior:
-  1. Coach 載入相關 Area/Product 的 Rolling Saga 作為 context
-  2. Coach 載入 Episodic Memory（用戶過去類似想法的結果）
-  3. Coach 分析：
-     - 核心假設是什麼？
-     - 有什麼盲點或遺漏？
-     - 類似的歷史案例（如果有）
-     - 具體化的行動路徑
-  4. 回傳結構化分析
-response: |
-  {
-    "refined": {
-      "core_thesis": "你想做的本質上是...",
-      "assumptions": ["假設1: ...", "假設2: ..."],
-      "blind_spots": ["你可能沒考慮到: ..."],
-      "similar_history": [
+```json
+{
+  "areas": [
+    {
+      "name": "Work",
+      "products": [
         {
-          "item_id": "dec_045",
-          "title": "上次類似的決定",
-          "outcome": "花了比預期多 2 倍時間"
+          "name": "Zentropy",
+          "topics": ["Architecture", "Frontend", "DevOps", "MCP"],
+          "active_actions": 12,
+          "status": "active"
+        },
+        {
+          "name": "Client-A Project",
+          "topics": ["API Integration", "Testing"],
+          "active_actions": 5,
+          "status": "active"
         }
-      ],
-      "suggested_actions": [
-        { "action": "先做 X 驗證假設1", "priority": "high" },
-        { "action": "跟 Y 確認 Z", "priority": "medium" }
       ]
     },
-    "auto_captured": true,
-    "captured_as": "task_xxx"
-  }
+    {
+      "name": "Personal",
+      "products": [
+        {
+          "name": "Health",
+          "topics": ["Exercise", "Sleep"],
+          "active_actions": 2,
+          "status": "maintain"
+        }
+      ]
+    }
+  ]
+}
 ```
 
-**為什麼需要這個**：
-- 產品定義 L3 的核心：「想法太模糊？AI 幫你 brainstorm、補盲點、具體化」
-- OpenClaw 只會執行命令，不會質疑——這是 Zentropy Coach 的差異
-- 在 Claude Desktop 中自然語言聊到一個想法 → 一鍵 refine
+### 5.7 `zentropy://profile/bias-vector` ✅ 已實作
 
-#### `challenge_plan`
-
-提交一個計畫或假設，Coach Agent 會刻意「扮演反方」挑戰它。
-
-```yaml
-name: challenge_plan
-scope: trigger:coach
-arguments:
-  plan:
-    type: string
-    required: true
-    max: 5000
-    description: "要被挑戰的計畫或假設"
-  focus:
-    type: enum
-    values: [feasibility, timeline, risk, scope, all]
-    required: false
-    default: all
-    description: "聚焦挑戰的面向"
-backend_endpoint: POST /api/coach/challenge
-agent: Coach
-behavior:
-  1. Coach 載入相關 context
-  2. Coach 載入歷史偏差數據
-  3. Coach 系統性挑戰：
-     - feasibility: 技術可行性、資源可得性
-     - timeline: 估時準確度（Reference Class Forecasting）
-     - risk: 外部依賴、不可控因素
-     - scope: 範圍是否合理、是否 over-scoped
-  4. 呈現「值得思考的問題」而非直接否定
-response: |
-  {
-    "challenges": [
-      {
-        "aspect": "timeline",
-        "challenge": "你估計 2 週完成，但歷史上類似任務平均花 3.5 週",
-        "data": {
-          "your_estimate_days": 14,
-          "historical_median_days": 24,
-          "your_bias_ratio": 1.7
-        },
-        "question": "deadline 是硬性的嗎？可以縮小範圍嗎？"
-      },
-      {
-        "aspect": "risk",
-        "challenge": "有 2 個外部依賴尚未確認",
-        "question": "如果 X 延遲，備案是什麼？"
-      }
-    ],
-    "overall_confidence": "medium",
-    "suggestion": "建議在第 1 週末安排一次 checkpoint 重新評估"
-  }
-```
-
-**為什麼需要這個**：
-- 策略報告明確指出：目前所有產品只做 Execution，沒有 Thought Partner
-- 「挑戰假設」是 Coach 的核心能力，也是最難被複製的
-- 結合 Episodic Memory 的歷史偏差數據，挑戰才有數據支撐而非泛泛而談
+用戶的分類偏好。保留不變。
 
 ---
 
-### 4.4 L4 Plan — 智慧規劃
+## 6. Tools（入站）— 最小必要的回流管道
 
-#### `plan_action`
+只保留**必須是主動動作**的 tool。按 Agent 歸屬設計，而非按 CRUD 操作設計。
 
-建立一個行動項目。與 Todoist 的 `createTask` 不同：Coach 會自動提供估時校正。
+### 6.0 設計總覽
+
+| Agent | Tool | 做什麼 | Scope |
+|:------|:-----|:------|:------|
+| **Gatekeeper** | `capture` | 統一入口——接住一切輸入 | `write:inbox` |
+| **Coach** | `consult_coach` | 諮詢教練——refine / challenge / estimate | `trigger:coach` |
+| **Coach** | `report_done` | 報告完成——閉環 + 偏差學習 | `write:inbox` |
+| **Librarian** | `search` | 語意搜尋 | `read:tasks` |
+| **Librarian** | `save_knowledge` | 寫入知識庫 | `write:knowledge` |
+
+**5 個 Tools。**
+
+### 6.1 `capture` — Gatekeeper 的統一入口
+
+取代原本的 `capture_thought`。不再區分 thought/decision/execution_result — Gatekeeper 自己判斷類型和去向。
+
+增加 `mode` 參數支援結構化回流（工具 → Zentropy 的關鍵通道）。
 
 ```yaml
-name: plan_action
-scope: write:actions
+name: capture
+scope: write:inbox
+description: |
+  統一入口 — 丟進來就好。
+  自由文字、決策紀錄、執行工具的子任務拆解、執行結果——
+  Gatekeeper 會自動判斷類型，Librarian 會自動歸檔。
 arguments:
-  title:
+  content:
     type: string
     required: true
-    max: 200
-    description: "行動標題"
-  description:
+    max: 50000
+    description: "內容（自由文字或 JSON 結構化內容）"
+  source:
     type: string
-    required: false
-    max: 5000
-    description: "行動描述"
-  product:
-    type: string
-    required: false
-    description: "所屬 Product"
-  topic:
-    type: string
-    required: false
-    description: "所屬 Topic"
-  estimated_minutes:
-    type: number
-    required: false
-    description: "用戶估計所需時間（分鐘）"
-  due_date:
-    type: string
-    format: date
-    required: false
-    description: "到期日 (YYYY-MM-DD)"
-  priority:
+    required: true
+    description: "來源（Claude Code, Cursor, Claude Desktop, API）"
+  mode:
     type: enum
-    values: [urgent, high, medium, low]
+    values:
+      - thought         # 隨手記（預設）
+      - execution_plan  # 執行工具產生的子任務拆解
+      - result          # 執行結果回報
     required: false
-    default: medium
-backend_endpoint: POST /api/actions
-agent: Gatekeeper (分類) → Coach (估時校正)
-behavior:
-  1. Gatekeeper 自動歸類到 Area/Product/Topic
-  2. 如果用戶提供 estimated_minutes：
-     - Coach 查詢 Episodic Memory 找類似任務
-     - 計算 Reference Class Forecast
-     - 回傳校正後的估時建議
-  3. 建立 Action Item (status: active)
-response: |
-  {
-    "id": "act_xxx",
-    "title": "完成 MCP Functions 設計",
-    "status": "active",
-    "filed_to": { "area": "Work", "product": "Zentropy", "topic": "Architecture" },
-    "estimation": {
-      "user_estimate_minutes": 120,
-      "coach_estimate_minutes": 180,
-      "bias_factor": 1.5,
-      "reasoning": "歷史上類似的設計任務，你平均低估 1.5 倍",
-      "similar_tasks_count": 8
-    }
-  }
+    default: thought
+    description: |
+      thought: 自由文字，Gatekeeper 自動分類
+      execution_plan: 結構化的子任務拆解，需包含 parent_id
+      result: 執行結果回報，需包含 parent_id + outcome
+  parent_id:
+    type: string
+    required: false
+    description: "關聯的父級 action ID（execution_plan 和 result 模式必填）"
+  context_hint:
+    type: string
+    max: 200
+    required: false
+    description: "語意提示（Area/Product），幫助 Gatekeeper 分類"
+backend_endpoint: POST /api/brain-dump
 ```
 
-#### `complete_action`
+**三種模式的場景**：
 
-完成一個行動項目。Coach 自動計算偏差並歸檔。
+**`thought` 模式**（預設）— 取代原 `capture_thought`：
+
+```
+用戶在 Claude Desktop 聊天：「我覺得 auth 模組應該改成 async」
+→ capture(content="auth 模組應該改成 async...", mode=thought)
+→ Gatekeeper 識別為想法，歸到 Work/Zentropy/Architecture
+→ Librarian 關聯到 act_001
+```
+
+**`execution_plan` 模式** — 工具產生的子任務回流（★ 橋的核心場景）：
+
+```
+1. Claude Code 讀取 zentropy://handoff/ready
+2. 看到 act_001「重構 auth 模組」+ 完整 context
+3. Claude Code 結合 codebase 拆出子任務
+4. 呼叫：
+   capture(
+     mode = "execution_plan",
+     parent_id = "act_001",
+     source = "Claude Code",
+     content = JSON.stringify({
+       "sub_items": [
+         { "title": "將 auth.ts middleware 改為 async", "estimated_minutes": 60 },
+         { "title": "更新 3 個依賴的 route handler", "estimated_minutes": 90 },
+         { "title": "修改測試 mock", "estimated_minutes": 45 },
+         { "title": "跑 benchmark 確認效能改善", "estimated_minutes": 30 },
+         { "title": "更新 API 文件", "estimated_minutes": 15 }
+       ],
+       "total_estimated_minutes": 240,
+       "codebase_context": "涉及 auth.ts + 3 個 route files + test/"
+     })
+   )
+5. Gatekeeper 識別為 execution_plan → 建立子任務掛在 act_001 下
+6. Coach 更新估時（原估 4h → 工具拆解後 4h，但加上偏差因子建議 7h）
+7. 下次用戶看 Zentropy，act_001 已經有完整的 sub-items
+```
+
+**`result` 模式** — 執行結果回流：
+
+```
+1. 用戶在 Claude Code 完成了 auth.ts 的重構
+2. Claude Code 呼叫：
+   capture(
+     mode = "result",
+     parent_id = "act_001",
+     source = "Claude Code",
+     content = JSON.stringify({
+       "outcome": "completed",
+       "actual_duration_minutes": 300,
+       "notes": "比預期複雜，需要處理 3 個 legacy 相容問題",
+       "artifacts": ["PR #67 已提交"]
+     })
+   )
+3. Coach 記錄：estimated=240, actual=300, ratio=1.25
+4. Coach 更新 Episodic Memory（refactor 類偏差因子微調）
+5. Librarian 歸檔到 History
+```
+
+**Response（所有模式統一）**：
+
+```json
+{
+  "id": "item_xxx",
+  "status": "processed",
+  "classified_as": "execution_plan",
+  "filed_to": { "area": "Work", "product": "Zentropy", "topic": "Architecture" },
+  "parent_id": "act_001",
+  "agent_actions": [
+    "Gatekeeper: 識別為子任務拆解",
+    "Librarian: 建立 5 個 sub-items 掛在 act_001 下",
+    "Coach: 更新估時 — 總計 240min（校正後建議 420min）"
+  ],
+  "_warning": null
+}
+```
+
+### 6.2 `consult_coach` — 向 Coach 提問
+
+統一的 Coach 諮詢介面。用 `intent` 參數區分「想深化」「想被挑戰」「想估時」，而不是拆成三個 tool。
 
 ```yaml
-name: complete_action
-scope: write:actions
+name: consult_coach
+scope: trigger:coach
+description: |
+  向 Coach 諮詢 — 可以是深化想法、挑戰計畫、或估時校正。
+  Coach 會結合 Episodic Memory 和相關知識提供回饋。
+arguments:
+  intent:
+    type: enum
+    values:
+      - refine     # 深化模糊想法 → 結構化行動路徑
+      - challenge  # 挑戰計畫/假設 → 揭露盲點和風險
+      - estimate   # 估時校正 → Reference Class Forecasting
+    required: true
+    description: "諮詢意圖"
+  content:
+    type: string
+    required: true
+    max: 5000
+    description: "想法、計畫、或任務描述"
+  focus:
+    type: string
+    required: false
+    max: 200
+    description: |
+      聚焦面向（可選）：
+      - refine: 不需要
+      - challenge: feasibility / timeline / risk / scope
+      - estimate: 任務類型提示（design, development, meeting...）
+  user_estimate_minutes:
+    type: number
+    required: false
+    description: "用戶的初始估計（分鐘）— 僅 estimate intent 使用"
+backend_endpoint: POST /api/coach/consult
+```
+
+**`refine` 意圖 — 思考夥伴**：
+
+```
+用戶：「我想做一個 MCP marketplace 讓第三方開發者上架工具」
+
+consult_coach(intent=refine, content="MCP marketplace...")
+
+Coach 回應：
+{
+  "intent": "refine",
+  "analysis": {
+    "core_thesis": "你想建立一個平台效應——讓第三方擴展 Zentropy 的 execute 能力",
+    "assumptions": [
+      "假設: 有足夠的開發者願意為 Zentropy 開發工具",
+      "假設: 用戶願意信任第三方工具存取他們的資料"
+    ],
+    "blind_spots": [
+      "安全審核成本——每個第三方工具都需要安全審查",
+      "你目前的用戶量能否支撐平台效應？"
+    ],
+    "similar_history": [
+      {
+        "item_id": "dec_023",
+        "summary": "上次考慮 plugin 系統時，因資源不足而推遲",
+        "date": "2025-11-15"
+      }
+    ],
+    "suggested_next_steps": [
+      { "action": "先跟 5 個潛在開發者做 user interview", "priority": "high" },
+      { "action": "定義最小的 plugin API spec", "priority": "medium" },
+      { "action": "評估安全審核流程的成本", "priority": "medium" }
+    ]
+  },
+  "auto_captured_as": "item_xxx"
+}
+```
+
+**`challenge` 意圖 — 反方質疑**：
+
+```
+用戶：「我要兩週內完成 Librarian Engine v2」
+
+consult_coach(intent=challenge, content="兩週內完成 Librarian Engine v2", focus="timeline")
+
+Coach 回應：
+{
+  "intent": "challenge",
+  "challenges": [
+    {
+      "aspect": "timeline",
+      "challenge": "歷史上類似的引擎重構平均花 3.5 週",
+      "data": {
+        "your_estimate_days": 14,
+        "historical_median_days": 24,
+        "your_bias_ratio_for_development": 1.0,
+        "but": "這是 refactor，不是 greenfield — refactor 偏差是 1.8x"
+      },
+      "question": "這是 hard deadline 嗎？可以先交付 MVP 子集嗎？"
+    },
+    {
+      "aspect": "scope",
+      "challenge": "v2 包含 5 個子系統，其中規則衝突解析是全新的",
+      "question": "可以先做 4 個已驗證的子系統，把規則衝突解析放 v2.1 嗎？"
+    }
+  ],
+  "overall_confidence": "low",
+  "suggestion": "建議先定義 v2-MVP scope，砍到 2 週可信的範圍，再漸進式交付。"
+}
+```
+
+**`estimate` 意圖 — Reference Class Forecasting**：
+
+```
+consult_coach(
+  intent=estimate,
+  content="設計新的 API 介面",
+  focus="design",
+  user_estimate_minutes=120
+)
+
+Coach 回應：
+{
+  "intent": "estimate",
+  "reference_class": {
+    "similar_tasks_found": 12,
+    "distribution": {
+      "p25_minutes": 90,
+      "median_minutes": 150,
+      "p75_minutes": 240,
+      "p90_minutes": 360
+    }
+  },
+  "personal_bias": {
+    "task_type": "design",
+    "bias_ratio": 2.1,
+    "sample_size": 8
+  },
+  "recommendation": {
+    "user_estimate_minutes": 120,
+    "suggested_minutes": 250,
+    "confidence": "medium",
+    "reasoning": "你估 2h，但過去 8 次設計任務平均低估 2.1 倍。建議預留 4h。"
+  }
+}
+```
+
+### 6.3 `report_done` — 閉環
+
+獨立於 `capture` 的原因：這是一個**語意明確的動作**——不是「丟東西進來」，而是「宣告完成」。Coach 的處理邏輯完全不同（計算偏差、歸檔、更新記憶）。
+
+```yaml
+name: report_done
+scope: write:inbox
+description: |
+  報告一個行動項目完成。Coach 會：
+  1. 計算估時偏差（estimated vs actual）
+  2. 更新 Episodic Memory（個人偏差因子）
+  3. 觸發 Librarian 歸檔
+  完成這個閉環是 Zentropy 偏差學習的數據基礎。
 arguments:
   action_id:
     type: string
     required: true
-    description: "要完成的行動 ID"
+    description: "完成的行動 ID"
   actual_duration_minutes:
     type: number
     required: false
     description: "實際花費時間（分鐘）"
+  outcome:
+    type: enum
+    values: [completed, partial, blocked, cancelled]
+    required: false
+    default: completed
+    description: "結果狀態"
   notes:
     type: string
     required: false
     max: 2000
     description: "完成筆記"
-backend_endpoint: POST /api/actions/{action_id}/complete
-agent: Coach
-behavior:
-  1. 標記 action 為 completed
-  2. 計算 estimated vs actual 偏差
-  3. 更新 Episodic Memory
-  4. 如果有相關的 sub-items，通知用戶
-  5. Librarian 歸檔到 History
-response: |
-  {
-    "action_id": "act_xxx",
-    "status": "completed",
-    "completed_at": "2026-02-13T15:30:00Z",
-    "deviation": {
-      "estimated_minutes": 120,
-      "actual_minutes": 180,
-      "ratio": 1.5
-    }
-  }
+backend_endpoint: POST /api/actions/{action_id}/done
 ```
 
-#### `update_action`
+**Response**：
 
-更新行動項目的屬性（描述、優先級、到期日等）。
+```json
+{
+  "action_id": "act_001",
+  "status": "completed",
+  "completed_at": "2026-02-13T17:30:00Z",
+  "deviation": {
+    "estimated_minutes": 240,
+    "actual_minutes": 300,
+    "ratio": 1.25,
+    "updated_bias_for_type": {
+      "type": "refactor",
+      "previous_bias": 1.8,
+      "new_bias": 1.73,
+      "sample_size": 9
+    }
+  },
+  "coach_feedback": "比估時多 25%，但比你的歷史平均（1.8x）好很多。refactor 能力在進步。",
+  "archived": true
+}
+```
+
+### 6.4 `search` — Librarian 的語意搜尋
+
+即原本的 `query_memory`，重新命名以符合 Agent 語意。
 
 ```yaml
-name: update_action
-scope: write:actions
+name: search
+scope: read:tasks
+description: "語意搜尋 — 跨知識庫、決策紀錄、行動項目搜尋相關資訊。"
 arguments:
-  action_id:
+  query:
     type: string
     required: true
-  title:
-    type: string
-    required: false
-    max: 200
-  description:
-    type: string
-    required: false
-    max: 5000
-  priority:
-    type: enum
-    values: [urgent, high, medium, low]
-    required: false
-  due_date:
-    type: string
-    format: date
-    required: false
-  status:
-    type: enum
-    values: [active, maintain, blocked]
-    required: false
-backend_endpoint: PATCH /api/actions/{action_id}
-agent: 無（直接更新，RLS 控制權限）
-```
-
-#### `get_daily_plan`
-
-取得 AI 生成的今日行動計畫。
-
-```yaml
-name: get_daily_plan
-scope: read:plan
-arguments:
-  date:
-    type: string
-    format: date
-    required: false
-    default: today
-    description: "查詢日期 (YYYY-MM-DD)"
-  area:
-    type: string
-    required: false
-    description: "只看特定 Area 的計畫"
-backend_endpoint: GET /api/coach/daily-plan
-agent: Coach
-behavior:
-  1. 掃描所有 active actions（依 due_date + priority 排序）
-  2. 考慮日曆中已有的行程（如果有日曆整合）
-  3. 考慮用戶的精力模式（如果有足夠歷史數據）
-  4. 生成優先排序的每日行動清單
-  5. 標記可能的時間衝突
-response: |
-  {
-    "date": "2026-02-13",
-    "plan": {
-      "top_priorities": [
-        {
-          "action_id": "act_001",
-          "title": "完成 MCP Functions 設計",
-          "estimated_minutes": 180,
-          "reason": "明天到期，且阻擋 M2 開發"
-        }
-      ],
-      "also_today": [
-        {
-          "action_id": "act_002",
-          "title": "Review PR #45",
-          "estimated_minutes": 30
-        }
-      ],
-      "total_estimated_minutes": 210,
-      "conflicts": [],
-      "coach_note": "今天行程較輕，適合深度工作。建議上午處理設計任務。"
-    }
-  }
-```
-
-#### `estimate_with_history`
-
-對一個任務描述進行 Reference Class Forecasting。不建立任何項目，純粹提供估時建議。
-
-```yaml
-name: estimate_with_history
-scope: trigger:coach
-arguments:
-  task_description:
-    type: string
-    required: true
-    max: 2000
-    description: "任務描述"
-  user_estimate_minutes:
-    type: number
-    required: false
-    description: "用戶的初始估計"
-  task_type:
-    type: string
-    required: false
-    description: "任務類型提示（如 'design', 'development', 'meeting'）"
-backend_endpoint: POST /api/coach/estimate
-agent: Coach
-behavior:
-  1. 從 Episodic Memory 檢索類似的歷史任務
-  2. 計算分佈估計（中位數、P75、P90）
-  3. 套用個人偏差因子
-  4. 如果用戶提供估計，計算偏差預測
-response: |
-  {
-    "task_description": "設計新的 API 介面",
-    "reference_class": {
-      "similar_tasks_found": 12,
-      "distribution": {
-        "p25_minutes": 90,
-        "median_minutes": 150,
-        "p75_minutes": 240,
-        "p90_minutes": 360
-      }
-    },
-    "personal_bias": {
-      "task_type": "design",
-      "historical_bias_ratio": 2.1,
-      "sample_size": 8
-    },
-    "recommendation": {
-      "suggested_minutes": 180,
-      "confidence": "medium",
-      "reasoning": "基於 12 個類似任務，你的設計類偏差為 2.1 倍。建議保守預留 180 分鐘。"
-    }
-  }
-```
-
-**為什麼需要這個**：
-- 策略報告的核心武器之一：Reference Class Forecasting
-- 目前市場上**零產品**實作此功能
-- 有病毒式傳播潛力：「看看你估時有多不準！」
-
----
-
-### 4.5 L5 Review — 主動教練
-
-#### `get_briefing`
-
-取得晨報或晚報。
-
-```yaml
-name: get_briefing
-scope: read:review
-arguments:
-  type:
-    type: enum
-    values: [morning, evening]
-    required: true
-    description: "晨報或晚報"
-  date:
-    type: string
-    format: date
-    required: false
-    default: today
-backend_endpoint: GET /api/coach/briefing
-agent: Coach
-behavior:
-  morning:
-    1. 掃描今日到期 + overdue actions
-    2. 檢查日曆衝突
-    3. 生成 Top 3 優先事項
-    4. 附帶 Coach 鼓勵/建議
-  evening:
-    1. 統計今日完成項目
-    2. 識別延遲/未完成項目
-    3. 為明天提出計畫建議
-    4. 心理閉環：「今天已經做到 X，明天可以處理 Y」
-response: |
-  {
-    "type": "morning",
-    "date": "2026-02-13",
-    "briefing": {
-      "open_loops": 5,
-      "due_today": 2,
-      "overdue": 1,
-      "top_priorities": ["act_001", "act_002"],
-      "calendar_conflicts": [],
-      "coach_message": "今天有 2 項到期。MCP 設計文件是最高優先，建議早上先處理。"
-    }
-  }
-```
-
-#### `get_weekly_review`
-
-取得 AI 自動生成的每週回顧（GTD Weekly Review 自動化）。
-
-```yaml
-name: get_weekly_review
-scope: read:review
-arguments:
-  week:
-    type: string
-    required: false
-    default: current
-    description: "週次 (YYYY-Wxx) 或 'current' / 'previous'"
-backend_endpoint: GET /api/coach/weekly-review
-agent: Coach
-behavior:
-  1. 掃描本週所有活動：
-     - 完成的 actions
-     - 新增的 items
-     - 歸檔的 decisions
-  2. 識別問題：
-     - 停滯任務（> 2 週沒動的 active items）
-     - 孤兒項目（沒有下一步行動的 Product）
-     - 估時偏差趨勢
-  3. 生成 5 分鐘可消化的摘要
-  4. 提出下週建議
-response: |
-  {
-    "week": "2026-W07",
-    "summary": {
-      "completed": 8,
-      "new_items": 5,
-      "stalled": 2,
-      "orphans": 1,
-      "estimation_accuracy_this_week": 0.73
-    },
-    "stalled_items": [
-      {
-        "id": "act_032",
-        "title": "聯繫法律顧問",
-        "stalled_since": "2026-01-28",
-        "suggestion": "歸檔或重新排期？"
-      }
-    ],
-    "estimation_trend": {
-      "this_week": 1.4,
-      "last_4_weeks": [1.2, 1.5, 1.3, 1.4],
-      "insight": "設計任務持續低估，其他類型趨於準確"
-    },
-    "coach_note": "本週完成 8 項，比上週多 2 項。估時準確度穩定在 73%，設計類仍需改善。建議下週先處理停滯的法律事項。"
-  }
-```
-
-**為什麼需要這個**：
-- GTD 的 #1 放棄觸發點是 Weekly Review（60-120 分鐘太痛苦）
-- Coach 將其壓縮到 5 分鐘確認
-- 這是 Zentropy 留存率的關鍵
-
-#### `detect_conflicts`
-
-主動掃描衝突、停滯、資源撞車。
-
-```yaml
-name: detect_conflicts
-scope: read:review
-arguments:
+    max: 500
+    description: "自然語言問題"
   scope:
-    type: enum
-    values: [today, this_week, all_active]
+    type: string
     required: false
-    default: this_week
-backend_endpoint: GET /api/coach/conflicts
-agent: Coach
-behavior:
-  1. 掃描時間衝突（同一天 > 8 小時任務量）
-  2. 掃描到期衝突（多項同日到期）
-  3. 掃描停滯項目（active 但 > 14 天未更新）
-  4. 掃描依賴衝突（被 blocked 的 action 阻擋了其他 action）
-response: |
-  {
-    "conflicts": [
-      {
-        "type": "overload",
-        "date": "2026-02-15",
-        "details": "當天排了 10 小時任務，超出合理容量",
-        "suggestion": "將 'Review PR #45' 移至 2/16"
-      },
-      {
-        "type": "stalled",
-        "item_id": "act_032",
-        "details": "已停滯 16 天",
-        "suggestion": "歸檔、委派或重新設定到期日"
-      }
-    ],
-    "health_score": 72
-  }
+    max: 200
+    description: "限制在特定 Area/Product"
+backend_endpoint: GET /api/search
+agent: Librarian（Vector Search + User Bias 校正）
 ```
 
----
+### 6.5 `save_knowledge` — Librarian 的知識寫入
 
-### 4.6 Execute — 執行邊界
-
-#### `proxy_calendar_event`
-
-代理建立日曆事件。這是 Execute 邊界的典型案例：「簡單動作，Zentropy 代勞」。
+即原本的 `append_to_knowledge`，重新命名以符合 Agent 語意。
 
 ```yaml
-name: proxy_calendar_event
-scope: write:execution
+name: save_knowledge
+scope: write:knowledge
+description: "將結構化知識寫入指定的 Reference 區域。"
 arguments:
+  product_name:
+    type: string
+    required: true
+    max: 200
+    description: "目標 Product（伺服器端驗證）"
+  topic_name:
+    type: string
+    required: true
+    max: 200
+    description: "目標 Topic"
   title:
     type: string
     required: true
     max: 200
-  start_time:
+    description: "標題"
+  content:
     type: string
-    format: datetime
     required: true
-    description: "ISO 8601 格式"
-  end_time:
-    type: string
-    format: datetime
-    required: true
-  description:
-    type: string
-    required: false
-    max: 2000
-  action_id:
-    type: string
-    required: false
-    description: "關聯的 Zentropy action（建立雙向連結）"
-backend_endpoint: POST /api/execute/calendar
-agent: Coach (驗證衝突) → Calendar Integration
-behavior:
-  1. Coach 檢查是否與現有行程衝突
-  2. 如果有 action_id，建立雙向關聯
-  3. 透過 Google Calendar API 建立事件
-  4. 回傳確認
-prerequisite: 用戶已連接 Google Calendar
-response: |
-  {
-    "calendar_event_id": "gcal_xxx",
-    "conflicts_detected": false,
-    "linked_action_id": "act_001"
-  }
+    max: 50000
+    description: "內容"
+backend_endpoint: POST /api/knowledge
+agent: Librarian（自動生成 Embeddings + 更新索引）
 ```
 
 ---
 
-## 5. MCP Resources 擴展
+## 7. Prompts
 
-### 現有 Resources（保留）
-
-| URI Pattern | Scope | 說明 |
-|:------------|:------|:-----|
-| `zentropy://knowledge/{area}/{product}/{topic}` | `read:knowledge` | 知識庫文件 |
-| `zentropy://saga/{product_id}` | `read:knowledge` | Rolling Saga |
-| `zentropy://profile/bias-vector` | `read:profile` | 用戶偏好 |
-
-### 新增 Resources
-
-#### `zentropy://plan/today`
-
-今日計畫的唯讀 Resource。AI 在其他工具中可以直接讀取。
-
-```yaml
-uri: zentropy://plan/today
-scope: read:plan
-mime_type: application/json
-content: |
-  與 get_daily_plan tool 相同的數據結構。
-  差異：Resource 是被動讀取（AI 自動載入），Tool 是主動觸發。
-use_case: |
-  Cursor 用戶在寫程式時，AI 自動讀取今日計畫，
-  知道用戶正在做什麼、接下來該做什麼。
-```
-
-#### `zentropy://plan/week`
-
-本週概覽。
-
-```yaml
-uri: zentropy://plan/week
-scope: read:plan
-mime_type: application/json
-content: |
-  {
-    "week": "2026-W07",
-    "days": {
-      "2026-02-09": { "actions": [...], "total_minutes": 240 },
-      ...
-    },
-    "overdue": [...],
-    "upcoming_deadlines": [...]
-  }
-```
-
-#### `zentropy://inbox/pending`
-
-當前 Inbox 待處理項目。
-
-```yaml
-uri: zentropy://inbox/pending
-scope: read:tasks
-mime_type: application/json
-content: |
-  { "items": [...], "count": 5 }
-use_case: |
-  讓 AI 知道有多少未處理的碎片，
-  可以在對話中適時提醒用戶。
-```
-
-#### `zentropy://memory/estimation-bias`
-
-個人估時偏差報告。
-
-```yaml
-uri: zentropy://memory/estimation-bias
-scope: read:review
-mime_type: application/json
-content: |
-  {
-    "overall_bias": 1.4,
-    "by_type": {
-      "design": { "bias": 2.1, "sample_size": 8 },
-      "development": { "bias": 1.0, "sample_size": 15 },
-      "meeting": { "bias": 1.3, "sample_size": 12 }
-    },
-    "trend": "improving"
-  }
-use_case: |
-  AI 在幫用戶估時時，自動讀取偏差數據，
-  主動進行校正而不需用戶觸發 estimate_with_history。
-```
-
-#### `zentropy://areas`
-
-用戶的 Area/Product/Topic 階層結構。
-
-```yaml
-uri: zentropy://areas
-scope: read:tasks
-mime_type: application/json
-content: |
-  {
-    "areas": [
-      {
-        "name": "Work",
-        "products": [
-          {
-            "name": "Zentropy",
-            "topics": ["Architecture", "Frontend", "DevOps"],
-            "active_actions": 12,
-            "status": "active"
-          }
-        ]
-      }
-    ]
-  }
-use_case: |
-  外部 AI 了解用戶的角色結構，
-  在 capture 時自動推斷應歸到哪個 Area/Product。
-```
-
----
-
-## 6. MCP Prompts 擴展
-
-### 現有 Prompts（保留）
+### 現有（保留）
 
 | Name | 說明 |
 |:-----|:-----|
 | `summarize-for-zentropy` | 將對話整理為 Rolling Summary 格式 |
 | `generate-spec-structure` | 生成 Spec 文件結構 |
 
-### 新增 Prompts
+### 新增
 
 #### `plan-next-actions`
 
 ```yaml
 name: plan-next-actions
-description: "根據當前脈絡，生成下一步行動建議"
+description: "根據當前脈絡，生成下一步行動建議（適合回流到 Zentropy）"
 arguments:
-  context:
-    type: string
-    description: "當前對話或工作脈絡"
-  product:
-    type: string
-    optional: true
-    description: "相關 Product"
+  context: { type: string, description: "當前工作脈絡" }
+  product: { type: string, optional: true }
 template: |
   基於以下脈絡，識別具體的下一步行動：
 
@@ -1052,29 +825,30 @@ template: |
   要求：
   1. 每個行動必須可在 2 小時內完成
   2. 標明優先級 (urgent/high/medium/low)
-  3. 如果行動之間有依賴關係，標明順序
-  4. 估計每個行動的時間
+  3. 標明依賴順序
+  4. 估計時間
 
-  輸出格式：
-  - [ ] [P1] 行動描述 (估時 Xm)
-  - [ ] [P2] 行動描述 (估時 Xm)
+  輸出 JSON 格式（可直接用於 capture mode=execution_plan）：
+  {
+    "sub_items": [
+      { "title": "...", "estimated_minutes": N, "priority": "...", "depends_on": [] }
+    ]
+  }
 ```
 
 #### `write-decision-record`
 
 ```yaml
 name: write-decision-record
-description: "將討論結果結構化為決策紀錄 (ADR 格式)"
+description: "將討論結構化為決策紀錄（ADR 格式，可直接用於 capture）"
 arguments:
-  discussion:
-    type: string
-    description: "決策討論的內容"
+  discussion: { type: string, description: "決策討論內容" }
 template: |
-  將以下討論整理為 Zentropy 標準的決策紀錄 (ADR)：
+  將以下討論整理為 Zentropy ADR 格式：
 
-  討論內容：{discussion}
+  {discussion}
 
-  輸出格式：
+  輸出：
   # ADR: [標題]
   ## 背景 (Context)
   ## 決策 (Decision)
@@ -1085,70 +859,223 @@ template: |
 
 ---
 
-## 7. 實作分期
+## 8. OAuth Scopes
 
-### Phase 1 — 核心閉環 (M1.5 ~ M2)
+### 完整 Scope 表
 
-**目標**：覆蓋完整 L1-L5 最小集，形成 Capture → Plan → Execute → Review 閉環。
+| Scope | 說明 | 使用者 |
+|:------|:-----|:------|
+| `read:tasks` | 讀取任務、行動項目、handoff | Resources: handoff/ready, context/now, areas |
+| `read:knowledge` | 讀取知識庫 | Resources: knowledge/*, saga/* |
+| `read:profile` | 讀取用戶偏好與偏差數據 | Resources: profile/*, memory/bias |
+| `write:inbox` | 寫入（capture + report_done） | Tools: capture, report_done |
+| `write:knowledge` | 寫入知識庫 | Tools: save_knowledge |
+| `trigger:coach` | 觸發 Coach Agent | Tools: consult_coach |
 
-| Tool | 層 | 優先級 | 原因 |
-|:-----|:--|:-------|:-----|
-| `list_items` | L2 | P0 | 最基礎的讀取能力，所有後續功能依賴它 |
-| `plan_action` | L4 | P0 | 行動項目是閉環的起點 |
-| `complete_action` | L4 | P0 | 閉環的關鍵一步 |
-| `get_briefing` | L5 | P0 | 用戶留存的核心（晨晚報） |
-| `capture_execution_result` | Execute | P0 | 閉環的回收站，Episodic Memory 的數據來源 |
-| `zentropy://plan/today` | Resource | P0 | AI 被動讀取今日計畫 |
-| `zentropy://areas` | Resource | P0 | AI 了解用戶的角色結構 |
+**注意**：相比 v1.0 設計，移除了 `write:actions`, `read:plan`, `read:review`, `write:execution`。原因：
 
-**新增 Scopes**: `write:actions`, `read:plan`, `read:review`
-**Backend Endpoints 需要新建**: `/api/actions`, `/api/coach/daily-plan`, `/api/coach/briefing`
+- `write:actions` → 由 `write:inbox` 覆蓋（capture mode=execution_plan 由 Gatekeeper 建立 actions）
+- `read:plan` / `read:review` → 併入 `read:tasks`（handoff/ready 和 context/now 本質是 task 的衍生物）
+- `write:execution` → 移除（Phase 3 再評估是否需要日曆代理）
 
-### Phase 2 — 差異化武器 (M2 ~ M3)
+### Scope 組合建議
 
-**目標**：實作 Zentropy 的三大差異化能力。
-
-| Tool | 層 | 優先級 | 原因 |
-|:-----|:--|:-------|:-----|
-| `estimate_with_history` | L4 | P1 | Reference Class Forecasting — 病毒式傳播潛力 |
-| `refine_idea` | L3 | P1 | Thought Partner — 市場空白 |
-| `challenge_plan` | L3 | P1 | Thought Partner — 深化版 |
-| `get_weekly_review` | L5 | P1 | GTD 自動化 — 留存率關鍵 |
-| `capture_decision` | L1 | P1 | 高價值知識捕捉 |
-| `update_action` | L4 | P1 | 任務管理基本操作 |
-| `zentropy://memory/estimation-bias` | Resource | P1 | AI 被動讀取偏差數據 |
-| `plan-next-actions` | Prompt | P1 | 行動規劃模板 |
-| `write-decision-record` | Prompt | P1 | ADR 生成模板 |
-
-**Backend Endpoints 需要新建**: `/api/coach/estimate`, `/api/coach/refine`, `/api/coach/challenge`, `/api/coach/weekly-review`
-
-### Phase 3 — 執行擴展 (M3+)
-
-| Tool | 層 | 優先級 | 原因 |
-|:-----|:--|:-------|:-----|
-| `detect_conflicts` | L5 | P2 | 衝突偵測 |
-| `proxy_calendar_event` | Execute | P2 | 日曆整合（需 Google Calendar OAuth） |
-| `zentropy://plan/week` | Resource | P2 | 週計畫 Resource |
-| `zentropy://inbox/pending` | Resource | P2 | Inbox 狀態 Resource |
-
-**新增 Scope**: `write:execution`
-**外部整合**: Google Calendar API
+| 模式 | Scopes | 場景 |
+|:-----|:-------|:-----|
+| **唯讀** | `read:tasks read:knowledge` | Cursor 讀 context coding |
+| **捕捉** | 唯讀 + `write:inbox` | Claude Desktop 隨手記 + 回報結果 |
+| **教練** | 捕捉 + `trigger:coach read:profile` | Claude Desktop 做規劃 + 諮詢 Coach |
+| **完整** | 全部 | 完全信任的 client |
 
 ---
 
-## 8. 與競品的差異化總結
+## 9. 端到端場景
 
-| 能力 | Todoist MCP | Linear MCP | Heptabase MCP | Notion MCP | **Zentropy MCP** |
-|:-----|:-----------|:-----------|:-------------|:-----------|:----------------|
-| Task CRUD | ✅ 完整 | ✅ 完整 | ❌ | ✅ 通用 | ✅ Agent-mediated |
-| 知識搜尋 | ❌ | ❌ | ✅ 語意 | ✅ AI | ✅ 語意 + Entity 階層 |
-| 想法深化 | ❌ | ❌ | ❌ | ❌ | ✅ `refine_idea` |
-| 計畫挑戰 | ❌ | ❌ | ❌ | ❌ | ✅ `challenge_plan` |
-| 估時校正 | ❌ | ❌ | ❌ | ❌ | ✅ `estimate_with_history` |
-| 偏差記憶 | ❌ | ❌ | ❌ | ❌ | ✅ Episodic Memory |
-| 每日計畫 | ❌ | ❌ | ❌ | ❌ | ✅ `get_daily_plan` |
-| 每週回顧 | ❌ | ❌ | ❌ | ❌ | ✅ `get_weekly_review` |
-| 結果回收 | ❌ | ❌ | ❌ | ❌ | ✅ `capture_execution_result` |
-| 日曆代理 | ❌ | ❌ | ❌ | ❌ | ✅ `proxy_calendar_event` |
+### 9.1 開發場景：從意圖到程式碼再回來
 
-**核心差異**：其他 MCP 都是「資料讀寫介面」，Zentropy MCP 是「AI 營運教練的操作介面」。
+```
+Phase 1: 意圖形成（在 Claude Desktop / App）
+─────────────────────────────────────────────
+用戶：「auth 模組效能有問題，需要重構成 async」
+→ capture(mode=thought, content="auth 效能問題...")
+→ Gatekeeper 歸類到 Work/Zentropy/Architecture
+→ Coach 自動估時（refactor 類 × 偏差 1.8x）
+→ 任務進入 handoff/ready
+
+Phase 2: 交接到執行工具（在 Claude Code）
+─────────────────────────────────────────────
+用戶打開 Claude Code
+→ AI 讀取 zentropy://handoff/ready
+→ 看到 act_001 + 完整 context_package
+→ AI：「你有個高優先的 auth 重構任務，讓我先看看 codebase」
+→ AI 閱讀 auth 相關檔案，拆出 5 個子任務
+→ capture(mode=execution_plan, parent_id="act_001", content={sub_items...})
+→ 子任務回流到 Zentropy
+
+Phase 3: 執行（在 Claude Code）
+─────────────────────────────────────────────
+用戶與 Claude Code 一起完成重構
+（Zentropy 不介入這個階段——這是工具的 domain）
+
+Phase 4: 閉環（在 Claude Code 或 App）
+─────────────────────────────────────────────
+→ report_done(action_id="act_001", actual_duration_minutes=300)
+→ Coach 計算偏差：estimated=240, actual=300, ratio=1.25
+→ Coach 更新 Episodic Memory
+→ Librarian 歸檔到 History
+→ 下次重構任務的估時會更準
+```
+
+### 9.2 跨領域場景：法律事務
+
+```
+Phase 1: 意圖形成
+用戶：「合約需要在週五前審完」
+→ capture → Gatekeeper 歸到 Work/Client-A/Compliance
+→ Coach: 「你法律類任務偏差 1.6x，建議今天就開始」
+
+Phase 2: 交接
+用戶打開法律文件 AI 工具（如 Claude + PDF）
+→ AI 讀取 zentropy://handoff/ready
+→ 看到合約審閱任務 + context（為什麼要審、關鍵條款、歷史決策）
+→ AI 結合合約 PDF 內容，列出審閱要點
+→ capture(mode=execution_plan, parent_id="act_055", content={sub_items...})
+
+Phase 3: 執行
+用戶審閱合約，標記關鍵條款
+
+Phase 4: 閉環
+→ report_done(action_id="act_055", notes="發現第 7 條有風險")
+→ Coach 更新法律類偏差因子
+```
+
+### 9.3 反向場景：工具 → Zentropy
+
+```
+用戶在 Claude Code 寫完程式後，發現了一些新的待辦事項：
+
+Claude Code：
+「基於今天的開發，我建議以下後續工作：
+ 1. 效能測試需要在 staging 環境跑一輪
+ 2. API 文件需要更新
+ 3. 應該通知 Client-A 這個改動可能影響他們的整合」
+
+→ capture(mode=execution_plan, source="Claude Code", content={
+    sub_items: [
+      { title: "staging 環境效能測試", estimated_minutes: 60, priority: "high" },
+      { title: "更新 API 文件", estimated_minutes: 30, priority: "medium" },
+      { title: "通知 Client-A 整合影響", estimated_minutes: 15, priority: "high" }
+    ]
+  })
+
+→ Gatekeeper: 自動歸類（前 2 個到 Zentropy/DevOps，第 3 個到 Client-A/Communication）
+→ Coach: 加入估時校正，更新 context/now
+→ 下次用戶打開任何 AI 工具，這些新任務已在 handoff/ready 裡
+```
+
+---
+
+## 10. 實作分期
+
+### Phase 1 — 橋的骨架 (M2)
+
+**目標**：建立完整的 意圖 → 交接 → 回流 閉環。
+
+| 項目 | 類型 | 優先級 | 說明 |
+|:-----|:-----|:-------|:-----|
+| `zentropy://handoff/ready` | Resource | **P0** | 整個 MCP 的靈魂 |
+| `zentropy://context/now` | Resource | **P0** | AI 的環境意識 |
+| `zentropy://areas` | Resource | **P0** | AI 理解用戶結構 |
+| `capture` (統一入口) | Tool | **P0** | 取代 capture_thought，支援 3 種 mode |
+| `report_done` | Tool | **P0** | 閉環關鍵 |
+| `search` | Tool | **P0** | 重新命名 query_memory |
+| `save_knowledge` | Tool | **P0** | 重新命名 append_to_knowledge |
+
+**Backend 需新建**：
+- `GET /api/handoff/ready` — Coach + Librarian 組裝交接包
+- `POST /api/actions/{id}/done` — Coach 偏差計算 + Librarian 歸檔
+- `POST /api/brain-dump` 擴展 — 支援 execution_plan / result mode
+
+**遷移**：`capture_thought` → `capture`, `query_memory` → `search`, `append_to_knowledge` → `save_knowledge`（保持向後相容，舊名稱標記 deprecated）
+
+### Phase 2 — Coach 智慧 (M2 ~ M3)
+
+| 項目 | 類型 | 優先級 | 說明 |
+|:-----|:-----|:-------|:-----|
+| `consult_coach` | Tool | **P1** | Refine + Challenge + Estimate 統一介面 |
+| `zentropy://memory/bias` | Resource | **P1** | 偏差數據被動讀取 |
+| `plan-next-actions` | Prompt | **P1** | 行動規劃模板 |
+| `write-decision-record` | Prompt | **P1** | ADR 生成模板 |
+
+**Backend 需新建**：
+- `POST /api/coach/consult` — Coach Agent 的統一諮詢端點
+- Episodic Memory 儲存與檢索層
+
+### Phase 3 — 生態擴展 (M3+)
+
+根據用戶回饋決定方向：
+
+| 候選 | 條件 |
+|:-----|:-----|
+| 日曆代理 (`proxy_calendar_event`) | 用戶訪談確認需求強度 |
+| 通知推送 | 確認推送管道（WhatsApp? Telegram? Slack?） |
+| 第三方工具整合指南 | 讓其他開發者能為 Zentropy 寫 MCP adapter |
+
+---
+
+## 11. 與競品的差異化
+
+| 維度 | Todoist MCP | Linear MCP | Heptabase MCP | OpenClaw | **Zentropy MCP** |
+|:-----|:-----------|:-----------|:-------------|:---------|:----------------|
+| **本質** | Task DB API | Issue DB API | Knowledge DB API | 通用 Agent | **意圖-執行的橋** |
+| **Tool 數量** | 19 | 40+ | 9 | N/A | **5** |
+| **出站品質** | 任務標題+到期日 | Issue 詳情 | 語意搜尋 | 通用 memory | **結構化意圖交接包** |
+| **入站智慧** | 直接寫 DB | 直接寫 DB | 只能寫 inbox | LLM 判斷 | **Agent-mediated 3 模式** |
+| **閉環** | ❌ | ❌ | ❌ | ❌ | ✅ **偏差學習** |
+| **Thought Partner** | ❌ | ❌ | ❌ | ❌ | ✅ **consult_coach** |
+| **估時校正** | ❌ | ❌ | ❌ | ❌ | ✅ **Reference Class** |
+
+**一句話差異**：
+
+> 其他 MCP 暴露的是 database。Zentropy MCP 暴露的是 intelligence — 三個 Agent 的判斷力，包裝成一座連接意圖與執行的橋。
+
+---
+
+## 12. 設計決策記錄
+
+### 為什麼是 5 個 Tools 而非 15 個？
+
+**v1.0 設計**（已棄用）按功能列了 15 個 Tools（capture_thought, capture_decision, capture_execution_result, list_items, refine_idea, challenge_plan, plan_action, complete_action, update_action, get_daily_plan, estimate_with_history, get_briefing, get_weekly_review, detect_conflicts, proxy_calendar_event）。
+
+**問題**：
+1. 本質上是「Todoist API + AI 功能」——CRUD 端點的包裝
+2. 讀取類 Tools（get_briefing, get_daily_plan）應該是 Resource（被動注入更符合環境智慧）
+3. 細分的 capture（thought / decision / result）增加了 AI 選擇的認知負擔——Gatekeeper 存在的意義就是「你不需要分類，丟進來就好」
+4. 15 個 tools 違反了 Obsidian semantic MCP 的啟發：「語意明確 > 功能齊全」
+
+**v2.0 決策**：
+- 讀取 → Resource（handoff/ready, context/now）
+- 所有寫入 → 統一入口 `capture`（Gatekeeper 負責分類）
+- Coach 能力 → 統一入口 `consult_coach`（intent 參數區分）
+- 閉環 → 獨立的 `report_done`（語意足夠明確且 Coach 處理邏輯完全不同）
+
+### 為什麼 `handoff/ready` 是核心而非 `context/now`？
+
+`context/now` 是「你今天有什麼」——這是所有生產力工具都做的事。
+`handoff/ready` 是「這件事的完整脈絡，拿去就能做」——這是沒有產品做的事。
+
+差距在於：一個 AI 在 Cursor 裡讀到「你有個 auth 重構任務」vs 讀到「auth 重構任務 + 為什麼要做 + 過去的相關決策 + 你在這類任務上的偏差 + 驗收標準」——後者才是真正消除意圖-執行摩擦的交接。
+
+### 為什麼 `capture` 要支援 execution_plan mode？
+
+這是「橋」的雙向性的關鍵。沒有 execution_plan mode，資訊只能從 Zentropy 流到工具，不能從工具流回來。
+
+場景：Claude Code 基於 codebase 拆了 5 個子任務。如果沒有 execution_plan mode：
+- 這 5 個子任務留在 Claude Code session 裡，session 結束就消失
+- 用戶下次打開 Zentropy 看不到這些細節
+- Coach 無法追蹤這些子任務的完成情況
+
+有了 execution_plan mode：
+- 子任務回流到 Zentropy，掛在父任務下
+- Zentropy 成為所有 AI 工具的「共享記憶」
+- Coach 能追蹤每個子任務的完成情況和偏差
