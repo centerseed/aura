@@ -8,13 +8,13 @@
 import type { PrismaClient } from '@prisma/client'
 import { prisma as defaultPrisma } from '@/lib/db'
 
-interface CalibrationData {
+export interface CalibrationData {
   areaName: string
   ratio: number
   sampleCount: number
 }
 
-interface CalibrationResult {
+export interface CalibrationResult {
   overallRatio: number
   byArea: CalibrationData[]
   totalSamples: number
@@ -52,7 +52,7 @@ export class CoachCalibration {
     return lines.join('\n')
   }
 
-  private async calculate(userId: string): Promise<CalibrationResult> {
+  async calculate(userId: string): Promise<CalibrationResult> {
     const items = await this.db.$queryRaw<Array<{
       area_name: string
       estimated_minutes: number

@@ -9,7 +9,8 @@ export type OAuthScope =
   | "read:profile"
   | "write:inbox"
   | "write:knowledge"
-  | "trigger:librarian";
+  | "trigger:librarian"
+  | "trigger:coach";
 
 /** Authenticated user context attached to each request */
 export interface AuthContext {
