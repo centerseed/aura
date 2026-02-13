@@ -307,4 +307,30 @@ export const API = {
     suggestProduct: (data: any) => postAPI('/api/suggest-product', data),
     reorganize: (data: any) => postAPI('/api/reorganize', data),
   },
+
+  // Coach Agent
+  coach: {
+    generateBriefing: (data: { type: 'MORNING' | 'EVENING'; date?: string; timezone?: string }) =>
+      postAPI('/api/coach/briefing', data),
+    getLatestBriefing: (params?: { type?: 'MORNING' | 'EVENING' }) => {
+      const qs = params?.type ? `?type=${params.type}` : ''
+      return getAPI(`/api/coach/briefing/latest${qs}`)
+    },
+    // Plan
+    plan: {
+      get: (params?: { date?: string }) => {
+        const qs = params?.date ? `?date=${params.date}` : ''
+        return getAPI(`/api/coach/plan${qs}`)
+      },
+      generate: (data?: { date?: string; timezone?: string }) =>
+        postAPI('/api/coach/plan', data),
+      updateItem: (itemId: string, data: {
+        order?: number
+        completed?: boolean
+        pinned?: boolean
+        deferred?: boolean
+        actual_minutes?: number
+      }) => patchAPI(`/api/coach/plan/items/${itemId}`, data),
+    },
+  },
 }

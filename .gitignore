@@ -184,3 +184,10 @@ video-studio/.remotion/
 video-studio/public/*.mp4
 video-studio/public/*.mov
 video-studio/public/*.webm
+
+# Playwright 錄影工具（實驗性功能，不納入版本控制）
+scripts/record-demo.js
+scripts/record-demo.sh
+scripts/record-demo-visible.js
+demo-videos/
+RECORD_REAL_UI.md
