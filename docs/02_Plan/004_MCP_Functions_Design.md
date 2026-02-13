@@ -1079,3 +1079,172 @@ Claude Code：
 - 子任務回流到 Zentropy，掛在父任務下
 - Zentropy 成為所有 AI 工具的「共享記憶」
 - Coach 能追蹤每個子任務的完成情況和偏差
+
+---
+
+## Appendix A: 用戶體驗場景（User-Facing Conversations）
+
+以下場景展示用戶在不同工具中的**實際對話體驗**——橋在背後無感運作。
+
+### A.1 在 Claude Code 開發時自動獲得任務脈絡
+
+用戶打開 Claude Code 就知道該做什麼，不用去 Zentropy App 查。
+
+```
+用戶：「今天要做什麼？」
+
+Claude Code（自動讀取 zentropy://handoff/ready）：
+「根據 Zentropy，你今天最高優先的是：
+
+ 1. [P1] 重構 auth 模組 — 到期明天
+    原因：P95 延遲 > 2s，同步呼叫是瓶頸
+    相關決策：ADR-005 採用 middleware pattern
+    Coach 提醒：你在 refactor 類低估 1.8 倍，建議預留 7h
+
+ 2. [P2] Review PR #45 — 今天到期
+    原因：阻擋 M2 開發，已等 3 天
+
+ 要從哪個開始？」
+```
+
+### A.2 Claude Code 幫你拆任務，自動回流到 Zentropy
+
+不用手動把子任務抄回去，Claude Code 直接幫你存。
+
+```
+用戶：「我要開始做 auth 重構，先幫我看 codebase 拆任務」
+
+Claude Code（讀取 codebase + zentropy://handoff/ready 的 context）：
+「看完 auth 相關程式碼後，我建議以下拆解：
+ 1. auth.ts: 把 verifyToken middleware 改為 async (60min)
+ 2. routes/user.ts, routes/admin.ts, routes/api.ts: 更新呼叫方式 (90min)
+ 3. tests/auth.test.ts: 修改 mock (45min)
+ 4. 跑 benchmark 確認效能改善 (30min)
+ 5. 更新 API 文件 (15min)
+
+ 要我把這個拆解存回 Zentropy 嗎？」
+
+用戶：「好」
+
+→ Claude Code 呼叫 capture(mode=execution_plan, parent_id="act_001", ...)
+→ 下次打開 Zentropy App，act_001 下已經有 5 個 sub-items
+```
+
+### A.3 在 Claude Desktop 隨手記，不用管分類
+
+聊到一半想到什麼，丟進去就好。
+
+```
+用戶（在 Claude Desktop 聊天）：
+「剛才跟客戶開會，他們希望 API 回傳格式從 snake_case 改成 camelCase，
+ 另外下週要交 Q1 報告，提醒我」
+
+Claude Desktop：
+「我幫你記到 Zentropy：
+ ✓ API 格式變更需求 → 已歸到 Work/Client-A/API Integration
+ ✓ Q1 報告提醒 → 已歸到 Work/Finance，到期下週五
+
+ 需要我幫你更深入分析 camelCase 遷移的影響嗎？」
+```
+
+（背後呼叫了兩次 `capture(mode=thought, ...)`，Gatekeeper 自動分類到不同的 Area/Product）
+
+### A.4 諮詢 Coach 校正估時
+
+不確定該花多少時間時，問 Coach。
+
+```
+用戶：「設計新的 notification 系統需要多久？我覺得 3 天吧」
+
+→ consult_coach(intent=estimate, content="設計 notification 系統",
+    user_estimate_minutes=1440, focus="design")
+
+Coach 回應：
+「你估了 3 天，但讓我查一下歷史：
+ - 過去 8 次設計任務，你平均低估 2.1 倍
+ - 類似複雜度的系統設計，中位數是 5 天
+ - 建議：預留 6 天，在第 3 天安排一次 checkpoint
+
+ 你的設計類偏差一直偏高，要不要先花 1 天做 spike 確認範圍？」
+```
+
+### A.5 完成任務後自動追蹤偏差
+
+做完就告訴它，Coach 自動學習你的模式。
+
+```
+用戶（在 Claude Code 完成工作後）：「auth 重構完了，大概花了 5 小時」
+
+→ report_done(action_id="act_001", actual_duration_minutes=300)
+
+「已記錄完成。Coach 的回饋：
+ - 預估 4h → 實際 5h（偏差 1.25x）
+ - 比你的 refactor 歷史平均（1.8x）好很多！
+ - 你的 refactor 偏差因子從 1.8 更新為 1.73
+
+ 接下來 handoff/ready 裡的下一個是 Review PR #45，要看嗎？」
+```
+
+### A.6 在 Cursor 寫程式時自動參考知識庫
+
+AI 寫程式時自動知道你的架構決策和規格。
+
+```
+用戶（在 Cursor 中）：「幫我寫 Librarian 的新規則引擎」
+
+Cursor AI（自動讀取 zentropy://knowledge/Work/Zentropy/Architecture/Librarian_Engine
+  + zentropy://handoff/ready 中相關的 context_package）：
+
+「根據 Zentropy 知識庫中的 Librarian 架構文件，
+ 以及 ADR-008 的決策（採用 rule chain pattern），
+ 我來寫 rule engine...」
+```
+
+（AI 不會瞎猜架構，因為它已經有完整的 context）
+
+### A.7 Coach 幫你挑戰一個計畫
+
+在做重大決定前，讓 Coach 當反方。
+
+```
+用戶：「我打算下個月同時上線 notification 系統和 billing 重構」
+
+→ consult_coach(intent=challenge, content="下月同時上線...", focus="feasibility")
+
+Coach：
+「讓我挑戰一下：
+
+ 1. 時間衝突：兩個都是大型任務，你下月還有 Client-A 的 deadline
+ 2. 風險疊加：如果 billing 重構出 bug，notification 系統的上線也會受影響
+ 3. 歷史：上次同時推兩個大功能（2025-09），有一個延遲了 3 週
+
+ 值得思考：可以先上 notification（風險較低），billing 放下下月嗎？」
+```
+
+### A.8 想法深化——從模糊到具體
+
+```
+用戶：「我在想要不要做一個 Zentropy 的 mobile app」
+
+→ consult_coach(intent=refine, content="Zentropy mobile app")
+
+Coach：
+「你的核心意圖是讓用戶隨時都能 capture，對嗎？
+
+ 假設分析：
+ - 假設 1：用戶需要在手機上 capture（合理——碎片時間最多）
+ - 假設 2：用戶需要在手機上做 planning（存疑——手機不適合深度思考）
+
+ 盲點：
+ - 你考慮過 LINE/Telegram bot 嗎？用戶不需要裝新 app
+ - 上次（2025-12）考慮 mobile app 時，因 React Native 學習曲線放棄
+
+ 建議路徑：
+ 1. [P1] 先做 Telegram bot 驗證 capture 需求（1 週）
+ 2. [P2] 觀察 2 週用戶使用頻率
+ 3. [P3] 如果日均 capture > 5 次，再投入 mobile app」
+```
+
+### 場景共同特徵
+
+**用戶不需要在 Zentropy App 和工作工具之間來回切換。** Zentropy 的 intelligence 透過 MCP 自動出現在用戶所在的地方——這就是「橋」的體驗。
