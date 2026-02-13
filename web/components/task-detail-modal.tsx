@@ -408,7 +408,7 @@ export function TaskDetailModal({
                       <button
                         key={id}
                         onClick={() => {
-                          onStatusChange(task.id, id);
+                          if (id !== task.drawer) onStatusChange(task.id, id);
                           setShowStatusDropdown(false);
                         }}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/10 transition-colors ${

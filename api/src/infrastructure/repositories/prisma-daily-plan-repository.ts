@@ -42,9 +42,9 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     })
 
     if (existing) {
-      // Delete old items and update plan
+      // 只刪除未完成的 items，保留已完成的（含 actual_minutes 偏差學習資料）
       await prisma.dailyPlanItem.deleteMany({
-        where: { plan_id: existing.id },
+        where: { plan_id: existing.id, completed: false },
       })
 
       const row = await prisma.dailyPlan.update({

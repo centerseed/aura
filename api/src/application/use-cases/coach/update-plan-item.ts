@@ -16,6 +16,7 @@ import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
 
 export interface UpdatePlanItemRequest {
+  userId: string
   itemId: string
   order?: number
   completed?: boolean
@@ -34,8 +35,20 @@ export class UpdatePlanItemUseCase {
   ) {}
 
   async execute(request: UpdatePlanItemRequest): Promise<UpdatePlanItemResponse> {
+    if (!request.userId) {
+      throw new ValidationException('User ID is required', 'userId')
+    }
     if (!request.itemId) {
       throw new ValidationException('Item ID is required', 'itemId')
+    }
+
+    // Ownership 驗證：確認 item 屬於該用戶
+    const planItem = await prisma.dailyPlanItem.findUnique({
+      where: { id: request.itemId },
+      include: { plan: { select: { user_id: true } } },
+    })
+    if (!planItem || planItem.plan.user_id !== request.userId) {
+      throw new ValidationException('Plan item not found', 'itemId')
     }
 
     const updateData: UpdateDailyPlanItemData = {}
