@@ -29,15 +29,25 @@ import { AuditLogger } from "./audit/audit-logger";
 // Backend
 import { BackendApiClient, BackendApiError } from "./backend-client/api-client";
 
-// Tools
+// Tools (legacy — kept for backwards compatibility, marked deprecated)
 import { handleCaptureThought } from "./tools/capture-thought";
 import { handleAppendToKnowledge } from "./tools/append-to-knowledge";
 import { handleQueryMemory } from "./tools/query-memory";
 
-// Resources
+// Tools (v2 — Bridge architecture)
+import { handleCapture } from "./tools/capture";
+import { handleReportDone } from "./tools/report-done";
+
+// Resources (legacy)
 import { readKnowledgeAsset } from "./resources/knowledge-assets";
 import { readRollingSaga } from "./resources/rolling-sagas";
 import { readUserPreferences } from "./resources/user-preferences";
+
+// Resources (v2 — Bridge architecture)
+import { readContextNow } from "./resources/context-now";
+import { readMemoryBias } from "./resources/memory-bias";
+import { readAreasHierarchy } from "./resources/areas-hierarchy";
+import { readHandoffReady } from "./resources/handoff-ready";
 
 // Prompts
 import {
@@ -301,7 +311,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
 
   server.tool(
     "query_memory",
-    "查詢記憶 — Perform semantic search across past decisions and data.",
+    "[Deprecated: use 'search'] 查詢記憶 — Perform semantic search across past decisions and data.",
     {
       query: z
         .string()
@@ -320,6 +330,144 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         input as Record<string, unknown>,
         ["read:tasks"],
         handleQueryMemory,
+      );
+    },
+  );
+
+  // ─── Register v2 Tools (Bridge Architecture) ──────────────────
+
+  // capture — 統一入口，取代 capture_thought
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "capture",
+    "統一入口 — 丟進來就好。支援 thought / execution_plan / result 三種模式。Gatekeeper 自動分類，Librarian 自動歸檔。",
+    {
+      content: z
+        .string()
+        .min(1)
+        .max(50_000)
+        .describe("Content (free text or JSON structured content, max 50,000 chars)"),
+      source: z
+        .string()
+        .describe("Source: Claude Code, Cursor, Claude Desktop, or API"),
+      mode: z
+        .enum(["thought", "execution_plan", "result"])
+        .optional()
+        .describe("Mode: thought (default), execution_plan (structured sub-tasks), result (execution outcome)"),
+      parent_id: z
+        .string()
+        .optional()
+        .describe("Parent action ID (required for execution_plan and result modes)"),
+      context_hint: z
+        .string()
+        .max(200)
+        .optional()
+        .describe("Semantic hint (Area/Product) to help Gatekeeper classify"),
+    },
+    async (input) => {
+      return executeToolPipeline(
+        "capture",
+        input as Record<string, unknown>,
+        ["write:inbox"],
+        handleCapture,
+      );
+    },
+  );
+
+  // report_done — 閉環 + 偏差學習
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "report_done",
+    "報告完成 — Coach 計算估時偏差、更新 Episodic Memory、觸發 Librarian 歸檔。",
+    {
+      action_id: z
+        .string()
+        .min(1)
+        .describe("ID of the completed action"),
+      actual_duration_minutes: z
+        .number()
+        .optional()
+        .describe("Actual time spent (minutes)"),
+      outcome: z
+        .enum(["completed", "partial", "blocked", "cancelled"])
+        .optional()
+        .describe("Outcome status (default: completed)"),
+      notes: z
+        .string()
+        .max(2000)
+        .optional()
+        .describe("Completion notes"),
+    },
+    async (input) => {
+      return executeToolPipeline(
+        "report_done",
+        input as Record<string, unknown>,
+        ["write:inbox"],
+        handleReportDone,
+      );
+    },
+  );
+
+  // search — 語意搜尋（重命名 query_memory）
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "search",
+    "語意搜尋 — 跨知識庫、決策紀錄、行動項目搜尋相關資訊。(Renamed from query_memory)",
+    {
+      query: z
+        .string()
+        .min(1)
+        .max(500)
+        .describe("Natural language question (max 500 chars)"),
+      scope: z
+        .string()
+        .max(200)
+        .optional()
+        .describe("Limit search to a specific Area/Product"),
+    },
+    async (input) => {
+      return executeToolPipeline(
+        "search",
+        input as Record<string, unknown>,
+        ["read:tasks"],
+        handleQueryMemory, // reuse same handler
+      );
+    },
+  );
+
+  // save_knowledge — 知識寫入（重命名 append_to_knowledge）
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "save_knowledge",
+    "寫入知識庫 — 將結構化知識寫入指定的 Reference 區域。(Renamed from append_to_knowledge)",
+    {
+      product_name: z
+        .string()
+        .min(1)
+        .max(200)
+        .describe("Target product name (validated server-side)"),
+      topic_name: z
+        .string()
+        .min(1)
+        .max(200)
+        .describe("Target topic name"),
+      title: z
+        .string()
+        .min(1)
+        .max(200)
+        .describe("Title of the knowledge entry"),
+      content: z
+        .string()
+        .min(1)
+        .max(50_000)
+        .describe("Full content (max 50,000 chars)"),
+    },
+    async (input) => {
+      return executeToolPipeline(
+        "save_knowledge",
+        input as Record<string, unknown>,
+        ["write:knowledge"],
+        handleAppendToKnowledge, // reuse same handler
       );
     },
   );
@@ -394,6 +542,113 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
       checkResourceScope(authContext, "profile");
 
       const result = await readUserPreferences(apiClient, authContext.userId);
+      const sanitized = sanitizeOutput(result, authContext.scopes);
+
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(sanitized.data),
+        }],
+      };
+    },
+  );
+
+  // ─── Register v2 Resources (Bridge Architecture) ─────────────
+
+  // handoff/ready ★ 核心 Resource
+  server.resource(
+    "handoff-ready",
+    "zentropy://handoff/ready",
+    {
+      description:
+        "★ 核心 Resource — 準備好被執行的意圖交接包。" +
+        "包含完整 context_package: why + 相關決策 + 知識連結 + 偏差校正 + 驗收標準。",
+      mimeType: "application/json",
+    },
+    async (uri) => {
+      const authContext = authenticateMcpRequest();
+      checkResourceScope(authContext, "tasks");
+
+      const result = await readHandoffReady(authContext.userId);
+      const sanitized = sanitizeOutput(result, authContext.scopes);
+
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(sanitized.data),
+        }],
+      };
+    },
+  );
+
+  // context/now — 全局狀態感知
+  server.resource(
+    "context-now",
+    "zentropy://context/now",
+    {
+      description:
+        "Coach 生成的全局狀態感知 — open loops, overdue, conflicts, stalled items, estimation bias.",
+      mimeType: "application/json",
+    },
+    async (uri) => {
+      const authContext = authenticateMcpRequest();
+      checkResourceScope(authContext, "tasks");
+
+      const result = await readContextNow(authContext.userId);
+      const sanitized = sanitizeOutput(result, authContext.scopes);
+
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(sanitized.data),
+        }],
+      };
+    },
+  );
+
+  // memory/bias — 個人估時偏差
+  server.resource(
+    "memory-bias",
+    "zentropy://memory/bias",
+    {
+      description:
+        "個人估時偏差數據 — overall ratio + per-area breakdown + insight.",
+      mimeType: "application/json",
+    },
+    async (uri) => {
+      const authContext = authenticateMcpRequest();
+      checkResourceScope(authContext, "profile");
+
+      const result = await readMemoryBias(authContext.userId);
+      const sanitized = sanitizeOutput(result, authContext.scopes);
+
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(sanitized.data),
+        }],
+      };
+    },
+  );
+
+  // areas — 用戶領域結構
+  server.resource(
+    "areas-hierarchy",
+    "zentropy://areas",
+    {
+      description:
+        "用戶的角色/資產/主題階層結構 — Area → Product → Topic with active action counts.",
+      mimeType: "application/json",
+    },
+    async (uri) => {
+      const authContext = authenticateMcpRequest();
+      checkResourceScope(authContext, "tasks");
+
+      const result = await readAreasHierarchy(authContext.userId);
       const sanitized = sanitizeOutput(result, authContext.scopes);
 
       return {
