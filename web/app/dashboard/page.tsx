@@ -2029,14 +2029,17 @@ function DashboardContent() {
       const data = await response.json();
       const events = data.data?.events;
       if (events && events.length > 0) {
-        const latest = events[events.length - 1];
+        const sorted = [...events].sort((a: any, b: any) =>
+          (b.created_at || '').localeCompare(a.created_at || '')
+        );
+        const latest = sorted[0];
         setSelectedTaskCalendarEvent({
           eventId: latest.calendar_event_id,
           eventLink: latest.event_link || '',
         });
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn('Failed to fetch task calendar event:', err)
     }
   };
 

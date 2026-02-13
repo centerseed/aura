@@ -93,7 +93,7 @@ interface RawSubTask {
 // ============================================================================
 
 const WORK_HOURS_PER_DAY = 8
-const DEFAULT_ESTIMATED_MINUTES = 60
+
 
 export class PlanCandidateCollector {
   async collect(userId: string, date: Date, timezone: string): Promise<CollectedData> {
@@ -324,7 +324,7 @@ export class PlanCandidateCollector {
       timeZoneName: 'longOffset',
     })
     const parts = formatter.formatToParts(midnight)
-    const offsetStr = parts.find(p => p.type === 'timeZoneName')?.value ?? '+08:00'
+    const offsetStr = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
     // offsetStr 格式為 "GMT+08:00" 或 "GMT-05:00"
     const offset = offsetStr.replace('GMT', '')
     return new Date(`${dateStr}T00:00:00.000${offset}`)

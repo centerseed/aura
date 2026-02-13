@@ -158,7 +158,7 @@ export class GeneratePlanUseCase {
     const subTaskUpdates: Array<{ id: string; minutes: number }> = []
 
     for (const item of aiResult.daily_plan) {
-      if (!item.estimated_minutes) continue
+      if (item.estimated_minutes == null) continue
       const candidate = candidateMap.get(item.item_id)
       if (!candidate || !candidate.subTaskId) continue
       // 只回寫原始值為 null 的（首次估時，不覆蓋用戶手動值）

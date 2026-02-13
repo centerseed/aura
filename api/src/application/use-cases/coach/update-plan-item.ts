@@ -43,7 +43,12 @@ export class UpdatePlanItemUseCase {
     if (request.completed !== undefined) updateData.completed = request.completed
     if (request.pinned !== undefined) updateData.pinned = request.pinned
     if (request.deferred !== undefined) updateData.deferred = request.deferred
-    if (request.actualMinutes !== undefined) updateData.actualMinutes = request.actualMinutes
+    if (request.actualMinutes !== undefined) {
+      if (request.actualMinutes < 0 || request.actualMinutes > 1440) {
+        throw new ValidationException('Actual minutes must be between 0 and 1440', 'actualMinutes')
+      }
+      updateData.actualMinutes = request.actualMinutes
+    }
 
     const item = await this.repository.updateItem(request.itemId, updateData)
 
