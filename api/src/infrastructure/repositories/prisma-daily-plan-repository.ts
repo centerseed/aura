@@ -120,6 +120,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       updateData.completed = data.completed
       updateData.completed_at = data.completed ? new Date() : null
     }
+    if (data.actualMinutes !== undefined) updateData.actual_minutes = data.actualMinutes
     if (data.pinned !== undefined) updateData.pinned = data.pinned
     if (data.deferred !== undefined) updateData.deferred = data.deferred
 
@@ -166,6 +167,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       reasoning: row.reasoning,
       completed: row.completed,
       completedAt: row.completed_at,
+      actualMinutes: row.actual_minutes,
       pinned: row.pinned,
       deferred: row.deferred,
       createdAt: row.created_at,

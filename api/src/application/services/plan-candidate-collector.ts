@@ -28,6 +28,8 @@ export interface PlanCandidate {
   areaName: string
   productName: string
   productDescription: string | null
+  taskContent: string
+  subTaskOrder: number | null
   estimatedMinutes: number | null
   dueDate: Date | null
   startDate: Date | null
@@ -68,7 +70,6 @@ interface RawCandidateTask {
   due_date: Date | null
   start_date: Date | null
   updated_at: Date
-  estimated_minutes: number | null
   area_name: string
   product_id: string
   product_name: string
@@ -135,10 +136,12 @@ export class PlanCandidateCollector {
             taskId: task.id,
             subTaskId: st.id,
             content: st.content,
+            taskContent: task.content,
+            subTaskOrder: st.order,
             areaName: task.area_name,
             productName: task.product_name,
             productDescription: task.product_description,
-            estimatedMinutes: st.estimated_minutes ?? task.estimated_minutes,
+            estimatedMinutes: st.estimated_minutes,
             dueDate: st.due_date ?? task.due_date,
             startDate: st.start_date ?? task.start_date,
             ...this.calcDays(st.due_date ?? task.due_date, task.updated_at, now),
@@ -152,10 +155,12 @@ export class PlanCandidateCollector {
           taskId: task.id,
           subTaskId: null,
           content: task.content,
+          taskContent: task.content,
+          subTaskOrder: null,
           areaName: task.area_name,
           productName: task.product_name,
           productDescription: task.product_description,
-          estimatedMinutes: task.estimated_minutes,
+          estimatedMinutes: null,
           dueDate: task.due_date,
           startDate: task.start_date,
           ...this.calcDays(task.due_date, task.updated_at, now),

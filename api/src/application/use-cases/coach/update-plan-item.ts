@@ -43,6 +43,20 @@ export class UpdatePlanItemUseCase {
     if (request.pinned !== undefined) updateData.pinned = request.pinned
     if (request.deferred !== undefined) updateData.deferred = request.deferred
 
+    // 完成時自動計算 actual_minutes（從 plan item 建立到完成的分鐘數）
+    if (request.completed === true) {
+      const existing = await prisma.dailyPlanItem.findUnique({
+        where: { id: request.itemId },
+        select: { created_at: true },
+      })
+      if (existing) {
+        const actualMinutes = Math.round(
+          (Date.now() - existing.created_at.getTime()) / (1000 * 60)
+        )
+        updateData.actualMinutes = actualMinutes
+      }
+    }
+
     const item = await this.repository.updateItem(request.itemId, updateData)
 
     // 完成連動：如果標記完成且有 subTaskId，同步 SubTask

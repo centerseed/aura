@@ -18,6 +18,7 @@ const DailyPlanOutputSchema = z.object({
     item_id: z.string().describe('task_id 或 subtask_id'),
     item_type: z.enum(['task', 'subtask']),
     order: z.number().describe('排序位置，1 開始'),
+    estimated_minutes: z.number().describe('預估完成時間（分鐘），根據任務內容與複雜度估計'),
     reasoning: z.string().describe('排序理由（繁體中文）'),
   })).describe('排序後的每日計畫項目'),
   capacity_note: z.string().describe('容量建議（繁體中文），如「今天有 5 小時可用，建議先完成前 3 項」'),
@@ -40,6 +41,7 @@ export class CoachPlanGenerator {
     productContexts: ProductContext[],
     availableMinutes: number,
     meetingMinutes: number,
+    calibrationNote?: string,
   ): Promise<DailyPlanOutput> {
     if (candidates.length === 0) {
       return {
@@ -50,7 +52,7 @@ export class CoachPlanGenerator {
       }
     }
 
-    const prompt = this.buildPrompt(candidates, productContexts, availableMinutes, meetingMinutes)
+    const prompt = this.buildPrompt(candidates, productContexts, availableMinutes, meetingMinutes, calibrationNote)
 
     const { object } = await generateObject({
       model: google('gemini-2.5-flash-lite'),
@@ -70,6 +72,7 @@ export class CoachPlanGenerator {
     productContexts: ProductContext[],
     availableMinutes: number,
     meetingMinutes: number,
+    calibrationNote?: string,
   ): string {
     const sections: string[] = []
 
@@ -81,6 +84,17 @@ export class CoachPlanGenerator {
     sections.push('3. 同一 Product 下的相關任務盡量排在一起（減少上下文切換）')
     sections.push('4. 考慮任務的 estimated_minutes，盡量在可用時間內安排')
     sections.push('5. 超出容量的任務放入 overflow_items')
+    sections.push('')
+    sections.push('## 估時指引')
+    sections.push('- 為每個項目估計完成時間（分鐘），填入 estimated_minutes')
+    sections.push('- 考慮任務複雜度、上下文切換成本')
+    sections.push('- 已有 est 值的項目可作為參考，但你可以根據判斷調整')
+    sections.push('- 最小單位 15 分鐘，一般任務 30-120 分鐘')
+    if (calibrationNote) {
+      sections.push('')
+      sections.push('## 個人校準資訊')
+      sections.push(calibrationNote)
+    }
     sections.push('')
 
     // Capacity
@@ -109,14 +123,18 @@ export class CoachPlanGenerator {
     sections.push('## 候選項目（需排序）')
     for (const c of candidates) {
       const id = c.subTaskId || c.taskId
-      const est = c.estimatedMinutes ?? 60
+      const est = c.estimatedMinutes ? `est=${c.estimatedMinutes}min` : '未估時'
       let urgency = ''
       if (c.daysOverdue) urgency = `⚠️ 逾期 ${c.daysOverdue} 天`
       else if (c.daysRemaining !== null && c.daysRemaining <= 0) urgency = '⚠️ 今日到期'
       else if (c.daysRemaining !== null) urgency = `剩 ${c.daysRemaining} 天`
 
+      const parentInfo = c.itemType === 'subtask' && c.taskContent !== c.content
+        ? ` (父任務: ${c.taskContent}, 第${c.subTaskOrder ?? '?'}步)`
+        : ''
+
       sections.push(
-        `- [${c.itemType}] id=${id} | ${c.productName}: ${c.content} | est=${est}min | ${urgency || '無期限'}${c.daysStagnant > 3 ? ` | 停滯${c.daysStagnant}天` : ''}`
+        `- [${c.itemType}] id=${id} | ${c.productName}: ${c.content}${parentInfo} | ${est} | ${urgency || '無期限'}${c.daysStagnant > 3 ? ` | 停滯${c.daysStagnant}天` : ''}`
       )
     }
     sections.push('')

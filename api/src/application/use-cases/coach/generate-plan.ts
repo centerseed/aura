@@ -10,8 +10,9 @@ import type {
   CreateDailyPlanData,
 } from '@/domain/interfaces/daily-plan-repository'
 import { PrismaDailyPlanRepository } from '@/infrastructure/repositories/prisma-daily-plan-repository'
-import { PlanCandidateCollector } from '@/application/services/plan-candidate-collector'
-import { CoachPlanGenerator } from '@/application/services/coach-plan-generator'
+import { PlanCandidateCollector, type PlanCandidate } from '@/application/services/plan-candidate-collector'
+import { CoachPlanGenerator, type DailyPlanOutput } from '@/application/services/coach-plan-generator'
+import { CoachCalibration } from '@/application/services/coach-calibration'
 import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
 
@@ -39,6 +40,7 @@ export class GeneratePlanUseCase {
     private readonly repository: IDailyPlanRepository = new PrismaDailyPlanRepository(),
     private readonly collector: PlanCandidateCollector = new PlanCandidateCollector(),
     private readonly planGenerator: CoachPlanGenerator = new CoachPlanGenerator(),
+    private readonly calibration: CoachCalibration = new CoachCalibration(),
   ) {}
 
   async execute(request: GeneratePlanRequest): Promise<GeneratePlanResponse> {
@@ -60,17 +62,19 @@ export class GeneratePlanUseCase {
     const collected = await this.collector.collect(request.userId, planDate, timezone)
     timings.collect = Date.now() - start
 
-    // 4. AI 排序
+    // 4. 取得校準資訊 + AI 排序
     start = Date.now()
+    const calibrationNote = await this.calibration.getCalibrationNote(request.userId)
     const aiResult = await this.planGenerator.generate(
       collected.candidates,
       collected.productContexts,
       collected.availableMinutes,
       collected.meetingMinutes,
+      calibrationNote ?? undefined,
     )
     timings.ai = Date.now() - start
 
-    // 5. 映射 AI 結果到候選資料
+    // 5. 映射 AI 結果到候選資料（AI 估時優先）
     const candidateMap = new Map(
       collected.candidates.map(c => [c.subTaskId || c.taskId, c])
     )
@@ -79,19 +83,24 @@ export class GeneratePlanUseCase {
       .map(item => {
         const candidate = candidateMap.get(item.item_id)
         if (!candidate) return null
+        // AI 估時優先，fallback 到候選值
+        const estimatedMinutes = item.estimated_minutes ?? candidate.estimatedMinutes
         return {
           taskId: candidate.taskId,
           subTaskId: candidate.subTaskId,
           content: candidate.content,
           areaName: candidate.areaName,
           productName: candidate.productName,
-          estimatedMinutes: candidate.estimatedMinutes,
+          estimatedMinutes,
           dueDate: candidate.dueDate,
           order: item.order,
           reasoning: item.reasoning,
         }
       })
       .filter((item): item is NonNullable<typeof item> => item !== null)
+
+    // 5b. 回寫 AI 估時到原始 Task/SubTask（僅首次估時，不覆蓋用戶手動值）
+    await this.writeBackEstimates(aiResult, candidateMap)
 
     // 計算 planned_minutes
     const plannedMinutes = plannedItems.reduce(
@@ -136,5 +145,37 @@ export class GeneratePlanUseCase {
   private toDateOnly(date: Date, timezone: string): Date {
     const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone })
     return new Date(dateStr + 'T00:00:00.000Z')
+  }
+
+  /**
+   * 回寫 AI 估時到原始 Task/SubTask
+   * 僅當原始記錄的 estimated_minutes 為 null 時才寫入（不覆蓋用戶手動值）
+   */
+  private async writeBackEstimates(
+    aiResult: DailyPlanOutput,
+    candidateMap: Map<string, PlanCandidate>,
+  ): Promise<void> {
+    const subTaskUpdates: Array<{ id: string; minutes: number }> = []
+
+    for (const item of aiResult.daily_plan) {
+      if (!item.estimated_minutes) continue
+      const candidate = candidateMap.get(item.item_id)
+      if (!candidate || !candidate.subTaskId) continue
+      // 只回寫原始值為 null 的（首次估時，不覆蓋用戶手動值）
+      if (candidate.estimatedMinutes !== null) continue
+
+      subTaskUpdates.push({ id: candidate.subTaskId, minutes: item.estimated_minutes })
+    }
+
+    if (subTaskUpdates.length > 0) {
+      await Promise.all(
+        subTaskUpdates.map(u =>
+          prisma.subTask.update({
+            where: { id: u.id },
+            data: { estimated_minutes: u.minutes },
+          })
+        ),
+      )
+    }
   }
 }

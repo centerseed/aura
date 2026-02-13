@@ -464,6 +464,7 @@ model DailyPlanItem {
   reasoning         String?   @db.Text
   completed         Boolean   @default(false)
   completed_at      DateTime? @db.Timestamp(6)
+  actual_minutes    Int?
   pinned            Boolean   @default(false)
   deferred          Boolean   @default(false)
 

@@ -22,6 +22,7 @@ export interface DailyPlanItemData {
   reasoning: string | null
   completed: boolean
   completedAt: Date | null
+  actualMinutes: number | null
   pinned: boolean
   deferred: boolean
   createdAt: Date
@@ -67,6 +68,7 @@ export interface UpdateDailyPlanItemData {
   order?: number
   completed?: boolean
   completedAt?: Date | null
+  actualMinutes?: number
   pinned?: boolean
   deferred?: boolean
 }
