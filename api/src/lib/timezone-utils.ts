@@ -39,6 +39,17 @@ export function toDateOnly(date: Date, timezone: string): Date {
 }
 
 /**
+ * 取得指定時區在某 UTC 時間的當地小時數 (0-23)
+ */
+export function getLocalHour(utcDate: Date, timezone: string): number {
+  const hour = parseInt(
+    utcDate.toLocaleString('en-US', { timeZone: timezone, hour: 'numeric', hourCycle: 'h23' }),
+    10,
+  )
+  return hour
+}
+
+/**
  * 從 request 或 user profile 解析時區
  */
 export async function resolveTimezone(userId: string, timezone?: string): Promise<string> {

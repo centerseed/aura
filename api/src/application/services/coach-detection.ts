@@ -121,8 +121,11 @@ export function detectCapacityOverload(
     meetingMinutes += (end - start) / (1000 * 60)
   }
 
-  // 計算任務估計時間（每個任務 60 分鐘）
-  const taskMinutes = tasks.length * ESTIMATED_MINUTES_PER_TASK
+  // 計算任務估計時間（優先使用 sub_tasks 估時，fallback 每個任務 60 分鐘）
+  let taskMinutes = 0
+  for (const task of tasks) {
+    taskMinutes += task.estimated_minutes ?? ESTIMATED_MINUTES_PER_TASK
+  }
 
   // 可用時間
   const availableMinutes = WORK_HOURS_PER_DAY * 60 - meetingMinutes

@@ -555,10 +555,10 @@ function CoachDrawerContent({
               <div className="space-y-1.5">
                 {briefing.calendar_events.map((evt) => (
                   <div key={evt.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-white/40 text-xs font-mono w-[90px] shrink-0">
+                    <span className="text-slate-500 dark:text-white/40 text-xs font-mono w-[90px] shrink-0">
                       {formatTime(evt.start_date_time)}-{formatTime(evt.end_date_time)}
                     </span>
-                    <span className="text-white/70 truncate">{evt.summary}</span>
+                    <span className="text-slate-700 dark:text-white/70 truncate">{evt.summary}</span>
                   </div>
                 ))}
               </div>
@@ -578,7 +578,7 @@ function CoachDrawerContent({
               <div className="space-y-1.5">
                 {briefing.overdue_tasks.map((task) => (
                   <div key={task.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-white/70 truncate">{task.content}</span>
+                    <span className="text-slate-700 dark:text-white/70 truncate">{task.content}</span>
                     <span className="text-orange-400/80 text-xs shrink-0">
                       -{task.days_overdue}d
                     </span>
@@ -601,7 +601,7 @@ function CoachDrawerContent({
               <div className="space-y-1.5">
                 {briefing.approaching_tasks.map((task) => (
                   <div key={task.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-white/70 truncate">{task.content}</span>
+                    <span className="text-slate-700 dark:text-white/70 truncate">{task.content}</span>
                     <span className="text-amber-400/80 text-xs shrink-0">
                       {task.days_remaining}d
                     </span>
@@ -623,7 +623,7 @@ function CoachDrawerContent({
             >
               <div className="space-y-1.5">
                 {briefing.conflicts.map((conflict, i) => (
-                  <p key={i} className="text-sm text-white/70">
+                  <p key={i} className="text-sm text-slate-700 dark:text-white/70">
                     {conflict.description}
                   </p>
                 ))}
@@ -644,8 +644,8 @@ function CoachDrawerContent({
               <div className="space-y-1.5">
                 {briefing.stagnations.map((stag, i) => (
                   <div key={i} className="text-sm">
-                    <p className="text-white/70">{stag.entity_name}</p>
-                    <p className="text-xs text-white/40">
+                    <p className="text-slate-700 dark:text-white/70">{stag.entity_name}</p>
+                    <p className="text-xs text-slate-500 dark:text-white/40">
                       {stag.area_name} - {stag.days_inactive} 天未更新
                     </p>
                   </div>
@@ -682,9 +682,9 @@ function CoachDrawerContent({
                           ? "歸檔"
                           : "委派"}
                       </span>
-                      <span className="text-white/70 truncate">{ds.task_content}</span>
+                      <span className="text-slate-700 dark:text-white/70 truncate">{ds.task_content}</span>
                     </div>
-                    <p className="text-xs text-white/40 mt-0.5 ml-12">
+                    <p className="text-xs text-slate-500 dark:text-white/40 mt-0.5 ml-12">
                       {ds.reasoning}
                     </p>
                   </div>
@@ -706,10 +706,10 @@ function CoachDrawerContent({
               <div className="space-y-1.5">
                 {briefing.tomorrow_preview.map((evt) => (
                   <div key={evt.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-white/40 text-xs font-mono w-[90px] shrink-0">
+                    <span className="text-slate-500 dark:text-white/40 text-xs font-mono w-[90px] shrink-0">
                       {formatTime(evt.start_date_time)}-{formatTime(evt.end_date_time)}
                     </span>
-                    <span className="text-white/70 truncate">{evt.summary}</span>
+                    <span className="text-slate-700 dark:text-white/70 truncate">{evt.summary}</span>
                   </div>
                 ))}
               </div>
@@ -723,8 +723,8 @@ function CoachDrawerContent({
 
       {/* Footer - generate button when briefing exists */}
       {isGenerating && (
-        <div className="px-5 py-3 border-t border-white/5">
-          <div className="flex items-center justify-center gap-2 text-sm text-indigo-300">
+        <div className="px-5 py-3 border-t border-slate-200 dark:border-white/5">
+          <div className="flex items-center justify-center gap-2 text-sm text-indigo-600 dark:text-indigo-300">
             <Loader2 className="w-4 h-4 animate-spin" />
             重新生成中...
           </div>
@@ -745,7 +745,7 @@ function CollapsibleSection({
   isExpanded,
   onToggle,
   children,
-  accentColor = "text-white/60",
+  accentColor = "text-slate-500 dark:text-white/60",
 }: {
   title: string;
   icon: React.ReactNode;
@@ -759,16 +759,16 @@ function CollapsibleSection({
     <div>
       <button
         onClick={onToggle}
-        className="w-full px-5 py-2 flex items-center gap-2 hover:bg-white/5 transition-colors"
+        className="w-full px-5 py-2 flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
       >
         {isExpanded ? (
-          <ChevronDown className="w-3 h-3 text-white/30" />
+          <ChevronDown className="w-3 h-3 text-slate-400 dark:text-white/30" />
         ) : (
-          <ChevronRight className="w-3 h-3 text-white/30" />
+          <ChevronRight className="w-3 h-3 text-slate-400 dark:text-white/30" />
         )}
         <span className={accentColor}>{icon}</span>
         <span className={`text-xs font-medium ${accentColor}`}>{title}</span>
-        <span className="text-[10px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded-full ml-auto">
+        <span className="text-[10px] text-slate-400 dark:text-white/30 bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full ml-auto">
           {count}
         </span>
       </button>

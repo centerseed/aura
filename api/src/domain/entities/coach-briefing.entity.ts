@@ -32,6 +32,7 @@ export interface TaskSummary {
   days_remaining: number | null
   days_stagnant: number | null
   urgency_level: string | null
+  estimated_minutes: number | null
 }
 
 export interface ConflictItem {

@@ -10,6 +10,12 @@ import { Prisma } from '@prisma/client'
 import { getStartOfDay, getEndOfDay } from '@/lib/timezone-utils'
 import type { CalendarEventSummary, TaskSummary } from '@/domain/entities/coach-briefing.entity'
 
+// SQL enum 常數 — 避免 raw SQL 中硬編碼字串
+const STATUS_ARCHIVE = Prisma.sql`'ARCHIVE'::"statusenum"`
+const STATUS_REFERENCE = Prisma.sql`'REFERENCE'::"statusenum"`
+const STATUS_ACTIVE = Prisma.sql`'ACTIVE'::"statusenum"`
+const STATUS_INBOX = Prisma.sql`'INBOX'::"statusenum"`
+
 // ============================================================================
 // Raw SQL 結果型別
 // ============================================================================
@@ -34,6 +40,7 @@ interface RawTaskRow {
   area_name: string
   product_name: string
   urgency_level: string | null
+  estimated_minutes: number | null
 }
 
 interface RawStagnantProduct {
@@ -156,14 +163,15 @@ export class CoachDataAggregator {
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
-        tam.urgency_level
+        tam.urgency_level,
+        (SELECT SUM(st.estimated_minutes) FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL)::int as estimated_minutes
       FROM tasks t
       JOIN products p ON p.id = t.product_id
       JOIN areas a ON a.id = p.area_id
       LEFT JOIN task_ai_metadata tam ON tam.task_id = t.id
       WHERE t.user_id = ${userId}::uuid
         AND t.deleted_at IS NULL
-        AND t.status NOT IN ('ARCHIVE', 'REFERENCE')
+        AND t.status NOT IN (${STATUS_ARCHIVE}, ${STATUS_REFERENCE})
         AND t.due_date IS NOT NULL
         AND t.due_date < ${now}
       ORDER BY t.due_date ASC
@@ -186,14 +194,15 @@ export class CoachDataAggregator {
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
-        tam.urgency_level
+        tam.urgency_level,
+        (SELECT SUM(st.estimated_minutes) FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL)::int as estimated_minutes
       FROM tasks t
       JOIN products p ON p.id = t.product_id
       JOIN areas a ON a.id = p.area_id
       LEFT JOIN task_ai_metadata tam ON tam.task_id = t.id
       WHERE t.user_id = ${userId}::uuid
         AND t.deleted_at IS NULL
-        AND t.status NOT IN ('ARCHIVE', 'REFERENCE')
+        AND t.status NOT IN (${STATUS_ARCHIVE}, ${STATUS_REFERENCE})
         AND t.due_date IS NOT NULL
         AND t.due_date >= ${now}
         AND t.due_date < ${threeDaysLater}
@@ -217,14 +226,15 @@ export class CoachDataAggregator {
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
-        tam.urgency_level
+        tam.urgency_level,
+        (SELECT SUM(st.estimated_minutes) FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL)::int as estimated_minutes
       FROM tasks t
       JOIN products p ON p.id = t.product_id
       JOIN areas a ON a.id = p.area_id
       LEFT JOIN task_ai_metadata tam ON tam.task_id = t.id
       WHERE t.user_id = ${userId}::uuid
         AND t.deleted_at IS NULL
-        AND t.status = 'ARCHIVE'
+        AND t.status = ${STATUS_ARCHIVE}
         AND t.updated_at >= ${todayStart}
         AND t.updated_at < ${todayEnd}
       ORDER BY t.updated_at DESC
@@ -244,14 +254,15 @@ export class CoachDataAggregator {
         t.updated_at,
         a.name as area_name,
         p.name as product_name,
-        tam.urgency_level
+        tam.urgency_level,
+        (SELECT SUM(st.estimated_minutes) FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL)::int as estimated_minutes
       FROM tasks t
       JOIN products p ON p.id = t.product_id
       JOIN areas a ON a.id = p.area_id
       LEFT JOIN task_ai_metadata tam ON tam.task_id = t.id
       WHERE t.user_id = ${userId}::uuid
         AND t.deleted_at IS NULL
-        AND t.status IN ('ACTIVE', 'INBOX')
+        AND t.status IN (${STATUS_ACTIVE}, ${STATUS_INBOX})
       ORDER BY t.due_date ASC NULLS LAST, t.updated_at DESC
     `
 
@@ -273,7 +284,7 @@ export class CoachDataAggregator {
       LEFT JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
       WHERE p.user_id = ${userId}::uuid
         AND p.deleted_at IS NULL
-        AND p.status IN ('ACTIVE', 'INBOX')
+        AND p.status IN (${STATUS_ACTIVE}, ${STATUS_INBOX})
       GROUP BY p.id, p.name, a.name
       HAVING MAX(t.updated_at) IS NOT NULL
         AND MAX(t.updated_at) < ${sevenDaysAgo}
@@ -333,6 +344,7 @@ export class CoachDataAggregator {
       days_remaining: daysRemaining,
       days_stagnant: daysStagnant,
       urgency_level: row.urgency_level,
+      estimated_minutes: row.estimated_minutes ?? null,
     }
   }
 

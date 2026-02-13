@@ -24,7 +24,7 @@ import { CoachAIGenerator } from '@/application/services/coach-ai-generator'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
-import { resolveTimezone } from '@/lib/timezone-utils'
+import { resolveTimezone, toDateOnly } from '@/lib/timezone-utils'
 
 // ============================================================================
 // DTOs
@@ -132,7 +132,7 @@ export class GenerateBriefingUseCase {
     const createData: CreateCoachBriefingData = {
       userId: request.userId,
       type: request.type,
-      briefingDate: this.toDateOnly(briefingDate, timezone),
+      briefingDate: toDateOnly(briefingDate, timezone),
       calendarEvents: aggregatedData.calendarEvents,
       overdueTasks: aggregatedData.overdueTasks,
       approachingTasks: aggregatedData.approachingTasks,
@@ -176,9 +176,4 @@ export class GenerateBriefingUseCase {
     }
   }
 
-
-  private toDateOnly(date: Date, timezone: string): Date {
-    const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD
-    return new Date(dateStr + 'T00:00:00.000Z')
-  }
 }
