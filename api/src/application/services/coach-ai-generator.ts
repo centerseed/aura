@@ -166,11 +166,24 @@ export class CoachAIGenerator {
 
     // 停滯
     if (input.stagnations.length > 0) {
-      sections.push('## 停滯警告')
-      for (const stag of input.stagnations) {
-        sections.push(`- [${stag.area_name}] ${stag.entity_name}（${stag.days_inactive} 天未更新）`)
+      const taskStagnations = input.stagnations.filter(s => s.type !== 'stuck_subtask')
+      const subtaskStagnations = input.stagnations.filter(s => s.type === 'stuck_subtask')
+
+      if (taskStagnations.length > 0) {
+        sections.push('## 停滯警告')
+        for (const stag of taskStagnations) {
+          sections.push(`- [${stag.area_name}] ${stag.entity_name}（${stag.days_inactive} 天未更新）`)
+        }
+        sections.push('')
       }
-      sections.push('')
+
+      if (subtaskStagnations.length > 0) {
+        sections.push('## 停滯子任務（超過 3 天未完成）')
+        for (const stag of subtaskStagnations) {
+          sections.push(`- [${stag.area_name}] 父任務: "${stag.parent_task_content}" → 子任務: "${stag.entity_name}"（已開始 ${stag.days_inactive} 天）`)
+        }
+        sections.push('')
+      }
     }
 
     // 晚報額外資訊

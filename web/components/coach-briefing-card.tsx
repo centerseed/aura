@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Clock,
   Calendar,
+  CalendarPlus,
   TrendingDown,
   Loader2,
   Sparkles,
@@ -56,10 +57,13 @@ interface ConflictItem {
 }
 
 interface StagnationItem {
+  type: string;
+  entity_id: string;
   entity_name: string;
   area_name: string;
   days_inactive: number;
   suggestion: string;
+  parent_task_content?: string;
 }
 
 interface Recommendation {
@@ -641,14 +645,9 @@ function CoachDrawerContent({
               onToggle={() => toggleSection("stagnation")}
               accentColor="text-yellow-300"
             >
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {briefing.stagnations.map((stag, i) => (
-                  <div key={i} className="text-sm">
-                    <p className="text-slate-700 dark:text-white/70">{stag.entity_name}</p>
-                    <p className="text-xs text-slate-500 dark:text-white/40">
-                      {stag.area_name} - {stag.days_inactive} 天未更新
-                    </p>
-                  </div>
+                  <StagnationItemRow key={i} stag={stag} />
                 ))}
               </div>
             </CollapsibleSection>
@@ -731,6 +730,76 @@ function CoachDrawerContent({
         </div>
       )}
     </>
+  );
+}
+
+// ============================================================================
+// Stagnation Item with Date Setting
+// ============================================================================
+
+function StagnationItemRow({ stag }: { stag: StagnationItem }) {
+  const [showDateInput, setShowDateInput] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSetDate = async (field: "start_date" | "due_date", value: string) => {
+    if (!value || stag.type !== "stuck_task") return;
+    try {
+      setIsSaving(true);
+      await API.tasks.update(stag.entity_id, {
+        [field === "start_date" ? "startDate" : "dueDate"]: value,
+      });
+      setShowDateInput(false);
+    } catch (err) {
+      console.error("[Coach] Failed to update task date:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isSubTask = stag.type === "stuck_subtask";
+
+  return (
+    <div className="text-sm">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          {isSubTask ? (
+            <>
+              <p className="text-slate-700 dark:text-white/70 truncate">{stag.parent_task_content}</p>
+              <p className="text-xs text-slate-600 dark:text-white/50 truncate ml-3">
+                └─ {stag.entity_name}（已開始 {stag.days_inactive} 天）
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-slate-700 dark:text-white/70 truncate">{stag.entity_name}</p>
+              <p className="text-xs text-slate-500 dark:text-white/40">
+                {stag.area_name} - {stag.days_inactive} 天未更新
+              </p>
+            </>
+          )}
+        </div>
+        {stag.type === "stuck_task" && (
+          <button
+            onClick={() => setShowDateInput(!showDateInput)}
+            className="shrink-0 p-1 rounded text-slate-400 dark:text-white/30 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+            title="設定日期"
+          >
+            <CalendarPlus className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      {showDateInput && (
+        <div className="mt-1.5 ml-0 flex gap-2 items-center">
+          <label className="text-[10px] text-slate-400 dark:text-white/30">截止日</label>
+          <input
+            type="date"
+            disabled={isSaving}
+            onChange={(e) => handleSetDate("due_date", e.target.value)}
+            className="text-xs px-1.5 py-0.5 rounded border border-slate-300 dark:border-white/10 bg-white dark:bg-white/5 text-slate-700 dark:text-white/70 disabled:opacity-50"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

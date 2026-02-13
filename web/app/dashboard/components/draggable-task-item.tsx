@@ -398,7 +398,7 @@ export function DraggableTaskItem({
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           className="opacity-0 group-hover/subitem:opacity-100 p-0.5 rounded hover:bg-blue-500/20 text-white/30 hover:text-blue-400 transition-all shrink-0"
-                          title="升級為獨立任務"
+                          title="轉成獨立任務"
                         >
                           <ArrowUpCircle className="w-3 h-3" />
                         </button>

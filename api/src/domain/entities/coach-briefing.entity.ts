@@ -26,6 +26,7 @@ export interface TaskSummary {
   content: string
   status: string
   due_date: string | null
+  start_date: string | null
   area_name: string
   product_name: string
   days_overdue: number | null
@@ -48,13 +49,27 @@ export interface ConflictItem {
 }
 
 export interface StagnationItem {
-  type: 'stagnant_product' | 'stuck_task' | 'zombie_project'
+  type: 'stagnant_product' | 'stuck_task' | 'stuck_subtask' | 'zombie_project'
   entity_id: string
   entity_name: string
   area_name: string
   days_inactive: number
   last_activity: string
   suggestion: string
+  parent_task_content?: string  // stuck_subtask 用：父任務名稱
+}
+
+export interface SubTaskSummary {
+  id: string
+  content: string
+  task_id: string
+  task_content: string
+  area_name: string
+  product_name: string
+  start_date: string | null
+  due_date: string | null
+  days_since_start: number
+  days_remaining: number | null
 }
 
 // ============================================================================

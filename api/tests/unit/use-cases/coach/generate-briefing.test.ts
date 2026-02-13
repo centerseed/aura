@@ -58,6 +58,7 @@ function makeMockAggregator(): CoachDataAggregator {
     completedTasks: [],
     remainingTasks: [],
     stagnantProducts: [],
+    stuckSubTasks: [],
     tomorrowPreview: [],
   }
 
@@ -172,6 +173,7 @@ describe('GenerateBriefingUseCase', () => {
         completedTasks: [],
         remainingTasks: [],
         stagnantProducts: [],
+        stuckSubTasks: [],
         tomorrowPreview: [],
       }
 

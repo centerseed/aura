@@ -12,8 +12,9 @@ import {
   detectCapacityOverload,
   detectStagnantProducts,
   detectStuckTasks,
+  detectStuckSubTasks,
 } from '@/application/services/coach-detection'
-import type { CalendarEventSummary, TaskSummary } from '@/domain/entities/coach-briefing.entity'
+import type { CalendarEventSummary, TaskSummary, SubTaskSummary } from '@/domain/entities/coach-briefing.entity'
 
 // ============================================================================
 // Test Helpers
@@ -39,21 +40,48 @@ function makeTask(overrides: Partial<TaskSummary> = {}): TaskSummary {
     content: 'Test task',
     status: 'ACTIVE',
     due_date: '2026-02-09',
+    start_date: null,
     area_name: 'Area A',
     product_name: 'Product A',
     days_overdue: null,
     days_remaining: null,
     days_stagnant: null,
     urgency_level: null,
+    estimated_minutes: null,
     ...overrides,
   }
 }
 
-interface StagnantProductInput {
-  id: string
-  name: string
-  area_name: string
-  last_task_updated_at: string
+import type { StagnantProductInput } from '@/application/services/coach-detection'
+
+function makeSubTask(overrides: Partial<SubTaskSummary> = {}): SubTaskSummary {
+  return {
+    id: 'st-1',
+    content: 'Test subtask',
+    task_id: 'task-1',
+    task_content: 'Parent task',
+    area_name: 'Area A',
+    product_name: 'Product A',
+    start_date: '2026-02-01',
+    due_date: null,
+    days_since_start: 5,
+    days_remaining: null,
+    ...overrides,
+  }
+}
+
+function makeStagnantProduct(overrides: Partial<StagnantProductInput> = {}): StagnantProductInput {
+  const now = new Date()
+  const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000)
+  return {
+    id: 'prod-1',
+    name: 'Test Product',
+    area_name: 'Area A',
+    lifecycle: 'FINITE',
+    last_task_updated_at: tenDaysAgo.toISOString(),
+    nearest_due_date: null,
+    ...overrides,
+  }
 }
 
 // ============================================================================
@@ -264,40 +292,44 @@ describe('detectCapacityOverload', () => {
 
 describe('detectStagnantProducts', () => {
   describe('正常路徑', () => {
-    it('應該偵測到超過 7 天沒更新的產品', () => {
-      const now = new Date()
-      const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000)
-
-      const products: StagnantProductInput[] = [
-        {
-          id: 'prod-1',
-          name: 'Old Product',
-          area_name: 'Area A',
-          last_task_updated_at: tenDaysAgo.toISOString(),
-        },
-      ]
-
-      const stagnations = detectStagnantProducts(products)
+    it('FINITE 產品超過 7 天應被偵測', () => {
+      const stagnations = detectStagnantProducts([makeStagnantProduct()])
       expect(stagnations).toHaveLength(1)
       expect(stagnations[0].type).toBe('stagnant_product')
-      expect(stagnations[0].entity_name).toBe('Old Product')
       expect(stagnations[0].days_inactive).toBeGreaterThanOrEqual(10)
     })
 
     it('最近更新的產品不應被標記', () => {
-      const now = new Date()
-      const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      expect(detectStagnantProducts([
+        makeStagnantProduct({ last_task_updated_at: twoDaysAgo.toISOString() }),
+      ])).toHaveLength(0)
+    })
 
-      const products: StagnantProductInput[] = [
-        {
-          id: 'prod-1',
-          name: 'Active Product',
-          area_name: 'Area A',
-          last_task_updated_at: twoDaysAgo.toISOString(),
-        },
-      ]
+    it('PERPETUAL 產品用 14 天門檻', () => {
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+      // 10 天未更新 PERPETUAL → 不停滯（門檻 14）
+      expect(detectStagnantProducts([
+        makeStagnantProduct({ lifecycle: 'PERPETUAL', last_task_updated_at: tenDaysAgo.toISOString() }),
+      ])).toHaveLength(0)
 
-      expect(detectStagnantProducts(products)).toHaveLength(0)
+      // 15 天未更新 PERPETUAL → 停滯
+      const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
+      expect(detectStagnantProducts([
+        makeStagnantProduct({ lifecycle: 'PERPETUAL', last_task_updated_at: fifteenDaysAgo.toISOString() }),
+      ])).toHaveLength(1)
+    })
+
+    it('最近任務截止日 > 14 天後，FINITE 產品門檻放寬到 14 天', () => {
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+      const twentyDaysLater = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000)
+      // 10 天未更新 FINITE + nearest_due_date 20 天後 → 不停滯（門檻放寬到 14）
+      expect(detectStagnantProducts([
+        makeStagnantProduct({
+          last_task_updated_at: tenDaysAgo.toISOString(),
+          nearest_due_date: twentyDaysLater.toISOString(),
+        }),
+      ])).toHaveLength(0)
     })
   })
 
@@ -314,43 +346,82 @@ describe('detectStagnantProducts', () => {
 
 describe('detectStuckTasks', () => {
   describe('正常路徑', () => {
-    it('應該偵測到超過 5 天沒更新的 ACTIVE 任務', () => {
-      const tasks: TaskSummary[] = [
-        makeTask({
-          id: 'task-stuck',
-          status: 'ACTIVE',
-          days_stagnant: 6,
-        }),
-      ]
+    it('無 due_date 任務停滯 10 天以上才觸發', () => {
+      // 9 天 → 不觸發（門檻 10）
+      expect(detectStuckTasks([
+        makeTask({ due_date: null, days_stagnant: 9, days_remaining: null }),
+      ])).toHaveLength(0)
 
-      const stagnations = detectStuckTasks(tasks)
-      expect(stagnations).toHaveLength(1)
-      expect(stagnations[0].type).toBe('stuck_task')
-      expect(stagnations[0].entity_name).toBe('Test task')
+      // 11 天 → 觸發
+      const result = detectStuckTasks([
+        makeTask({ due_date: null, days_stagnant: 11, days_remaining: null }),
+      ])
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('stuck_task')
     })
 
-    it('最近更新的 ACTIVE 任務不應被標記', () => {
-      const tasks: TaskSummary[] = [
-        makeTask({
-          id: 'task-active',
-          status: 'ACTIVE',
-          days_stagnant: 2,
-        }),
-      ]
+    it('due_date <= 3 天用門檻 2', () => {
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 2, days_remaining: 2 }),
+      ])).toHaveLength(1)
+    })
 
-      expect(detectStuckTasks(tasks)).toHaveLength(0)
+    it('due_date <= 7 天用門檻 3', () => {
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 3, days_remaining: 5 }),
+      ])).toHaveLength(1)
+
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 2, days_remaining: 5 }),
+      ])).toHaveLength(0)
+    })
+
+    it('due_date <= 14 天用門檻 5', () => {
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 5, days_remaining: 10 }),
+      ])).toHaveLength(1)
+
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 4, days_remaining: 10 }),
+      ])).toHaveLength(0)
+    })
+
+    it('due_date > 14 天用門檻 7', () => {
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 7, days_remaining: 20 }),
+      ])).toHaveLength(1)
+
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 6, days_remaining: 20 }),
+      ])).toHaveLength(0)
     })
 
     it('非 ACTIVE/INBOX 狀態的任務不應被檢查', () => {
-      const tasks: TaskSummary[] = [
-        makeTask({
-          id: 'task-ref',
-          status: 'REFERENCE',
-          days_stagnant: 30,
-        }),
-      ]
+      expect(detectStuckTasks([
+        makeTask({ status: 'REFERENCE', days_stagnant: 30 }),
+      ])).toHaveLength(0)
+    })
+  })
 
-      expect(detectStuckTasks(tasks)).toHaveLength(0)
+  describe('過濾邏輯', () => {
+    it('已逾期任務不出現在停滯', () => {
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 10, days_overdue: 3, days_remaining: null }),
+      ])).toHaveLength(0)
+    })
+
+    it('start_date 在未來的不出現', () => {
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10)
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 10, start_date: tomorrow, due_date: null, days_remaining: null }),
+      ])).toHaveLength(0)
+    })
+
+    it('start_date 在過去的正常偵測', () => {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().substring(0, 10)
+      expect(detectStuckTasks([
+        makeTask({ days_stagnant: 11, start_date: yesterday, due_date: null, days_remaining: null }),
+      ])).toHaveLength(1)
     })
   })
 
@@ -360,29 +431,84 @@ describe('detectStuckTasks', () => {
     })
 
     it('days_stagnant 為 null 的任務不應被標記', () => {
-      const tasks: TaskSummary[] = [
-        makeTask({
-          id: 'task-null',
-          status: 'ACTIVE',
-          days_stagnant: null,
-        }),
-      ]
-
-      expect(detectStuckTasks(tasks)).toHaveLength(0)
+      expect(detectStuckTasks([
+        makeTask({ status: 'ACTIVE', days_stagnant: null }),
+      ])).toHaveLength(0)
     })
 
     it('INBOX 狀態的停滯任務也應被偵測', () => {
-      const tasks: TaskSummary[] = [
-        makeTask({
-          id: 'task-inbox',
-          status: 'INBOX',
-          days_stagnant: 7,
-        }),
-      ]
+      const result = detectStuckTasks([
+        makeTask({ status: 'INBOX', days_stagnant: 11, due_date: null, days_remaining: null }),
+      ])
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('stuck_task')
+    })
+  })
+})
 
-      const stagnations = detectStuckTasks(tasks)
-      expect(stagnations).toHaveLength(1)
-      expect(stagnations[0].type).toBe('stuck_task')
+// ============================================================================
+// detectStuckSubTasks
+// ============================================================================
+
+describe('detectStuckSubTasks', () => {
+  describe('正常路徑', () => {
+    it('超過 3 天未完成的 subtask 應觸發停滯', () => {
+      const result = detectStuckSubTasks([makeSubTask({ days_since_start: 4 })])
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('stuck_subtask')
+      expect(result[0].entity_name).toBe('Test subtask')
+      expect(result[0].parent_task_content).toBe('Parent task')
+      expect(result[0].days_inactive).toBe(4)
+    })
+
+    it('剛好 3 天的 subtask 應觸發停滯', () => {
+      const result = detectStuckSubTasks([makeSubTask({ days_since_start: 3 })])
+      expect(result).toHaveLength(1)
+    })
+
+    it('不到 3 天的 subtask 不應觸發', () => {
+      const result = detectStuckSubTasks([makeSubTask({ days_since_start: 2 })])
+      expect(result).toHaveLength(0)
+    })
+
+    it('已逾期的 subtask 應在建議中提到逾期', () => {
+      const result = detectStuckSubTasks([
+        makeSubTask({ days_since_start: 5, days_remaining: -2, due_date: '2026-02-10' }),
+      ])
+      expect(result).toHaveLength(1)
+      expect(result[0].suggestion).toContain('已逾期')
+    })
+
+    it('未逾期的 subtask 建議拆解或重新評估', () => {
+      const result = detectStuckSubTasks([
+        makeSubTask({ days_since_start: 5, days_remaining: 3, due_date: '2026-02-20' }),
+      ])
+      expect(result).toHaveLength(1)
+      expect(result[0].suggestion).toContain('拆解或重新評估')
+    })
+  })
+
+  describe('邊界條件', () => {
+    it('空陣列應回傳空結果', () => {
+      expect(detectStuckSubTasks([])).toHaveLength(0)
+    })
+
+    it('多個 subtask 應分別偵測', () => {
+      const result = detectStuckSubTasks([
+        makeSubTask({ id: 'st-1', days_since_start: 5 }),
+        makeSubTask({ id: 'st-2', days_since_start: 1 }),
+        makeSubTask({ id: 'st-3', days_since_start: 10 }),
+      ])
+      expect(result).toHaveLength(2)
+      expect(result.map(r => r.entity_id)).toEqual(['st-1', 'st-3'])
+    })
+
+    it('days_remaining 為 null 不應算逾期', () => {
+      const result = detectStuckSubTasks([
+        makeSubTask({ days_since_start: 5, days_remaining: null }),
+      ])
+      expect(result).toHaveLength(1)
+      expect(result[0].suggestion).not.toContain('已逾期')
     })
   })
 })

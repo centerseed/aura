@@ -927,6 +927,28 @@ export function TaskDetailModal({
                 />
               </div>
 
+              {/* Completed Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  const newCompleted = !editDialogSubItem.completed;
+                  onToggleSubItem?.(task.id, editDialogSubItem.id, newCompleted);
+                  setEditDialogSubItem({ ...editDialogSubItem, completed: newCompleted });
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors w-full ${
+                  editDialogSubItem.completed
+                    ? 'bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25'
+                    : 'bg-white/5 text-white/60 border border-white/15 hover:bg-white/10 hover:text-white/80'
+                }`}
+              >
+                {editDialogSubItem.completed ? (
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border-2 border-white/30" />
+                )}
+                {editDialogSubItem.completed ? '已完成' : '標記為完成'}
+              </button>
+
               {/* Date Fields */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Start Date */}
@@ -1059,7 +1081,7 @@ export function TaskDetailModal({
                 <>
                   <div className="flex items-center gap-3 pt-1">
                     <div className="flex-1 h-px bg-white/10" />
-                    <span className="text-xs text-white/30">移動 / 升級</span>
+                    <span className="text-xs text-white/30">移動 / 轉換</span>
                     <div className="flex-1 h-px bg-white/10" />
                   </div>
 
@@ -1117,7 +1139,7 @@ export function TaskDetailModal({
                         className="px-3 py-2 text-xs font-medium rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center gap-1 shrink-0"
                       >
                         {isPromoting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
-                        {isPromoting ? "升級中" : "升級"}
+                        {isPromoting ? "轉換中" : "轉成獨立任務"}
                       </button>
                     )}
                   </div>
