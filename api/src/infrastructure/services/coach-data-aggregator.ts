@@ -340,8 +340,18 @@ export class CoachDataAggregator {
   // ============================================================================
 
   private getStartOfDay(date: Date, timezone: string): Date {
-    const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD
-    return new Date(`${dateStr}T00:00:00.000+08:00`) // 台北時區
+    const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone })
+    const midnight = new Date(`${dateStr}T00:00:00`)
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hourCycle: 'h23',
+      timeZoneName: 'longOffset',
+    })
+    const parts = formatter.formatToParts(midnight)
+    const offsetStr = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
+    const offset = offsetStr.replace('GMT', '')
+    return new Date(`${dateStr}T00:00:00.000${offset}`)
   }
 
   private getEndOfDay(date: Date, timezone: string): Date {

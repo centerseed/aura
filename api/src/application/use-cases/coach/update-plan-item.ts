@@ -65,26 +65,17 @@ export class UpdatePlanItemUseCase {
 
     const item = await this.repository.updateItem(request.itemId, updateData)
 
-    // 完成連動：如果標記完成且有 subTaskId，同步 SubTask
-    if (request.completed && item.subTaskId) {
-      await prisma.subTask.update({
-        where: { id: item.subTaskId },
-        data: {
-          completed: true,
-          completed_at: new Date(),
-        },
-      })
-    }
-
-    // 如果取消完成且有 subTaskId，也同步取消
-    if (request.completed === false && item.subTaskId) {
-      await prisma.subTask.update({
-        where: { id: item.subTaskId },
-        data: {
-          completed: false,
-          completed_at: null,
-        },
-      })
+    // 完成連動：同步 SubTask 狀態（使用 transaction 確保一致性）
+    if (request.completed !== undefined && item.subTaskId) {
+      await prisma.$transaction([
+        prisma.subTask.update({
+          where: { id: item.subTaskId },
+          data: {
+            completed: request.completed,
+            completed_at: request.completed ? new Date() : null,
+          },
+        }),
+      ])
     }
 
     return { item }

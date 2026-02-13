@@ -51,18 +51,25 @@ export async function GET(request: NextRequest) {
       AND t.deleted_at IS NULL
   `
 
-  // 4. 為每位用戶生成簡報
+  // 4. 為每位用戶生成簡報（並發限制 3，避免 Gemini API rate limit）
+  const CONCURRENCY_LIMIT = 3
   const useCase = new GenerateBriefingUseCase()
-  const results = await Promise.allSettled(
-    activeUsers.map(async (user) => {
-      const result = await useCase.execute({
-        userId: user.id,
-        type: briefingType,
-        timezone: user.timezone || 'Asia/Taipei',
-      })
-      return { userId: user.id, briefingId: result.briefing.id }
-    }),
-  )
+  const results: PromiseSettledResult<{ userId: string; briefingId: string }>[] = []
+
+  for (let i = 0; i < activeUsers.length; i += CONCURRENCY_LIMIT) {
+    const batch = activeUsers.slice(i, i + CONCURRENCY_LIMIT)
+    const batchResults = await Promise.allSettled(
+      batch.map(async (user) => {
+        const result = await useCase.execute({
+          userId: user.id,
+          type: briefingType,
+          timezone: user.timezone || 'Asia/Taipei',
+        })
+        return { userId: user.id, briefingId: result.briefing.id }
+      }),
+    )
+    results.push(...batchResults)
+  }
 
   // 5. 統計結果
   const succeeded = results.filter(r => r.status === 'fulfilled').length
