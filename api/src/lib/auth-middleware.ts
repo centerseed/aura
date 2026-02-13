@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getAuth } from "./firebase-admin";
 import { UnauthorizedException } from "./api-response";
+import { verifyInternalAuth } from "@/mcp/oauth/jwt";
 
 /**
  * 從 Authorization header 提取並驗證 Firebase ID Token
@@ -76,6 +77,19 @@ export async function authenticateRequest(
   prisma: any
 ): Promise<string> {
   try {
+    // Internal MCP auth: same-process calls from MCP tool handlers.
+    // The MCP layer already verified the user via OAuth 2.1 JWT,
+    // so we trust the HMAC-signed user ID for internal API calls.
+    const mcpInternalHmac = request.headers.get("x-mcp-internal");
+    const mcpUserId = request.headers.get("x-mcp-user-id");
+    if (mcpInternalHmac && mcpUserId && process.env.ZENTROPY_MCP_JWT_SECRET) {
+      if (verifyInternalAuth(mcpUserId, mcpInternalHmac)) {
+        return mcpUserId;
+      }
+      // If HMAC doesn't match, fall through to normal auth
+      console.warn("[auth] MCP internal auth HMAC mismatch, falling through");
+    }
+
     // 測試模式：允許使用 X-Test-User-Id header（僅限本地環境）
     const isLocalDb = process.env.DATABASE_URL?.includes('localhost') ||
                       process.env.DATABASE_URL?.includes('127.0.0.1');
@@ -84,7 +98,7 @@ export async function authenticateRequest(
     if ((isLocalDb || isTest)) {
       const testUserId = request.headers.get("x-test-user-id");
       if (testUserId) {
-        console.log(`🧪 Test mode: Using test user ID: ${testUserId}`);
+        console.log(`Test mode: Using test user ID: ${testUserId}`);
         return testUserId;
       }
     }

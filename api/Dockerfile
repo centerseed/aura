@@ -27,7 +27,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
-# 3. 運行階段 (使用 next start 而非 standalone)
+# 3. 運行階段 (custom server: Next.js + MCP on same port)
 FROM base AS runner
 WORKDIR /app
 
@@ -47,6 +47,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+# Custom server + MCP source (tsx compiles at runtime)
+COPY --from=builder /app/server.ts ./server.ts
+COPY --from=builder /app/src/mcp ./src/mcp
 
 USER nextjs
 
@@ -55,6 +58,5 @@ EXPOSE 3001
 ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
-# 使用 next start 而非 node server.js
-# 必須用 npx next start 並指定 PORT，因為 package.json 的 start 硬編碼了 3002
-CMD ["sh", "-c", "npx next start -p $PORT"]
+# Custom server: Next.js API + MCP endpoint on same port
+CMD ["node", "--import", "tsx/esm", "server.ts"]
