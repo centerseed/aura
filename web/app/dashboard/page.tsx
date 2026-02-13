@@ -2020,8 +2020,11 @@ function DashboardContent() {
   const fetchTaskCalendarEvent = async (taskId: string) => {
     setSelectedTaskCalendarEvent(null);
     try {
-      const token = await user?.getIdToken();
-      if (!token) return;
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken();
+
+
       const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/events`, {
         headers: { Authorization: `Bearer ${token}` },
       });
