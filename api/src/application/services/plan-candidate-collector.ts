@@ -16,7 +16,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { getStartOfDay, getEndOfDay } from '@/lib/timezone-utils'
-import { WORK_HOURS_PER_DAY } from '@/lib/coach-constants'
+import { WORK_HOURS_PER_DAY, MAX_UNSCHEDULED_TASKS, MAX_MILESTONES, MAX_TODAY_CANDIDATES } from '@/lib/coach-constants'
 
 // ============================================================================
 // Types
@@ -39,6 +39,16 @@ export interface PlanCandidate {
   daysRemaining: number | null
   daysStagnant: number
   milestoneId: string | null
+  dateSource: string | null
+}
+
+export interface MilestoneContext {
+  id: string
+  name: string
+  targetDate: Date
+  priority: number
+  entityType: string
+  entityName: string
 }
 
 export interface ProductContext {
@@ -56,6 +66,8 @@ export interface ProductContext {
 
 export interface CollectedData {
   candidates: PlanCandidate[]
+  unscheduledTasks: PlanCandidate[]
+  milestones: MilestoneContext[]
   productContexts: ProductContext[]
   meetingMinutes: number
   availableMinutes: number
@@ -77,6 +89,7 @@ interface RawCandidateTask {
   product_name: string
   product_description: string | null
   inferred_from_milestone: string | null
+  date_source: string | null
 }
 
 interface RawSubTask {
@@ -100,9 +113,11 @@ export class PlanCandidateCollector {
     const todayEnd = getEndOfDay(date, timezone)
     const threeDaysLater = new Date(todayEnd.getTime() + 3 * 24 * 60 * 60 * 1000)
 
-    const [candidateTasks, calendarEvents] = await Promise.all([
+    const [candidateTasks, calendarEvents, unscheduledRaw, milestones] = await Promise.all([
       this.queryCandidateTasks(userId, todayStart, threeDaysLater),
       this.queryMeetingMinutes(userId, todayStart, todayEnd),
+      this.queryUnscheduledTasks(userId),
+      this.queryMilestones(userId, todayStart),
     ])
 
     // Fetch subtasks for all candidate tasks
@@ -145,6 +160,7 @@ export class PlanCandidateCollector {
             startDate: st.start_date ?? task.start_date,
             ...this.calcDays(st.due_date ?? task.due_date, task.updated_at, now),
             milestoneId: task.inferred_from_milestone,
+            dateSource: task.date_source,
           })
         }
       } else {
@@ -164,9 +180,29 @@ export class PlanCandidateCollector {
           startDate: task.start_date,
           ...this.calcDays(task.due_date, task.updated_at, now),
           milestoneId: task.inferred_from_milestone,
+          dateSource: task.date_source,
         })
       }
     }
+
+    // Build unscheduled candidates
+    const unscheduledTasks: PlanCandidate[] = unscheduledRaw.map(task => ({
+      itemType: 'task' as const,
+      taskId: task.id,
+      subTaskId: null,
+      content: task.content,
+      taskContent: task.content,
+      subTaskOrder: null,
+      areaName: task.area_name,
+      productName: task.product_name,
+      productDescription: task.product_description,
+      estimatedMinutes: null,
+      dueDate: task.due_date,
+      startDate: task.start_date,
+      ...this.calcDays(task.due_date, task.updated_at, now),
+      milestoneId: task.inferred_from_milestone,
+      dateSource: task.date_source,
+    }))
 
     // Build product contexts
     const productContexts = this.buildProductContexts(candidateTasks)
@@ -177,6 +213,8 @@ export class PlanCandidateCollector {
 
     return {
       candidates,
+      unscheduledTasks,
+      milestones,
       productContexts,
       meetingMinutes,
       availableMinutes,
@@ -192,6 +230,9 @@ export class PlanCandidateCollector {
     todayStart: Date,
     threeDaysLater: Date,
   ): Promise<RawCandidateTask[]> {
+    // 7 天窗口：逾期 + 7 天內到期（但不撈更遠的）
+    const sevenDaysLater = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+
     return prisma.$queryRaw<RawCandidateTask[]>`
       SELECT
         t.id::text,
@@ -201,6 +242,7 @@ export class PlanCandidateCollector {
         t.start_date,
         t.updated_at,
         t.inferred_from_milestone::text,
+        t.date_source,
         a.name as area_name,
         p.id::text as product_id,
         p.name as product_name,
@@ -212,14 +254,25 @@ export class PlanCandidateCollector {
         AND t.deleted_at IS NULL
         AND t.status IN ('ACTIVE', 'INBOX')
         AND (
-          t.due_date IS NOT NULL AND t.due_date < ${threeDaysLater}
-          OR t.start_date IS NOT NULL AND t.start_date <= ${todayStart}
-          OR t.status = 'ACTIVE' AND t.updated_at >= ${new Date(todayStart.getTime() - 14 * 24 * 60 * 60 * 1000)}
+          -- 1. 逾期：不管 start_date，一律最優先
+          (t.due_date IS NOT NULL AND t.due_date < ${todayStart})
+          -- 2. 7 天內到期 + 可開始
+          OR (
+            t.due_date IS NOT NULL
+            AND t.due_date < ${sevenDaysLater}
+            AND (t.start_date IS NULL OR t.start_date <= ${todayStart})
+          )
+          -- 3. 明確已開始（start_date <= 今天，不論有無 due_date）
+          OR (
+            t.start_date IS NOT NULL
+            AND t.start_date <= ${todayStart}
+          )
         )
       ORDER BY
         CASE WHEN t.due_date IS NOT NULL AND t.due_date < ${todayStart} THEN 0 ELSE 1 END,
         t.due_date ASC NULLS LAST,
         t.updated_at DESC
+      LIMIT ${MAX_TODAY_CANDIDATES}
     `
   }
 
@@ -258,6 +311,56 @@ export class PlanCandidateCollector {
         AND ce.start_date_time < ${todayEnd}
     `
     return result[0]?.total_minutes ?? 0
+  }
+
+  private async queryUnscheduledTasks(userId: string): Promise<RawCandidateTask[]> {
+    return prisma.$queryRaw<RawCandidateTask[]>`
+      SELECT
+        t.id::text,
+        t.content,
+        t.status::text,
+        t.due_date,
+        t.start_date,
+        t.updated_at,
+        t.inferred_from_milestone::text,
+        t.date_source,
+        a.name as area_name,
+        p.id::text as product_id,
+        p.name as product_name,
+        p.description as product_description
+      FROM tasks t
+      JOIN products p ON p.id = t.product_id
+      JOIN areas a ON a.id = p.area_id
+      WHERE t.user_id = ${userId}::uuid
+        AND t.deleted_at IS NULL
+        AND t.status IN ('ACTIVE', 'INBOX')
+        AND t.start_date IS NULL
+        AND (t.date_source IS NULL OR t.date_source = 'coach')
+      ORDER BY t.due_date ASC NULLS LAST, t.updated_at DESC
+      LIMIT ${MAX_UNSCHEDULED_TASKS}
+    `
+  }
+
+  private async queryMilestones(userId: string, todayStart: Date): Promise<MilestoneContext[]> {
+    return prisma.$queryRaw<MilestoneContext[]>`
+      SELECT
+        m.id::text,
+        m.name,
+        m.target_date as "targetDate",
+        m.priority,
+        m.entity_type as "entityType",
+        COALESCE(p.name, a.name, tp.name) as "entityName"
+      FROM milestones m
+      LEFT JOIN products p ON m.entity_type = 'PRODUCT' AND m.entity_id = p.id
+      LEFT JOIN areas a ON m.entity_type = 'AREA' AND m.entity_id = a.id
+      LEFT JOIN topics tp ON m.entity_type = 'TOPIC' AND m.entity_id = tp.id
+      WHERE m.user_id = ${userId}::uuid
+        AND m.deleted_at IS NULL
+        AND m.status IN ('planned', 'in_progress')
+        AND m.target_date >= ${todayStart}
+      ORDER BY m.target_date ASC
+      LIMIT ${MAX_MILESTONES}
+    `
   }
 
   // ============================================================================

@@ -66,6 +66,7 @@ import type {
   EntityType,
 } from "@/types";
 import { QuickCapture } from "@/components/quick-capture";
+import { TodayPlanSheet } from "@/components/today-plan-sheet";
 import { AIButtonTip } from "@/components/ai-button-tip";
 import { QuickInputGuide } from "@/components/quick-input-guide";
 import { TimelineView } from "@/components/timeline-view";
@@ -3244,11 +3245,11 @@ function DashboardContent() {
               <button
                 onClick={() => setShowCompletedSheet(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-all"
-                title="查看今日完成的任務"
+                title="查看今日計畫"
               >
                 <CheckCircle2 className="w-4 h-4 text-green-400" />
                 <span className="text-sm text-green-400">
-                  今天已完成 ({completedTodayTasks.length}/{(stats.total || 0) + completedTodayTasks.length})
+                  今日計畫 ({completedTodayTasks.length}/{(stats.total || 0) + completedTodayTasks.length})
                 </span>
               </button>
 
@@ -4115,69 +4116,27 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* 今日完成清單 Sheet */}
-        {showCompletedSheet && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setShowCompletedSheet(false)}
-            />
-            {/* Sheet */}
-            <div className="relative w-full max-w-md mx-4 bg-slate-800 rounded-xl border border-white/10 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-400" />
-                  <h3 className="text-lg font-semibold text-white">今日完成</h3>
-                  <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold">
-                    {completedTodayTasks.length}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowCompletedSheet(false)}
-                  className="p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              {/* Content */}
-              <div className="max-h-[60vh] overflow-y-auto">
-                {completedTodayTasks.length === 0 ? (
-                  <div className="py-12 text-center text-white/50">
-                    <p>今天還沒有完成任何任務</p>
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-white/5">
-                    {completedTodayTasks.map((task) => (
-                      <li key={task.id} className="px-5 py-3 hover:bg-white/5 transition-colors">
-                        <div className="flex items-start gap-3">
-                          <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-400 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-white/70 line-through">
-                              {task.title}
-                            </p>
-                            {task.tag && (
-                              <p className="text-xs text-white/40 mt-0.5">
-                                {task.tag.area} &gt; {task.tag.product}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-white/10 bg-white/5">
-                <p className="text-xs text-white/40 text-center">
-                  每日成就會在午夜重置
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* 今日計畫 Sheet */}
+        <TodayPlanSheet
+          open={showCompletedSheet}
+          onClose={() => setShowCompletedSheet(false)}
+          completedTodayTasks={completedTodayTasks}
+          onCompleteTask={handleCompleteTask}
+          onOpenTask={(taskId, subTaskId) => {
+            const task = areas
+              .flatMap((a) => a.products.flatMap((p) => p.tasks))
+              .filter((t) => t != null)
+              .find((t) => t.id === taskId);
+            if (task) {
+              setShowCompletedSheet(false);
+              setInitialEditSubItemId(subTaskId || null);
+              setSelectedTask(task);
+              setSelectedTaskCalendarEvent(null);
+              setIsTaskDetailModalOpen(true);
+              fetchTaskCalendarEvent(task.id);
+            }
+          }}
+        />
 
         {/* 浮動快速輸入 */}
         <QuickCapture

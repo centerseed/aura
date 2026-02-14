@@ -7,7 +7,7 @@
 import { google } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import type { PlanCandidate, ProductContext } from './plan-candidate-collector'
+import type { PlanCandidate, MilestoneContext } from './plan-candidate-collector'
 
 // ============================================================================
 // Zod Schema
@@ -27,6 +27,12 @@ const DailyPlanOutputSchema = z.object({
     item_id: z.string(),
     suggestion: z.string().describe('建議處理方式（繁體中文）'),
   })).describe('排不進今天的項目'),
+  scheduling: z.array(z.object({
+    task_id: z.string(),
+    suggested_start_date: z.string().describe('YYYY-MM-DD'),
+    suggested_due_date: z.string().nullable().describe('YYYY-MM-DD，已有 due_date 則回傳 null'),
+    reasoning: z.string().describe('排程理由（繁體中文，1句）'),
+  })).describe('為缺少日期的待排程任務建議 start_date / due_date'),
 })
 
 export type DailyPlanOutput = z.infer<typeof DailyPlanOutputSchema>
@@ -38,21 +44,26 @@ export type DailyPlanOutput = z.infer<typeof DailyPlanOutputSchema>
 export class CoachPlanGenerator {
   async generate(
     candidates: PlanCandidate[],
-    productContexts: ProductContext[],
     availableMinutes: number,
     meetingMinutes: number,
     calibrationNote?: string,
-  ): Promise<DailyPlanOutput> {
-    if (candidates.length === 0) {
+    unscheduledTasks?: PlanCandidate[],
+    milestones?: MilestoneContext[],
+  ): Promise<{ output: DailyPlanOutput; prompt: string }> {
+    if (candidates.length === 0 && (!unscheduledTasks || unscheduledTasks.length === 0)) {
       return {
-        daily_plan: [],
-        capacity_note: '今天沒有待處理的任務，可以專注在長期規劃上。',
-        coach_message: '今天行程很寬裕！不妨回顧一下整體方向，或處理一些平時沒時間做的事。',
-        overflow_items: [],
+        output: {
+          daily_plan: [],
+          capacity_note: '今天沒有待處理的任務，可以專注在長期規劃上。',
+          coach_message: '今天行程很寬裕！不妨回顧一下整體方向，或處理一些平時沒時間做的事。',
+          overflow_items: [],
+          scheduling: [],
+        },
+        prompt: '(no candidates)',
       }
     }
 
-    const prompt = this.buildPrompt(candidates, productContexts, availableMinutes, meetingMinutes, calibrationNote)
+    const prompt = this.buildPrompt(candidates, availableMinutes, meetingMinutes, calibrationNote, unscheduledTasks, milestones)
 
     const { object } = await generateObject({
       model: google('gemini-2.5-flash-lite'),
@@ -60,7 +71,7 @@ export class CoachPlanGenerator {
       prompt,
     })
 
-    return object
+    return { output: object, prompt }
   }
 
   // ============================================================================
@@ -69,21 +80,41 @@ export class CoachPlanGenerator {
 
   private buildPrompt(
     candidates: PlanCandidate[],
-    productContexts: ProductContext[],
     availableMinutes: number,
     meetingMinutes: number,
     calibrationNote?: string,
+    unscheduledTasks?: PlanCandidate[],
+    milestones?: MilestoneContext[],
   ): string {
     const sections: string[] = []
 
+    // 日期上下文
+    const now = new Date()
+    const dayNames = ['日', '一', '二', '三', '四', '五', '六']
+    const dayOfWeek = dayNames[now.getDay()]
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6
+
     sections.push('你是 Zentropy 的營運教練（Coach Agent）。請為用戶排定今天的工作計畫。')
+    sections.push('')
+    sections.push(`## 今日資訊`)
+    sections.push(`- 日期: ${dateStr}（星期${dayOfWeek}）`)
+    if (isWeekend) {
+      sections.push(`- ⚠️ 今天是週末，請注意：`)
+      sections.push(`  - 政府機關（區役所、公所、市政府等）週末不開放`)
+      sections.push(`  - 銀行、郵局等公家機關週末不營業`)
+      sections.push(`  - 與他人開會或討論的任務可能不適合排在週末`)
+      sections.push(`  - 優先安排可以獨自完成的工作任務`)
+    }
     sections.push('')
     sections.push('## 排序原則')
     sections.push('1. 逾期任務最優先')
-    sections.push('2. 今日到期 > 即將到期')
-    sections.push('3. 同一 Product 下的相關任務盡量排在一起（減少上下文切換）')
-    sections.push('4. 考慮任務的 estimated_minutes，盡量在可用時間內安排')
-    sections.push('5. 超出容量的任務放入 overflow_items')
+    sections.push('2. 今日到期 > 即將到期（3天內）> 本週到期')
+    sections.push('3. 剩餘天數 > 7 天的任務，除非今天特別適合做，否則不要排入 daily_plan，放入 overflow_items')
+    sections.push('4. 同一 Product 下的相關任務盡量排在一起（減少上下文切換）')
+    sections.push('5. 考慮任務的現實可行性（需要到特定地點、需要他人配合的任務是否今天能做）')
+    sections.push('6. 考慮任務的 estimated_minutes，嚴格遵守可用時間限制')
+    sections.push('7. 超出容量或不適合今天做的任務放入 overflow_items，並說明建議何時做')
     sections.push('')
     sections.push('## 估時指引')
     sections.push('- 為每個項目估計完成時間（分鐘），填入 estimated_minutes')
@@ -101,23 +132,10 @@ export class CoachPlanGenerator {
     sections.push('## 今日容量')
     sections.push(`- 會議時間: ${meetingMinutes} 分鐘`)
     sections.push(`- 可用工作時間: ${availableMinutes} 分鐘 (${(availableMinutes / 60).toFixed(1)} 小時)`)
-    sections.push('')
-
-    // Product contexts
-    if (productContexts.length > 0) {
-      sections.push('## Product 上下文')
-      for (const ctx of productContexts) {
-        sections.push(`### ${ctx.areaName} / ${ctx.productName}`)
-        if (ctx.productDescription) {
-          sections.push(`描述: ${ctx.productDescription}`)
-        }
-        sections.push(`相關任務 (${ctx.taskSummaries.length}):`)
-        for (const ts of ctx.taskSummaries.slice(0, 10)) {
-          sections.push(`  - ${ts.content}${ts.dueDate ? ` (到期: ${ts.dueDate})` : ''} [${ts.status}]`)
-        }
-        sections.push('')
-      }
+    if (availableMinutes <= 180) {
+      sections.push(`- ⚠️ 今天可用時間很少，請只排最緊急、最重要的 1-3 項任務`)
     }
+    sections.push('')
 
     // Candidates
     sections.push('## 候選項目（需排序）')
@@ -127,6 +145,7 @@ export class CoachPlanGenerator {
       let urgency = ''
       if (c.daysOverdue) urgency = `⚠️ 逾期 ${c.daysOverdue} 天`
       else if (c.daysRemaining !== null && c.daysRemaining <= 0) urgency = '⚠️ 今日到期'
+      else if (c.daysRemaining !== null && c.daysRemaining <= 3) urgency = `🔶 剩 ${c.daysRemaining} 天`
       else if (c.daysRemaining !== null) urgency = `剩 ${c.daysRemaining} 天`
 
       const parentInfo = c.itemType === 'subtask' && c.taskContent !== c.content
@@ -139,11 +158,42 @@ export class CoachPlanGenerator {
     }
     sections.push('')
 
+    // Milestones
+    if (milestones && milestones.length > 0) {
+      sections.push('## 里程碑（排程參考）')
+      for (const m of milestones) {
+        const targetStr = new Date(m.targetDate).toISOString().substring(0, 10)
+        sections.push(`- [${m.entityType}] ${m.entityName}: "${m.name}" target=${targetStr} priority=${m.priority}`)
+      }
+      sections.push('')
+    }
+
+    // Unscheduled tasks
+    if (unscheduledTasks && unscheduledTasks.length > 0) {
+      const today = new Date().toISOString().substring(0, 10)
+      sections.push('## 待排程任務（需建議日期）')
+      for (const t of unscheduledTasks) {
+        const dueStr = t.dueDate ? `due=${new Date(t.dueDate).toISOString().substring(0, 10)}` : '無日期'
+        sections.push(`- id=${t.taskId} | ${t.productName}: ${t.content} | ${dueStr} | milestone=${t.milestoneId ?? '無'}`)
+      }
+      sections.push('')
+      sections.push('排程原則：')
+      sections.push('1. 有里程碑的任務 → due_date 必須在里程碑 target_date 之前')
+      sections.push('2. 有 due_date 無 start_date → 根據估時反推（due - estimated_days = start）')
+      sections.push('3. 無任何日期 → 根據優先級分散到未來 1-2 週，避免同天過多')
+      sections.push('4. 任務內容含時間線索（「下週二」「月底前」）→ 必須據此設定')
+      sections.push(`5. 今天是 ${today}，start_date 不早於今天`)
+      sections.push('')
+    }
+
     sections.push('## 回應要求')
-    sections.push('1. daily_plan: 按建議執行順序排列所有候選項目')
-    sections.push('2. 超出可用時間的項目放入 overflow_items')
-    sections.push('3. capacity_note: 說明容量分配')
-    sections.push('4. coach_message: 2-3 句親切的開場語')
+    sections.push('1. daily_plan: 只放今天真正適合且來得及做的項目，按建議執行順序排列')
+    sections.push('2. overflow_items: 不適合今天做的項目（太遠、週末限制、容量不足），suggestion 說明建議何時做')
+    sections.push('3. capacity_note: 說明今天的容量與分配')
+    sections.push('4. coach_message: 2-3 句親切的開場語，考慮今天是什麼日子')
+    if (unscheduledTasks && unscheduledTasks.length > 0) {
+      sections.push('5. scheduling: 為每個待排程任務建議 start_date 和 due_date')
+    }
 
     return sections.join('\n')
   }

@@ -25,6 +25,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { BriefingSchedule } from "@/domain/entities/user.entity";
+import { isInBriefingWindow, getCurrentLocalHour } from "@/lib/briefing-window-utils";
 
 // ============================================================================
 // Types
@@ -131,6 +133,11 @@ export function CoachAgent() {
   const [showBubble, setShowBubble] = useState(false);
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 用戶設定與時區
+  const [userSettings, setUserSettings] = useState<BriefingSchedule | undefined>(undefined);
+  const [userTimezone, setUserTimezone] = useState<string>('Asia/Taipei');
+  const [currentLocalHour, setCurrentLocalHour] = useState<number>(new Date().getHours());
+
   const briefing = activeTab === "MORNING" ? morningBriefing : eveningBriefing;
 
   const loadBriefings = useCallback(async () => {
@@ -164,6 +171,36 @@ export function CoachAgent() {
     }
   }, []);
 
+  // 載入用戶設定與時區
+  useEffect(() => {
+    async function loadUserSettings() {
+      try {
+        const response = await API.users.me();
+        const settings = response.user?.settings?.briefingSchedule;
+        const timezone = response.user?.timezone || 'Asia/Taipei';
+
+        setUserSettings(settings);
+        setUserTimezone(timezone);
+        setCurrentLocalHour(getCurrentLocalHour(timezone));
+      } catch (err) {
+        console.error('[Coach] Failed to load user settings:', err);
+        // 使用預設值
+        setUserTimezone('Asia/Taipei');
+        setCurrentLocalHour(new Date().getHours());
+      }
+    }
+    loadUserSettings();
+  }, []);
+
+  // 每分鐘更新當地時間
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentLocalHour(getCurrentLocalHour(userTimezone));
+    }, 60000); // 60 秒
+
+    return () => clearInterval(interval);
+  }, [userTimezone]);
+
   useEffect(() => {
     loadBriefings();
     return () => {
@@ -196,6 +233,28 @@ export function CoachAgent() {
       setIsGenerating(false);
     }
   };
+
+  // 判斷是否應顯示生成按鈕
+  const shouldShowGenerateButton = useCallback(
+    (type: "MORNING" | "EVENING") => {
+      // 1. 檢查是否在時間窗口內
+      const inWindow = isInBriefingWindow(type, userSettings, currentLocalHour);
+      if (!inWindow) return false;
+
+      // 2. 檢查今天是否已有對應簡報
+      const existingBriefing = type === "MORNING" ? morningBriefing : eveningBriefing;
+      if (!existingBriefing) return true;
+
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const briefingDate = existingBriefing.briefing_date.split("T")[0];
+
+      // 如果已有今天的簡報，不顯示生成按鈕
+      if (briefingDate === today) return false;
+
+      return true;
+    },
+    [userSettings, currentLocalHour, morningBriefing, eveningBriefing]
+  );
 
   const isMorning = new Date().getHours() < 14;
   const newestBriefing = eveningBriefing || morningBriefing;
@@ -270,6 +329,7 @@ export function CoachAgent() {
             isMorning={isMorning}
             onGenerate={handleGenerate}
             onRefresh={loadBriefings}
+            shouldShowGenerateButton={shouldShowGenerateButton}
           />
         </SheetContent>
       </Sheet>
@@ -296,6 +356,7 @@ function CoachDrawerContent({
   isMorning,
   onGenerate,
   onRefresh,
+  shouldShowGenerateButton,
 }: {
   briefing: BriefingData | null;
   morningBriefing: BriefingData | null;
@@ -308,6 +369,7 @@ function CoachDrawerContent({
   isMorning: boolean;
   onGenerate: (type: "MORNING" | "EVENING") => void;
   onRefresh: () => void;
+  shouldShowGenerateButton: (type: "MORNING" | "EVENING") => boolean;
 }) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
@@ -429,6 +491,31 @@ function CoachDrawerContent({
 
   // ---- Empty ----
   if (!briefing) {
+    const shouldShow = shouldShowGenerateButton(activeTab);
+
+    if (!shouldShow) {
+      // 不在時間窗口內或已有今天的簡報
+      return (
+        <>
+          {header}
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto">
+                <Clock className="w-6 h-6 text-slate-400 dark:text-white/30" />
+              </div>
+              <p className="text-sm text-slate-500 dark:text-white/40">
+                目前不在 {activeTab === "MORNING" ? "晨報" : "晚報"} 觀看時間內
+              </p>
+              <p className="text-xs text-slate-400 dark:text-white/30">
+                可至「設定」調整時間窗口
+              </p>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    // 在時間窗口內，顯示生成按鈕
     return (
       <>
         {header}

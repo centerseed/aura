@@ -11,7 +11,6 @@ import {
   detectTimeOverlaps,
   detectDeadlineCollisions,
   detectCapacityOverload,
-  detectStagnantProducts,
   detectStuckTasks,
 } from '@/application/services/coach-detection'
 import type { StagnationItem } from '@/domain/entities/coach-briefing.entity'
@@ -73,7 +72,6 @@ export class GetContextNowUseCase {
       aggregated.remainingTasks,
       aggregated.calendarEvents,
     )
-    const stagnantProducts = detectStagnantProducts(aggregated.stagnantProducts)
     const stuckTasks = detectStuckTasks(aggregated.remainingTasks)
 
     // All conflicts
@@ -81,11 +79,6 @@ export class GetContextNowUseCase {
 
     // Stalled items
     const stalledItems: ContextNowStalledItem[] = [
-      ...stagnantProducts.map(s => ({
-        id: s.entity_id,
-        title: s.entity_name,
-        stalled_days: s.days_inactive,
-      })),
       ...stuckTasks.map(s => ({
         id: s.entity_id,
         title: s.entity_name,

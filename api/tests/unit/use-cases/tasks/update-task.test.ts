@@ -873,6 +873,119 @@ describe('UpdateTaskUseCase', () => {
     })
   })
 
+  describe('date_source 保護機制', () => {
+    it('用戶改 start_date → date_source 自動設為 user', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue({ ...existingTask, startDate: new Date('2026-02-18') })
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        startDate: '2026-02-18',
+      })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          dateSource: 'user',
+        })
+      )
+    })
+
+    it('用戶改 due_date → date_source 自動設為 user', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Test Task',
+        status: 'INBOX',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue({ ...existingTask, dueDate: new Date('2026-12-31'), status: 'ACTIVE' })
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        dueDate: '2026-12-31',
+      })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          dateSource: 'user',
+        })
+      )
+    })
+
+    it('用戶改其他欄位（content）→ date_source 不變', async () => {
+      const existingTask = {
+        id: 'task-123',
+        userId: 'user-123',
+        productId: 'product-123',
+        topicId: null,
+        content: 'Old content',
+        status: 'ACTIVE',
+        aiAnalysis: null,
+        references: [],
+        subItems: [],
+        startDate: null,
+        dueDate: null,
+        timeConfidence: null,
+        inferredFromMilestone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue({ ...existingTask, content: 'New content' })
+
+      await useCase.execute({
+        taskId: 'task-123',
+        userId: 'user-123',
+        content: 'New content',
+      })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.not.objectContaining({
+          dateSource: expect.anything(),
+        })
+      )
+    })
+  })
+
   describe('Librarian 學習整合', () => {
     let librarianObserveMock: any
     let prismaMock: any

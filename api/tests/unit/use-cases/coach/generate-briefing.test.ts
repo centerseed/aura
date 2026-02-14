@@ -17,6 +17,33 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
+// Mock GeneratePlanUseCase
+const mockPlanExecute = vi.fn().mockResolvedValue({
+  plan: {
+    id: 'plan-1',
+    userId: 'user-1',
+    planDate: new Date('2026-02-09'),
+    coachMessage: '今天加油！',
+    capacityNote: '可用時間約 5 小時',
+    availableMinutes: 300,
+    meetingMinutes: 60,
+    plannedMinutes: 240,
+    items: [
+      { id: 'item-1', planId: 'plan-1', itemType: 'task', taskId: 'task-1', subTaskId: null, content: '完成報告', areaName: '營運', productName: 'Zentropy', estimatedMinutes: 60, dueDate: null, order: 1, reasoning: '優先處理', completed: false, completedAt: null, actualMinutes: null },
+      { id: 'item-2', planId: 'plan-1', itemType: 'task', taskId: 'task-2', subTaskId: null, content: '客戶會議準備', areaName: '業務', productName: 'Havital', estimatedMinutes: 45, dueDate: null, order: 2, reasoning: '今日到期', completed: false, completedAt: null, actualMinutes: null },
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  timings: { collect: 10, plan: 20, save: 5 },
+})
+
+vi.mock('@/application/use-cases/coach/generate-plan', () => ({
+  GeneratePlanUseCase: vi.fn().mockImplementation(() => ({
+    execute: mockPlanExecute,
+  })),
+}))
+
 // ============================================================================
 // Mock Factories
 // ============================================================================
@@ -57,7 +84,6 @@ function makeMockAggregator(): CoachDataAggregator {
     approachingTasks: [],
     completedTasks: [],
     remainingTasks: [],
-    stagnantProducts: [],
     stuckSubTasks: [],
     tomorrowPreview: [],
   }
@@ -95,6 +121,7 @@ describe('GenerateBriefingUseCase', () => {
     mockRepo = makeMockRepository()
     mockAggregator = makeMockAggregator()
     mockAIGenerator = makeMockAIGenerator()
+    mockPlanExecute.mockClear()
     useCase = new GenerateBriefingUseCase(mockRepo, mockAggregator, mockAIGenerator)
   })
 
@@ -172,8 +199,7 @@ describe('GenerateBriefingUseCase', () => {
         approachingTasks: [],
         completedTasks: [],
         remainingTasks: [],
-        stagnantProducts: [],
-        stuckSubTasks: [],
+            stuckSubTasks: [],
         tomorrowPreview: [],
       }
 
@@ -188,6 +214,79 @@ describe('GenerateBriefingUseCase', () => {
       const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
       expect(aiCall.conflicts.length).toBeGreaterThan(0)
       expect(aiCall.conflicts[0].type).toBe('time_overlap')
+    })
+  })
+
+  describe('Daily Plan 整合', () => {
+    it('晨報應該先生成 plan 再傳給 AI generator', async () => {
+      await useCase.execute({
+        userId: 'user-1',
+        type: 'MORNING',
+      })
+
+      // 驗證 plan 被呼叫
+      expect(mockPlanExecute).toHaveBeenCalledTimes(1)
+
+      // 驗證 AI generator 收到 dailyPlan 資料
+      const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
+      expect(aiCall.dailyPlan).toBeDefined()
+      expect(aiCall.dailyPlan.items).toHaveLength(2)
+      expect(aiCall.dailyPlan.items[0].content).toBe('完成報告')
+      expect(aiCall.dailyPlan.items[1].content).toBe('客戶會議準備')
+      expect(aiCall.dailyPlan.coachMessage).toBe('今天加油！')
+      expect(aiCall.dailyPlan.capacityNote).toBe('可用時間約 5 小時')
+    })
+
+    it('晨報 plan 生成失敗時 AI 仍應正常執行（無 dailyPlan）', async () => {
+      mockPlanExecute.mockRejectedValueOnce(new Error('Plan failed'))
+
+      const result = await useCase.execute({
+        userId: 'user-1',
+        type: 'MORNING',
+      })
+
+      // AI 仍被呼叫，但沒有 dailyPlan
+      expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
+      const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
+      expect(aiCall.dailyPlan).toBeUndefined()
+
+      // 結果仍正常
+      expect(result.briefing).toBeDefined()
+      expect(result.timings).toHaveProperty('plan_error')
+    })
+
+    it('晚報不應該生成 plan', async () => {
+      await useCase.execute({
+        userId: 'user-1',
+        type: 'EVENING',
+      })
+
+      expect(mockPlanExecute).not.toHaveBeenCalled()
+      const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
+      expect(aiCall.dailyPlan).toBeUndefined()
+    })
+
+    it('plan 生成應在 AI 生成之前（驗證執行順序）', async () => {
+      const callOrder: string[] = []
+      mockPlanExecute.mockImplementationOnce(async () => {
+        callOrder.push('plan')
+        return {
+          plan: {
+            id: 'plan-1', userId: 'user-1', planDate: new Date(), coachMessage: null,
+            capacityNote: null, availableMinutes: null, meetingMinutes: null, plannedMinutes: null,
+            items: [], createdAt: new Date(), updatedAt: new Date(),
+          },
+          timings: {},
+        }
+      })
+      ;(mockAIGenerator.generate as any).mockImplementationOnce(async () => {
+        callOrder.push('ai')
+        return { summary: 'test', recommendations: [{ priority: 1, action: 'test', reasoning: 'test', related_task_id: null }], deferSuggestions: [] }
+      })
+
+      await useCase.execute({ userId: 'user-1', type: 'MORNING' })
+
+      expect(callOrder).toEqual(['plan', 'ai'])
     })
   })
 

@@ -17,7 +17,6 @@ import {
   detectTimeOverlaps,
   detectDeadlineCollisions,
   detectCapacityOverload,
-  detectStagnantProducts,
   detectStuckTasks,
   detectStuckSubTasks,
 } from '@/application/services/coach-detection'
@@ -91,13 +90,45 @@ export class GenerateBriefingUseCase {
     )
     const conflicts = [...timeOverlaps, ...deadlineCollisions, ...capacityOverload]
 
-    const stagnantProducts = detectStagnantProducts(aggregatedData.stagnantProducts)
     const stuckTasks = detectStuckTasks(aggregatedData.remainingTasks)
     const stuckSubTasks = detectStuckSubTasks(aggregatedData.stuckSubTasks)
-    const stagnations = [...stagnantProducts, ...stuckTasks, ...stuckSubTasks]
+    const stagnations = [...stuckTasks, ...stuckSubTasks]
     timings.detection = Date.now() - start
 
-    // 6. AI 生成摘要 + 建議
+    // 6. 晨報時先生成每日計畫（plan 結果會傳給 AI）
+    let dailyPlan: import('@/application/services/coach-ai-generator').DailyPlanForBriefing | undefined
+    if (request.type === 'MORNING') {
+      try {
+        start = Date.now()
+        const planUseCase = new GeneratePlanUseCase()
+        const planResult = await planUseCase.execute({
+          userId: request.userId,
+          date: request.date,
+          timezone,
+        })
+        timings.plan = Date.now() - start
+
+        // 提取 plan 資料供 AI 使用
+        dailyPlan = {
+          items: planResult.plan.items.map(item => ({
+            order: item.order,
+            content: item.content,
+            areaName: item.areaName,
+            productName: item.productName,
+            estimatedMinutes: item.estimatedMinutes,
+            reasoning: item.reasoning,
+          })),
+          coachMessage: planResult.plan.coachMessage,
+          capacityNote: planResult.plan.capacityNote,
+          overflowItems: [], // overflow 目前不存在於 DailyPlanData，由 AI 生成時已處理
+        }
+      } catch (err) {
+        console.error('[GenerateBriefing] Plan generation failed (non-blocking):', err)
+        timings.plan_error = 1
+      }
+    }
+
+    // 7. AI 生成摘要 + 建議（含 plan 資料）
     start = Date.now()
     const aiResult = await this.aiGenerator.generate({
       type: request.type,
@@ -109,25 +140,9 @@ export class GenerateBriefingUseCase {
       completedTasks: aggregatedData.completedTasks,
       remainingTasks: aggregatedData.remainingTasks,
       tomorrowPreview: aggregatedData.tomorrowPreview,
+      dailyPlan,
     })
     timings.ai = Date.now() - start
-
-    // 7. 晨報時同步生成每日計畫
-    if (request.type === 'MORNING') {
-      try {
-        start = Date.now()
-        const planUseCase = new GeneratePlanUseCase()
-        await planUseCase.execute({
-          userId: request.userId,
-          date: request.date,
-          timezone,
-        })
-        timings.plan = Date.now() - start
-      } catch (err) {
-        console.error('[GenerateBriefing] Plan generation failed (non-blocking):', err)
-        timings.plan_error = 1
-      }
-    }
 
     // 8. 儲存（幂等：同 user+type+date 覆蓋）
     start = Date.now()

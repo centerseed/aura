@@ -6,7 +6,6 @@
 
 export const WORK_HOURS_PER_DAY = 8
 export const ESTIMATED_MINUTES_PER_TASK = 60
-export const STAGNANT_PRODUCT_THRESHOLD_DAYS = 7
 export const STUCK_TASK_THRESHOLD_DAYS = 5
 
 /**
@@ -21,9 +20,9 @@ export const STUCK_TASK_THRESHOLDS = {
   NO_DUE_DATE: 10,  // 無截止日
 } as const
 
-export const STAGNANT_PRODUCT_THRESHOLDS = {
-  FINITE: 7,
-  PERPETUAL: 14,
-} as const
-
 export const STUCK_SUBTASK_THRESHOLD_DAYS = 3
+
+// 候選數量上限
+export const MAX_TODAY_CANDIDATES = 15
+export const MAX_UNSCHEDULED_TASKS = 20
+export const MAX_MILESTONES = 10

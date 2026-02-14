@@ -63,51 +63,144 @@ export class GeneratePlanUseCase {
     const collected = await this.collector.collect(request.userId, planDate, timezone)
     timings.collect = Date.now() - start
 
-    // 4. 取得校準資訊 + AI 排序
+    // 4. 取得校準資訊（非阻塞）
+    let calibrationNote: string | undefined
+    try {
+      const note = await this.calibration.getCalibrationNote(request.userId)
+      calibrationNote = note ?? undefined
+    } catch (err) {
+      console.warn('[GeneratePlan] Calibration failed (non-blocking):', err)
+    }
+
+    // 5. AI 排序
     start = Date.now()
-    const calibrationNote = await this.calibration.getCalibrationNote(request.userId)
-    const aiResult = await this.planGenerator.generate(
+    const { output: aiResult, prompt: aiPrompt } = await this.planGenerator.generate(
       collected.candidates,
-      collected.productContexts,
       collected.availableMinutes,
       collected.meetingMinutes,
-      calibrationNote ?? undefined,
+      calibrationNote,
+      collected.unscheduledTasks,
+      collected.milestones,
     )
     timings.ai = Date.now() - start
+    console.log('[GeneratePlan] Prompt length:', aiPrompt.length, 'chars')
+    console.log('[GeneratePlan] Prompt:\n', aiPrompt)
+    console.log('[GeneratePlan] AI result: daily_plan=%d items, overflow=%d items',
+      aiResult.daily_plan.length, aiResult.overflow_items.length)
 
-    // 5. 映射 AI 結果到候選資料（AI 估時優先）
+    // 6. 映射 AI 結果 + 容量硬截斷
     const candidateMap = new Map(
       collected.candidates.map(c => [c.subTaskId || c.taskId, c])
     )
 
-    const plannedItems = aiResult.daily_plan
-      .map(item => {
-        const candidate = candidateMap.get(item.item_id)
-        if (!candidate) return null
-        // AI 估時優先，fallback 到候選值
-        const estimatedMinutes = item.estimated_minutes ?? candidate.estimatedMinutes
-        return {
-          taskId: candidate.taskId,
-          subTaskId: candidate.subTaskId,
-          content: candidate.content,
-          areaName: candidate.areaName,
-          productName: candidate.productName,
-          estimatedMinutes,
-          dueDate: candidate.dueDate,
-          order: item.order,
-          reasoning: item.reasoning,
-        }
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null)
+    const plannedItems: Array<{
+      taskId: string; subTaskId: string | null; content: string;
+      areaName: string; productName: string; estimatedMinutes: number | null;
+      dueDate: Date | null; order: number; reasoning: string;
+    }> = []
+    let accumulatedMinutes = 0
 
-    // 5b. 回寫 AI 估時到原始 Task/SubTask（僅首次估時，不覆蓋用戶手動值）
+    for (const item of aiResult.daily_plan) {
+      const candidate = candidateMap.get(item.item_id)
+      if (!candidate) continue
+
+      const estimatedMinutes = item.estimated_minutes ?? candidate.estimatedMinutes ?? 60
+      // 容量硬截斷：超過 availableMinutes 就不排入
+      if (accumulatedMinutes + estimatedMinutes > collected.availableMinutes && plannedItems.length > 0) {
+        console.log('[GeneratePlan] Capacity cutoff at item %d (%s), accumulated=%dmin, available=%dmin',
+          item.order, candidate.content.substring(0, 20), accumulatedMinutes, collected.availableMinutes)
+        continue
+      }
+      accumulatedMinutes += estimatedMinutes
+
+      plannedItems.push({
+        taskId: candidate.taskId,
+        subTaskId: candidate.subTaskId,
+        content: candidate.content,
+        areaName: candidate.areaName,
+        productName: candidate.productName,
+        estimatedMinutes,
+        dueDate: candidate.dueDate,
+        order: plannedItems.length + 1,
+        reasoning: item.reasoning,
+      })
+    }
+
+    // 6b. 回寫 AI 估時到原始 Task/SubTask（僅首次估時，不覆蓋用戶手動值）
     await this.writeBackEstimates(aiResult, candidateMap)
 
-    // 計算 planned_minutes
-    const plannedMinutes = plannedItems.reduce(
-      (sum, item) => sum + (item.estimatedMinutes ?? 60),
-      0,
+    // 6c. 回寫 AI 建議日期到待排程任務
+    if (aiResult.scheduling && aiResult.scheduling.length > 0) {
+      const scheduledCount = await this.writeBackSuggestedDates(aiResult.scheduling)
+      console.log('[GeneratePlan] Wrote back suggested dates for %d tasks', scheduledCount)
+    }
+
+    const plannedMinutes = accumulatedMinutes
+
+    // 6d. 建構 overflow items 為 DailyPlanItem rows（不再用 JSONB）
+    const overflowItemRows = (aiResult.overflow_items || []).map((oi, idx) => {
+      const candidate = candidateMap.get(oi.item_id)
+      return {
+        taskId: candidate?.taskId ?? '',
+        subTaskId: candidate?.subTaskId ?? null,
+        content: candidate?.content ?? oi.item_id,
+        areaName: candidate?.areaName ?? '',
+        productName: candidate?.productName ?? '',
+        estimatedMinutes: candidate?.estimatedMinutes ?? null,
+        dueDate: candidate?.dueDate ?? null,
+        order: plannedItems.length + idx + 1,
+        reasoning: oi.suggestion,
+        status: 'overflow' as const,
+      }
+    })
+
+    // 6e. 讀取前一天計畫，提取用戶手動調整的項目
+    const yesterday = new Date(planDateOnly)
+    yesterday.setDate(yesterday.getDate() - 1)
+    let userAdjustedItems: typeof plannedItems = []
+    try {
+      const yesterdayPlan = await this.repository.findByDate(request.userId, yesterday)
+      if (yesterdayPlan) {
+        userAdjustedItems = yesterdayPlan.items
+          .filter(item => item.userAdjusted && !item.completed)
+          .map((item, idx) => ({
+            taskId: item.taskId,
+            subTaskId: item.subTaskId,
+            content: item.content,
+            areaName: item.areaName,
+            productName: item.productName,
+            estimatedMinutes: item.estimatedMinutes,
+            dueDate: item.dueDate,
+            order: idx + 1,
+            reasoning: item.reasoning ?? '用戶手動調整保留',
+            status: 'today' as const,
+            userAdjusted: true,
+          }))
+      }
+    } catch (err) {
+      console.warn('[GeneratePlan] Failed to read yesterday plan (non-blocking):', err)
+    }
+
+    // 6f. 合併：用戶調整的在前，AI 排的在後（去重）
+    const adjustedTaskKeys = new Set(
+      userAdjustedItems.map(i => `${i.taskId}:${i.subTaskId || ''}`)
     )
+    const deduplicatedPlanned = plannedItems
+      .filter(i => !adjustedTaskKeys.has(`${i.taskId}:${i.subTaskId || ''}`))
+    // Re-number orders: adjusted items first (1-based), then planned, then overflow
+    const adjustedCount = userAdjustedItems.length
+    const reorderedPlanned = deduplicatedPlanned.map((item, idx) => ({
+      ...item,
+      order: adjustedCount + idx + 1,
+    }))
+    const deduplicatedOverflow = overflowItemRows
+      .filter(i => !adjustedTaskKeys.has(`${i.taskId}:${i.subTaskId || ''}`))
+      .map((item, idx) => ({
+        ...item,
+        order: adjustedCount + reorderedPlanned.length + idx + 1,
+      }))
+
+    const allItems = [...userAdjustedItems, ...reorderedPlanned, ...deduplicatedOverflow]
 
     // 6. 儲存
     start = Date.now()
@@ -119,7 +212,8 @@ export class GeneratePlanUseCase {
       availableMinutes: collected.availableMinutes,
       meetingMinutes: collected.meetingMinutes,
       plannedMinutes: plannedMinutes,
-      items: plannedItems,
+      overflowItems: [],
+      items: allItems,
     }
 
     const plan = await this.repository.upsert(createData)
@@ -208,5 +302,40 @@ export class GeneratePlanUseCase {
         ),
       )
     }
+  }
+
+  /**
+   * 回寫 AI 建議的 start_date / due_date
+   * 只更新 date_source 為 null 或 'coach' 的任務（絕不覆蓋 user 設定）
+   */
+  private async writeBackSuggestedDates(
+    scheduling: Array<{
+      task_id?: string
+      suggested_start_date?: string
+      suggested_due_date?: string | null
+      reasoning?: string
+    }>,
+  ): Promise<number> {
+    const valid = scheduling.filter(s => s.task_id && (s.suggested_start_date || s.suggested_due_date))
+    if (valid.length === 0) return 0
+
+    const updates = valid.map(s => {
+      const data: Record<string, any> = {
+        date_source: 'coach',
+      }
+      if (s.suggested_start_date) data.start_date = new Date(s.suggested_start_date)
+      if (s.suggested_due_date) data.due_date = new Date(s.suggested_due_date)
+
+      return prisma.task.update({
+        where: {
+          id: s.task_id!,
+          OR: [{ date_source: null }, { date_source: 'coach' }],
+        } as any,
+        data,
+      })
+    })
+
+    const results = await Promise.allSettled(updates)
+    return results.filter(r => r.status === 'fulfilled').length
   }
 }

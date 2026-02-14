@@ -9,6 +9,7 @@
 import type {
   DailyPlanItemData,
   UpdateDailyPlanItemData,
+  PlanItemStatus,
 } from '@/domain/interfaces/daily-plan-repository'
 import { PrismaDailyPlanRepository } from '@/infrastructure/repositories/prisma-daily-plan-repository'
 import { ValidationException } from '@/lib/api-response'
@@ -22,6 +23,8 @@ export interface UpdatePlanItemRequest {
   actualMinutes?: number
   pinned?: boolean
   deferred?: boolean
+  status?: PlanItemStatus
+  userAdjusted?: boolean
 }
 
 export interface UpdatePlanItemResponse {
@@ -52,6 +55,8 @@ export class UpdatePlanItemUseCase {
     if (request.pinned !== undefined) updateData.pinned = request.pinned
     if (request.deferred !== undefined) updateData.deferred = request.deferred
     if (request.actualMinutes !== undefined) updateData.actualMinutes = request.actualMinutes
+    if (request.status !== undefined) updateData.status = request.status
+    if (request.userAdjusted !== undefined) updateData.userAdjusted = request.userAdjusted
 
     // 單一 transaction：所有權驗證 → 更新 → 完成連動
     const item = await prisma.$transaction(async (tx) => {

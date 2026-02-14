@@ -20,6 +20,8 @@ import {
   OAUTH_PROVIDER_ICONS,
 } from "@/lib/oauth-client";
 import { OAuthConnectDialog } from "@/components/oauth-connect-dialog";
+import { BriefingScheduleSettings } from "@/components/briefing-schedule-settings";
+import { BriefingSchedule } from "@/domain/entities/user.entity";
 
 function SettingsContent() {
   const router = useRouter();
@@ -34,6 +36,8 @@ function SettingsContent() {
     name: string | null;
     displayName: string;
     auth_provider: string;
+    timezone: string;
+    settings: any | null;
   } | null>(null);
 
   // OAuth 狀態（目前只支援 Google Calendar）
@@ -61,7 +65,10 @@ function SettingsContent() {
         });
         if (userRes.ok) {
           const data = await userRes.json();
-          setUserData(data);
+          setUserData({
+            ...data.user,
+            timezone: data.user.timezone || 'Asia/Taipei',
+          });
         }
 
         // 載入 Google Calendar 狀態
@@ -241,6 +248,49 @@ function SettingsContent() {
     router.push("/onboarding");
   };
 
+  const handleSaveBriefingSchedule = async (schedule: BriefingSchedule) => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
+      alert("請先登入");
+      return;
+    }
+
+    const token = await firebaseUser.getIdToken();
+    const currentSettings = userData?.settings || {};
+
+    const response = await fetch(`${API_BASE_URL}/api/me`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        settings: {
+          ...currentSettings,
+          briefingSchedule: schedule,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("更新失敗");
+    }
+
+    // 重新載入用戶資料
+    const userRes = await fetch(`${API_BASE_URL}/api/me`, {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+    if (userRes.ok) {
+      const data = await userRes.json();
+      setUserData({
+        ...data.user,
+        timezone: data.user.timezone || 'Asia/Taipei',
+      });
+    }
+  };
+
   const handleResetOnboarding = async () => {
     const confirmed = confirm(
       "這將刪除所有現有的 Areas（身份地圖）並重新開始 Onboarding 流程。\n\n確定要繼續嗎？"
@@ -414,6 +464,12 @@ function SettingsContent() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* 晨報/晚報設定 */}
+          <BriefingScheduleSettings
+            initialSettings={userData?.settings?.briefingSchedule}
+            onSave={handleSaveBriefingSchedule}
+          />
 
           {/* 開發者工具 */}
           <Card className="bg-slate-900 border-amber-500/30">

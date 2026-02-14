@@ -448,6 +448,11 @@ export function TaskDetailModal({
                   <Calendar className="w-3.5 h-3.5 text-white/50" />
                   {task.start_date ? new Date(task.start_date).toLocaleDateString('zh-TW') : "設定日期"}
                 </button>
+                {task.start_date && task.date_source === 'coach' && (
+                  <span className="text-[10px] text-blue-400/60 bg-blue-500/10 px-1.5 py-0.5 rounded mt-1 inline-block">
+                    Coach 建議
+                  </span>
+                )}
               </div>
               <div className="min-w-[120px]">
                 <h3 className="text-xs text-white/50 mb-1">截止日期</h3>
@@ -458,6 +463,11 @@ export function TaskDetailModal({
                   <Calendar className="w-3.5 h-3.5 text-white/50" />
                   {task.due_date ? new Date(task.due_date).toLocaleDateString('zh-TW') : "設定日期"}
                 </button>
+                {task.due_date && task.date_source === 'coach' && (
+                  <span className="text-[10px] text-blue-400/60 bg-blue-500/10 px-1.5 py-0.5 rounded mt-1 inline-block">
+                    Coach 建議
+                  </span>
+                )}
               </div>
 
               {/* Google Calendar - inline */}
@@ -967,10 +977,9 @@ export function TaskDetailModal({
                     className="cursor-pointer"
                   >
                     {editDialogStartDate ? (() => {
-                      const d = new Date(editDialogStartDate)
-                      const now = new Date()
-                      now.setHours(0,0,0,0)
-                      const diff = Math.ceil((d.getTime() - now.getTime()) / (1000*60*60*24))
+                      const dStr = editDialogStartDate.slice(0, 10)
+                      const nowStr = new Date().toLocaleDateString('en-CA')
+                      const diff = Math.round((new Date(dStr).getTime() - new Date(nowStr).getTime()) / (1000*60*60*24))
                       const text = diff < 0 ? `已開始 ${Math.abs(diff)} 天` : diff === 0 ? '今天開始' : `${diff} 天後開始`
                       return (
                         <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">
@@ -1002,7 +1011,7 @@ export function TaskDetailModal({
                     ref={dueDateRef}
                     type="date"
                     value={editDialogDueDate}
-                    max={task.due_date ? task.due_date.slice(0, 10) : undefined}
+                    max={task.due_date ? new Date(task.due_date).toLocaleDateString('sv-SE') : undefined}
                     onChange={(e) => setEditDialogDueDate(e.target.value)}
                     className="absolute opacity-0 pointer-events-none [color-scheme:dark]"
                     tabIndex={-1}

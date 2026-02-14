@@ -35,6 +35,7 @@ interface RawTaskRow {
   inferred_from_milestone: string | null
   remind_at: Date | null
   reminder_enabled: boolean
+  date_source: string | null
   reminder_timezone: string | null
   notification_id: number | null
   created_at: Date
@@ -70,6 +71,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.due_date,
         t.time_confidence,
         t.inferred_from_milestone,
+        t.date_source,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -116,6 +118,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.due_date,
         t.time_confidence,
         t.inferred_from_milestone,
+        t.date_source,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -159,6 +162,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.due_date,
         t.time_confidence,
         t.inferred_from_milestone,
+        t.date_source,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -271,6 +275,9 @@ export class PrismaTaskRepository implements ITaskRepository {
         ...(data.notificationId !== undefined && {
           notification_id: data.notificationId,
         }),
+        ...(data.dateSource !== undefined && {
+          date_source: data.dateSource,
+        }),
       } as any,
     })
 
@@ -382,6 +389,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       dueDate: row.due_date,
       timeConfidence: row.time_confidence,
       inferredFromMilestone: row.inferred_from_milestone,
+      dateSource: row.date_source,
       remindAt: row.remind_at,
       reminderEnabled: row.reminder_enabled || false,
       reminderTimezone: row.reminder_timezone,
@@ -605,6 +613,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       dueDate: prismaTask.due_date,
       timeConfidence: prismaTask.time_confidence,
       inferredFromMilestone: prismaTask.inferred_from_milestone,
+      dateSource: prismaTask.date_source ?? null,
       remindAt: prismaTask.remind_at,
       reminderEnabled: prismaTask.reminder_enabled || false,
       reminderTimezone: prismaTask.reminder_timezone,

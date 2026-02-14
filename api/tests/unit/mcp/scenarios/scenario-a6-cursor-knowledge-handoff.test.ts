@@ -179,18 +179,11 @@ describe('Scenario A.6: Cursor 自動參考知識庫 + 任務脈絡', () => {
               { id: 't4', content: 'task4', status: 'INBOX', due_date: null, updated_at: new Date(), area_name: 'Personal', product_name: 'H', urgency_level: null, estimated_minutes: null },
               { id: 't5', content: 'task5', status: 'ACTIVE', due_date: null, updated_at: new Date(), area_name: 'Work', product_name: 'Z', urgency_level: null, estimated_minutes: null },
             ])
-          case 6: // stagnant products
-            return Promise.resolve([{
-              id: 'prod-stagnant',
-              name: '停滯產品',
-              area_name: 'Work',
-              last_task_updated_at: new Date('2026-01-20'),
-            }])
-          case 7: // stuck subtasks
+          case 6: // stuck subtasks
             return Promise.resolve([])
-          case 8: // tomorrow preview
+          case 7: // tomorrow preview
             return Promise.resolve([])
-          case 9: // calibration data (CoachCalibration.calculate)
+          case 8: // calibration data (CoachCalibration.calculate)
             return Promise.resolve([
               { area_name: 'Work', estimated_minutes: 100, actual_minutes: 140 },
               { area_name: 'Work', estimated_minutes: 100, actual_minutes: 140 },

@@ -189,6 +189,11 @@ export class UpdateTaskUseCase {
       updateData.notificationId = request.notificationId
     }
 
+    // 5.5 用戶修改日期 → 設 date_source='user'（保護不被 Coach 覆寫）
+    if (request.startDate !== undefined || request.dueDate !== undefined) {
+      updateData.dateSource = 'user'
+    }
+
     // 6. 透過 Repository 更新
     const updatedTask = await this.taskRepository.update(
       request.taskId,

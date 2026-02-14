@@ -49,7 +49,7 @@ export interface ConflictItem {
 }
 
 export interface StagnationItem {
-  type: 'stagnant_product' | 'stuck_task' | 'stuck_subtask' | 'zombie_project'
+  type: 'stuck_task' | 'stuck_subtask' | 'zombie_project'
   entity_id: string
   entity_name: string
   area_name: string

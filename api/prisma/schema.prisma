@@ -139,6 +139,7 @@ model Task {
   reminder_enabled        Boolean                @default(false)
   reminder_timezone       String?                @db.VarChar(50)
   notification_id         Int?
+  date_source             String?                @db.VarChar(10)
   product                 Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   topic                   Topic?                 @relation(fields: [topic_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -440,6 +441,7 @@ model DailyPlan {
   available_minutes Int?
   meeting_minutes   Int?
   planned_minutes   Int?
+  overflow_items    Json?           @db.JsonB
 
   user              User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
   items             DailyPlanItem[]
@@ -469,12 +471,16 @@ model DailyPlanItem {
   actual_minutes    Int?
   pinned            Boolean   @default(false)
   deferred          Boolean   @default(false)
+  status            String    @default("today") @db.VarChar(10)
+  user_adjusted     Boolean   @default(false)
+  adjusted_at       DateTime? @db.Timestamp(6)
 
   plan              DailyPlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
   task              Task      @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   sub_task          SubTask?  @relation(fields: [sub_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([plan_id, order])
+  @@index([plan_id, status])
   @@map("daily_plan_items")
 }
 

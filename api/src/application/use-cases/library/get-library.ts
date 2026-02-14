@@ -37,6 +37,7 @@ export interface TaskData {
   due_date: string | null
   time_confidence: number | null
   inferred_from_milestone: string | null
+  date_source: string | null
   sub_items: Array<{
     id: string
     content: string
@@ -110,6 +111,7 @@ interface RawLibraryRow {
   task_due_date: Date | null
   task_time_confidence: number | null
   task_inferred_from_milestone: string | null
+  task_date_source: string | null
   task_created_at: Date | null
   topic_name: string | null
 }
@@ -143,6 +145,7 @@ export class GetLibraryUseCase {
         t.due_date as task_due_date,
         t.time_confidence as task_time_confidence,
         t.inferred_from_milestone as task_inferred_from_milestone,
+        t.date_source as task_date_source,
         t.created_at as task_created_at,
         top.name as topic_name
       FROM areas a
@@ -274,6 +277,7 @@ export class GetLibraryUseCase {
       due_date: row.task_due_date?.toISOString() || null,
       time_confidence: row.task_time_confidence || null,
       inferred_from_milestone: row.task_inferred_from_milestone || null,
+      date_source: row.task_date_source || null,
       sub_items: subItems,
       sub_items_meta: subItemsMeta,
       references: references,

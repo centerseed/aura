@@ -42,9 +42,13 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     })
 
     if (existing) {
-      // 只刪除未完成的 items，保留已完成的（含 actual_minutes 偏差學習資料）
+      // 只刪除今日未完成的 items，保留已完成的和用戶調整過的
       await prisma.dailyPlanItem.deleteMany({
-        where: { plan_id: existing.id, completed: false },
+        where: {
+          plan_id: existing.id,
+          completed: false,
+          user_adjusted: false,
+        },
       })
 
       const row = await prisma.dailyPlan.update({
@@ -55,6 +59,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
           available_minutes: data.availableMinutes,
           meeting_minutes: data.meetingMinutes,
           planned_minutes: data.plannedMinutes,
+          overflow_items: (data.overflowItems ?? []) as any,
           items: {
             create: data.items.map(item => ({
               task_id: item.taskId,
@@ -67,6 +72,8 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
               due_date: item.dueDate,
               order: item.order,
               reasoning: item.reasoning,
+              status: item.status ?? 'today',
+              user_adjusted: item.userAdjusted ?? false,
             })),
           },
         },
@@ -90,6 +97,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
         available_minutes: data.availableMinutes,
         meeting_minutes: data.meetingMinutes,
         planned_minutes: data.plannedMinutes,
+        overflow_items: (data.overflowItems ?? []) as any,
         items: {
           create: data.items.map(item => ({
             task_id: item.taskId,
@@ -101,6 +109,8 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
             due_date: item.dueDate,
             order: item.order,
             reasoning: item.reasoning,
+            status: item.status ?? 'today',
+            user_adjusted: item.userAdjusted ?? false,
           })),
         },
       },
@@ -128,6 +138,11 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     if (data.actualMinutes !== undefined) updateData.actual_minutes = data.actualMinutes
     if (data.pinned !== undefined) updateData.pinned = data.pinned
     if (data.deferred !== undefined) updateData.deferred = data.deferred
+    if (data.status !== undefined) updateData.status = data.status
+    if (data.userAdjusted !== undefined) {
+      updateData.user_adjusted = data.userAdjusted
+      if (data.userAdjusted) updateData.adjusted_at = new Date()
+    }
 
     const row = await tx.dailyPlanItem.update({
       where: { id: itemId },
@@ -151,6 +166,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       availableMinutes: row.available_minutes,
       meetingMinutes: row.meeting_minutes,
       plannedMinutes: row.planned_minutes,
+      overflowItems: Array.isArray(row.overflow_items) ? row.overflow_items : [],
       items: (row.items || []).map((item: any) => this.toItemDomain(item)),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -176,6 +192,9 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       actualMinutes: row.actual_minutes,
       pinned: row.pinned,
       deferred: row.deferred,
+      status: row.status ?? 'today',
+      userAdjusted: row.user_adjusted ?? false,
+      adjustedAt: row.adjusted_at ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }

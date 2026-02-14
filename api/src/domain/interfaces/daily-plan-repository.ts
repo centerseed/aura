@@ -10,6 +10,8 @@
 
 export type PlanItemType = 'task' | 'subtask'
 
+export type PlanItemStatus = 'today' | 'overflow'
+
 export interface DailyPlanItemData {
   id: string
   planId: string
@@ -28,8 +30,18 @@ export interface DailyPlanItemData {
   actualMinutes: number | null
   pinned: boolean
   deferred: boolean
+  status: PlanItemStatus
+  userAdjusted: boolean
+  adjustedAt: Date | null
   createdAt: Date
   updatedAt: Date
+}
+
+export interface OverflowItem {
+  itemId: string
+  content: string
+  productName: string
+  suggestion: string
 }
 
 export interface DailyPlanData {
@@ -41,6 +53,7 @@ export interface DailyPlanData {
   availableMinutes: number | null
   meetingMinutes: number | null
   plannedMinutes: number | null
+  overflowItems: OverflowItem[]
   items: DailyPlanItemData[]
   createdAt: Date
   updatedAt: Date
@@ -54,6 +67,7 @@ export interface CreateDailyPlanData {
   availableMinutes: number | null
   meetingMinutes: number | null
   plannedMinutes: number | null
+  overflowItems?: OverflowItem[]
   items: Array<{
     taskId: string
     subTaskId: string | null
@@ -64,6 +78,8 @@ export interface CreateDailyPlanData {
     dueDate: Date | null
     order: number
     reasoning: string | null
+    status?: PlanItemStatus
+    userAdjusted?: boolean
   }>
 }
 
@@ -74,6 +90,8 @@ export interface UpdateDailyPlanItemData {
   actualMinutes?: number
   pinned?: boolean
   deferred?: boolean
+  status?: PlanItemStatus
+  userAdjusted?: boolean
 }
 
 // ============================================================================
