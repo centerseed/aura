@@ -186,9 +186,11 @@ describe('Scenario A.6: Cursor 自動參考知識庫 + 任務脈絡', () => {
               area_name: 'Work',
               last_task_updated_at: new Date('2026-01-20'),
             }])
-          case 7: // tomorrow preview
+          case 7: // stuck subtasks
             return Promise.resolve([])
-          case 8: // calibration data (CoachCalibration.calculate)
+          case 8: // tomorrow preview
+            return Promise.resolve([])
+          case 9: // calibration data (CoachCalibration.calculate)
             return Promise.resolve([
               { area_name: 'Work', estimated_minutes: 100, actual_minutes: 140 },
               { area_name: 'Work', estimated_minutes: 100, actual_minutes: 140 },
