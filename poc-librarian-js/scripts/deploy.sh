@@ -39,7 +39,7 @@ if [ "$PROJECT_ID" != "$REQUIRED_PROJECT" ]; then
   PROJECT_ID="$REQUIRED_PROJECT"
 fi
 
-IMAGE="gcr.io/$PROJECT_ID/$SERVICE_NAME"
+IMAGE="asia-east1-docker.pkg.dev/$PROJECT_ID/zentropy-images/$SERVICE_NAME"
 
 echo "🚀 部署 Librarian Service"
 echo "   Project:  $PROJECT_ID"
@@ -121,6 +121,29 @@ echo "   API Key: $LIBRARIAN_API_KEY"
 echo ""
 echo "🧪 執行冒煙測試..."
 API_KEY="$LIBRARIAN_API_KEY" bash scripts/smoke-test.sh "$SERVICE_URL"
+
+# ============================================================================
+# 6. 清理舊 container images（保留最近 2 個）
+# ============================================================================
+echo ""
+echo "🧹 清理舊 container images（保留最近 2 個）..."
+OLD_DIGESTS=$(gcloud artifacts docker images list "$IMAGE" \
+  --project "$PROJECT_ID" \
+  --sort-by="~UPDATE_TIME" \
+  --format="value(version)" \
+  --limit=999 2>/dev/null | tail -n +3)
+
+if [ -n "$OLD_DIGESTS" ]; then
+  DELETED=0
+  for DIGEST in $OLD_DIGESTS; do
+    echo "   刪除: ${DIGEST:0:20}..."
+    gcloud artifacts docker images delete "${IMAGE}@${DIGEST}" \
+      --project "$PROJECT_ID" --quiet 2>/dev/null && DELETED=$((DELETED+1)) || true
+  done
+  echo "✅ 已清理 ${DELETED} 個舊 image"
+else
+  echo "✅ 沒有需要清理的舊 image"
+fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

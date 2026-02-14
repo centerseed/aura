@@ -158,7 +158,7 @@ echo ""
 DEPLOY_PROJECT="zentropy-4f7a5"
 DEPLOY_SERVICE="zentropy-api"
 DEPLOY_REGION="asia-east1"
-DEPLOY_IMAGE="gcr.io/${DEPLOY_PROJECT}/${DEPLOY_SERVICE}:latest"
+DEPLOY_IMAGE="asia-east1-docker.pkg.dev/${DEPLOY_PROJECT}/zentropy-images/${DEPLOY_SERVICE}:latest"
 LIBRARIAN_URL="https://librarian-service-isakqhri2a-de.a.run.app"
 
 # 安全檢查：確認 project
@@ -194,6 +194,28 @@ echo "${GREEN}✅ 部署完成！${NC}"
 SERVICE_URL=$(gcloud run services describe "$DEPLOY_SERVICE" \
   --region "$DEPLOY_REGION" --project "$DEPLOY_PROJECT" --format 'value(status.url)')
 echo "   URL: ${SERVICE_URL}"
+echo ""
+
+# Step 3: 清理舊 container images（保留最近 2 個）
+echo "${BLUE}🧹 清理舊 container images（保留最近 2 個）...${NC}"
+REPO_PATH="asia-east1-docker.pkg.dev/${DEPLOY_PROJECT}/zentropy-images/${DEPLOY_SERVICE}"
+OLD_DIGESTS=$(gcloud artifacts docker images list "$REPO_PATH" \
+  --project "$DEPLOY_PROJECT" \
+  --sort-by="~UPDATE_TIME" \
+  --format="value(version)" \
+  --limit=999 2>/dev/null | tail -n +3)
+
+if [ -n "$OLD_DIGESTS" ]; then
+  DELETED=0
+  for DIGEST in $OLD_DIGESTS; do
+    echo "   刪除: ${DIGEST:0:20}..."
+    gcloud artifacts docker images delete "${REPO_PATH}@${DIGEST}" \
+      --project "$DEPLOY_PROJECT" --quiet 2>/dev/null && DELETED=$((DELETED+1)) || true
+  done
+  echo "${GREEN}✅ 已清理 ${DELETED} 個舊 image${NC}"
+else
+  echo "${GREEN}✅ 沒有需要清理的舊 image${NC}"
+fi
 echo ""
 
 exit 0
