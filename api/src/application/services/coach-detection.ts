@@ -186,7 +186,7 @@ export function detectStagnantProducts(products: StagnantProductInput[]): Stagna
     const lastActivity = new Date(product.last_task_updated_at)
     const daysInactive = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24))
 
-    let threshold = product.lifecycle === 'PERPETUAL'
+    let threshold: number = product.lifecycle === 'PERPETUAL'
       ? STAGNANT_PRODUCT_THRESHOLDS.PERPETUAL
       : STAGNANT_PRODUCT_THRESHOLDS.FINITE
 
