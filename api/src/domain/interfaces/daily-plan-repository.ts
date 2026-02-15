@@ -104,4 +104,6 @@ export interface IDailyPlanRepository {
   upsert(data: CreateDailyPlanData): Promise<DailyPlanData>
 
   updateItem(itemId: string, data: UpdateDailyPlanItemData): Promise<DailyPlanItemData>
+
+  addItem(planId: string, item: CreateDailyPlanData['items'][0]): Promise<DailyPlanItemData>
 }

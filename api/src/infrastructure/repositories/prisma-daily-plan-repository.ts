@@ -185,6 +185,28 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     return this.toItemDomain(row)
   }
 
+  async addItem(planId: string, item: CreateDailyPlanData['items'][0]): Promise<DailyPlanItemData> {
+    const row = await prisma.dailyPlanItem.create({
+      data: {
+        plan_id: planId,
+        task_id: item.taskId,
+        sub_task_id: item.subTaskId,
+        item_type: item.subTaskId ? 'subtask' : 'task',
+        content: item.content,
+        area_name: item.areaName,
+        product_name: item.productName,
+        estimated_minutes: item.estimatedMinutes,
+        due_date: item.dueDate,
+        order: item.order,
+        reasoning: item.reasoning,
+        status: item.status ?? 'overflow',
+        user_adjusted: item.userAdjusted ?? false,
+      },
+    })
+
+    return this.toItemDomain(row)
+  }
+
   // ============================================================================
   // 轉換方法
   // ============================================================================

@@ -13,6 +13,7 @@ import {
 } from '@/lib/api-response'
 import { UpdateSubItemUseCase } from '@/application/use-cases/tasks/update-sub-item'
 import { DeleteSubItemUseCase } from '@/application/use-cases/tasks/delete-sub-item'
+import { syncPlanOnTaskChange } from '@/application/services/plan-sync'
 
 // ============================================================================
 // PATCH /api/tasks/[taskId]/sub-items/[subItemId] - 更新 sub-item
@@ -50,7 +51,17 @@ export async function PATCH(
       dueDate: due_date,
     })
 
-    // 4. 統一回應格式
+    // 4. 同步 Plan（fire-and-forget）
+    if (due_date !== undefined) {
+      syncPlanOnTaskChange({
+        userId,
+        taskId,
+        subTaskId: subItemId,
+        dueDate: due_date,
+      }).catch(console.error)
+    }
+
+    // 5. 統一回應格式
     return ApiResponseBuilder.success(
       {
         subItem: result.subItem,

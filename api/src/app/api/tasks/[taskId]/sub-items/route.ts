@@ -13,6 +13,7 @@ import {
 } from '@/lib/api-response'
 import { AddSubItemUseCase } from '@/application/use-cases/tasks/add-sub-item'
 import { ReorderSubItemsUseCase } from '@/application/use-cases/tasks/reorder-sub-items'
+import { syncPlanOnTaskChange } from '@/application/services/plan-sync'
 
 // ============================================================================
 // PUT /api/tasks/[taskId]/sub-items - 重新排序 sub-items
@@ -76,7 +77,21 @@ export async function POST(
       content,
     })
 
-    // 4. 統一回應格式
+    // 4. 同步 Plan（fire-and-forget，基於父任務的 due_date）
+    const parentTask = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { due_date: true },
+    })
+    if (parentTask?.due_date) {
+      syncPlanOnTaskChange({
+        userId,
+        taskId,
+        subTaskId: result.subItem.id,
+        dueDate: parentTask.due_date,
+      }).catch(console.error)
+    }
+
+    // 5. 統一回應格式
     return ApiResponseBuilder.success(
       {
         subItem: result.subItem,

@@ -14,6 +14,7 @@ import { safeToISOString, safeToISOStringRequired } from '@/lib/date-utils'
 import { GetTasksUseCase } from '@/application/use-cases/tasks/get-tasks'
 import { UpdateTaskUseCase } from '@/application/use-cases/tasks/update-task'
 import { CreateTaskUseCase } from '@/application/use-cases/tasks/create-task'
+import { syncPlanOnTaskChange } from '@/application/services/plan-sync'
 
 // ============================================================================
 // GET /api/tasks - 查詢任務列表
@@ -221,7 +222,16 @@ export async function PATCH(request: NextRequest) {
       })),
     }
 
-    // 6. 統一回應格式（包含狀態轉換提示訊息）
+    // 6. 同步 Plan（fire-and-forget）
+    if (due_date !== undefined) {
+      syncPlanOnTaskChange({
+        userId,
+        taskId,
+        dueDate: due_date,
+      }).catch(console.error)
+    }
+
+    // 7. 統一回應格式（包含狀態轉換提示訊息）
     return ApiResponseBuilder.success(
       {
         task: formattedTask,
@@ -337,7 +347,16 @@ export async function POST(request: NextRequest) {
       })),
     }
 
-    // 6. 統一回應格式
+    // 6. 同步 Plan（fire-and-forget）
+    if (due_date) {
+      syncPlanOnTaskChange({
+        userId,
+        taskId: task.id,
+        dueDate: due_date,
+      }).catch(console.error)
+    }
+
+    // 7. 統一回應格式
     return ApiResponseBuilder.success(
       {
         task: formattedTask,
