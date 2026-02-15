@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { cleanupZombieTopics } from "@/app/api/products/[id]/apply-reorganization/zombie-cleanup";
+import { cleanupZombieTopics } from "@/application/use-cases/topics/cleanup-zombie-topics";
 
 // Mock PrismaClient
 function createMockDb(topics: Array<{ id: string; name: string }>, activeTaskCounts: Record<string, number> = {}) {

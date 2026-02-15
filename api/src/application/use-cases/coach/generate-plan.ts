@@ -10,7 +10,7 @@ import type {
   CreateDailyPlanData,
 } from '@/domain/interfaces/daily-plan-repository'
 import { PrismaDailyPlanRepository } from '@/infrastructure/repositories/prisma-daily-plan-repository'
-import { type PlanCandidate } from '@/application/services/plan-candidate-collector'
+import type { PlanCandidate } from '@/domain/entities/plan-candidate.entity'
 import { UnifiedDataCollector, type UnifiedRawData } from '@/infrastructure/services/unified-data-collector'
 import { UnifiedDataTransformer } from '@/infrastructure/services/unified-data-transformer'
 import { CoachPlanGenerator, type DailyPlanOutput } from '@/application/services/coach-plan-generator'

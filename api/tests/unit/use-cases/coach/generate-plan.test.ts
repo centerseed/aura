@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import type { IDailyPlanRepository, DailyPlanData, CreateDailyPlanData } from '@/domain/interfaces/daily-plan-repository'
-import type { CollectedData, PlanCandidate } from '@/application/services/plan-candidate-collector'
+import type { CollectedData, PlanCandidate } from '@/domain/entities/plan-candidate.entity'
 import type { UnifiedDataCollector, UnifiedRawData } from '@/infrastructure/services/unified-data-collector'
 import type { UnifiedDataTransformer } from '@/infrastructure/services/unified-data-transformer'
 import type { CoachPlanGenerator } from '@/application/services/coach-plan-generator'

@@ -8,7 +8,7 @@
 
 import type { UnifiedRawData } from './unified-data-collector'
 import type { AggregatedData } from './coach-data-aggregator'
-import type { CollectedData, PlanCandidate, WeeklyDayInfo } from '@/application/services/plan-candidate-collector'
+import type { CollectedData, PlanCandidate, WeeklyDayInfo } from '@/domain/entities/plan-candidate.entity'
 import type { CalendarEventSummary, TaskSummary, SubTaskSummary } from '@/domain/entities/coach-briefing.entity'
 import { WORK_HOURS_PER_DAY, MAX_TODAY_CANDIDATES } from '@/lib/coach-constants'
 

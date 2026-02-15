@@ -42,15 +42,24 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     })
 
     if (existing) {
-      // 用 transaction 包裝：刪除 + 更新 + 批次插入
+      // 用 transaction 包裝：查詢 + 刪除 + 更新 + 批次插入
       await prisma.$transaction(async (tx) => {
-        // 刪除所有未完成的 items
-        await tx.dailyPlanItem.deleteMany({
+        const itemsToDelete = await tx.dailyPlanItem.findMany({
           where: {
             plan_id: existing.id,
             completed: false,
           },
+          select: { id: true },
         })
+
+        // 逐一刪除（避免使用 deleteMany）
+        if (itemsToDelete.length > 0) {
+          await Promise.all(
+            itemsToDelete.map(item =>
+              tx.dailyPlanItem.delete({ where: { id: item.id } })
+            )
+          )
+        }
 
         // 更新 plan 本身
         await tx.dailyPlan.update({
@@ -85,7 +94,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
             })),
           })
         }
-      })
+      }, { timeout: 15000 })
 
       // 讀回完整資料
       const row = await prisma.dailyPlan.findUnique({

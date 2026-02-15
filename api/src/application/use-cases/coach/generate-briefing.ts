@@ -111,6 +111,7 @@ export class GenerateBriefingUseCase {
     let planResult: Awaited<ReturnType<GeneratePlanUseCase['execute']>> | undefined
 
     if (request.type === 'MORNING') {
+      // 先生成 plan
       try {
         start = Date.now()
         const planUseCase = new GeneratePlanUseCase()
@@ -126,19 +127,10 @@ export class GenerateBriefingUseCase {
         timings.plan_error = 1
       }
 
-      // 從 plan 結果 + 偵測結果組裝摘要，不需第二次 LLM
-      aiResult = this.buildMorningSummaryFromPlan(
-        planResult,
-        conflicts,
-        stagnations,
-        aggregatedData.overdueTasks,
-        aggregatedData.calendarEvents,
-      )
-    } else {
-      // 晚報仍用 AI（回顧語氣需要 AI）
+      // 把 plan 結果傳給 AI generator 作為 context
       start = Date.now()
       aiResult = await this.aiGenerator.generate({
-        type: request.type,
+        type: 'MORNING',
         calendarEvents: aggregatedData.calendarEvents,
         overdueTasks: aggregatedData.overdueTasks,
         approachingTasks: aggregatedData.approachingTasks,
@@ -147,8 +139,84 @@ export class GenerateBriefingUseCase {
         completedTasks: aggregatedData.completedTasks,
         remainingTasks: aggregatedData.remainingTasks,
         tomorrowPreview: aggregatedData.tomorrowPreview,
+        dailyPlan: planResult ? {
+          items: planResult.plan.items.map(i => ({
+            order: i.order,
+            content: i.content,
+            areaName: i.areaName,
+            productName: i.productName,
+            estimatedMinutes: i.estimatedMinutes,
+            reasoning: i.reasoning,
+          })),
+          coachMessage: planResult.plan.coachMessage,
+          capacityNote: planResult.plan.capacityNote,
+          overflowItems: [],
+        } : undefined,
       })
       timings.ai = Date.now() - start
+    } else {
+      // 晚報：補充 plan 已完成項目（向前相容：舊的完成不會有 ARCHIVE status）
+      const eveningCompleted = [...aggregatedData.completedTasks]
+      try {
+        const todayStr = toDateOnly(briefingDate, timezone)
+        const todayPlan = await prisma.dailyPlan.findFirst({
+          where: { user_id: request.userId, plan_date: new Date(todayStr) },
+          include: {
+            items: {
+              where: { completed: true },
+              select: {
+                id: true, task_id: true, sub_task_id: true, content: true,
+                area_name: true, product_name: true, estimated_minutes: true,
+              },
+            },
+          },
+        })
+        if (todayPlan) {
+          const existingIds = new Set(eveningCompleted.map(t => t.id))
+          for (const item of todayPlan.items) {
+            const id = item.sub_task_id || item.task_id
+            if (id && !existingIds.has(id)) {
+              eveningCompleted.push({
+                id,
+                content: item.content,
+                status: 'completed',
+                due_date: null,
+                start_date: null,
+                area_name: item.area_name || '',
+                product_name: item.product_name || '',
+                days_overdue: null,
+                days_remaining: null,
+                days_stagnant: null,
+                urgency_level: null,
+                estimated_minutes: item.estimated_minutes,
+              })
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[GenerateBriefing] Failed to load plan completed items:', err)
+      }
+
+      // AI 生成回顧（不傳 remainingTasks）
+      start = Date.now()
+      aiResult = await this.aiGenerator.generate({
+        type: request.type,
+        calendarEvents: aggregatedData.calendarEvents,
+        overdueTasks: aggregatedData.overdueTasks,
+        approachingTasks: aggregatedData.approachingTasks,
+        conflicts,
+        stagnations,
+        completedTasks: eveningCompleted,
+        remainingTasks: [], // 不傳 remainingTasks 給 AI，防止捏造
+        tomorrowPreview: aggregatedData.tomorrowPreview,
+      })
+      timings.ai = Date.now() - start
+
+      // defer_suggestions 改用程式碼規則生成，不靠 AI
+      aiResult.deferSuggestions = this.buildDeferSuggestions(
+        aggregatedData.remainingTasks,
+        stagnations,
+      )
     }
 
     // 8. 儲存（幂等：同 user+type+date 覆蓋）
@@ -163,7 +231,7 @@ export class GenerateBriefingUseCase {
       conflicts,
       stagnations,
       completedTasks: aggregatedData.completedTasks,
-      remainingTasks: aggregatedData.remainingTasks,
+      remainingTasks: request.type === 'MORNING' ? aggregatedData.remainingTasks : [],
       tomorrowPreview: aggregatedData.tomorrowPreview,
       summary: aiResult.summary,
       recommendations: aiResult.recommendations,
@@ -190,76 +258,50 @@ export class GenerateBriefingUseCase {
   // ============================================================================
 
   /**
-   * 從 plan 結果 + 偵測結果組裝晨報摘要（無 LLM）
-   * plan 的 coachMessage 已是 AI 生成的，直接當 summary 用
+   * 基於規則生成 defer suggestions（不靠 AI）
+   * - 逾期 > 14 天 → archive
+   * - 逾期 > 7 天 → defer
+   * - 停滯 > 14 天 → archive
    */
-  private buildMorningSummaryFromPlan(
-    planResult: Awaited<ReturnType<GeneratePlanUseCase['execute']>> | undefined,
-    conflicts: import('@/domain/entities/coach-briefing.entity').ConflictItem[],
+  private buildDeferSuggestions(
+    remainingTasks: import('@/domain/entities/coach-briefing.entity').TaskSummary[],
     stagnations: import('@/domain/entities/coach-briefing.entity').StagnationItem[],
-    overdueTasks: import('@/domain/entities/coach-briefing.entity').TaskSummary[],
-    calendarEvents: import('@/domain/entities/coach-briefing.entity').CalendarEventSummary[],
-  ): import('@/application/services/coach-ai-generator').CoachAIOutput {
-    const recommendations: import('@/domain/entities/coach-briefing.entity').Recommendation[] = []
+  ): import('@/domain/entities/coach-briefing.entity').DeferSuggestion[] {
+    const suggestions: import('@/domain/entities/coach-briefing.entity').DeferSuggestion[] = []
 
-    // Summary: 用 plan 的 coachMessage，如果沒有就自己組
-    let summary: string
-    if (planResult?.plan.coachMessage) {
-      summary = planResult.plan.coachMessage
-    } else {
-      const parts: string[] = []
-      if (overdueTasks.length > 0) parts.push(`有 ${overdueTasks.length} 個逾期任務需要注意`)
-      if (calendarEvents.length > 0) parts.push(`今天有 ${calendarEvents.length} 場會議`)
-      summary = parts.length > 0 ? parts.join('，') + '。' : '今天沒有特別緊急的事項，可以專注推進手上的工作。'
-    }
-
-    // Recommendations: 從偵測結果提取
-    if (overdueTasks.length > 0) {
-      const top = overdueTasks[0]
-      recommendations.push({
-        priority: 1,
-        action: `先處理逾期任務「${top.content}」`,
-        reasoning: `已逾期 ${top.days_overdue} 天`,
-        related_task_id: top.id,
-      })
-    }
-
-    for (const conflict of conflicts.slice(0, 2)) {
-      if (conflict.type === 'capacity_overload') {
-        recommendations.push({
-          priority: 2,
-          action: '考慮延後非緊急任務，今天行程較滿',
-          reasoning: conflict.description,
-          related_task_id: null,
+    for (const task of remainingTasks) {
+      if (task.days_overdue != null && task.days_overdue > 14) {
+        suggestions.push({
+          task_id: task.id,
+          task_content: task.content,
+          suggested_action: 'archive',
+          reasoning: `已逾期 ${task.days_overdue} 天，建議歸檔或重新評估是否仍需要`,
+        })
+      } else if (task.days_overdue != null && task.days_overdue > 7) {
+        suggestions.push({
+          task_id: task.id,
+          task_content: task.content,
+          suggested_action: 'defer',
+          reasoning: `已逾期 ${task.days_overdue} 天，建議重新設定截止日期`,
         })
       }
     }
 
-    // 至少一個建議
-    if (recommendations.length === 0 && planResult?.plan.items && planResult.plan.items.length > 0) {
-      const first = planResult.plan.items[0]
-      recommendations.push({
-        priority: 1,
-        action: `從「${first.content}」開始今天的工作`,
-        reasoning: first.reasoning || '排序優先',
-        related_task_id: null,
-      })
+    for (const stag of stagnations) {
+      if (stag.days_inactive > 14) {
+        // 避免與 remainingTasks 重複
+        if (!suggestions.some(s => s.task_id === stag.entity_id)) {
+          suggestions.push({
+            task_id: stag.entity_id,
+            task_content: stag.entity_name,
+            suggested_action: 'archive',
+            reasoning: `已停滯 ${stag.days_inactive} 天未更新，建議歸檔或委派`,
+          })
+        }
+      }
     }
 
-    if (recommendations.length === 0) {
-      recommendations.push({
-        priority: 1,
-        action: '查看今日計畫，按順序執行',
-        reasoning: '保持節奏',
-        related_task_id: null,
-      })
-    }
-
-    return {
-      summary,
-      recommendations,
-      deferSuggestions: [],
-    }
+    return suggestions.slice(0, 5)
   }
 
   private validateRequest(request: GenerateBriefingRequest): void {

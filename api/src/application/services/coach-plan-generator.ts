@@ -7,7 +7,7 @@
 import { google } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import type { PlanCandidate, MilestoneContext, WeeklyDayInfo } from './plan-candidate-collector'
+import type { PlanCandidate, MilestoneContext, WeeklyDayInfo } from '@/domain/entities/plan-candidate.entity'
 
 // ============================================================================
 // Zod Schema

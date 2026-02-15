@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { CoachPlanGenerator } from '@/application/services/coach-plan-generator'
-import type { PlanCandidate, MilestoneContext } from '@/application/services/plan-candidate-collector'
+import type { PlanCandidate, MilestoneContext } from '@/domain/entities/plan-candidate.entity'
 
 // Mock AI SDK — 攔截 prompt，不實際呼叫 AI
 vi.mock('ai', () => ({

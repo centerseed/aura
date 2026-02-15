@@ -959,19 +959,26 @@ function TodaySheetContent({
           </div>
         )}
 
-        {/* ====== 今日計畫區 ====== */}
+        {/* ====== 今日計畫區（晨報顯示完整計畫，晚報只顯示已完成） ====== */}
         <div className="border-t border-slate-200 dark:border-white/5">
-          <PlanSection
-            plan={plan}
-            setPlan={setPlan}
-            isLoading={isLoadingPlan}
-            completingItems={completingItems}
-            setCompletingItems={setCompletingItems}
-            completedTodayTasks={completedTodayTasks}
-            onCompleteTask={onCompleteTask}
-            onOpenTask={onOpenTask}
-            loadPlan={loadPlan}
-          />
+          {activeTab === "MORNING" ? (
+            <PlanSection
+              plan={plan}
+              setPlan={setPlan}
+              isLoading={isLoadingPlan}
+              completingItems={completingItems}
+              setCompletingItems={setCompletingItems}
+              completedTodayTasks={completedTodayTasks}
+              onCompleteTask={onCompleteTask}
+              onOpenTask={onOpenTask}
+              loadPlan={loadPlan}
+            />
+          ) : (
+            <EveningCompletedSection
+              plan={plan}
+              completedTodayTasks={completedTodayTasks}
+            />
+          )}
         </div>
 
         <div className="h-4" />
@@ -987,6 +994,60 @@ function TodaySheetContent({
         </div>
       )}
     </>
+  );
+}
+
+// ============================================================================
+// Evening Completed Section (晚報只顯示已完成，不顯示待辦)
+// ============================================================================
+
+function EveningCompletedSection({
+  plan,
+  completedTodayTasks,
+}: {
+  plan: DailyPlan | null;
+  completedTodayTasks: TaskCard[];
+}) {
+  const completedItems = plan?.items.filter((i) => i.completed) ?? [];
+  const extraCompleted = completedTodayTasks.filter(
+    (t) => !completedItems.some((i) => i.task_id === t.id)
+  );
+  const totalCompleted = completedItems.length + extraCompleted.length;
+
+  if (totalCompleted === 0) {
+    return (
+      <div className="px-5 py-6 text-center">
+        <CheckCircle2 className="w-8 h-8 text-slate-300 dark:text-white/20 mx-auto mb-2" />
+        <p className="text-sm text-slate-500 dark:text-white/40">今天辛苦了，好好休息</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-5 py-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-medium text-slate-500 dark:text-white/40 uppercase tracking-wider">
+          今日成果
+        </h3>
+        <span className="text-[10px] text-slate-400 dark:text-white/30 bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">
+          {totalCompleted}
+        </span>
+      </div>
+      <ul className="space-y-0.5">
+        {completedItems.map((item) => (
+          <li key={item.id} className="flex items-start gap-2 py-1">
+            <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-400 shrink-0" />
+            <p className="text-sm text-slate-600 dark:text-white/60 truncate">{item.content}</p>
+          </li>
+        ))}
+        {extraCompleted.map((task) => (
+          <li key={task.id} className="flex items-start gap-2 py-1">
+            <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-400 shrink-0" />
+            <p className="text-sm text-slate-600 dark:text-white/60 truncate">{task.title}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -1160,27 +1221,29 @@ function PlanSection({
       )}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        {/* Today items */}
-        <div className="px-5 pb-3">
-          {todayItems.length === 0 ? (
-            <p className="text-sm text-slate-400 dark:text-white/40 py-2">所有任務已完成！</p>
-          ) : (
-            <SortableContext items={todayItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-              <ul className="space-y-0.5">
-                {todayItems.map((item, idx) => (
-                  <SortablePlanItem
-                    key={item.id}
-                    item={item}
-                    idx={idx}
-                    section="today"
-                    isCompleting={completingItems.has(item.id)}
-                    onComplete={handleCompleteItem}
-                    onOpenTask={onOpenTask}
-                  />
-                ))}
-              </ul>
-            </SortableContext>
-          )}
+        {/* Today items - 今日區塊加上邊框 */}
+        <div className="mx-5 mb-3">
+          <div className="rounded-lg border-2 border-amber-200 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-500/5 p-3">
+            {todayItems.length === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-white/40 py-2">所有任務已完成！</p>
+            ) : (
+              <SortableContext items={todayItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                <ul className="space-y-0.5">
+                  {todayItems.map((item, idx) => (
+                    <SortablePlanItem
+                      key={item.id}
+                      item={item}
+                      idx={idx}
+                      section="today"
+                      isCompleting={completingItems.has(item.id)}
+                      onComplete={handleCompleteItem}
+                      onOpenTask={onOpenTask}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            )}
+          </div>
         </div>
 
         {/* Capacity line + Overflow */}
@@ -1188,9 +1251,9 @@ function PlanSection({
           <div className="px-5 pb-3">
             <div className="flex items-center gap-2 mb-2">
               <div className="flex-1 border-t border-dashed border-slate-300 dark:border-white/10" />
-              <span className="text-[10px] text-slate-400 dark:text-white/30 flex items-center gap-1">
-                <CalendarClock className="w-3 h-3" />
-                容量線
+              <span className="text-xs text-slate-500 dark:text-white/50 font-medium flex items-center gap-1">
+                <CalendarClock className="w-3.5 h-3.5" />
+                明後天的代辦事項
               </span>
               <div className="flex-1 border-t border-dashed border-slate-300 dark:border-white/10" />
             </div>
@@ -1255,7 +1318,7 @@ function PlanSection({
       {/* Footer hint */}
       <div className="px-5 py-2">
         <p className="text-[10px] text-slate-400 dark:text-white/25 text-center">
-          拖拽可在「今日」與「容量線以下」之間移動
+          拖拽可在「今日」與「明後天」區域之間移動
         </p>
       </div>
     </>

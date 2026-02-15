@@ -5,7 +5,7 @@ import { isValidUUID } from "@/domain/constants/validation";
 import type { Reference } from "@/domain/entities/task.entity";
 import { mergeReferences } from "@/application/use-cases/merge-references";
 import { syncSubTasksToJson } from "@/infrastructure/repositories/sub-task-sync";
-import { cleanupZombieTopics } from "./zombie-cleanup";
+import { cleanupZombieTopics } from "@/application/use-cases/topics/cleanup-zombie-topics";
 
 type TopicOperation =
   | { action: "keep"; topic_name: string }

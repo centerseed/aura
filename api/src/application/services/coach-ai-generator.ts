@@ -41,9 +41,9 @@ const EveningBriefingSchema = z.object({
   summary: z.string().describe('2-4 句繁體中文摘要，回顧今日成果'),
   recommendations: z
     .array(RecommendationSchema)
-    .min(1)
-    .max(3)
-    .describe('Top 1-3 明日建議'),
+    .min(0)
+    .max(1)
+    .describe('0-1 個收心建議，讓用戶安心入睡'),
   defer_suggestions: z
     .array(
       z.object({
@@ -104,6 +104,8 @@ export class CoachAIGenerator {
     })
     const aiTime = Date.now() - start
     console.log(`[AIGenerator] ${input.type} AI call:`, aiTime, 'ms, prompt length:', prompt.length, 'chars')
+    console.log(`[AIGenerator] ${input.type} PROMPT:\n`, prompt)
+    console.log(`[AIGenerator] ${input.type} RESPONSE:`, JSON.stringify(object, null, 2))
 
     return {
       summary: object.summary,
@@ -247,11 +249,28 @@ export class CoachAIGenerator {
     sections.push('')
     sections.push('## 回應要求')
     if (input.dailyPlan && input.dailyPlan.items.length > 0) {
-      sections.push('1. summary：用 2-4 句繁體中文概述今日重點。你已經有一份排好的今日計畫，summary 應圍繞計畫重點來說明，而非逐條複述衝突或逾期資料。用洞察而非摘要，例如「今天排了 5 項任務，建議先處理 X 因為它阻塞了 Y」而非「您有 3 個逾期任務」。如有衝突或逾期仍需提及，但應融入計畫脈絡中。')
-      sections.push('2. recommendations：1-3 個具體可執行的建議，基於計畫的排序邏輯，給出具體的第一步行動（「先完成 X 再處理 Y」而非「整理任務」）')
+      const totalMinutes = input.dailyPlan.items.reduce((sum, i) => sum + (i.estimatedMinutes || 0), 0)
+      const itemCount = input.dailyPlan.items.length
+      sections.push(`1. summary：用 2-4 句繁體中文概述今日重點。你已有一份排好的計畫（${itemCount} 項任務，約 ${totalMinutes} 分鐘）。`)
+      sections.push('   - 用洞察而非摘要，例如「今天排了 5 項任務，建議先處理 X 因為它阻塞了 Y」')
+      sections.push('   - 如果有逾期/衝突，融入計畫脈絡中說明，而非單純列出數字')
+      sections.push('   - 如果計畫容量滿載，提醒用戶專注優先項目')
+      sections.push('2. recommendations：1-3 個具體可執行的第一步行動')
+      sections.push('   - 必須是具體動作（「先完成報告初稿再開會」），禁止空泛建議（「查看計畫」「整理任務」）')
+      sections.push('   - 基於計畫排序和任務間的依賴關係給建議')
+    } else if (input.overdueTasks.length > 0 || input.approachingTasks.length > 0) {
+      sections.push('1. summary：用 2-4 句繁體中文概述今日重點，必須提及逾期或即將到期的任務')
+      sections.push('2. recommendations：1-3 個具體可執行的建議')
+      sections.push('   - 必須是具體動作，禁止「查看計畫」「整理任務」這類空話')
+    } else if (input.calendarEvents.length > 0) {
+      sections.push('1. summary：用 2-4 句繁體中文概述今日重點。今天沒有逾期壓力，結合行事曆給出建議。')
+      sections.push(`   - 例如「今天有 ${input.calendarEvents.length} 場會議，空檔時間適合推進 X」`)
+      sections.push('2. recommendations：1-3 個具體可執行的建議，結合會議時間和任務安排')
     } else {
-      sections.push('1. summary：用 2-4 句繁體中文概述重點（如果有衝突或逾期必須提到）')
-      sections.push('2. recommendations：1-3 個具體可執行的建議（「先完成 X 再處理 Y」而非「整理任務」）')
+      sections.push('1. summary：用 2-4 句繁體中文概述今日重點。今天沒有逾期壓力，是專注推進工作的好時機。')
+      sections.push('2. recommendations：1-3 個具體可執行的建議')
+      sections.push('   - 從即將到期或停滯的任務中挑選值得推進的項目')
+      sections.push('   - 必須是具體動作，禁止「查看計畫」「整理任務」這類空話')
     }
 
     return sections.join('\n')
@@ -304,32 +323,22 @@ export class CoachAIGenerator {
       sections.push('')
     }
 
-    // 提供 remaining tasks 給 AI 作為 defer_suggestions 的來源，但不要求 AI 列出
-    // 只在有逾期或大量任務時才提供，讓 AI 有素材產生延後建議
-    const tasksForDeferContext = input.remainingTasks.filter(
-      t => (t.days_overdue != null && t.days_overdue > 0) || (t.days_stagnant != null && t.days_stagnant > 7)
-    )
-    if (tasksForDeferContext.length > 0) {
-      sections.push('## 背景資料（僅供生成 defer_suggestions 參考，不要在 summary 中提及這些任務）')
-      for (const task of tasksForDeferContext.slice(0, 10)) {
-        sections.push(`- [${task.area_name}/${task.product_name}] ${task.content}${task.days_overdue ? `（逾期 ${task.days_overdue} 天）` : `（${task.days_stagnant} 天未更新）`} [id: ${task.id}]`)
-      }
-      sections.push('')
-    }
-
     sections.push('---')
     sections.push('')
-    sections.push('## 回應要求')
+    sections.push('## 回應要求（嚴格遵守）')
     sections.push('1. summary：用 2-4 句繁體中文回顧今日成果。')
-    sections.push('   - 聚焦在「完成了什麼」和「今天的付出」，語氣正面溫暖')
-    sections.push('   - 如果完成了任務，具體肯定（「今天完成了 X 和 Y，特別是 X 很重要因為…」）')
-    sections.push('   - 如果沒有完成任務但有會議，肯定會議的投入（「今天有 N 場會議，這些溝通對推進 X 很重要」）')
-    sections.push('   - 如果今天什麼都沒做，也不要責備，溫和地說「今天是休息日也很好，明天再出發」')
+    sections.push('   - **嚴禁幻覺**：你只能提及上方「今日完成」和「今日參與的會議與活動」中明確列出的項目。')
+    sections.push('   - **嚴禁改寫名稱**：引用任務或會議時，必須使用上方資料中的原文名稱，不得自行改寫、概括或替換。')
+    sections.push('   - 如果上方「今日完成」區段為空或不存在，就說「今天是休息日也很好」，絕對不要編造任務。')
+    sections.push('   - 如果上方「今日參與的會議與活動」區段為空或不存在，就不要提及任何會議。')
+    sections.push('   - 語氣正面溫暖，聚焦「完成了什麼」和「今天的付出」')
     sections.push('   - 絕對不要提及逾期、停滯、未完成的數量。那些是明天晨報的事。')
-    sections.push('2. recommendations：1-3 個面向明天的輕量建議')
-    sections.push('   - 語氣是「明天可以…」而非「你還沒做…」')
-    sections.push('   - 例如：「明天早上可以先處理 X，趁精神好的時候搞定」')
-    sections.push('3. defer_suggestions：如果背景資料中有長期逾期或停滯的任務，可以建議延後/歸檔/委派（必須附上 task_id 和 task_content）。如果沒有就給空陣列。')
+    sections.push('2. recommendations：0-1 個收心建議（可以是空陣列）')
+    sections.push('   - 今晚的重點是讓用戶安心入睡，不是規劃明天')
+    sections.push('   - 如果明天有早會或重要行程，可以提醒「明天有早會，記得設鬧鐘」')
+    sections.push('   - 除此之外，不要列待辦事項。明天的事交給明天的晨報。')
+    sections.push('   - 語氣是「今天辛苦了，好好休息」而非「明天還有很多事要做」')
+    sections.push('3. defer_suggestions：給空陣列 []。延後建議由系統規則生成，不需要 AI 處理。')
 
     return sections.join('\n')
   }

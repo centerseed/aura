@@ -2,8 +2,8 @@
  * UpdatePlanItemUseCase - 更新計畫項目（完成/釘選/延後/排序）
  *
  * 完成連動：
- * - subtask → 同步 SubTask.completed = true
- * - task → 不自動改 Task.status
+ * - subtask → 同步 SubTask.completed
+ * - task → 同步 Task.status = ARCHIVE + completed_at
  */
 
 import type {
@@ -72,15 +72,27 @@ export class UpdatePlanItemUseCase {
       // 2. 更新 plan item
       const updatedItem = await this.repository.updateItemWithTx(tx, request.itemId, updateData)
 
-      // 3. 完成連動：同步 SubTask 狀態
-      if (request.completed !== undefined && updatedItem.subTaskId) {
-        await tx.subTask.update({
-          where: { id: updatedItem.subTaskId },
-          data: {
-            completed: request.completed,
-            completed_at: request.completed ? new Date() : null,
-          },
-        })
+      // 3. 完成連動
+      if (request.completed !== undefined) {
+        if (updatedItem.subTaskId) {
+          // subtask → 同步 SubTask.completed
+          await tx.subTask.update({
+            where: { id: updatedItem.subTaskId },
+            data: {
+              completed: request.completed,
+              completed_at: request.completed ? new Date() : null,
+            },
+          })
+        } else if (updatedItem.taskId) {
+          // task → 同步 Task.status = ARCHIVE + completed_at
+          await tx.task.update({
+            where: { id: updatedItem.taskId },
+            data: {
+              status: request.completed ? 'ARCHIVE' : 'ACTIVE',
+              completed_at: request.completed ? new Date() : null,
+            },
+          })
+        }
       }
 
       return updatedItem

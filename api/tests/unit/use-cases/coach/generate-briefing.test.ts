@@ -159,12 +159,16 @@ describe('GenerateBriefingUseCase', () => {
       expect(result.timings).toHaveProperty('collect')
       expect(result.timings).toHaveProperty('transform')
       expect(result.timings).toHaveProperty('detection')
+      expect(result.timings).toHaveProperty('ai')
       expect(result.timings).toHaveProperty('save')
 
-      // 晨報不呼叫 AI generator（從 plan 結果組裝）
+      // 晨報呼叫 AI generator
       expect(mockCollector.collect).toHaveBeenCalledTimes(1)
       expect(mockTransformer.toBriefingData).toHaveBeenCalledTimes(1)
-      expect(mockAIGenerator.generate).not.toHaveBeenCalled()
+      expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
+      expect(mockAIGenerator.generate).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'MORNING' }),
+      )
       expect(mockRepo.upsertByDate).toHaveBeenCalledTimes(1)
     })
 
@@ -241,7 +245,7 @@ describe('GenerateBriefingUseCase', () => {
   })
 
   describe('Daily Plan 整合', () => {
-    it('晨報應生成 plan 並從結果組裝摘要（不呼叫 AI generator）', async () => {
+    it('晨報應生成 plan 並把結果傳給 AI generator', async () => {
       await useCase.execute({
         userId: 'user-1',
         type: 'MORNING',
@@ -250,15 +254,16 @@ describe('GenerateBriefingUseCase', () => {
       // plan 被呼叫
       expect(mockPlanExecute).toHaveBeenCalledTimes(1)
 
-      // AI generator 不被呼叫（晨報從 plan 結果組裝）
-      expect(mockAIGenerator.generate).not.toHaveBeenCalled()
-
-      // summary 來自 plan 的 coachMessage
-      const upsertCall = (mockRepo.upsertByDate as any).mock.calls[0][0]
-      expect(upsertCall.summary).toBe('今天加油！')
+      // AI generator 被呼叫，且帶有 dailyPlan context
+      expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
+      const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
+      expect(aiCall.type).toBe('MORNING')
+      expect(aiCall.dailyPlan).toBeDefined()
+      expect(aiCall.dailyPlan.items).toHaveLength(2)
+      expect(aiCall.dailyPlan.coachMessage).toBe('今天加油！')
     })
 
-    it('晨報 plan 生成失敗時仍應正常生成（fallback 摘要）', async () => {
+    it('晨報 plan 生成失敗時仍呼叫 AI（無 dailyPlan context）', async () => {
       mockPlanExecute.mockRejectedValueOnce(new Error('Plan failed'))
 
       const result = await useCase.execute({
@@ -266,18 +271,16 @@ describe('GenerateBriefingUseCase', () => {
         type: 'MORNING',
       })
 
-      // AI generator 仍不被呼叫
-      expect(mockAIGenerator.generate).not.toHaveBeenCalled()
+      // AI generator 仍被呼叫，但沒有 dailyPlan
+      expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
+      const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
+      expect(aiCall.dailyPlan).toBeUndefined()
 
-      // 結果仍正常，有 fallback summary
       expect(result.briefing).toBeDefined()
       expect(result.timings).toHaveProperty('plan_error')
-
-      const upsertCall = (mockRepo.upsertByDate as any).mock.calls[0][0]
-      expect(upsertCall.summary).toBeDefined()
     })
 
-    it('晚報應呼叫 AI generator', async () => {
+    it('晚報應呼叫 AI generator 且不傳 remainingTasks', async () => {
       await useCase.execute({
         userId: 'user-1',
         type: 'EVENING',
@@ -287,6 +290,8 @@ describe('GenerateBriefingUseCase', () => {
       expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
       const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
       expect(aiCall.type).toBe('EVENING')
+      // remainingTasks 應為空陣列，防止 AI 捏造
+      expect(aiCall.remainingTasks).toEqual([])
     })
   })
 

@@ -5,6 +5,22 @@
  * - 測試資料庫連線
  * - 測試用戶建立
  * - 測試資料清理
+ *
+ * 🚨 重要安全警告：
+ * 1. cleanupIntegrationTests() 使用 deleteMany 僅適用於測試環境的 beforeAll/afterAll
+ * 2. **強烈推薦**使用 withTestTransaction() 進行測試隔離（自動 rollback，更安全）
+ * 3. **絕對禁止**在生產環境或任何非測試代碼中使用 deleteMany
+ * 4. 整合測試必須使用 DATABASE_URL_TEST 環境變數（本地 PostgreSQL）
+ * 5. vitest.config.ts 已內建 Supabase 阻斷機制，確保不會連接生產資料庫
+ *
+ * 推薦用法：
+ * ```typescript
+ * it('測試案例', async () => {
+ *   await withTestTransaction(async (tx) => {
+ *     // 所有資料庫操作使用 tx，測試結束後自動 rollback
+ *   })
+ * })
+ * ```
  */
 
 import { prisma } from '@/lib/db'
