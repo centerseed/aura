@@ -716,8 +716,8 @@ function TodaySheetContent({
             </p>
           </div>
 
-          {/* Alert badges */}
-          {(hasConflicts || hasOverdue || hasStagnation || hasCalendar) && (
+          {/* Alert badges (晚報不顯示焦慮性 badges) */}
+          {activeTab === "MORNING" && (hasConflicts || hasOverdue || hasStagnation || hasCalendar) && (
             <div className="mt-3 flex gap-2 flex-wrap">
               {hasOverdue && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-orange-100 dark:bg-orange-500/15 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-500/20">
@@ -749,18 +749,20 @@ function TodaySheetContent({
             </div>
           )}
 
-          {/* Expand full report */}
-          <button
-            onClick={() => setExpandedReport(!expandedReport)}
-            className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/60 transition-colors"
-          >
-            {expandedReport ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            {expandedReport ? "收合完整報告" : "展開完整報告"}
-          </button>
+          {/* Expand full report (晚報直接展開) */}
+          {activeTab === "MORNING" && (
+            <button
+              onClick={() => setExpandedReport(!expandedReport)}
+              className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/60 transition-colors"
+            >
+              {expandedReport ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              {expandedReport ? "收合完整報告" : "展開完整報告"}
+            </button>
+          )}
         </div>
 
-        {/* ====== 展開的完整報告 ====== */}
-        {expandedReport && (
+        {/* ====== 展開的完整報告（晨報需點擊展開，晚報直接展開） ====== */}
+        {(activeTab === "EVENING" || expandedReport) && (
           <div className="border-t border-slate-200 dark:border-white/5">
             {/* Recommendations */}
             {briefing.recommendations.length > 0 && (
@@ -797,11 +799,13 @@ function TodaySheetContent({
 
             {/* Collapsible detail sections */}
             <div className="border-t border-slate-200 dark:border-white/5">
-              <div className="px-5 pt-3 pb-1">
-                <h3 className="text-xs font-medium text-slate-400 dark:text-white/30 uppercase tracking-wider">
-                  詳細資訊
-                </h3>
-              </div>
+              {activeTab === "MORNING" && (
+                <div className="px-5 pt-3 pb-1">
+                  <h3 className="text-xs font-medium text-slate-400 dark:text-white/30 uppercase tracking-wider">
+                    詳細資訊
+                  </h3>
+                </div>
+              )}
 
               {hasCalendar && (
                 <CollapsibleSection
@@ -844,7 +848,7 @@ function TodaySheetContent({
                 </CollapsibleSection>
               )}
 
-              {hasApproaching && (
+              {hasApproaching && activeTab === "MORNING" && (
                 <CollapsibleSection
                   title="即將到期"
                   icon={<ArrowRight className="w-3.5 h-3.5 text-amber-400" />}
@@ -881,7 +885,7 @@ function TodaySheetContent({
                 </CollapsibleSection>
               )}
 
-              {hasStagnation && (
+              {hasStagnation && activeTab === "MORNING" && (
                 <CollapsibleSection
                   title="停滯警告"
                   icon={<TrendingDown className="w-3.5 h-3.5 text-yellow-400" />}
