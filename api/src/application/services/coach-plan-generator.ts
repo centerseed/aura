@@ -7,7 +7,7 @@
 import { google } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import type { PlanCandidate, MilestoneContext } from './plan-candidate-collector'
+import type { PlanCandidate, MilestoneContext, WeeklyDayInfo } from './plan-candidate-collector'
 
 // ============================================================================
 // Zod Schema
@@ -21,7 +21,6 @@ const DailyPlanOutputSchema = z.object({
     estimated_minutes: z.number().describe('預估完成時間（分鐘），根據任務內容與複雜度估計'),
     reasoning: z.string().describe('排序理由（繁體中文）'),
   })).describe('排序後的每日計畫項目'),
-  capacity_note: z.string().describe('容量建議（繁體中文），如「今天有 5 小時可用，建議先完成前 3 項」'),
   coach_message: z.string().describe('晨報親切語（繁體中文），2-3 句鼓勵或提醒'),
   overflow_items: z.array(z.object({
     item_id: z.string(),
@@ -49,12 +48,12 @@ export class CoachPlanGenerator {
     calibrationNote?: string,
     unscheduledTasks?: PlanCandidate[],
     milestones?: MilestoneContext[],
+    weeklyOverview?: WeeklyDayInfo[],
   ): Promise<{ output: DailyPlanOutput; prompt: string }> {
     if (candidates.length === 0 && (!unscheduledTasks || unscheduledTasks.length === 0)) {
       return {
         output: {
           daily_plan: [],
-          capacity_note: '今天沒有待處理的任務，可以專注在長期規劃上。',
           coach_message: '今天行程很寬裕！不妨回顧一下整體方向，或處理一些平時沒時間做的事。',
           overflow_items: [],
           scheduling: [],
@@ -63,13 +62,16 @@ export class CoachPlanGenerator {
       }
     }
 
-    const prompt = this.buildPrompt(candidates, availableMinutes, meetingMinutes, calibrationNote, unscheduledTasks, milestones)
+    const prompt = this.buildPrompt(candidates, availableMinutes, meetingMinutes, calibrationNote, unscheduledTasks, milestones, weeklyOverview)
 
+    const start = Date.now()
     const { object } = await generateObject({
       model: google('gemini-2.5-flash-lite'),
       schema: DailyPlanOutputSchema,
       prompt,
     })
+    const aiTime = Date.now() - start
+    console.log('[PlanGenerator] AI call:', aiTime, 'ms, prompt length:', prompt.length, 'chars')
 
     return { output: object, prompt }
   }
@@ -85,6 +87,7 @@ export class CoachPlanGenerator {
     calibrationNote?: string,
     unscheduledTasks?: PlanCandidate[],
     milestones?: MilestoneContext[],
+    weeklyOverview?: WeeklyDayInfo[],
   ): string {
     const sections: string[] = []
 
@@ -107,14 +110,16 @@ export class CoachPlanGenerator {
       sections.push(`  - 優先安排可以獨自完成的工作任務`)
     }
     sections.push('')
-    sections.push('## 排序原則')
+    sections.push('## 排序原則（嚴格遵守）')
     sections.push('1. 逾期任務最優先')
-    sections.push('2. 今日到期 > 即將到期（3天內）> 本週到期')
-    sections.push('3. 剩餘天數 > 7 天的任務，除非今天特別適合做，否則不要排入 daily_plan，放入 overflow_items')
-    sections.push('4. 同一 Product 下的相關任務盡量排在一起（減少上下文切換）')
-    sections.push('5. 考慮任務的現實可行性（需要到特定地點、需要他人配合的任務是否今天能做）')
-    sections.push('6. 考慮任務的 estimated_minutes，嚴格遵守可用時間限制')
-    sections.push('7. 超出容量或不適合今天做的任務放入 overflow_items，並說明建議何時做')
+    sections.push('2. 今日到期必須排入')
+    sections.push('3. **看週表決定**：如果某天負荷率 > 80%，提前拉部分任務到前面較空的日子')
+    sections.push('4. **如果某天很空（負荷率 < 30%），可以從後面拉任務過來填充**')
+    sections.push('5. daily_plan 控制在 3-5 項，overflow 的 suggestion 說明建議哪天做（如「建議週三做，當天負荷較低」）')
+    sections.push('6. 容量上限 80%，留 20% 緩衝給意外事務')
+    sections.push('7. 同 Product 任務排一起減少上下文切換')
+    sections.push('8. 考慮任務的現實可行性（需要到特定地點、需要他人配合的任務是否今天能做）')
+    sections.push('9. 寧可少排確保完成，也不要塞太多全部做不完。**少即是多**')
     sections.push('')
     sections.push('## 估時指引')
     sections.push('- 為每個項目估計完成時間（分鐘），填入 estimated_minutes')
@@ -136,6 +141,51 @@ export class CoachPlanGenerator {
       sections.push(`- ⚠️ 今天可用時間很少，請只排最緊急、最重要的 1-3 項任務`)
     }
     sections.push('')
+
+    // Weekly overview
+    if (weeklyOverview && weeklyOverview.length > 0) {
+      sections.push('## 本週容量與負荷（週視野）')
+      sections.push('')
+      sections.push('| 日期 | 星期 | 可用時間 | 會議 | 到期任務 | 任務估時 | 負荷率 |')
+      sections.push('|------|------|---------|------|---------|---------|-------|')
+      for (let i = 0; i < weeklyOverview.length; i++) {
+        const d = weeklyOverview[i]
+        const availHours = (d.availableMinutes / 60).toFixed(1)
+        const meetHours = (d.meetingMinutes / 60).toFixed(1)
+        const estHours = (d.totalEstimatedMinutes / 60).toFixed(1)
+        const loadRate = d.availableMinutes > 0
+          ? Math.round((d.totalEstimatedMinutes / d.availableMinutes) * 100)
+          : 0
+        const marker = i === 0 ? ' ← 今天' : ''
+        sections.push(`| ${d.date} | ${d.dayOfWeek} | ${availHours}h | ${meetHours}h | ${d.tasksDue} 項 | ${estHours}h | ${loadRate}% |${marker}`)
+      }
+      sections.push('')
+
+      // Generate insights
+      const insights: string[] = []
+      for (let i = 1; i < weeklyOverview.length; i++) {
+        const d = weeklyOverview[i]
+        const loadRate = d.availableMinutes > 0
+          ? (d.totalEstimatedMinutes / d.availableMinutes) * 100
+          : 0
+        if (loadRate > 80) {
+          insights.push(`⚠️ ${d.date}（${d.dayOfWeek}）負荷率 ${Math.round(loadRate)}%，建議今天提前處理部分該日任務`)
+        }
+      }
+      for (let i = 1; i < weeklyOverview.length; i++) {
+        const d = weeklyOverview[i]
+        const loadRate = d.availableMinutes > 0
+          ? (d.totalEstimatedMinutes / d.availableMinutes) * 100
+          : 0
+        if (loadRate < 30) {
+          insights.push(`✅ ${d.date}（${d.dayOfWeek}）較空，非緊急任務可安排到該天`)
+        }
+      }
+      for (const insight of insights) {
+        sections.push(insight)
+      }
+      if (insights.length > 0) sections.push('')
+    }
 
     // Candidates
     sections.push('## 候選項目（需排序）')
@@ -189,10 +239,9 @@ export class CoachPlanGenerator {
     sections.push('## 回應要求')
     sections.push('1. daily_plan: 只放今天真正適合且來得及做的項目，按建議執行順序排列')
     sections.push('2. overflow_items: 不適合今天做的項目（太遠、週末限制、容量不足），suggestion 說明建議何時做')
-    sections.push('3. capacity_note: 說明今天的容量與分配')
-    sections.push('4. coach_message: 2-3 句親切的開場語，考慮今天是什麼日子')
+    sections.push('3. coach_message: 2-3 句親切的開場語，考慮今天是什麼日子')
     if (unscheduledTasks && unscheduledTasks.length > 0) {
-      sections.push('5. scheduling: 為每個待排程任務建議 start_date 和 due_date')
+      sections.push('4. scheduling: 為每個待排程任務建議 start_date 和 due_date')
     }
 
     return sections.join('\n')

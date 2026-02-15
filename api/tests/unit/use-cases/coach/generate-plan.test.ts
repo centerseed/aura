@@ -5,14 +5,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import type { IDailyPlanRepository, DailyPlanData, CreateDailyPlanData } from '@/domain/interfaces/daily-plan-repository'
-import type { PlanCandidateCollector, CollectedData, PlanCandidate } from '@/application/services/plan-candidate-collector'
+import type { CollectedData, PlanCandidate } from '@/application/services/plan-candidate-collector'
+import type { UnifiedDataCollector, UnifiedRawData } from '@/infrastructure/services/unified-data-collector'
+import type { UnifiedDataTransformer } from '@/infrastructure/services/unified-data-transformer'
 import type { CoachPlanGenerator } from '@/application/services/coach-plan-generator'
 import type { DailyPlanOutput } from '@/application/services/coach-plan-generator'
 import type { CoachCalibration } from '@/application/services/coach-calibration'
 
 // Mock prisma for resolveTimezone + writeBackEstimates + setStartDates + writeBackSuggestedDates
-const { mockTaskUpdate } = vi.hoisted(() => ({
+const { mockTaskUpdate, mockTaskFindMany } = vi.hoisted(() => ({
   mockTaskUpdate: vi.fn().mockResolvedValue({}),
+  mockTaskFindMany: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -26,6 +29,7 @@ vi.mock('@/lib/db', () => ({
     task: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       update: mockTaskUpdate,
+      findMany: mockTaskFindMany,
     },
     $transaction: vi.fn().mockResolvedValue([]),
   },
@@ -87,6 +91,7 @@ function makeDefaultCollectedData(overrides: Partial<CollectedData> = {}): Colle
     productContexts: [],
     meetingMinutes: 60,
     availableMinutes: 180,
+    weeklyOverview: [],
     ...overrides,
   }
 }
@@ -98,7 +103,6 @@ function makeDefaultAiOutput(overrides: Partial<DailyPlanOutput> = {}): DailyPla
       { item_id: 'st-2', item_type: 'subtask', order: 2, estimated_minutes: 90, reasoning: '其次' },
       { item_id: 'st-3', item_type: 'subtask', order: 3, estimated_minutes: 120, reasoning: '最後' },
     ],
-    capacity_note: '3 小時可用',
     coach_message: '加油！',
     overflow_items: [],
     scheduling: [],
@@ -111,7 +115,8 @@ function makeDefaultAiOutput(overrides: Partial<DailyPlanOutput> = {}): DailyPla
 // ============================================================================
 
 let mockRepository: IDailyPlanRepository
-let mockCollector: PlanCandidateCollector
+let mockCollector: UnifiedDataCollector
+let mockTransformer: UnifiedDataTransformer
 let mockGenerator: CoachPlanGenerator
 let mockCalibration: CoachCalibration
 let useCase: GeneratePlanUseCase
@@ -125,8 +130,24 @@ beforeEach(() => {
     updateItem: vi.fn(),
   }
 
+  const mockRawData: UnifiedRawData = {
+    allTasks: [],
+    allSubTasks: [],
+    todayCalendar: [],
+    tomorrowCalendar: [],
+    weeklyCalendar: new Map(),
+    completedTasks: [],
+    unscheduledTasks: [],
+    milestones: [],
+  }
+
   mockCollector = {
-    collect: vi.fn<[string, Date, string], Promise<CollectedData>>().mockResolvedValue(makeDefaultCollectedData()),
+    collect: vi.fn<[string, Date, string], Promise<UnifiedRawData>>().mockResolvedValue(mockRawData),
+  } as any
+
+  mockTransformer = {
+    toPlanCollectedData: vi.fn().mockReturnValue(makeDefaultCollectedData()),
+    toBriefingData: vi.fn().mockReturnValue({}),
   } as any
 
   mockGenerator = {
@@ -143,6 +164,7 @@ beforeEach(() => {
   useCase = new GeneratePlanUseCase(
     mockRepository,
     mockCollector,
+    mockTransformer,
     mockGenerator,
     mockCalibration,
   )
@@ -158,14 +180,19 @@ describe('GeneratePlanUseCase', () => {
       const result = await useCase.execute({ userId: 'user-1' })
 
       const upsertCall = (mockRepository.upsert as any).mock.calls[0][0] as CreateDailyPlanData
-      expect(upsertCall.items).toHaveLength(2)
-      expect(upsertCall.items[0].content).toBe('任務 A')
-      expect(upsertCall.items[1].content).toBe('任務 B')
+      // A(60) + B(90) = 150 < 180 OK, +C(120) = 270 > 180 截斷
+      const todayItems = upsertCall.items.filter((i: any) => i.status !== 'overflow')
+      const overflowItems = upsertCall.items.filter((i: any) => i.status === 'overflow')
+      expect(todayItems).toHaveLength(2)
+      expect(todayItems[0].content).toBe('任務 A')
+      expect(todayItems[1].content).toBe('任務 B')
+      expect(overflowItems).toHaveLength(1)
+      expect(overflowItems[0].content).toBe('任務 C')
       expect(upsertCall.plannedMinutes).toBe(150)
     })
 
     it('第一個項目即使超過容量也應排入', async () => {
-      ;(mockCollector.collect as any).mockResolvedValue(makeDefaultCollectedData({
+      ;(mockTransformer.toPlanCollectedData as any).mockReturnValueOnce(makeDefaultCollectedData({
         candidates: [makeCandidate({ subTaskId: 'st-big', content: '大任務', estimatedMinutes: 300 })],
       }))
       ;(mockGenerator.generate as any).mockResolvedValue({
@@ -211,7 +238,7 @@ describe('GeneratePlanUseCase', () => {
 
   describe('AI 估時優先', () => {
     it('AI 估時覆蓋候選值', async () => {
-      ;(mockCollector.collect as any).mockResolvedValue(makeDefaultCollectedData({
+      ;(mockTransformer.toPlanCollectedData as any).mockReturnValueOnce(makeDefaultCollectedData({
         candidates: [makeCandidate({ subTaskId: 'st-1', estimatedMinutes: 60 })],
         availableMinutes: 480,
         meetingMinutes: 0,
@@ -229,7 +256,7 @@ describe('GeneratePlanUseCase', () => {
     })
 
     it('AI 無估時時 fallback 到候選值', async () => {
-      ;(mockCollector.collect as any).mockResolvedValue(makeDefaultCollectedData({
+      ;(mockTransformer.toPlanCollectedData as any).mockReturnValueOnce(makeDefaultCollectedData({
         candidates: [makeCandidate({ subTaskId: 'st-1', estimatedMinutes: 90 })],
         availableMinutes: 480,
         meetingMinutes: 0,
@@ -247,7 +274,7 @@ describe('GeneratePlanUseCase', () => {
     })
 
     it('兩者都無時 fallback 60 分鐘', async () => {
-      ;(mockCollector.collect as any).mockResolvedValue(makeDefaultCollectedData({
+      ;(mockTransformer.toPlanCollectedData as any).mockReturnValueOnce(makeDefaultCollectedData({
         candidates: [makeCandidate({ subTaskId: 'st-1', estimatedMinutes: null })],
         availableMinutes: 480,
         meetingMinutes: 0,
@@ -299,13 +326,23 @@ describe('GeneratePlanUseCase', () => {
         prompt: 'test',
       })
 
+      // Mock findMany 回傳可更新的 task
+      mockTaskFindMany.mockResolvedValueOnce([{ id: 'task-unscheduled-1' }])
+
       await useCase.execute({ userId: 'user-1' })
 
-      expect(mockTaskUpdate).toHaveBeenCalledWith({
+      // 驗證先查詢
+      expect(mockTaskFindMany).toHaveBeenCalledWith({
         where: {
-          id: 'task-unscheduled-1',
+          id: { in: ['task-unscheduled-1'] },
           OR: [{ date_source: null }, { date_source: 'coach' }],
         },
+        select: { id: true },
+      })
+
+      // 驗證更新
+      expect(mockTaskUpdate).toHaveBeenCalledWith({
+        where: { id: 'task-unscheduled-1' },
         data: {
           date_source: 'coach',
           start_date: new Date('2026-02-18'),
@@ -339,13 +376,23 @@ describe('GeneratePlanUseCase', () => {
         prompt: 'test',
       })
 
+      // Mock findMany 回傳可更新的 task
+      mockTaskFindMany.mockResolvedValueOnce([{ id: 'task-x' }])
+
       await useCase.execute({ userId: 'user-1' })
 
-      expect(mockTaskUpdate).toHaveBeenCalledWith({
+      // 驗證先查詢可更新的 task
+      expect(mockTaskFindMany).toHaveBeenCalledWith({
         where: {
-          id: 'task-x',
+          id: { in: ['task-x'] },
           OR: [{ date_source: null }, { date_source: 'coach' }],
         },
+        select: { id: true },
+      })
+
+      // 驗證更新時用簡單的 WHERE { id }
+      expect(mockTaskUpdate).toHaveBeenCalledWith({
+        where: { id: 'task-x' },
         data: {
           date_source: 'coach',
           start_date: new Date('2026-02-18'),
@@ -366,7 +413,7 @@ describe('GeneratePlanUseCase', () => {
         entityName: 'Naruvia',
       }]
 
-      ;(mockCollector.collect as any).mockResolvedValue(makeDefaultCollectedData({
+      ;(mockTransformer.toPlanCollectedData as any).mockReturnValueOnce(makeDefaultCollectedData({
         unscheduledTasks,
         milestones,
       }))

@@ -13,7 +13,6 @@ vi.mock('ai', () => ({
   generateObject: vi.fn().mockResolvedValue({
     object: {
       daily_plan: [],
-      capacity_note: '',
       coach_message: '',
       overflow_items: [],
       scheduling: [],
@@ -136,13 +135,13 @@ describe('CoachPlanGenerator', () => {
       expect(prompt).toContain('現實可行性')
     })
 
-    it('應指示剩餘天數 > 7 天的任務放入 overflow', async () => {
+    it('應指示使用週視野決定任務排程', async () => {
       const { prompt } = await generator.generate(
         [makeCandidate()], 480, 0,
       )
 
-      expect(prompt).toContain('7 天')
-      expect(prompt).toContain('overflow_items')
+      expect(prompt).toContain('週表決定')
+      expect(prompt).toContain('overflow')
     })
   })
 
@@ -219,6 +218,71 @@ describe('CoachPlanGenerator', () => {
       expect(prompt).toContain('🔶 剩 3 天')
 
       vi.useRealTimers()
+    })
+  })
+
+  describe('週視野 prompt', () => {
+    it('應在 prompt 中包含週容量表格', async () => {
+      const weeklyOverview = [
+        { date: '2026-02-15', dayOfWeek: '星期六', meetingMinutes: 120, availableMinutes: 360, tasksDue: 2, totalEstimatedMinutes: 180 },
+        { date: '2026-02-16', dayOfWeek: '星期日', meetingMinutes: 0, availableMinutes: 480, tasksDue: 0, totalEstimatedMinutes: 0 },
+        { date: '2026-02-17', dayOfWeek: '星期一', meetingMinutes: 180, availableMinutes: 300, tasksDue: 3, totalEstimatedMinutes: 270 },
+        { date: '2026-02-18', dayOfWeek: '星期二', meetingMinutes: 60, availableMinutes: 420, tasksDue: 1, totalEstimatedMinutes: 60 },
+        { date: '2026-02-19', dayOfWeek: '星期三', meetingMinutes: 240, availableMinutes: 240, tasksDue: 2, totalEstimatedMinutes: 150 },
+      ]
+
+      const { prompt } = await generator.generate(
+        [makeCandidate()], 360, 120,
+        undefined, undefined, undefined,
+        weeklyOverview,
+      )
+
+      expect(prompt).toContain('本週容量與負荷')
+      expect(prompt).toContain('2026-02-15')
+      expect(prompt).toContain('星期一')
+      expect(prompt).toContain('← 今天')
+    })
+
+    it('應對高負荷日生成提前處理建議', async () => {
+      const weeklyOverview = [
+        { date: '2026-02-15', dayOfWeek: '星期六', meetingMinutes: 0, availableMinutes: 480, tasksDue: 1, totalEstimatedMinutes: 120 },
+        { date: '2026-02-16', dayOfWeek: '星期日', meetingMinutes: 0, availableMinutes: 480, tasksDue: 5, totalEstimatedMinutes: 420 },
+      ]
+
+      const { prompt } = await generator.generate(
+        [makeCandidate()], 480, 0,
+        undefined, undefined, undefined,
+        weeklyOverview,
+      )
+
+      // 星期日 420/480 = 87.5% > 80%
+      expect(prompt).toContain('⚠️')
+      expect(prompt).toContain('建議今天提前處理')
+    })
+
+    it('應對低負荷日生成分散建議', async () => {
+      const weeklyOverview = [
+        { date: '2026-02-15', dayOfWeek: '星期六', meetingMinutes: 0, availableMinutes: 480, tasksDue: 3, totalEstimatedMinutes: 360 },
+        { date: '2026-02-16', dayOfWeek: '星期日', meetingMinutes: 0, availableMinutes: 480, tasksDue: 0, totalEstimatedMinutes: 60 },
+      ]
+
+      const { prompt } = await generator.generate(
+        [makeCandidate()], 480, 0,
+        undefined, undefined, undefined,
+        weeklyOverview,
+      )
+
+      // 星期日 60/480 = 12.5% < 30%
+      expect(prompt).toContain('✅')
+      expect(prompt).toContain('較空')
+    })
+
+    it('無週視野資料時 prompt 不應包含表格', async () => {
+      const { prompt } = await generator.generate(
+        [makeCandidate()], 480, 0,
+      )
+
+      expect(prompt).not.toContain('本週容量與負荷')
     })
   })
 })

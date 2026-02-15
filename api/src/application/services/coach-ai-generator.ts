@@ -96,11 +96,14 @@ export class CoachAIGenerator {
     const prompt = this.buildPrompt(input)
     const schema = input.type === 'MORNING' ? MorningBriefingSchema : EveningBriefingSchema
 
+    const start = Date.now()
     const { object } = await generateObject({
       model: google('gemini-2.5-flash-lite'),
       schema,
       prompt,
     })
+    const aiTime = Date.now() - start
+    console.log(`[AIGenerator] ${input.type} AI call:`, aiTime, 'ms, prompt length:', prompt.length, 'chars')
 
     return {
       summary: object.summary,
