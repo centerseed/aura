@@ -12,6 +12,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { getStartOfDay, getEndOfDay } from '@/lib/timezone-utils'
+import type { UnifiedRawData } from '@/domain/interfaces/data-collector'
 import { WORK_HOURS_PER_DAY, MAX_UNSCHEDULED_TASKS, MAX_MILESTONES, MAX_TODAY_CANDIDATES } from '@/lib/coach-constants'
 
 // ============================================================================
@@ -67,25 +68,19 @@ interface RawMilestone {
 }
 
 // ============================================================================
-// Unified Raw Data (8 parallel queries)
+// Internal Type Mapping
 // ============================================================================
 
-export interface UnifiedRawData {
-  allTasks: RawTask[]              // 所有 ACTIVE/INBOX 任務
-  allSubTasks: RawSubTask[]        // 所有活躍子任務
-  todayCalendar: RawCalendarEvent[]
-  tomorrowCalendar: RawCalendarEvent[]
-  weeklyCalendar: Map<string, number> // date → meeting minutes
-  completedTasks: RawTask[]        // 今日完成
-  unscheduledTasks: RawTask[]      // 未排程
-  milestones: RawMilestone[]
-}
+// UnifiedRawData 來自 @/domain/interfaces/data-collector
+// 以下是內部 RawTask/RawSubTask 與 UnifiedRawData 之間的轉換器
 
 // ============================================================================
 // Collector
 // ============================================================================
 
-export class UnifiedDataCollector {
+import type { IDataCollector } from '@/domain/interfaces/data-collector'
+
+export class UnifiedDataCollector implements IDataCollector {
   async collect(userId: string, date: Date, timezone: string): Promise<UnifiedRawData> {
     const todayStart = getStartOfDay(date, timezone)
     const todayEnd = getEndOfDay(date, timezone)
@@ -132,7 +127,7 @@ export class UnifiedDataCollector {
     })
 
     // 建立週會議分鐘數 Map（從完整事件計算）
-    const weeklyMeetingMinutes = this.buildWeeklyMeetingMap(weeklyCalendar)
+    const weeklyMeetingMinutes = this.buildWeeklyMeetingMap(weeklyCalendar, todayStart)
 
     return {
       allTasks,
@@ -311,14 +306,36 @@ export class UnifiedDataCollector {
 
   /**
    * 從事件列表建立週會議分鐘數 Map（記憶體操作）
+   *
+   * ⚠️ 重要：返回的 Map key 是「本地時區日期字串」(YYYY-MM-DD)
+   * 基於 todayStart 計算每天的邊界（todayStart 已是本地時區的 00:00）
    */
-  private buildWeeklyMeetingMap(events: RawCalendarEvent[]): Map<string, number> {
+  private buildWeeklyMeetingMap(events: RawCalendarEvent[], todayStart: Date): Map<string, number> {
     const map = new Map<string, number>()
-    for (const evt of events) {
-      const dateStr = evt.start_date_time.toISOString().substring(0, 10)
-      const durationMinutes = (evt.end_date_time.getTime() - evt.start_date_time.getTime()) / 1000 / 60
-      map.set(dateStr, (map.get(dateStr) || 0) + durationMinutes)
+
+    // 計算 5 天的邊界（基於 todayStart 的時區）
+    const dayBoundaries: Array<{ start: Date; dateStr: string }> = []
+    for (let i = 0; i < 5; i++) {
+      const dayStart = new Date(todayStart.getTime() + i * 24 * 60 * 60 * 1000)
+      const dateStr = dayStart.toISOString().substring(0, 10)
+      dayBoundaries.push({ start: dayStart, dateStr })
     }
+
+    // 將事件歸類到對應日期
+    for (const evt of events) {
+      for (let i = 0; i < dayBoundaries.length - 1; i++) {
+        const dayStart = dayBoundaries[i].start
+        const nextDayStart = dayBoundaries[i + 1].start
+        const dateStr = dayBoundaries[i].dateStr
+
+        if (evt.start_date_time >= dayStart && evt.start_date_time < nextDayStart) {
+          const durationMinutes = (evt.end_date_time.getTime() - evt.start_date_time.getTime()) / 1000 / 60
+          map.set(dateStr, (map.get(dateStr) || 0) + durationMinutes)
+          break
+        }
+      }
+    }
+
     return map
   }
 

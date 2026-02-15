@@ -10,6 +10,8 @@ import type {
   CoachBriefingData,
   CreateCoachBriefingData,
 } from '@/domain/interfaces/coach-briefing-repository'
+import type { IDataCollector } from '@/domain/interfaces/data-collector'
+import type { IDataTransformer } from '@/domain/interfaces/data-transformer'
 import type { BriefingType } from '@/domain/entities/coach-briefing.entity'
 import { PrismaCoachBriefingRepository } from '@/infrastructure/repositories/prisma-coach-briefing-repository'
 import { UnifiedDataCollector } from '@/infrastructure/services/unified-data-collector'
@@ -50,8 +52,8 @@ export interface GenerateBriefingResponse {
 export class GenerateBriefingUseCase {
   constructor(
     private readonly repository: ICoachBriefingRepository = new PrismaCoachBriefingRepository(),
-    private readonly collector: UnifiedDataCollector = new UnifiedDataCollector(),
-    private readonly transformer: UnifiedDataTransformer = new UnifiedDataTransformer(),
+    private readonly collector: IDataCollector = new UnifiedDataCollector(),
+    private readonly transformer: IDataTransformer = new UnifiedDataTransformer(),
     private readonly aiGenerator: CoachAIGenerator = new CoachAIGenerator(),
   ) {}
 

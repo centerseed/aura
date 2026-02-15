@@ -9,9 +9,11 @@ import type {
   DailyPlanData,
   CreateDailyPlanData,
 } from '@/domain/interfaces/daily-plan-repository'
-import { PrismaDailyPlanRepository } from '@/infrastructure/repositories/prisma-daily-plan-repository'
+import type { IDataCollector, UnifiedRawData } from '@/domain/interfaces/data-collector'
+import type { IDataTransformer } from '@/domain/interfaces/data-transformer'
 import type { PlanCandidate } from '@/domain/entities/plan-candidate.entity'
-import { UnifiedDataCollector, type UnifiedRawData } from '@/infrastructure/services/unified-data-collector'
+import { PrismaDailyPlanRepository } from '@/infrastructure/repositories/prisma-daily-plan-repository'
+import { UnifiedDataCollector } from '@/infrastructure/services/unified-data-collector'
 import { UnifiedDataTransformer } from '@/infrastructure/services/unified-data-transformer'
 import { CoachPlanGenerator, type DailyPlanOutput } from '@/application/services/coach-plan-generator'
 import { CoachCalibration } from '@/application/services/coach-calibration'
@@ -42,8 +44,8 @@ export interface GeneratePlanResponse {
 export class GeneratePlanUseCase {
   constructor(
     private readonly repository: IDailyPlanRepository = new PrismaDailyPlanRepository(),
-    private readonly collector: UnifiedDataCollector = new UnifiedDataCollector(),
-    private readonly transformer: UnifiedDataTransformer = new UnifiedDataTransformer(),
+    private readonly collector: IDataCollector = new UnifiedDataCollector(),
+    private readonly transformer: IDataTransformer = new UnifiedDataTransformer(),
     private readonly planGenerator: CoachPlanGenerator = new CoachPlanGenerator(),
     private readonly calibration: CoachCalibration = new CoachCalibration(),
   ) {}

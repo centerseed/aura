@@ -10,9 +10,10 @@ import type { UnifiedRawData } from './unified-data-collector'
 import type { AggregatedData } from './coach-data-aggregator'
 import type { CollectedData, PlanCandidate, WeeklyDayInfo } from '@/domain/entities/plan-candidate.entity'
 import type { CalendarEventSummary, TaskSummary, SubTaskSummary } from '@/domain/entities/coach-briefing.entity'
+import type { IDataTransformer } from '@/domain/interfaces/data-transformer'
 import { WORK_HOURS_PER_DAY, MAX_TODAY_CANDIDATES } from '@/lib/coach-constants'
 
-export class UnifiedDataTransformer {
+export class UnifiedDataTransformer implements IDataTransformer {
   /**
    * 轉換成 Briefing 需要的格式
    */
@@ -342,7 +343,7 @@ export class UnifiedDataTransformer {
           const dueStr = c.dueDate.toISOString().substring(0, 10)
           return dueStr === dateStr
         })
-        .reduce((sum, c) => sum + (c.estimatedMinutes || 60), 0)
+        .reduce((sum, c) => sum + (c.estimatedMinutes ?? 60), 0)
 
       overview.push({
         date: dateStr,

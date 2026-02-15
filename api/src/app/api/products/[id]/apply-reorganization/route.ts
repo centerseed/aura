@@ -149,36 +149,54 @@ export async function POST(
       let updatedTasksCount = 0; // 追蹤實際更新的 tasks 數量
 
       if (applyTopicOps) {
-        for (const cluster of proposal.proposed_clusters) {
-          // 優先使用已經 rename/merge 過的 topic ID
-          const existingId = topicIdMapping.get(cluster.topic_name);
-          let topicId: string;
+        // 🚨 性能優化：避免 N+1 查詢，先批次查詢所有需要的 topics
+        const uniqueTopicNames = Array.from(
+          new Set(
+            proposal.proposed_clusters
+              .map(c => c.topic_name)
+              .filter(name => !topicIdMapping.has(name)) // 排除已經 rename/merge 過的
+          )
+        );
 
-          if (existingId) {
-            topicId = existingId;
-          } else {
-            // 查找現有 Topic
-            let topic = await tx.topic.findFirst({
-              where: {
-                user_id: userId,
-                product_id: productId,
-                name: cluster.topic_name,
-                deleted_at: null,
-              },
-            });
+        const existingTopics = await tx.topic.findMany({
+          where: {
+            user_id: userId,
+            product_id: productId,
+            name: { in: uniqueTopicNames },
+            deleted_at: null,
+          },
+          select: { id: true, name: true },
+        });
 
-            // 如果不存在,創建新 Topic
-            if (!topic) {
-              topic = await tx.topic.create({
+        // 在記憶體中建立 name -> id 映射
+        const existingTopicMap = new Map(existingTopics.map(t => [t.name, t.id]));
+
+        // 找出不存在的 topics，準備批次創建
+        const topicsToCreate = uniqueTopicNames.filter(name => !existingTopicMap.has(name));
+
+        if (topicsToCreate.length > 0) {
+          const createResults = await Promise.all(
+            topicsToCreate.map(name =>
+              tx.topic.create({
                 data: {
                   user_id: userId,
                   product_id: productId,
-                  name: cluster.topic_name,
+                  name: name,
                 } as any,
-              });
-            }
+              })
+            )
+          );
+          createResults.forEach(topic => existingTopicMap.set(topic.name, topic.id));
+        }
 
-            topicId = topic.id;
+        // 現在所有 topic 都已存在，可以進行批次更新
+        for (const cluster of proposal.proposed_clusters) {
+          // 優先使用已經 rename/merge 過的 topic ID，其次使用查詢到的 topic
+          const topicId = topicIdMapping.get(cluster.topic_name) || existingTopicMap.get(cluster.topic_name);
+
+          if (!topicId) {
+            console.warn(`Topic ${cluster.topic_name} not found and couldn't be created, skipping...`);
+            continue;
           }
 
           topicMapping.set(cluster.topic_name, topicId);
@@ -196,6 +214,8 @@ export async function POST(
             const updateResult = await tx.task.updateMany({
               where: {
                 id: { in: validTaskIds },
+                user_id: userId,
+                product_id: productId,
                 deleted_at: null,
                 status: { not: "ARCHIVE" },
               },
@@ -255,15 +275,27 @@ export async function POST(
           }
 
           // 獲取所有 sub tasks (用於建立 sub_items，包含所有欄位)
+          // 🚨 安全驗證：確保所有 sub tasks 屬於當前 product 和 user
           const subTasks = await tx.task.findMany({
             where: {
               id: { in: validSubTaskIds },
+              user_id: userId,
+              product_id: productId,
               deleted_at: null,
             },
             orderBy: {
               created_at: "asc",
             },
           });
+
+          // 驗證查詢到的 tasks 數量，防止跨 product 攻擊
+          if (subTasks.length !== validSubTaskIds.length) {
+            console.error(
+              `🚨 SECURITY: Mismatch in sub task count. Expected ${validSubTaskIds.length}, got ${subTasks.length}. ` +
+              `This may indicate an attempt to consolidate tasks from other products.`
+            );
+            continue;
+          }
 
           // ✅ 從 sub_tasks 表取得目前最大 order
           const maxOrderResult = await tx.subTask.aggregate({
