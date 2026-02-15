@@ -31,8 +31,8 @@ const mockPlanExecute = vi.fn().mockResolvedValue({
     meetingMinutes: 60,
     plannedMinutes: 240,
     items: [
-      { id: 'item-1', planId: 'plan-1', itemType: 'task', taskId: 'task-1', subTaskId: null, content: '完成報告', areaName: '營運', productName: 'Zentropy', estimatedMinutes: 60, dueDate: null, order: 1, reasoning: '優先處理', completed: false, completedAt: null, actualMinutes: null },
-      { id: 'item-2', planId: 'plan-1', itemType: 'task', taskId: 'task-2', subTaskId: null, content: '客戶會議準備', areaName: '業務', productName: 'Havital', estimatedMinutes: 45, dueDate: null, order: 2, reasoning: '今日到期', completed: false, completedAt: null, actualMinutes: null },
+      { id: 'item-1', planId: 'plan-1', itemType: 'task', taskId: 'task-1', subTaskId: null, content: '完成報告', areaName: '營運', productName: 'Zentropy', estimatedMinutes: 60, dueDate: null, order: 1, reasoning: '優先處理', completed: false, completedAt: null, actualMinutes: null, status: 'today' },
+      { id: 'item-2', planId: 'plan-1', itemType: 'task', taskId: 'task-2', subTaskId: null, content: '客戶會議準備', areaName: '業務', productName: 'Havital', estimatedMinutes: 45, dueDate: null, order: 2, reasoning: '今日到期', completed: false, completedAt: null, actualMinutes: null, status: 'today' },
     ],
     createdAt: new Date(),
     updatedAt: new Date(),

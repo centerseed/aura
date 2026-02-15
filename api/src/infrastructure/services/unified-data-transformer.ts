@@ -78,7 +78,15 @@ export class UnifiedDataTransformer implements IDataTransformer {
     const threeDaysLater = new Date(todayStart.getTime() + 3 * 24 * 60 * 60 * 1000)
     const sevenDaysLater = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-    // 篩選候選任務 (逾期 + 7天內到期 + 已開始)
+    // 子任務按 task_id 分組（提前建立，供候選篩選使用）
+    const subTasksByTaskForFilter = new Map<string, typeof raw.allSubTasks[0][]>()
+    for (const st of raw.allSubTasks) {
+      const arr = subTasksByTaskForFilter.get(st.task_id) || []
+      arr.push(st)
+      subTasksByTaskForFilter.set(st.task_id, arr)
+    }
+
+    // 篩選候選任務 (逾期 + 7天內到期 + 已開始 + 子任務到期)
     const candidateTasks = raw.allTasks.filter(task => {
       // 1. 逾期
       if (task.due_date && task.due_date < todayStart) return true
@@ -90,21 +98,19 @@ export class UnifiedDataTransformer implements IDataTransformer {
       ) return true
       // 3. 已開始
       if (task.start_date && task.start_date <= todayStart) return true
+      // 4. 子任務有自己的 due_date 且在 7 天內到期
+      const subTasks = subTasksByTaskForFilter.get(task.id) || []
+      const hasUrgentSubTask = subTasks.some(st =>
+        !st.completed && st.due_date && st.due_date < sevenDaysLater
+      )
+      if (hasUrgentSubTask) return true
       return false
     }).slice(0, MAX_TODAY_CANDIDATES)
-
-    // Group subtasks by task_id
-    const subTasksByTask = new Map<string, typeof raw.allSubTasks[0][]>()
-    for (const st of raw.allSubTasks) {
-      const arr = subTasksByTask.get(st.task_id) || []
-      arr.push(st)
-      subTasksByTask.set(st.task_id, arr)
-    }
 
     // 展開候選 (Task 有 SubTask 則展開，否則 Task 自己)
     const candidates: PlanCandidate[] = []
     for (const task of candidateTasks) {
-      const subTasks = subTasksByTask.get(task.id) || []
+      const subTasks = subTasksByTaskForFilter.get(task.id) || []
       const uncompletedSubTasks = subTasks.filter(st => !st.completed)
 
       if (uncompletedSubTasks.length > 0) {
@@ -343,7 +349,7 @@ export class UnifiedDataTransformer implements IDataTransformer {
           const dueStr = c.dueDate.toISOString().substring(0, 10)
           return dueStr === dateStr
         })
-        .reduce((sum, c) => sum + (c.estimatedMinutes ?? 60), 0)
+        .reduce((sum, c) => sum + (c.estimatedMinutes ?? 30), 0)
 
       overview.push({
         date: dateStr,

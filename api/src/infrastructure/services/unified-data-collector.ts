@@ -315,7 +315,7 @@ export class UnifiedDataCollector implements IDataCollector {
 
     // 計算 5 天的邊界（基於 todayStart 的時區）
     const dayBoundaries: Array<{ start: Date; dateStr: string }> = []
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const dayStart = new Date(todayStart.getTime() + i * 24 * 60 * 60 * 1000)
       const dateStr = dayStart.toISOString().substring(0, 10)
       dayBoundaries.push({ start: dayStart, dateStr })

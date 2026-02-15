@@ -115,6 +115,7 @@ export class GeneratePlanUseCase {
       taskId: string; subTaskId: string | null; content: string;
       areaName: string; productName: string; estimatedMinutes: number | null;
       dueDate: Date | null; order: number; reasoning: string;
+      status: 'today' | 'overflow';
     }> = []
     let accumulatedMinutes = 0
 
@@ -148,6 +149,7 @@ export class GeneratePlanUseCase {
         dueDate: candidate.dueDate,
         order: plannedItems.length + 1,
         reasoning: item.reasoning,
+        status: 'today',
       })
     }
 
@@ -200,7 +202,7 @@ export class GeneratePlanUseCase {
       if (existingPlan) {
         const seenAdjustedKeys = new Set<string>()
         userAdjustedItems = existingPlan.items
-          .filter(item => item.userAdjusted && !item.completed)
+          .filter(item => item.userAdjusted && !item.completed && item.status === 'today')
           .filter(item => {
             const key = `${item.taskId}:${item.subTaskId || ''}`
             if (seenAdjustedKeys.has(key)) return false
@@ -246,16 +248,21 @@ export class GeneratePlanUseCase {
 
     const allItems = [...userAdjustedItems, ...reorderedPlanned, ...deduplicatedOverflow]
 
+    // 重新計算 plannedMinutes：只計算 status=today 的項目
+    const actualPlannedMinutes = allItems
+      .filter(i => i.status === 'today')
+      .reduce((sum, i) => sum + (i.estimatedMinutes ?? 0), 0)
+
     // 6. 儲存 + 設定開始日期（並行執行，操作不同表）
     start = Date.now()
     const createData: CreateDailyPlanData = {
       userId: request.userId,
       planDate: planDateOnly,
       coachMessage: aiResult.coach_message,
-      capacityNote: this.buildCapacityNote(collected.availableMinutes, collected.meetingMinutes, plannedMinutes),
+      capacityNote: this.buildCapacityNote(collected.availableMinutes, collected.meetingMinutes, actualPlannedMinutes),
       availableMinutes: collected.availableMinutes,
       meetingMinutes: collected.meetingMinutes,
-      plannedMinutes: plannedMinutes,
+      plannedMinutes: actualPlannedMinutes,
       overflowItems: [],
       items: allItems,
     }

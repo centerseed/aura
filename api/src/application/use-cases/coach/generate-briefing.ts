@@ -142,7 +142,9 @@ export class GenerateBriefingUseCase {
         remainingTasks: aggregatedData.remainingTasks,
         tomorrowPreview: aggregatedData.tomorrowPreview,
         dailyPlan: planResult ? {
-          items: planResult.plan.items.map(i => ({
+          items: planResult.plan.items
+            .filter(i => i.status === 'today')
+            .map(i => ({
             order: i.order,
             content: i.content,
             areaName: i.areaName,

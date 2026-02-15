@@ -213,8 +213,8 @@ export function TodayOverviewSheet({
 
   // Count stats for the header button
   const todayPlanItems = plan?.items.filter((i) => !i.completed && i.status === "today") ?? [];
-  const completedPlanItems = plan?.items.filter((i) => i.completed) ?? [];
-  const totalPlanItems = plan?.items.length ?? 0;
+  const completedPlanItems = plan?.items.filter((i) => i.completed && i.status === "today") ?? [];
+  const totalPlanItems = plan?.items.filter((i) => i.status === "today").length ?? 0;
 
   const loadBriefings = useCallback(async () => {
     try {
@@ -331,7 +331,8 @@ export function TodayOverviewSheet({
       if (!inWindow) return false;
       const existingBriefing = type === "MORNING" ? morningBriefing : eveningBriefing;
       if (!existingBriefing) return true;
-      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const briefingDate = existingBriefing.briefing_date.split("T")[0];
       if (briefingDate === today) return false;
       return true;
@@ -659,7 +660,8 @@ function TodaySheetContent({
 
   // ---- Main Content ----
   const isOutdated = (() => {
-    const todayDate = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const briefingDate = briefing.briefing_date.split("T")[0];
     return briefingDate !== todayDate;
   })();
@@ -1012,7 +1014,7 @@ function EveningCompletedSection({
   plan: DailyPlan | null;
   completedTodayTasks: TaskCard[];
 }) {
-  const completedItems = plan?.items.filter((i) => i.completed) ?? [];
+  const completedItems = plan?.items.filter((i) => i.completed && i.status === "today") ?? [];
   const extraCompleted = completedTodayTasks.filter(
     (t) => !completedItems.some((i) => i.task_id === t.id)
   );
@@ -1089,7 +1091,7 @@ function PlanSection({
 
   const todayItems = plan?.items.filter((i) => !i.completed && i.status === "today").sort((a, b) => a.order - b.order) ?? [];
   const overflowItems = plan?.items.filter((i) => !i.completed && i.status === "overflow").sort((a, b) => a.order - b.order) ?? [];
-  const completedItems = plan?.items.filter((i) => i.completed) ?? [];
+  const completedItems = plan?.items.filter((i) => i.completed && i.status === "today") ?? [];
 
   // Capacity note
   const capacityNote = plan?.capacity_note;
