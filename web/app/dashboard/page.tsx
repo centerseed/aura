@@ -66,6 +66,7 @@ import type {
   EntityType,
 } from "@/types";
 import { QuickCapture } from "@/components/quick-capture";
+import { TodayOverviewSheet } from "@/components/today-overview-sheet";
 import { AIButtonTip } from "@/components/ai-button-tip";
 import { QuickInputGuide } from "@/components/quick-input-guide";
 import { TimelineView } from "@/components/timeline-view";
@@ -79,7 +80,6 @@ import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CoachAgent } from "@/components/coach-briefing-card";
 
 // 視圖類型
 type ViewMode = "structure" | "timeline" | "load";
@@ -110,6 +110,7 @@ interface ApiProduct {
   lifecycle: "FINITE" | "PERPETUAL";
   referenceCount: number;
   tasks: TaskCard[];
+  topics?: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -135,6 +136,8 @@ function cleanLibraryData(areas: any[]): ApiArea[] {
           status: product.status || 'ACTIVE',
           lifecycle: product.lifecycle || 'FINITE',
           referenceCount: Number(product.referenceCount) || 0,
+          topics: (Array.isArray(product.topics) ? product.topics : [])
+            .filter((t: any) => t != null && t.id && t.name),
           tasks: (Array.isArray(product.tasks) ? product.tasks : [])
             .filter((t: any) => t != null && t.id && t.title)
             .map((task: any) => ({
@@ -518,7 +521,7 @@ function DraggableTaskItem({
                         >
                           {subItem.content}
                         </span>
-                        {subItem.due_date && (() => {
+                        {subItem.due_date && !subItem.completed && (() => {
                           const dueInfo = getRelativeTimeDesc(new Date(subItem.due_date!));
                           return (
                             <span
@@ -1163,7 +1166,6 @@ function DashboardContent() {
 
   // 今日完成任務追蹤（從 API 獲取）
   const [completedTodayTasks, setCompletedTodayTasks] = useState<TaskCard[]>([]);
-  const [showCompletedSheet, setShowCompletedSheet] = useState(false);
   const [completionFeedback, setCompletionFeedback] = useState<string | null>(null);
 
   // 最近兩週已歸檔任務（用於「顯示已完成」功能）
@@ -1857,6 +1859,75 @@ function DashboardContent() {
       }
     } catch (error) {
       console.error("Failed to change task status:", error);
+    }
+  };
+
+  const handleTopicChange = async (taskId: string, topicId: string | null) => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ taskId, topicId }),
+      });
+
+      if (!res.ok) throw new Error("主題更新失敗");
+
+      const responseData = await res.json();
+      const { task: updatedTask } = responseData.data;
+
+      if (updatedTask) {
+        setAreas(prevAreas => updateAreasState(prevAreas, (areas) =>
+          areas.map(area => ({
+            ...area,
+            products: area.products.map(product => ({
+              ...product,
+              tasks: product.tasks.map(task =>
+                task.id === taskId ? updatedTask : task
+              ),
+            })),
+          }))
+        ));
+        if (selectedTask?.id === taskId) setSelectedTask(updatedTask);
+      }
+    } catch (error) {
+      console.error("Failed to change topic:", error);
+    }
+  };
+
+  const handleProductChange = async (taskId: string, newProductId: string) => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ taskId, productId: newProductId }),
+      });
+
+      if (!res.ok) throw new Error("專案更新失敗");
+
+      // Product change moves task between products, reload all data
+      const libraryRes = await fetch(`${API_BASE_URL}/api/library`, {
+        headers: authHeaders,
+      });
+      if (libraryRes.ok) {
+        const libraryData = await libraryRes.json();
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
+
+        // Update selectedTask to reflect changes
+        const updatedTask = (libraryData.data?.areas || [])
+          .flatMap((a: any) => a.products?.flatMap((p: any) => p.tasks || []) || [])
+          .find((t: any) => t?.id === taskId);
+        if (updatedTask) setSelectedTask(updatedTask);
+      }
+    } catch (error) {
+      console.error("Failed to change product:", error);
     }
   };
 
@@ -2918,7 +2989,7 @@ function DashboardContent() {
   };
 
   // 應用 AI 重組建議
-  const handleApplyReorganization = async () => {
+  const handleApplyReorganization = async (options?: { applyTopicOps: boolean; applyConsolidations: boolean }) => {
     if (!reorganizeProposal || !userId) return;
 
     setIsApplying(true); // ✅ 開始 applying loading
@@ -2929,7 +3000,11 @@ function DashboardContent() {
           "Content-Type": "application/json",
           ...(await getAuthHeaders())
         },
-        body: JSON.stringify(reorganizeProposal),
+        body: JSON.stringify({
+          ...reorganizeProposal,
+          apply_topic_operations: options?.applyTopicOps ?? true,
+          apply_task_consolidations: options?.applyConsolidations ?? true,
+        }),
       });
 
       if (!res.ok) {
@@ -3240,17 +3315,24 @@ function DashboardContent() {
               {/* 主題切換 */}
               <ThemeToggle />
 
-              {/* 今日完成指標 */}
-              <button
-                onClick={() => setShowCompletedSheet(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-all"
-                title="查看今日完成的任務"
-              >
-                <CheckCircle2 className="w-4 h-4 text-green-400" />
-                <span className="text-sm text-green-400">
-                  今天已完成 ({completedTodayTasks.length}/{(stats.total || 0) + completedTodayTasks.length})
-                </span>
-              </button>
+              {/* 今日概覽 */}
+              <TodayOverviewSheet
+                completedTodayTasks={completedTodayTasks}
+                onCompleteTask={handleCompleteTask}
+                onOpenTask={(taskId, subTaskId) => {
+                  const task = areas
+                    .flatMap((a) => a.products.flatMap((p) => p.tasks))
+                    .filter((t) => t != null)
+                    .find((t) => t.id === taskId);
+                  if (task) {
+                    setInitialEditSubItemId(subTaskId || null);
+                    setSelectedTask(task);
+                    setSelectedTaskCalendarEvent(null);
+                    setIsTaskDetailModalOpen(true);
+                    fetchTaskCalendarEvent(task.id);
+                  }
+                }}
+              />
 
               {/* 視圖切換按鈕 */}
               <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
@@ -3289,8 +3371,6 @@ function DashboardContent() {
               </button>
             </div>
 
-              {/* Coach 教練按鈕 */}
-              <CoachAgent />
 
               {/* 設定按鈕 */}
               <button
@@ -3859,6 +3939,17 @@ function DashboardContent() {
             onComplete={handleCompleteTask}
             onDelete={handleDeleteTask}
             onStatusChange={handleTaskStatusChange}
+            onProductChange={handleProductChange}
+            onTopicChange={handleTopicChange}
+            areas={(Array.isArray(areas) ? areas : []).map((area) => ({
+              id: area.id,
+              name: area.name,
+              products: (Array.isArray(area.products) ? area.products : []).map((p) => ({
+                id: p.id,
+                name: p.name,
+                topics: p.topics || [],
+              })),
+            }))}
             onAddToCalendar={handleAddToCalendar}
             isCalendarConnected={calendarConnected}
             calendarEvent={selectedTaskCalendarEvent}
@@ -4111,70 +4202,6 @@ function DashboardContent() {
             <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-500/90 text-white shadow-lg backdrop-blur-sm">
               <CheckCircle2 className="w-5 h-5" />
               <span className="font-medium">{completionFeedback}</span>
-            </div>
-          </div>
-        )}
-
-        {/* 今日完成清單 Sheet */}
-        {showCompletedSheet && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setShowCompletedSheet(false)}
-            />
-            {/* Sheet */}
-            <div className="relative w-full max-w-md mx-4 bg-slate-800 rounded-xl border border-white/10 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-400" />
-                  <h3 className="text-lg font-semibold text-white">今日完成</h3>
-                  <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold">
-                    {completedTodayTasks.length}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowCompletedSheet(false)}
-                  className="p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              {/* Content */}
-              <div className="max-h-[60vh] overflow-y-auto">
-                {completedTodayTasks.length === 0 ? (
-                  <div className="py-12 text-center text-white/50">
-                    <p>今天還沒有完成任何任務</p>
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-white/5">
-                    {completedTodayTasks.map((task) => (
-                      <li key={task.id} className="px-5 py-3 hover:bg-white/5 transition-colors">
-                        <div className="flex items-start gap-3">
-                          <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-400 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-white/70 line-through">
-                              {task.title}
-                            </p>
-                            {task.tag && (
-                              <p className="text-xs text-white/40 mt-0.5">
-                                {task.tag.area} &gt; {task.tag.product}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-white/10 bg-white/5">
-                <p className="text-xs text-white/40 text-center">
-                  每日成就會在午夜重置
-                </p>
-              </div>
             </div>
           </div>
         )}

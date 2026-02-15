@@ -120,6 +120,7 @@ export interface TaskCard {
   due_date?: string | null
   time_confidence?: number | null
   inferred_from_milestone?: string | null
+  date_source?: string | null
   // Raw fields for matching
   product_id?: string
   // Timestamps

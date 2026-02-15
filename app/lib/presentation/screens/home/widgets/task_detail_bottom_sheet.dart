@@ -46,6 +46,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   late String? _selectedTopicId;
   String? _selectedAreaId;
 
+  // Topic 選擇用
+  List<Map<String, dynamic>> _availableTopics = [];
+
   // 狀態選擇
   late TaskStatus _selectedStatus;
 
@@ -73,6 +76,23 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               completed: sub.completed,
             ))
         .toList();
+
+    // Fetch topics for current product
+    if (_selectedProductId != null) {
+      _fetchTopics(_selectedProductId!);
+    }
+  }
+
+  Future<void> _fetchTopics(String productId) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final topics = await apiClient.getProductTopics(productId);
+      if (mounted) {
+        setState(() => _availableTopics = topics);
+      }
+    } catch (e) {
+      // Silently fail - topics are optional
+    }
   }
 
   @override
@@ -604,8 +624,46 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       setState(() {
         _selectedProductId = selected.id;
         _selectedTopicId = null;
+        _availableTopics = [];
       });
+      _fetchTopics(selected.id);
+    }
+  }
 
+  Future<void> _showTopicSelector() async {
+    final topics = _availableTopics;
+    final selected = await showModalBottomSheet<Map<String, dynamic>?>(
+      context: context,
+      backgroundColor: const Color(0xFF2c2c2e),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("選擇主題", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.label_off_outlined, color: Colors.grey),
+              title: const Text('未分類', style: TextStyle(color: Colors.white)),
+              selected: _selectedTopicId == null,
+              selectedTileColor: Colors.purple.withValues(alpha: 0.2),
+              onTap: () => Navigator.pop(context, <String, dynamic>{'id': null, 'name': '未分類'}),
+            ),
+            ...topics.map((topic) => ListTile(
+              leading: const Icon(Icons.label_outline, color: Colors.purple),
+              title: Text(topic['name'] as String, style: const TextStyle(color: Colors.white)),
+              selected: topic['id'] == _selectedTopicId,
+              selectedTileColor: Colors.purple.withValues(alpha: 0.2),
+              onTap: () => Navigator.pop(context, topic),
+            )),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) {
+      setState(() {
+        _selectedTopicId = selected['id'] as String?;
+      });
     }
   }
 
@@ -1073,8 +1131,15 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                   error: (_, __) => _buildChip('載入失敗', Colors.red),
                 ),
                 // Topic chip
-                if (_selectedTopicId != null)
-                  _buildChip(widget.task.topicName ?? '未分類', Colors.purple),
+                _buildChip(
+                  _selectedTopicId != null
+                    ? (_availableTopics.where((t) => t['id'] == _selectedTopicId).isNotEmpty
+                        ? _availableTopics.firstWhere((t) => t['id'] == _selectedTopicId)['name'] as String
+                        : widget.task.topicName ?? '未分類')
+                    : '未分類',
+                  Colors.purple,
+                  onTap: _showTopicSelector,
+                ),
               ],
             ),
           ),

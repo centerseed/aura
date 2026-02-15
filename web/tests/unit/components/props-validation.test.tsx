@@ -12,22 +12,37 @@ import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { GanttView } from '@/components/gantt-view'
 import { MilestoneList } from '@/components/milestone-list'
+import type { Milestone } from '@/types'
+
+const mockDrawerConfig = {
+  INBOX: { label: '規劃中', dotColor: '#888' },
+  ACTIVE: { label: '進行中', dotColor: '#3b82f6' },
+  MAINTAIN: { label: '維護中', dotColor: '#22c55e' },
+  REFERENCE: { label: '參考', dotColor: '#a855f7' },
+  ARCHIVE: { label: '已歸檔', dotColor: '#6b7280' },
+} as any
+
+const mockMilestone: Milestone = {
+  id: 'm1',
+  user_id: 'u1',
+  name: 'Test Milestone',
+  target_date: '2026-03-01',
+  status: 'planned',
+  entity_type: 'PRODUCT',
+  entity_id: 'p1',
+  priority: 1,
+  description: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+}
 
 describe('Component Props Validation', () => {
   describe('GanttView - milestones prop', () => {
     it('✅ 正確：milestones 是 array', () => {
       const validProps = {
         areas: [],
-        milestones: [
-          {
-            id: 'm1',
-            name: 'Test Milestone',
-            target_date: '2026-03-01',
-            status: 'active',
-            entity_type: 'PRODUCT',
-            entity_id: 'p1',
-          },
-        ],
+        milestones: [mockMilestone],
+        drawerConfig: mockDrawerConfig,
       }
 
       // 這不應該拋出錯誤
@@ -40,6 +55,7 @@ describe('Component Props Validation', () => {
       const invalidProps = {
         areas: [],
         milestones: null as any, // 模擬錯誤的 prop
+        drawerConfig: mockDrawerConfig,
       }
 
       // 如果沒有 Array.isArray() 保護，這會拋出 TypeError
@@ -52,6 +68,7 @@ describe('Component Props Validation', () => {
       const invalidProps = {
         areas: [],
         milestones: undefined as any,
+        drawerConfig: mockDrawerConfig,
       }
 
       expect(() => {
@@ -63,6 +80,7 @@ describe('Component Props Validation', () => {
       const invalidProps = {
         areas: [],
         milestones: { wrong: 'format' } as any,
+        drawerConfig: mockDrawerConfig,
       }
 
       expect(() => {
@@ -74,14 +92,7 @@ describe('Component Props Validation', () => {
   describe('MilestoneList - milestones prop', () => {
     it('✅ 正確：milestones 是 array', () => {
       const validProps = {
-        milestones: [
-          {
-            id: 'm1',
-            name: 'Test',
-            target_date: '2026-03-01',
-            status: 'active',
-          },
-        ],
+        milestones: [mockMilestone],
         onEdit: () => {},
         onDelete: () => {},
       }

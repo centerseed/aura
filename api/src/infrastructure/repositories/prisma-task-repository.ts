@@ -35,6 +35,7 @@ interface RawTaskRow {
   inferred_from_milestone: string | null
   remind_at: Date | null
   reminder_enabled: boolean
+  date_source: string | null
   reminder_timezone: string | null
   notification_id: number | null
   created_at: Date
@@ -70,6 +71,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.due_date,
         t.time_confidence,
         t.inferred_from_milestone,
+        t.date_source,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -116,6 +118,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.due_date,
         t.time_confidence,
         t.inferred_from_milestone,
+        t.date_source,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -159,6 +162,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.due_date,
         t.time_confidence,
         t.inferred_from_milestone,
+        t.date_source,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -248,7 +252,11 @@ export class PrismaTaskRepository implements ITaskRepository {
     await prisma.task.update({
       where: { id },
       data: {
-        ...(data.status && { status: this.toPrismaStatus(data.status) }),
+        ...(data.status && {
+          status: this.toPrismaStatus(data.status),
+          ...(data.status === 'ARCHIVE' ? { completed_at: new Date() } : {}),
+          ...(data.status !== 'ARCHIVE' ? { completed_at: null } : {}),
+        }),
         ...(data.productId && { product_id: data.productId }),
         ...(data.topicId !== undefined && { topic_id: data.topicId }),
         ...(data.content && { content: data.content.trim() }),
@@ -270,6 +278,9 @@ export class PrismaTaskRepository implements ITaskRepository {
         }),
         ...(data.notificationId !== undefined && {
           notification_id: data.notificationId,
+        }),
+        ...(data.dateSource !== undefined && {
+          date_source: data.dateSource,
         }),
       } as any,
     })
@@ -382,6 +393,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       dueDate: row.due_date,
       timeConfidence: row.time_confidence,
       inferredFromMilestone: row.inferred_from_milestone,
+      dateSource: row.date_source,
       remindAt: row.remind_at,
       reminderEnabled: row.reminder_enabled || false,
       reminderTimezone: row.reminder_timezone,
@@ -461,8 +473,8 @@ export class PrismaTaskRepository implements ITaskRepository {
       const archiveStatus = 'ARCHIVE'
 
       conditions.push(Prisma.sql`AND t.status = ${archiveStatus}::text::"statusenum"`)
-      conditions.push(Prisma.sql`AND t.updated_at >= ${todayStart}`)
-      conditions.push(Prisma.sql`AND t.updated_at < ${todayEnd}`)
+      conditions.push(Prisma.sql`AND t.completed_at >= ${todayStart}`)
+      conditions.push(Prisma.sql`AND t.completed_at < ${todayEnd}`)
     }
 
     // 更新時間範圍
@@ -532,7 +544,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
       where.status = PrismaStatus.ARCHIVE
-      where.updated_at = {
+      where.completed_at = {
         gte: todayStart,
         lt: todayEnd,
       }
@@ -605,6 +617,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       dueDate: prismaTask.due_date,
       timeConfidence: prismaTask.time_confidence,
       inferredFromMilestone: prismaTask.inferred_from_milestone,
+      dateSource: prismaTask.date_source ?? null,
       remindAt: prismaTask.remind_at,
       reminderEnabled: prismaTask.reminder_enabled || false,
       reminderTimezone: prismaTask.reminder_timezone,

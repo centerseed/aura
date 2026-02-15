@@ -56,15 +56,6 @@ interface RawStuckSubTask {
   updated_at: Date
 }
 
-interface RawStagnantProduct {
-  id: string
-  name: string
-  area_name: string
-  lifecycle: string
-  last_task_updated_at: Date
-  nearest_due_date: Date | null
-}
-
 // ============================================================================
 // 聚合結果
 // ============================================================================
@@ -75,14 +66,6 @@ export interface AggregatedData {
   approachingTasks: TaskSummary[]
   completedTasks: TaskSummary[]
   remainingTasks: TaskSummary[]
-  stagnantProducts: Array<{
-    id: string
-    name: string
-    area_name: string
-    lifecycle: string
-    last_task_updated_at: string
-    nearest_due_date: string | null
-  }>
   stuckSubTasks: SubTaskSummary[]
   tomorrowPreview: CalendarEventSummary[]
 }
@@ -103,7 +86,6 @@ export class CoachDataAggregator {
     const tomorrowStart = new Date(todayEnd.getTime())
     const tomorrowEnd = new Date(tomorrowStart.getTime() + 24 * 60 * 60 * 1000)
     const threeDaysLater = new Date(todayEnd.getTime() + 3 * 24 * 60 * 60 * 1000)
-    const sevenDaysAgo = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000)
 
     const [
       calendarEvents,
@@ -111,7 +93,6 @@ export class CoachDataAggregator {
       approachingTasks,
       completedTasks,
       remainingTasks,
-      stagnantProducts,
       stuckSubTasks,
       tomorrowPreview,
     ] = await Promise.all([
@@ -125,11 +106,9 @@ export class CoachDataAggregator {
       this.queryCompletedTasks(userId, todayStart, todayEnd),
       // 5. 所有活躍任務
       this.queryRemainingTasks(userId),
-      // 6. 停滯產品
-      this.queryStagnantProducts(userId, sevenDaysAgo),
-      // 7. 已開始但未完成的子任務
+      // 6. 已開始但未完成的子任務
       this.queryStuckSubTasks(userId, todayStart),
-      // 8. 明日行事曆
+      // 7. 明日行事曆
       this.queryTodayCalendarEvents(userId, tomorrowStart, tomorrowEnd),
     ])
 
@@ -139,7 +118,6 @@ export class CoachDataAggregator {
       approachingTasks,
       completedTasks,
       remainingTasks,
-      stagnantProducts,
       stuckSubTasks,
       tomorrowPreview,
     }
@@ -260,9 +238,10 @@ export class CoachDataAggregator {
       WHERE t.user_id = ${userId}::uuid
         AND t.deleted_at IS NULL
         AND t.status = ${STATUS_ARCHIVE}
-        AND t.updated_at >= ${todayStart}
-        AND t.updated_at < ${todayEnd}
-      ORDER BY t.updated_at DESC
+        AND t.completed_at IS NOT NULL
+        AND t.completed_at >= ${todayStart}
+        AND t.completed_at < ${todayEnd}
+      ORDER BY t.completed_at DESC
     `
 
     return rows.map(row => this.rawToTaskSummary(row, new Date()))
@@ -293,40 +272,6 @@ export class CoachDataAggregator {
     `
 
     return rows.map(row => this.rawToTaskSummary(row, now))
-  }
-
-  private async queryStagnantProducts(
-    userId: string,
-    sevenDaysAgo: Date,
-  ): Promise<AggregatedData['stagnantProducts']> {
-    const rows = await prisma.$queryRaw<RawStagnantProduct[]>`
-      SELECT
-        p.id::text,
-        p.name,
-        a.name as area_name,
-        p.lifecycle::text as lifecycle,
-        MAX(t.updated_at) as last_task_updated_at,
-        MIN(CASE WHEN t.due_date > NOW() THEN t.due_date END) as nearest_due_date
-      FROM products p
-      JOIN areas a ON a.id = p.area_id
-      LEFT JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      WHERE p.user_id = ${userId}::uuid
-        AND p.deleted_at IS NULL
-        AND p.status IN (${STATUS_ACTIVE}, ${STATUS_INBOX})
-      GROUP BY p.id, p.name, a.name, p.lifecycle
-      HAVING MAX(t.updated_at) IS NOT NULL
-        AND MAX(t.updated_at) < ${sevenDaysAgo}
-      ORDER BY MAX(t.updated_at) ASC
-    `
-
-    return rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      area_name: row.area_name,
-      lifecycle: row.lifecycle,
-      last_task_updated_at: row.last_task_updated_at.toISOString(),
-      nearest_due_date: row.nearest_due_date ? row.nearest_due_date.toISOString() : null,
-    }))
   }
 
   private async queryStuckSubTasks(

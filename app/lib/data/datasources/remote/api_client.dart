@@ -128,6 +128,15 @@ class ApiClient {
     await _dio.delete('/products/$productId');
   }
 
+  /// 取得 Product 的所有 Topics
+  /// GET /api/products/:id/topics
+  Future<List<Map<String, dynamic>>> getProductTopics(String productId) async {
+    final response = await _dio.get('/products/$productId/topics');
+    final dataWrapper = response.data['data'];
+    final List<dynamic> topics = dataWrapper is Map ? (dataWrapper['topics'] ?? []) : dataWrapper;
+    return topics.map((t) => {'id': t['id'] as String, 'name': t['name'] as String}).toList();
+  }
+
   Future<Map<String, dynamic>> reorganizeProductTopics(String productId) async {
     final response = await _dio.post('/products/$productId/reorganize-topics');
     return response.data;

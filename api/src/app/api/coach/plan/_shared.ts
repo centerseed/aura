@@ -27,6 +27,11 @@ export function formatPlanItem(item: DailyPlanItemData) {
       : item.completedAt ? String(item.completedAt) : null,
     pinned: item.pinned,
     deferred: item.deferred,
+    status: item.status,
+    user_adjusted: item.userAdjusted,
+    adjusted_at: item.adjustedAt instanceof Date
+      ? item.adjustedAt.toISOString()
+      : item.adjustedAt ? String(item.adjustedAt) : null,
   }
 }
 
@@ -42,6 +47,7 @@ export function formatPlan(plan: DailyPlanData) {
     available_minutes: plan.availableMinutes,
     meeting_minutes: plan.meetingMinutes,
     planned_minutes: plan.plannedMinutes,
+    overflow_items: plan.overflowItems ?? [],
     items: plan.items.map(formatPlanItem),
     created_at: plan.createdAt instanceof Date
       ? plan.createdAt.toISOString()

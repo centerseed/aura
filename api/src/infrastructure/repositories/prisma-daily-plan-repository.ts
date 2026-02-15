@@ -31,7 +31,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
   }
 
   async upsert(data: CreateDailyPlanData): Promise<DailyPlanData> {
-    // Delete existing plan items first if plan exists, then upsert
+    // 批次操作用 transaction 包裝，減少往返次數
     const existing = await prisma.dailyPlan.findUnique({
       where: {
         user_id_plan_date: {
@@ -42,21 +42,43 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     })
 
     if (existing) {
-      // 只刪除未完成的 items，保留已完成的（含 actual_minutes 偏差學習資料）
-      await prisma.dailyPlanItem.deleteMany({
-        where: { plan_id: existing.id, completed: false },
-      })
+      // 用 transaction 包裝：查詢 + 刪除 + 更新 + 批次插入
+      await prisma.$transaction(async (tx) => {
+        const itemsToDelete = await tx.dailyPlanItem.findMany({
+          where: {
+            plan_id: existing.id,
+            completed: false,
+          },
+          select: { id: true },
+        })
 
-      const row = await prisma.dailyPlan.update({
-        where: { id: existing.id },
-        data: {
-          coach_message: data.coachMessage,
-          capacity_note: data.capacityNote,
-          available_minutes: data.availableMinutes,
-          meeting_minutes: data.meetingMinutes,
-          planned_minutes: data.plannedMinutes,
-          items: {
-            create: data.items.map(item => ({
+        // 逐一刪除（避免使用 deleteMany）
+        if (itemsToDelete.length > 0) {
+          await Promise.all(
+            itemsToDelete.map(item =>
+              tx.dailyPlanItem.delete({ where: { id: item.id } })
+            )
+          )
+        }
+
+        // 更新 plan 本身
+        await tx.dailyPlan.update({
+          where: { id: existing.id },
+          data: {
+            coach_message: data.coachMessage,
+            capacity_note: data.capacityNote,
+            available_minutes: data.availableMinutes,
+            meeting_minutes: data.meetingMinutes,
+            planned_minutes: data.plannedMinutes,
+            overflow_items: (data.overflowItems ?? []) as any,
+          },
+        })
+
+        // 批次插入新 items (createMany 比嵌套 create 快)
+        if (data.items.length > 0) {
+          await tx.dailyPlanItem.createMany({
+            data: data.items.map(item => ({
+              plan_id: existing.id,
               task_id: item.taskId,
               sub_task_id: item.subTaskId,
               item_type: item.subTaskId ? 'subtask' : 'task',
@@ -67,9 +89,16 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
               due_date: item.dueDate,
               order: item.order,
               reasoning: item.reasoning,
+              status: item.status ?? 'today',
+              user_adjusted: item.userAdjusted ?? false,
             })),
-          },
-        },
+          })
+        }
+      }, { timeout: 15000 })
+
+      // 讀回完整資料
+      const row = await prisma.dailyPlan.findUnique({
+        where: { id: existing.id },
         include: {
           items: {
             orderBy: { order: 'asc' },
@@ -77,23 +106,31 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
         },
       })
 
-      return this.toDomain(row)
+      return this.toDomain(row!)
     }
 
-    // Create new plan
-    const row = await prisma.dailyPlan.create({
-      data: {
-        user_id: data.userId,
-        plan_date: data.planDate,
-        coach_message: data.coachMessage,
-        capacity_note: data.capacityNote,
-        available_minutes: data.availableMinutes,
-        meeting_minutes: data.meetingMinutes,
-        planned_minutes: data.plannedMinutes,
-        items: {
-          create: data.items.map(item => ({
+    // Create new plan (首次建立也用 transaction + createMany)
+    const row = await prisma.$transaction(async (tx) => {
+      const plan = await tx.dailyPlan.create({
+        data: {
+          user_id: data.userId,
+          plan_date: data.planDate,
+          coach_message: data.coachMessage,
+          capacity_note: data.capacityNote,
+          available_minutes: data.availableMinutes,
+          meeting_minutes: data.meetingMinutes,
+          planned_minutes: data.plannedMinutes,
+          overflow_items: (data.overflowItems ?? []) as any,
+        },
+      })
+
+      if (data.items.length > 0) {
+        await tx.dailyPlanItem.createMany({
+          data: data.items.map(item => ({
+            plan_id: plan.id,
             task_id: item.taskId,
             sub_task_id: item.subTaskId,
+            item_type: item.subTaskId ? 'subtask' : 'task',
             content: item.content,
             area_name: item.areaName,
             product_name: item.productName,
@@ -101,17 +138,23 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
             due_date: item.dueDate,
             order: item.order,
             reasoning: item.reasoning,
+            status: item.status ?? 'today',
+            user_adjusted: item.userAdjusted ?? false,
           })),
+        })
+      }
+
+      return tx.dailyPlan.findUnique({
+        where: { id: plan.id },
+        include: {
+          items: {
+            orderBy: { order: 'asc' },
+          },
         },
-      },
-      include: {
-        items: {
-          orderBy: { order: 'asc' },
-        },
-      },
+      })
     })
 
-    return this.toDomain(row)
+    return this.toDomain(row!)
   }
 
   async updateItem(itemId: string, data: UpdateDailyPlanItemData): Promise<DailyPlanItemData> {
@@ -128,6 +171,11 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
     if (data.actualMinutes !== undefined) updateData.actual_minutes = data.actualMinutes
     if (data.pinned !== undefined) updateData.pinned = data.pinned
     if (data.deferred !== undefined) updateData.deferred = data.deferred
+    if (data.status !== undefined) updateData.status = data.status
+    if (data.userAdjusted !== undefined) {
+      updateData.user_adjusted = data.userAdjusted
+      if (data.userAdjusted) updateData.adjusted_at = new Date()
+    }
 
     const row = await tx.dailyPlanItem.update({
       where: { id: itemId },
@@ -151,6 +199,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       availableMinutes: row.available_minutes,
       meetingMinutes: row.meeting_minutes,
       plannedMinutes: row.planned_minutes,
+      overflowItems: Array.isArray(row.overflow_items) ? row.overflow_items : [],
       items: (row.items || []).map((item: any) => this.toItemDomain(item)),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -176,6 +225,9 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       actualMinutes: row.actual_minutes,
       pinned: row.pinned,
       deferred: row.deferred,
+      status: row.status ?? 'today',
+      userAdjusted: row.user_adjusted ?? false,
+      adjustedAt: row.adjusted_at ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }

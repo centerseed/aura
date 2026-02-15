@@ -2,7 +2,7 @@
  * CoachDetectionService 單元測試
  *
  * 純函數偵測引擎，無 DB 依賴
- * 測試：時間衝突、截止日碰撞、容量超載、停滯產品、卡住任務
+ * 測試：時間衝突、截止日碰撞、容量超載、卡住任務
  */
 
 import { describe, it, expect } from 'vitest'
@@ -10,7 +10,6 @@ import {
   detectTimeOverlaps,
   detectDeadlineCollisions,
   detectCapacityOverload,
-  detectStagnantProducts,
   detectStuckTasks,
   detectStuckSubTasks,
 } from '@/application/services/coach-detection'
@@ -52,8 +51,6 @@ function makeTask(overrides: Partial<TaskSummary> = {}): TaskSummary {
   }
 }
 
-import type { StagnantProductInput } from '@/application/services/coach-detection'
-
 function makeSubTask(overrides: Partial<SubTaskSummary> = {}): SubTaskSummary {
   return {
     id: 'st-1',
@@ -66,20 +63,6 @@ function makeSubTask(overrides: Partial<SubTaskSummary> = {}): SubTaskSummary {
     due_date: null,
     days_since_start: 5,
     days_remaining: null,
-    ...overrides,
-  }
-}
-
-function makeStagnantProduct(overrides: Partial<StagnantProductInput> = {}): StagnantProductInput {
-  const now = new Date()
-  const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000)
-  return {
-    id: 'prod-1',
-    name: 'Test Product',
-    area_name: 'Area A',
-    lifecycle: 'FINITE',
-    last_task_updated_at: tenDaysAgo.toISOString(),
-    nearest_due_date: null,
     ...overrides,
   }
 }
@@ -282,60 +265,6 @@ describe('detectCapacityOverload', () => {
         makeEvent({ id: 'evt-1', start_date_time: '2026-02-09T09:00:00+08:00', end_date_time: '2026-02-09T18:00:00+08:00' }),
       ]
       expect(detectCapacityOverload([], events)).toHaveLength(0)
-    })
-  })
-})
-
-// ============================================================================
-// detectStagnantProducts
-// ============================================================================
-
-describe('detectStagnantProducts', () => {
-  describe('正常路徑', () => {
-    it('FINITE 產品超過 7 天應被偵測', () => {
-      const stagnations = detectStagnantProducts([makeStagnantProduct()])
-      expect(stagnations).toHaveLength(1)
-      expect(stagnations[0].type).toBe('stagnant_product')
-      expect(stagnations[0].days_inactive).toBeGreaterThanOrEqual(10)
-    })
-
-    it('最近更新的產品不應被標記', () => {
-      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-      expect(detectStagnantProducts([
-        makeStagnantProduct({ last_task_updated_at: twoDaysAgo.toISOString() }),
-      ])).toHaveLength(0)
-    })
-
-    it('PERPETUAL 產品用 14 天門檻', () => {
-      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
-      // 10 天未更新 PERPETUAL → 不停滯（門檻 14）
-      expect(detectStagnantProducts([
-        makeStagnantProduct({ lifecycle: 'PERPETUAL', last_task_updated_at: tenDaysAgo.toISOString() }),
-      ])).toHaveLength(0)
-
-      // 15 天未更新 PERPETUAL → 停滯
-      const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
-      expect(detectStagnantProducts([
-        makeStagnantProduct({ lifecycle: 'PERPETUAL', last_task_updated_at: fifteenDaysAgo.toISOString() }),
-      ])).toHaveLength(1)
-    })
-
-    it('最近任務截止日 > 14 天後，FINITE 產品門檻放寬到 14 天', () => {
-      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
-      const twentyDaysLater = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000)
-      // 10 天未更新 FINITE + nearest_due_date 20 天後 → 不停滯（門檻放寬到 14）
-      expect(detectStagnantProducts([
-        makeStagnantProduct({
-          last_task_updated_at: tenDaysAgo.toISOString(),
-          nearest_due_date: twentyDaysLater.toISOString(),
-        }),
-      ])).toHaveLength(0)
-    })
-  })
-
-  describe('邊界條件', () => {
-    it('空陣列應回傳空結果', () => {
-      expect(detectStagnantProducts([])).toHaveLength(0)
     })
   })
 })

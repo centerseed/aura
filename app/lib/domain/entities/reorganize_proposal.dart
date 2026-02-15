@@ -1,28 +1,82 @@
 import 'package:equatable/equatable.dart';
 
+class TopicOperation extends Equatable {
+  final String action; // "keep", "rename", "merge"
+  final String? topicName; // for keep
+  final String? oldName; // for rename
+  final String? newName; // for rename
+  final List<String>? sourceNames; // for merge
+  final String? targetName; // for merge
+  final String? reasoning; // for rename/merge
+
+  const TopicOperation({
+    required this.action,
+    this.topicName,
+    this.oldName,
+    this.newName,
+    this.sourceNames,
+    this.targetName,
+    this.reasoning,
+  });
+
+  factory TopicOperation.fromJson(Map<String, dynamic> json) {
+    return TopicOperation(
+      action: json['action'] ?? '',
+      topicName: json['topic_name'],
+      oldName: json['old_name'],
+      newName: json['new_name'],
+      sourceNames: json['source_names'] != null
+          ? List<String>.from(json['source_names'])
+          : null,
+      targetName: json['target_name'],
+      reasoning: json['reasoning'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{'action': action};
+    if (topicName != null) map['topic_name'] = topicName;
+    if (oldName != null) map['old_name'] = oldName;
+    if (newName != null) map['new_name'] = newName;
+    if (sourceNames != null) map['source_names'] = sourceNames;
+    if (targetName != null) map['target_name'] = targetName;
+    if (reasoning != null) map['reasoning'] = reasoning;
+    return map;
+  }
+
+  @override
+  List<Object?> get props => [action, topicName, oldName, newName, sourceNames, targetName, reasoning];
+}
+
 class ReorganizeProposal extends Equatable {
   final String productId;
   final String productName;
   final List<String> currentTopics;
   final int? currentTopicCount;
+  final List<TopicOperation> topicOperations;
   final List<TopicCluster> proposedClusters;
   final List<TaskConsolidation> taskConsolidations;
   final List<TaskContext> tasksContext;
   final String? logId;
   final String reasoning;
   final List<TimeInference> timeInferences;
+  final bool? applyTopicOperations;
+  final bool? applyTaskConsolidations;
 
   const ReorganizeProposal({
     required this.productId,
     required this.productName,
     required this.currentTopics,
     this.currentTopicCount,
+    this.topicOperations = const [],
     required this.proposedClusters,
     required this.taskConsolidations,
     required this.tasksContext,
     this.logId,
     this.reasoning = '',
     this.timeInferences = const [],
+    this.applyTopicOperations,
+    this.applyTaskConsolidations,
   });
 
   factory ReorganizeProposal.fromJson(Map<String, dynamic> json) {
@@ -31,6 +85,11 @@ class ReorganizeProposal extends Equatable {
       productName: json['product_name'] ?? '',
       currentTopics: List<String>.from(json['current_topics'] ?? []),
       currentTopicCount: json['current_topic_count'],
+      topicOperations:
+          (json['topic_operations'] as List<dynamic>?)
+              ?.map((e) => TopicOperation.fromJson(e))
+              .toList() ??
+          [],
       proposedClusters:
           (json['proposed_clusters'] as List<dynamic>?)
               ?.map((e) => TopicCluster.fromJson(e))
@@ -53,15 +112,18 @@ class ReorganizeProposal extends Equatable {
               ?.map((e) => TimeInference.fromJson(e))
               .toList() ??
           [],
+      applyTopicOperations: json['apply_topic_operations'],
+      applyTaskConsolidations: json['apply_task_consolidations'],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final map = {
       'product_id': productId,
       'product_name': productName,
       'current_topics': currentTopics,
       'current_topic_count': currentTopicCount,
+      'topic_operations': topicOperations.map((e) => e.toJson()).toList(),
       'proposed_clusters': proposedClusters.map((e) => e.toJson()).toList(),
       'task_consolidations': taskConsolidations.map((e) => e.toJson()).toList(),
       'tasks_context': tasksContext.map((e) => e.toJson()).toList(),
@@ -69,6 +131,30 @@ class ReorganizeProposal extends Equatable {
       'reasoning': reasoning,
       'time_inferences': timeInferences.map((e) => e.toJson()).toList(),
     };
+    if (applyTopicOperations != null) map['apply_topic_operations'] = applyTopicOperations;
+    if (applyTaskConsolidations != null) map['apply_task_consolidations'] = applyTaskConsolidations;
+    return map;
+  }
+
+  ReorganizeProposal copyWith({
+    bool? applyTopicOperations,
+    bool? applyTaskConsolidations,
+  }) {
+    return ReorganizeProposal(
+      productId: productId,
+      productName: productName,
+      currentTopics: currentTopics,
+      currentTopicCount: currentTopicCount,
+      topicOperations: topicOperations,
+      proposedClusters: proposedClusters,
+      taskConsolidations: taskConsolidations,
+      tasksContext: tasksContext,
+      logId: logId,
+      reasoning: reasoning,
+      timeInferences: timeInferences,
+      applyTopicOperations: applyTopicOperations ?? this.applyTopicOperations,
+      applyTaskConsolidations: applyTaskConsolidations ?? this.applyTaskConsolidations,
+    );
   }
 
   @override
@@ -77,12 +163,15 @@ class ReorganizeProposal extends Equatable {
     productName,
     currentTopics,
     currentTopicCount,
+    topicOperations,
     proposedClusters,
     taskConsolidations,
     tasksContext,
     logId,
     reasoning,
     timeInferences,
+    applyTopicOperations,
+    applyTaskConsolidations,
   ];
 }
 

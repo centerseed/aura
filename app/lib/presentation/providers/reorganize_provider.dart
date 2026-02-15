@@ -28,13 +28,17 @@ class ReorganizeController extends StateNotifier<AsyncValue<void>> {
     );
   }
 
-  Future<void> apply(String productId) async {
+  Future<void> apply(String productId, {bool applyTopicOps = true, bool applyConsolidations = true}) async {
     final proposal = ref.read(reorganizeProposalProvider);
     if (proposal == null) return;
 
     state = const AsyncValue.loading();
     final repository = ref.read(di.productRepositoryProvider);
-    final result = await repository.applyReorganization(productId, proposal);
+    final proposalWithFlags = proposal.copyWith(
+      applyTopicOperations: applyTopicOps,
+      applyTaskConsolidations: applyConsolidations,
+    );
+    final result = await repository.applyReorganization(productId, proposalWithFlags);
 
     result.fold(
       (failure) {

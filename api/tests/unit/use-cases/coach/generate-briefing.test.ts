@@ -5,7 +5,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GenerateBriefingUseCase } from '@/application/use-cases/coach/generate-briefing'
 import type { ICoachBriefingRepository, CoachBriefingData, CreateCoachBriefingData } from '@/domain/interfaces/coach-briefing-repository'
-import type { CoachDataAggregator, AggregatedData } from '@/infrastructure/services/coach-data-aggregator'
+import type { AggregatedData } from '@/infrastructure/services/coach-data-aggregator'
+import type { UnifiedDataCollector, UnifiedRawData } from '@/infrastructure/services/unified-data-collector'
+import type { UnifiedDataTransformer } from '@/infrastructure/services/unified-data-transformer'
 import type { CoachAIGenerator, CoachAIOutput } from '@/application/services/coach-ai-generator'
 
 // Mock prisma for resolveTimezone
@@ -15,6 +17,33 @@ vi.mock('@/lib/db', () => ({
       findUnique: vi.fn().mockResolvedValue({ timezone: 'Asia/Taipei' }),
     },
   },
+}))
+
+// Mock GeneratePlanUseCase
+const mockPlanExecute = vi.fn().mockResolvedValue({
+  plan: {
+    id: 'plan-1',
+    userId: 'user-1',
+    planDate: new Date('2026-02-09'),
+    coachMessage: '今天加油！',
+    capacityNote: '可用時間約 5 小時',
+    availableMinutes: 300,
+    meetingMinutes: 60,
+    plannedMinutes: 240,
+    items: [
+      { id: 'item-1', planId: 'plan-1', itemType: 'task', taskId: 'task-1', subTaskId: null, content: '完成報告', areaName: '營運', productName: 'Zentropy', estimatedMinutes: 60, dueDate: null, order: 1, reasoning: '優先處理', completed: false, completedAt: null, actualMinutes: null },
+      { id: 'item-2', planId: 'plan-1', itemType: 'task', taskId: 'task-2', subTaskId: null, content: '客戶會議準備', areaName: '業務', productName: 'Havital', estimatedMinutes: 45, dueDate: null, order: 2, reasoning: '今日到期', completed: false, completedAt: null, actualMinutes: null },
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  timings: { collect: 10, plan: 20, save: 5 },
+})
+
+vi.mock('@/application/use-cases/coach/generate-plan', () => ({
+  GeneratePlanUseCase: vi.fn().mockImplementation(() => ({
+    execute: mockPlanExecute,
+  })),
 }))
 
 // ============================================================================
@@ -50,20 +79,37 @@ function makeMockRepository(): ICoachBriefingRepository {
   }
 }
 
-function makeMockAggregator(): CoachDataAggregator {
-  const mockData: AggregatedData = {
+function makeMockCollector(): UnifiedDataCollector {
+  const mockRawData: UnifiedRawData = {
+    allTasks: [],
+    allSubTasks: [],
+    todayCalendar: [],
+    tomorrowCalendar: [],
+    weeklyCalendar: new Map(),
+    completedTasks: [],
+    unscheduledTasks: [],
+    milestones: [],
+  }
+
+  return {
+    collect: vi.fn().mockResolvedValue(mockRawData),
+  } as any
+}
+
+function makeMockTransformer(): UnifiedDataTransformer {
+  const mockAggregatedData: AggregatedData = {
     calendarEvents: [],
     overdueTasks: [],
     approachingTasks: [],
     completedTasks: [],
     remainingTasks: [],
-    stagnantProducts: [],
     stuckSubTasks: [],
     tomorrowPreview: [],
   }
 
   return {
-    aggregate: vi.fn().mockResolvedValue(mockData),
+    toBriefingData: vi.fn().mockReturnValue(mockAggregatedData),
+    toPlanCollectedData: vi.fn().mockReturnValue({}),
   } as any
 }
 
@@ -88,14 +134,17 @@ function makeMockAIGenerator(): CoachAIGenerator {
 describe('GenerateBriefingUseCase', () => {
   let useCase: GenerateBriefingUseCase
   let mockRepo: ICoachBriefingRepository
-  let mockAggregator: ReturnType<typeof makeMockAggregator>
+  let mockCollector: ReturnType<typeof makeMockCollector>
+  let mockTransformer: ReturnType<typeof makeMockTransformer>
   let mockAIGenerator: ReturnType<typeof makeMockAIGenerator>
 
   beforeEach(() => {
     mockRepo = makeMockRepository()
-    mockAggregator = makeMockAggregator()
+    mockCollector = makeMockCollector()
+    mockTransformer = makeMockTransformer()
     mockAIGenerator = makeMockAIGenerator()
-    useCase = new GenerateBriefingUseCase(mockRepo, mockAggregator, mockAIGenerator)
+    mockPlanExecute.mockClear()
+    useCase = new GenerateBriefingUseCase(mockRepo, mockCollector, mockTransformer, mockAIGenerator)
   })
 
   describe('正常路徑', () => {
@@ -107,14 +156,19 @@ describe('GenerateBriefingUseCase', () => {
 
       expect(result.briefing).toBeDefined()
       expect(result.briefing.id).toBe('briefing-1')
-      expect(result.timings).toHaveProperty('aggregate')
+      expect(result.timings).toHaveProperty('collect')
+      expect(result.timings).toHaveProperty('transform')
       expect(result.timings).toHaveProperty('detection')
       expect(result.timings).toHaveProperty('ai')
       expect(result.timings).toHaveProperty('save')
 
-      // 驗證流程
-      expect(mockAggregator.aggregate).toHaveBeenCalledTimes(1)
+      // 晨報呼叫 AI generator
+      expect(mockCollector.collect).toHaveBeenCalledTimes(1)
+      expect(mockTransformer.toBriefingData).toHaveBeenCalledTimes(1)
       expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
+      expect(mockAIGenerator.generate).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'MORNING' }),
+      )
       expect(mockRepo.upsertByDate).toHaveBeenCalledTimes(1)
     })
 
@@ -137,7 +191,7 @@ describe('GenerateBriefingUseCase', () => {
         date: '2026-02-08',
       })
 
-      expect(mockAggregator.aggregate).toHaveBeenCalledWith(
+      expect(mockCollector.collect).toHaveBeenCalledWith(
         'user-1',
         expect.any(Date),
         'Asia/Taipei',
@@ -172,22 +226,72 @@ describe('GenerateBriefingUseCase', () => {
         approachingTasks: [],
         completedTasks: [],
         remainingTasks: [],
-        stagnantProducts: [],
-        stuckSubTasks: [],
+            stuckSubTasks: [],
         tomorrowPreview: [],
       }
 
-      ;(mockAggregator.aggregate as any).mockResolvedValue(aggregatedWithOverdue)
+      ;(mockTransformer.toBriefingData as any).mockReturnValueOnce(aggregatedWithOverdue)
 
       await useCase.execute({
         userId: 'user-1',
         type: 'MORNING',
       })
 
-      // AI 應該收到偵測到的衝突
+      // 晨報從 plan 組裝，衝突會在 upsert 資料中
+      const upsertCall = (mockRepo.upsertByDate as any).mock.calls[0][0]
+      expect(upsertCall.conflicts.length).toBeGreaterThan(0)
+      expect(upsertCall.conflicts[0].type).toBe('time_overlap')
+    })
+  })
+
+  describe('Daily Plan 整合', () => {
+    it('晨報應生成 plan 並把結果傳給 AI generator', async () => {
+      await useCase.execute({
+        userId: 'user-1',
+        type: 'MORNING',
+      })
+
+      // plan 被呼叫
+      expect(mockPlanExecute).toHaveBeenCalledTimes(1)
+
+      // AI generator 被呼叫，且帶有 dailyPlan context
+      expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
       const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
-      expect(aiCall.conflicts.length).toBeGreaterThan(0)
-      expect(aiCall.conflicts[0].type).toBe('time_overlap')
+      expect(aiCall.type).toBe('MORNING')
+      expect(aiCall.dailyPlan).toBeDefined()
+      expect(aiCall.dailyPlan.items).toHaveLength(2)
+      expect(aiCall.dailyPlan.coachMessage).toBe('今天加油！')
+    })
+
+    it('晨報 plan 生成失敗時仍呼叫 AI（無 dailyPlan context）', async () => {
+      mockPlanExecute.mockRejectedValueOnce(new Error('Plan failed'))
+
+      const result = await useCase.execute({
+        userId: 'user-1',
+        type: 'MORNING',
+      })
+
+      // AI generator 仍被呼叫，但沒有 dailyPlan
+      expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
+      const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
+      expect(aiCall.dailyPlan).toBeUndefined()
+
+      expect(result.briefing).toBeDefined()
+      expect(result.timings).toHaveProperty('plan_error')
+    })
+
+    it('晚報應呼叫 AI generator 且不傳 remainingTasks', async () => {
+      await useCase.execute({
+        userId: 'user-1',
+        type: 'EVENING',
+      })
+
+      expect(mockPlanExecute).not.toHaveBeenCalled()
+      expect(mockAIGenerator.generate).toHaveBeenCalledTimes(1)
+      const aiCall = (mockAIGenerator.generate as any).mock.calls[0][0]
+      expect(aiCall.type).toBe('EVENING')
+      // remainingTasks 應為空陣列，防止 AI 捏造
+      expect(aiCall.remainingTasks).toEqual([])
     })
   })
 

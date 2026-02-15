@@ -98,6 +98,55 @@ export async function PATCH(request: NextRequest) {
       throw new ValidationException('Invalid settings format')
     }
 
+    // 驗證 briefingSchedule（如果提供）
+    if (settings?.briefingSchedule) {
+      const { morning, evening } = settings.briefingSchedule
+
+      if (morning) {
+        if (typeof morning.enabled !== 'boolean') {
+          throw new ValidationException('Invalid morning.enabled (must be boolean)')
+        }
+        if (morning.enabled) {
+          if (
+            typeof morning.windowStart !== 'number' ||
+            morning.windowStart < 0 ||
+            morning.windowStart > 23
+          ) {
+            throw new ValidationException('Invalid morning.windowStart (must be 0-23)')
+          }
+          if (
+            typeof morning.windowEnd !== 'number' ||
+            morning.windowEnd < 1 ||
+            morning.windowEnd > 24
+          ) {
+            throw new ValidationException('Invalid morning.windowEnd (must be 1-24)')
+          }
+        }
+      }
+
+      if (evening) {
+        if (typeof evening.enabled !== 'boolean') {
+          throw new ValidationException('Invalid evening.enabled (must be boolean)')
+        }
+        if (evening.enabled) {
+          if (
+            typeof evening.windowStart !== 'number' ||
+            evening.windowStart < 0 ||
+            evening.windowStart > 23
+          ) {
+            throw new ValidationException('Invalid evening.windowStart (must be 0-23)')
+          }
+          if (
+            typeof evening.windowEnd !== 'number' ||
+            evening.windowEnd < 1 ||
+            evening.windowEnd > 24
+          ) {
+            throw new ValidationException('Invalid evening.windowEnd (must be 1-24)')
+          }
+        }
+      }
+    }
+
     // 更新用戶
     const updatedUser = await prisma.user.update({
       where: { id: user.id },

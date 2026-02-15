@@ -19,7 +19,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json() as any
-    const { order, completed, pinned, deferred, actualMinutes } = body || {}
+    const { order, completed, pinned, deferred, actualMinutes, status, user_adjusted } = body || {}
 
     const useCase = new UpdatePlanItemUseCase()
     const result = await useCase.execute({
@@ -30,6 +30,8 @@ export async function PATCH(
       pinned,
       deferred,
       actualMinutes,
+      status,
+      userAdjusted: user_adjusted,
     })
 
     return ApiResponseBuilder.success({

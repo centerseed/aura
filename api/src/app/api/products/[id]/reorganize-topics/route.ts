@@ -8,6 +8,26 @@ import { buildReorganizePrompt } from "@/lib/reorganize-prompt";
 
 // Zod Schema for AI structured output (極簡版 - 減少 74% 輸出量)
 const ReorganizeProposalSchema = z.object({
+  // Topic 治理（可選，向後兼容）
+  topic_operations: z.array(z.discriminatedUnion("action", [
+    z.object({
+      action: z.literal("keep"),
+      topic_name: z.string(),
+    }),
+    z.object({
+      action: z.literal("rename"),
+      old_name: z.string(),
+      new_name: z.string().describe("新名稱，5-10 字"),
+      reasoning: z.string().max(20),
+    }),
+    z.object({
+      action: z.literal("merge"),
+      source_names: z.array(z.string()).min(1),
+      target_name: z.string(),
+      reasoning: z.string().max(20),
+    }),
+  ])).optional(),
+
   // Topic 分群
   proposed_clusters: z.array(
     z.object({
@@ -104,7 +124,13 @@ export async function POST(
     timings["db_milestones"] = Date.now() - startDb3;
 
     // 4. 構建上下文資訊
-    const currentTopics = [...new Set(tasks.map((t) => t.topic?.name).filter((name): name is string => Boolean(name)))];
+    // 查詢該 Product 下所有未刪除的 Topics（不只是有 active tasks 的）
+    // 這樣 AI 才能看到所有舊 topic 並提出 merge/rename 建議
+    const allProductTopics = await prisma.topic.findMany({
+      where: { product_id: productId, deleted_at: null },
+      select: { name: true },
+    });
+    const currentTopics = allProductTopics.map(t => t.name);
 
     // 構建 Tasks 資訊 (給 AI) — 從 sub_tasks 表讀取
     const tasksData = await Promise.all(tasks.map(async (t) => {
@@ -162,6 +188,13 @@ export async function POST(
     });
     timings["ai_generateObject"] = Date.now() - startAI;
 
+    // 過濾無效的 merge 操作（source_names 少於 2 個不算真正的合併）
+    if (result.topic_operations) {
+      result.topic_operations = result.topic_operations.filter(
+        (op) => op.action !== "merge" || op.source_names.length >= 2
+      );
+    }
+
     // 6. 構建 consolidation_map (用於標記 c_role)
     const consolidationMap = new Map<string, "p" | "s">();
     result.task_consolidations?.forEach((c) => {
@@ -215,6 +248,7 @@ export async function POST(
           tasks_count: tasks.length,
         },
         output_content: {
+          topic_operations: result.topic_operations || [],
           proposed_clusters: result.proposed_clusters,
           task_consolidations: result.task_consolidations || [],
         },
@@ -258,6 +292,7 @@ export async function POST(
       product_name: product.name,
       current_topics: currentTopics,
       current_topic_count: currentTopics.length,
+      topic_operations: result.topic_operations || [],
       proposed_clusters: result.proposed_clusters,
       task_consolidations: result.task_consolidations || [],
       tasks_context: tasksContext,

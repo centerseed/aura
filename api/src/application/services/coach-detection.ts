@@ -5,7 +5,6 @@
  * - 時間重疊 (time_overlap)
  * - 截止日碰撞 (deadline_collision)
  * - 容量超載 (capacity_overload)
- * - 停滯產品 (stagnant_product)
  * - 卡住任務 (stuck_task)
  */
 
@@ -20,7 +19,6 @@ import {
   WORK_HOURS_PER_DAY,
   ESTIMATED_MINUTES_PER_TASK,
   STUCK_TASK_THRESHOLDS,
-  STAGNANT_PRODUCT_THRESHOLDS,
   STUCK_SUBTASK_THRESHOLD_DAYS,
 } from '@/lib/coach-constants'
 
@@ -160,59 +158,6 @@ export function detectCapacityOverload(
 // ============================================================================
 // 停滯偵測
 // ============================================================================
-
-export interface StagnantProductInput {
-  id: string
-  name: string
-  area_name: string
-  lifecycle: string
-  last_task_updated_at: string
-  nearest_due_date: string | null
-}
-
-/**
- * 偵測停滯產品
- *
- * 規則：
- * - FINITE 產品：門檻 7 天
- * - PERPETUAL 產品：門檻 14 天
- * - 如果產品下最近的 task due_date > 14 天後，門檻也放寬到 14 天
- */
-export function detectStagnantProducts(products: StagnantProductInput[]): StagnationItem[] {
-  const now = new Date()
-  const stagnations: StagnationItem[] = []
-
-  for (const product of products) {
-    const lastActivity = new Date(product.last_task_updated_at)
-    const daysInactive = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24))
-
-    let threshold: number = product.lifecycle === 'PERPETUAL'
-      ? STAGNANT_PRODUCT_THRESHOLDS.PERPETUAL
-      : STAGNANT_PRODUCT_THRESHOLDS.FINITE
-
-    // 如果最近的任務截止日 > 14 天後，放寬門檻
-    if (product.nearest_due_date) {
-      const daysUntilDue = Math.floor((new Date(product.nearest_due_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      if (daysUntilDue > 14) {
-        threshold = Math.max(threshold, STAGNANT_PRODUCT_THRESHOLDS.PERPETUAL)
-      }
-    }
-
-    if (daysInactive >= threshold) {
-      stagnations.push({
-        type: 'stagnant_product',
-        entity_id: product.id,
-        entity_name: product.name,
-        area_name: product.area_name,
-        days_inactive: daysInactive,
-        last_activity: product.last_task_updated_at,
-        suggestion: `「${product.name}」已 ${daysInactive} 天未更新，建議檢視是否需要推進或歸檔`,
-      })
-    }
-  }
-
-  return stagnations
-}
 
 /**
  * 根據 days_remaining 取得動態停滯門檻

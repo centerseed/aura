@@ -100,6 +100,33 @@ ${tasksCompact}
 
 ---
 
+# 任務 0: Topic 治理
+
+在重新分群之前，先審查現有的 Topics，決定每個 Topic 的去留：
+
+**操作類型**：
+- \`keep\` — 名稱清晰、語意獨立 → 保留
+- \`rename\` — 名稱模糊或不具描述性 → 改名（如 "其他" → "技術債"）
+- \`merge\` — 語意重複的 Topics → 合併（如 "v2 課表 UI" + "v2 課表開發" → "v2 課表開發"）
+
+**規則**：
+1. 每個現有 Topic 必須出現在某個 operation 中
+2. merge/rename 後的名稱必須與後續 \`proposed_clusters\` 中使用的名稱一致
+3. merge 至少需要 2 個 source
+
+**JSON 範例**：
+\`\`\`json
+{
+  "topic_operations": [
+    { "action": "keep", "topic_name": "用戶認證" },
+    { "action": "rename", "old_name": "其他", "new_name": "技術債清理", "reasoning": "命名過於籠統" },
+    { "action": "merge", "source_names": ["v2 課表 UI", "v2 課表開發"], "target_name": "v2 課表開發", "reasoning": "語意重複" }
+  ]
+}
+\`\`\`
+
+---
+
 # 任務 1: Topic 分群
 
 **核心判斷**：兩個任務「做 A 時需要知道 B」→ 同一 Topic
