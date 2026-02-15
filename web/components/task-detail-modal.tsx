@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Calendar, AlertCircle, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight } from "lucide-react";
+import { X, Calendar, AlertCircle, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight, Package, FolderOpen, Tag } from "lucide-react";
 import type { DrawerStatus } from "@/types";
 import {
   DndContext,
@@ -24,12 +24,24 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { TaskCard, SubItem, Reference } from "@/types";
 
+interface AreaWithProducts {
+  id: string;
+  name: string;
+  products: Array<{
+    id: string;
+    name: string;
+    topics?: Array<{ id: string; name: string }>;
+  }>;
+}
+
 interface TaskDetailModalProps {
   task: TaskCard;
   isOpen: boolean;
   onClose: () => void;
   onEditTitle?: (taskId: string, newTitle: string) => void;
   onEditNarrative?: (taskId: string, newNarrative: string) => void;
+  onProductChange?: (taskId: string, productId: string) => void;
+  onTopicChange?: (taskId: string, topicId: string | null) => void;
   onSetDueDate?: (taskId: string) => void;
   onSetStartDate?: (taskId: string) => void;
   onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void;
@@ -50,6 +62,7 @@ interface TaskDetailModalProps {
   isCalendarConnected?: boolean;
   initialEditSubItemId?: string | null;
   calendarEvent?: { eventId: string; eventLink: string } | null;
+  areas?: AreaWithProducts[];
 }
 
 // 計算相對時間描述（與 draggable-task-item 相同邏輯）
@@ -133,7 +146,7 @@ function SortableSubItem({
         >
           {item.content}
         </span>
-        {item.due_date && (() => {
+        {item.due_date && !item.completed && (() => {
           const info = getRelativeTimeDesc(new Date(item.due_date!))
           return (
             <span
@@ -181,11 +194,14 @@ export function TaskDetailModal({
   onComplete,
   onDelete,
   onStatusChange,
+  onProductChange,
+  onTopicChange,
   onAddToCalendar,
   onSetReminder,
   isCalendarConnected,
   initialEditSubItemId,
   calendarEvent,
+  areas = [],
 }: TaskDetailModalProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -204,6 +220,8 @@ export function TaskDetailModal({
   const [subItems, setSubItems] = useState<SubItem[]>(task.sub_items || []);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [showTopicDropdown, setShowTopicDropdown] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [calendarEventLink, setCalendarEventLink] = useState<string | null>(calendarEvent?.eventLink ?? null);
   const [calendarEventId, setCalendarEventId] = useState<string | null>(calendarEvent?.eventId ?? null);
@@ -369,18 +387,13 @@ export function TaskDetailModal({
                 {task.title}
               </h2>
             )}
-            <div className="flex items-center gap-2 mt-2 text-sm text-white/60">
-              <span>{task.tag.area}</span>
-              <span>→</span>
-              <span>{task.tag.product}</span>
-              <span>→</span>
-              <span>{task.tag.topic}</span>
-            </div>
+            {/* Status & Product Badges */}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
             {/* Status Badge */}
             {onStatusChange && (
-              <div className="relative mt-3">
+              <div className="relative">
                 <button
-                  onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                  onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowProductDropdown(false); setShowTopicDropdown(false); }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     {
                       INBOX: "bg-amber-500/20 text-amber-400 border border-amber-500/30",
@@ -424,6 +437,104 @@ export function TaskDetailModal({
                 )}
               </div>
             )}
+
+            {/* Product Selector */}
+            {onProductChange && areas.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => { setShowProductDropdown(!showProductDropdown); setShowStatusDropdown(false); setShowTopicDropdown(false); }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/30"
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  {task.tag.product || "選擇專案"}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showProductDropdown && (
+                  <div className="absolute top-full left-0 mt-1 z-10 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden min-w-[200px] max-h-[300px] overflow-y-auto">
+                    {areas.map((area) => (
+                      <div key={area.id}>
+                        <div className="px-3 py-1.5 text-[10px] font-medium text-white/40 uppercase tracking-wider bg-white/5 flex items-center gap-1.5">
+                          <FolderOpen className="w-3 h-3" />
+                          {area.name}
+                        </div>
+                        {area.products.map((product) => (
+                          <button
+                            key={product.id}
+                            onClick={() => {
+                              onProductChange(task.id, product.id);
+                              setShowProductDropdown(false);
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              task.tag.product === product.name ? "bg-white/5 font-medium" : ""
+                            }`}
+                          >
+                            <Package className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span className="text-white/80 flex-1 truncate text-left">{product.name}</span>
+                            {task.tag.product === product.name && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-indigo-400" />}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Topic Selector */}
+            {(() => {
+              const currentProduct = areas.flatMap(a => a.products).find(p => p.name === task.tag.product);
+              const productTopics = currentProduct?.topics || [];
+              if (onTopicChange && productTopics.length > 0) {
+                return (
+                  <div className="relative">
+                    <button
+                      onClick={() => { setShowTopicDropdown(!showTopicDropdown); setShowStatusDropdown(false); setShowProductDropdown(false); }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30"
+                    >
+                      <Tag className="w-3.5 h-3.5" />
+                      {task.tag.topic || "選擇主題"}
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    {showTopicDropdown && (
+                      <div className="absolute top-full left-0 mt-1 z-10 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden min-w-[160px] max-h-[250px] overflow-y-auto">
+                        <button
+                          onClick={() => { onTopicChange(task.id, null); setShowTopicDropdown(false); }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                            !task.tag.topic || task.tag.topic === '未分類' ? "bg-white/5 font-medium" : ""
+                          }`}
+                        >
+                          <span className="text-white/50">未分類</span>
+                        </button>
+                        {productTopics.map((topic) => (
+                          <button
+                            key={topic.id}
+                            onClick={() => { onTopicChange(task.id, topic.id); setShowTopicDropdown(false); }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/10 transition-colors ${
+                              task.tag.topic === topic.name ? "bg-white/5 font-medium" : ""
+                            }`}
+                          >
+                            <Tag className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                            <span className="text-white/80 flex-1 truncate text-left">{topic.name}</span>
+                            {task.tag.topic === topic.name && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-green-400" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              // 沒有 topics 或沒有 onTopicChange 時，顯示唯讀 pill
+              if (task.tag.topic) {
+                return (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-white/50 border border-white/10">
+                    <Tag className="w-3.5 h-3.5" />
+                    {task.tag.topic}
+                  </span>
+                );
+              }
+              return null;
+            })()}
+            </div>
           </div>
           <button
             onClick={onClose}

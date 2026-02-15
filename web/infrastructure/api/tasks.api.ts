@@ -24,6 +24,7 @@ export interface CreateTaskDTO {
 export interface UpdateTaskDTO {
   content?: string
   status?: DrawerStatus
+  product_id?: string
   topic_id?: string | null
   due_date?: string | null
 }

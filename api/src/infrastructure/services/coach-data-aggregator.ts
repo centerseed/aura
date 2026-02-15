@@ -238,9 +238,10 @@ export class CoachDataAggregator {
       WHERE t.user_id = ${userId}::uuid
         AND t.deleted_at IS NULL
         AND t.status = ${STATUS_ARCHIVE}
-        AND t.updated_at >= ${todayStart}
-        AND t.updated_at < ${todayEnd}
-      ORDER BY t.updated_at DESC
+        AND t.completed_at IS NOT NULL
+        AND t.completed_at >= ${todayStart}
+        AND t.completed_at < ${todayEnd}
+      ORDER BY t.completed_at DESC
     `
 
     return rows.map(row => this.rawToTaskSummary(row, new Date()))

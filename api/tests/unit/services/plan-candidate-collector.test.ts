@@ -21,20 +21,26 @@ interface MockData {
 
 let mockData: MockData
 
-// 用呼叫順序追蹤：collect 內部 Promise.all 的 4 個 query + 1 個 subTasks query
-// 順序：[candidateTasks, meetingMinutes, unscheduledTasks, milestones] 然後 subTasks
-let callCount = 0
+// 根據 tagged template SQL 內容判斷 query 類型（不依賴呼叫順序）
+// Prisma $queryRaw 的 tagged template 傳入的是 Sql 物件，需要用 .strings 或序列化取得 SQL
+// Prisma $queryRaw tagged template 產生 Sql 物件，內有 .strings 陣列
+// 但呼叫方式是 prisma.$queryRaw`SQL`，vitest mock 收到的第一個參數
+// 是 tagged template 的結果（Sql 物件）。用 callCount 方式最穩定。
+let queryCallCount = 0
 
 vi.mock('@/lib/db', () => ({
   prisma: {
     $queryRaw: (...args: any[]) => {
-      const idx = callCount++
+      const idx = queryCallCount++
+      // Promise.all 順序: [candidateTasks(0), meetingMinutes(1), unscheduledTasks(2), milestones(3), weeklyMeetings(4)]
+      // 然後 subTasks(5)
       switch (idx) {
         case 0: return Promise.resolve(mockData.candidateTasks)
         case 1: return Promise.resolve([{ total_minutes: mockData.meetingMinutes }])
         case 2: return Promise.resolve(mockData.unscheduledTasks)
         case 3: return Promise.resolve(mockData.milestones)
-        case 4: return Promise.resolve(mockData.subTasks)
+        case 4: return Promise.resolve([]) // weeklyMeetingMinutes
+        case 5: return Promise.resolve(mockData.subTasks)
         default: return Promise.resolve([])
       }
     },
@@ -86,7 +92,7 @@ describe('PlanCandidateCollector', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    callCount = 0
+    queryCallCount = 0
     collector = new PlanCandidateCollector()
     mockData = {
       candidateTasks: [],

@@ -101,52 +101,95 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 
 ## Milestone 2: Zero-Friction Intake（4 週）
 > 目標：讓輸入零摩擦——「丟進來就好」的核心承諾
+>
+> **狀態**：🟡 進行中（2026-02-15）
 
-### 2.1 Gatekeeper 強化
-- [ ] 重構 Brain Dump 為正式的 Gatekeeper Use Case
-- [ ] 多模態輸入整合：
+### 2.1 Gatekeeper 強化 — 語音輸入
+- [x] Web: `quick-capture.tsx` — Web Speech API 語音辨識（展開/浮動兩種模式都支援） ✅
+  - 使用瀏覽器原生 `SpeechRecognition` API，零延遲、零 API 成本
+  - 支援中文（`zh-TW`），即時轉文字填入輸入框
+- [x] Flutter: 使用本地端 `speech_to_text` 套件，on-device STT ✅
+- 多模態輸入整合：
   - 文字（已有）
   - 圖片 OCR（M0 完成）
-  - 語音轉文字（Whisper API 或 Gemini）
-- [ ] 自動 Entity 掛載：根據 Embedding 相似度自動建議 Area/Product
-- [ ] 自動 Status 推斷：判斷 ACTIVE vs REFERENCE vs MAINTAIN
+  - 語音轉文字 — **Web（Web Speech API）+ Flutter（on-device STT）完成** ✅
 
-### 2.2 Mobile Quick Capture 優化
-- [ ] Flutter: 一鍵語音輸入 → 自動結構化
-- [ ] Flutter: 拍照 → OCR → 結構化
+### 2.2 Mobile Quick Capture
+- [x] Flutter: 一鍵語音輸入 → 自動結構化 — **使用本地端 `speech_to_text` 套件，已在 M0 實作** ✅
+- [x] Flutter: 拍照 → OCR → 結構化 — **已在 M0 實作** ✅
 - [ ] Push Notification 整合（晨晚報推送）
 
-### 2.3 Telegram / LINE Bot（可選）
-- [ ] 簡單的訊息 → Brain Dump API 橋接
-- [ ] 讓用戶隨時隨地丟想法進系統
+### 2.3 自動 Entity 掛載 + Status 推斷
+- [x] 自動 Entity 掛載：已有 pgvector embedding 相似度匹配 Product（M0 完成） ✅
+- [ ] 強化 Area 層級的 embedding 匹配（目前只做 Product）
+- [ ] 自動 Status 推斷（ACTIVE/REFERENCE/MAINTAIN）— **暫緩，避免影響已調穩的分類 prompt**
+- [ ] 前端建議 UI：顯示 AI 建議的 Area/Product/Status，用戶可一鍵確認或修改 — **Web + Flutter 都可實現**
+
+### 2.4 Telegram / LINE Bot — 延後至 M5 Beta
+> 作為 Growth channel，非 M2 核心。M2 已有 Web + Flutter 兩個零摩擦入口。
 
 ---
 
 ## Milestone 3: Automated Governance（4 週）
 > 目標：讓 Librarian 真正「主動治理」，而非只是被動歸檔
+>
+> **現有基礎**：已有完整的 Reorganize Pipeline + Librarian 學習引擎
 
-### 3.1 排程治理引擎
-- [ ] 每日自動執行 Librarian System 2（深夜 3:00）
-  - 規則蒸餾（已有 POC）
-  - 群聚偵測（已有 POC）
-  - 滾動摘要更新
-- [ ] 每週自動執行「熵減掃描」
-  - 語義拓撲：偵測 Topic 群聚（哪些 Topics 應該合併）
-  - 敘事演化：偵測 Product 重心偏移
-  - 提出 Reorganize 建議（需用戶確認）
+### 已實作基礎（代碼已存在）
+
+**Reorganize Pipeline（按需觸發）**：
+- [x] `AnalyzeStructureUseCase` — AI 分析整體結構，建議 Product 合併 + Task 重分類 ✅
+- [x] `ExecuteReorganizationUseCase` — 執行合併/重分類，支援選擇性操作 ✅
+- [x] `POST /api/reorganize` — 兩階段 API（預覽 → 確認執行）✅
+- [x] `reorganize-prompt.ts` — Topic 層級重組 prompt（合併 > 拆分、保守原則）✅
+
+**Librarian 學習引擎（poc-librarian-js/）**：
+- [x] `librarianObserve()` — 記錄用戶修正（Task 移動 Product/Topic 時觸發）✅
+- [x] `librarianRecall()` — 查詢活躍規則（Brain Dump 分類時使用）✅
+- [x] Hot Path（即時）：匹配既有規則 → 提升 confidence，0 次 LLM 呼叫 ✅
+- [x] Warm Path（隱式）：累積 3+ 未匹配修正 → 單次 LLM 嘗試歸納 ✅
+- [x] Cold Path（完整蒸餾）：累積 ≥10 修正 → 多階段蒸餾 ✅
+  - Stage 0: 規則老化（30 天降 confidence，90 天歸檔）
+  - Stage 1: 自適應聚類（ml-kmeans 優先，silhouette < 0.3 fallback LLM）
+  - Stage 2: 規則蒸餾（每個 cluster → 1 條規則）
+  - Stage 3: 衝突偵測與解決（重複/矛盾/相似）
+  - Stage 4: 清理（低信心歸檔，上限 20 條/用戶）
+- [x] Vector 搜尋：Gemini Embedding (768-dim) + cosine similarity ✅
+
+**Cron 基礎建設**：
+- [x] Vercel Cron 架構已建立（Coach Briefing 使用中）✅
+- [x] `CRON_SECRET` 驗證機制 ✅
+
+### 3.1 排程治理引擎（將被動 → 主動）
+
+目前 Reorganize 和 Librarian Reflect 都是**按需觸發**，M3 的核心是加上**自動排程**：
+
+- [ ] `api/src/app/api/cron/librarian-reflect/route.ts` — 每日 Cron（UTC 19:00 = 台北 03:00）
+  - 呼叫 Librarian `/api/reflect` 觸發 Cold Path 蒸餾
+  - 條件：有 ≥5 筆未處理修正才執行（避免空轉）
+  - 記錄執行結果到 `SystemEvaluationLog`
+- [ ] `api/src/app/api/cron/structure-scan/route.ts` — 每週 Cron（週日 03:30）
+  - 呼叫 `AnalyzeStructureUseCase` 掃描每位活躍用戶的結構
+  - 將建議存為「待確認」記錄（不自動執行）
+  - 推送通知到 Coach Briefing（晨報中顯示「系統建議重組 N 項」）
+- [ ] 環境配置：`vercel.json` 新增 cron schedules
 
 ### 3.2 Librarian 主動關聯
-- [ ] Use Case: `FindRelatedContext`
-  - 用戶處理某 Task 時，自動浮現相關的歷史任務/筆記
+
+- [ ] Use Case: `FindRelatedContextUseCase`
+  - 用戶查看某 Task 時，用 embedding 搜尋相關的歷史任務/筆記
   - 跨 Area 關聯（例：工作的技術問題 ↔ 個人學習筆記）
+  - 已有 `findRelevantProductsHybrid()` 做 Product 相似度，需擴展到 Task 層級
 - [ ] API: `GET /api/librarian/related?taskId=xxx`
-- [ ] Web: Task Detail 側邊欄顯示相關脈絡
+- [ ] Web + Flutter: Task Detail 側邊欄顯示相關脈絡
 
 ### 3.3 治理儀表板
+
 - [ ] Web: 「系統健康度」面板
-  - 各 Area 的活躍度
-  - 哪些 Product 停滯
-  - Entropy Score（系統混亂度指標）
+  - 各 Area 的活躍度（已有 `AnalyzeStructureUseCase` 可產出結構摘要）
+  - 停滯偵測（已有 `coach-detection.ts` 的停滯邏輯可復用）
+  - 待確認的重組建議列表（來自 3.1 週掃描）
+  - Entropy Score（基於 Topic 分散度、命名一致性計算）
 
 ---
 
@@ -199,8 +242,8 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 | Milestone | 時長 | 累計 | 核心交付 | 狀態 |
 |-----------|------|------|---------|------|
 | **M0: Cleanup** ✅ | 2 週 | 2 週 | 技術債清零 + Librarian 整合 | 已完成 |
-| **M1: Coach** 🟡 | 6 週 | 8 週 | 晨晚報 + 衝突偵測 + 停滯偵測 | 進行中（預計 2026-02-28） |
-| **M2: Intake** | 4 週 | 12 週 | 語音/圖片/多模態零摩擦輸入 | 待開始 |
+| **M1: Coach** 🟡 | 6 週 | 8 週 | 晨晚報 + 衝突偵測 + 停滯偵測 | ~90% 完成 |
+| **M2: Intake** 🟡 | 4 週 | 12 週 | 語音/圖片/多模態零摩擦輸入 | 進行中（語音完成，前端建議 UI 待做） |
 | **M3: Governance** | 4 週 | 16 週 | 自動排程治理 + 主動關聯 | 待開始 |
 | **M4: MCP** | 3 週 | 19 週 | zentropy:// MCP Server | 待開始 |
 | **M5: Beta** | 4 週 | 23 週 | 公開測試 + 定價 + Launch | 待開始 |
@@ -227,7 +270,7 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
   - 🟡 晚報功能實作（待完成）
   - 🟡 端到端整合測試（進行中）
 - **M2**: 語音/圖片 → 自動結構化為 Task，正確掛載 Entity 率 > 70%
-- **M3**: 排程 Cron 自動跑 → 生成 Reorganize 建議 + 相關脈絡浮現可用
+- **M3**: Cron 每日蒸餾 + 每週結構掃描自動執行 → 晨報顯示重組建議 + Task 相關脈絡浮現可用
 - **M4**: Claude Desktop 成功透過 MCP 讀取 Zentropy 資料
 - **M5**: 20 位 Beta 用戶連續使用 2 週，NPS > 40
 
@@ -247,34 +290,45 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 - ✅ `web/lib/briefing-window-utils.ts` — 晨報窗口計算
 - ✅ `web/tests/unit/lib/briefing-window-utils.test.ts` — 窗口計算測試
 
+### 已實作（M2）
+- ✅ `web/components/quick-capture.tsx` — Web Speech API 語音辨識按鈕（展開/浮動模式）
+
 ### 需修改（待完成）
-- `web/components/quick-capture.tsx` — 多模態輸入（M2）
 - `api/src/infrastructure/scheduler/` — Cron 排程器（M1 晚報）
 
-### 需新增（M2 之後）
+### 需新增（M3 之後）
 - `api/src/application/use-cases/coach/generate-evening-review.ts` — 晚報
 - `api/src/infrastructure/scheduler/` — Cron 排程器
 - `packages/mcp-server/` — MCP Server 套件
 
 ---
 
-## 最新更新（2026-02-14）
+## 最新更新（2026-02-15）
 
-### 已實作
+### M1 Coach 已完成項目
 - **Coach 晨報系統**：核心邏輯完成，API 可用
   - 集成日曆行程、任務狀態、衝突偵測
   - 包含停滯任務警示、優先事項建議
 - **計畫項目管理**：新增 `/api/coach/plan/items` CRUD 操作
 - **Web UI**：晨報卡片、排程設定、計畫表單
-- **測試**：70%+ 單元測試覆蓋，衝突/停滯偵測通過驗證
+- **測試**：567 個單元測試通過（61 個測試檔案）
 
-### 進行中
-- 優化衝突偵測準確率（跨時區支援）
-- Web UI 集成衝突警示 Badge
-- 晚報功能開發
+### M2 Intake 已完成項目（2026-02-15）
+- **語音輸入**：
+  - Web：`quick-capture.tsx` — Web Speech API 語音辨識（零延遲、零成本）
+  - Flutter：on-device `speech_to_text`（延遲低、品質夠用）
+  - 不需 server-side 轉錄，兩端都用客戶端 STT
 
-### 待開始（M2+）
-- 語音/圖片多模態輸入
+### M2 待完成
+- **前端建議 UI**（P0）：AI 分類建議一鍵確認/修改（Web + Flutter）
+- Area embedding 匹配強化
+- Push Notification 整合（晨晚報推送到 Flutter）
+
+### 暫緩
+- AI 分類 prompt 的 Status 推斷 / confidence score / risk level — **分類 prompt 已調穩，避免回退**
+- Telegram / LINE Bot — 延後至 M5 Beta（作為 Growth channel）
+
+### 待開始（M3+）
 - Cron 排程器自動觸發
 - Librarian 主動治理
 - MCP Server 實作

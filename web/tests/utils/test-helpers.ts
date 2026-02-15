@@ -26,7 +26,9 @@ export function renderWithProviders(
 }
 
 // Mock NextRequest helper
-export function createMockRequest(options: MockRequestOptions = {}): Request {
+// 回傳 any 避免 Request vs NextRequest 型別不相容問題
+// 實際測試中只需要 headers.get() 和 json() 方法
+export function createMockRequest(options: MockRequestOptions = {}): any {
   const {
     method = 'GET',
     body,

@@ -229,7 +229,7 @@ describe('auth-middleware', () => {
         return { uid: firebaseUid }
       })
 
-      prismaMock.user.findFirst.mockImplementation(async () => {
+      ;(prismaMock.user.findFirst.mockImplementation as any)(async () => {
         callOrder.push('findUser')
         return mockUser as any
       })

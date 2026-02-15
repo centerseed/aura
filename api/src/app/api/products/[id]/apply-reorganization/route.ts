@@ -5,11 +5,18 @@ import { isValidUUID } from "@/domain/constants/validation";
 import type { Reference } from "@/domain/entities/task.entity";
 import { mergeReferences } from "@/application/use-cases/merge-references";
 import { syncSubTasksToJson } from "@/infrastructure/repositories/sub-task-sync";
+import { cleanupZombieTopics } from "./zombie-cleanup";
+
+type TopicOperation =
+  | { action: "keep"; topic_name: string }
+  | { action: "rename"; old_name: string; new_name: string; reasoning: string }
+  | { action: "merge"; source_names: string[]; target_name: string; reasoning: string };
 
 interface ReorganizeProposal {
   product_id: string;
   product_name: string;
   current_topics: string[];
+  topic_operations?: TopicOperation[];
   proposed_clusters: Array<{
     topic_name: string;
     task_ids: string[];
@@ -21,6 +28,8 @@ interface ReorganizeProposal {
     reasoning: string;
   }>;
   logId?: string;
+  apply_topic_operations?: boolean;
+  apply_task_consolidations?: boolean;
 }
 
 // POST /api/products/[id]/apply-reorganization
@@ -50,68 +59,158 @@ export async function POST(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    const applyTopicOps = proposal.apply_topic_operations !== false;
+    const applyConsolidations = proposal.apply_task_consolidations !== false;
+
+    console.log("\n[APPLY-REORGANIZATION] 開始處理");
+    console.log(`  Product: ${productId}`);
+    console.log(`  applyTopicOps: ${applyTopicOps}, applyConsolidations: ${applyConsolidations}`);
+    console.log(`  topic_operations: ${JSON.stringify(proposal.topic_operations || [])}`);
+    console.log(`  proposed_clusters: ${proposal.proposed_clusters.length} 個`);
+    console.log(`  task_consolidations: ${(proposal.task_consolidations || []).length} 個`);
+
     // 使用 Transaction 確保原子性 (設定 30 秒超時以處理大量 tasks)
     const result = await prisma.$transaction(async (tx) => {
-      // UUID 驗證（使用統一函數）
+      // 0. 處理 Topic Operations（rename / merge）
+      const topicIdMapping = new Map<string, string>(); // old topic name -> resolved topic id
+      const operatedTopicIds = new Set<string>(); // 本次操作過的 topic IDs
+
+      if (applyTopicOps && proposal.topic_operations && proposal.topic_operations.length > 0) {
+        for (const op of proposal.topic_operations) {
+          if (op.action === "rename") {
+            const existingTopic = await tx.topic.findFirst({
+              where: { user_id: userId, product_id: productId, name: op.old_name, deleted_at: null },
+            });
+            if (existingTopic) {
+              await tx.topic.update({
+                where: { id: existingTopic.id },
+                data: { name: op.new_name },
+              });
+              topicIdMapping.set(op.new_name, existingTopic.id);
+              operatedTopicIds.add(existingTopic.id);
+            }
+          } else if (op.action === "merge") {
+            // 找到或建立 target topic
+            let targetTopic = await tx.topic.findFirst({
+              where: { user_id: userId, product_id: productId, name: op.target_name, deleted_at: null },
+            });
+
+            // 如果 target 不存在，用第一個 source 改名
+            const sourceTopics = [];
+            for (const sourceName of op.source_names) {
+              const t = await tx.topic.findFirst({
+                where: { user_id: userId, product_id: productId, name: sourceName, deleted_at: null },
+              });
+              if (t) sourceTopics.push(t);
+            }
+
+            if (!targetTopic && sourceTopics.length > 0) {
+              // 用第一個 source 改名為 target
+              targetTopic = sourceTopics[0];
+              await tx.topic.update({
+                where: { id: targetTopic.id },
+                data: { name: op.target_name },
+              });
+            }
+
+            if (targetTopic) {
+              topicIdMapping.set(op.target_name, targetTopic.id);
+              operatedTopicIds.add(targetTopic.id);
+
+              // 把其他 source topics 的 tasks 搬到 target，然後軟刪除
+              for (const sourceTopic of sourceTopics) {
+                if (sourceTopic.id === targetTopic.id) continue;
+                await tx.task.updateMany({
+                  where: { topic_id: sourceTopic.id, deleted_at: null },
+                  data: { topic_id: targetTopic.id },
+                });
+                await tx.topic.update({
+                  where: { id: sourceTopic.id },
+                  data: { deleted_at: new Date() },
+                });
+                operatedTopicIds.add(sourceTopic.id);
+              }
+            }
+          } else if (op.action === "keep") {
+            // keep 只加到 topicIdMapping 供 cluster 分配複用，不加到 operatedTopicIds
+            // 如果 keep 的 topic 不在任何 proposed_cluster 中，zombie cleanup 應該清理它
+            const existingTopic = await tx.topic.findFirst({
+              where: { user_id: userId, product_id: productId, name: op.topic_name, deleted_at: null },
+            });
+            if (existingTopic) {
+              topicIdMapping.set(op.topic_name, existingTopic.id);
+            }
+          }
+        }
+      }
 
       // 1. 根據 proposed_clusters 創建或查找 Topics
       const topicMapping: Map<string, string> = new Map(); // cluster.topic_name -> topic.id
       let updatedTasksCount = 0; // 追蹤實際更新的 tasks 數量
 
-      for (const cluster of proposal.proposed_clusters) {
-        // 查找現有 Topic
-        let topic = await tx.topic.findFirst({
-          where: {
-            user_id: userId,
-            product_id: productId,
-            name: cluster.topic_name,
-            deleted_at: null,
-          },
-        });
+      if (applyTopicOps) {
+        for (const cluster of proposal.proposed_clusters) {
+          // 優先使用已經 rename/merge 過的 topic ID
+          const existingId = topicIdMapping.get(cluster.topic_name);
+          let topicId: string;
 
-        // 如果不存在,創建新 Topic
-        if (!topic) {
-          topic = await tx.topic.create({
-            data: {
-              user_id: userId,
-              product_id: productId,
-              name: cluster.topic_name,
-            } as any, // TypeScript 類型斷言,created_at 由 Prisma 自動處理
-          });
-        }
+          if (existingId) {
+            topicId = existingId;
+          } else {
+            // 查找現有 Topic
+            let topic = await tx.topic.findFirst({
+              where: {
+                user_id: userId,
+                product_id: productId,
+                name: cluster.topic_name,
+                deleted_at: null,
+              },
+            });
 
-        topicMapping.set(cluster.topic_name, topic.id);
+            // 如果不存在,創建新 Topic
+            if (!topic) {
+              topic = await tx.topic.create({
+                data: {
+                  user_id: userId,
+                  product_id: productId,
+                  name: cluster.topic_name,
+                } as any,
+              });
+            }
 
-        // 2. 批次更新該 cluster 中的所有 Tasks 的 topic_id
-        // 過濾出有效的 task IDs
-        const validTaskIds = cluster.task_ids.filter(taskId => {
-          if (!isValidUUID(taskId)) {
-            console.warn(`Invalid task_id in cluster: ${taskId}, skipping...`);
-            return false;
+            topicId = topic.id;
           }
-          return true;
-        });
 
-        // ✅ 批次更新：一次 UPDATE 整個 cluster 的所有 tasks
-        // ✅ 只更新未刪除且未完成的 tasks，節省 DB 操作
-        if (validTaskIds.length > 0) {
-          const updateResult = await tx.task.updateMany({
-            where: {
-              id: { in: validTaskIds },
-              deleted_at: null,
-              status: { not: "ARCHIVE" }, // 不更新已完成的任務
-            },
-            data: {
-              topic_id: topic.id,
-            },
+          topicMapping.set(cluster.topic_name, topicId);
+
+          // 2. 批次更新該 cluster 中的所有 Tasks 的 topic_id
+          const validTaskIds = cluster.task_ids.filter(taskId => {
+            if (!isValidUUID(taskId)) {
+              console.warn(`Invalid task_id in cluster: ${taskId}, skipping...`);
+              return false;
+            }
+            return true;
           });
-          updatedTasksCount += updateResult.count;
+
+          if (validTaskIds.length > 0) {
+            const updateResult = await tx.task.updateMany({
+              where: {
+                id: { in: validTaskIds },
+                deleted_at: null,
+                status: { not: "ARCHIVE" },
+              },
+              data: {
+                topic_id: topicId,
+              },
+            });
+            updatedTasksCount += updateResult.count;
+          }
         }
       }
 
       // 3. 處理 Task 整合 (將細碎 Tasks 合併為 todo-list)
       let consolidatedCount = 0;
-      if (proposal.task_consolidations && proposal.task_consolidations.length > 0) {
+      if (applyConsolidations && proposal.task_consolidations && proposal.task_consolidations.length > 0) {
         for (const consolidation of proposal.task_consolidations) {
           // 驗證 parent_task_id 格式
           if (!isValidUUID(consolidation.parent_task_id)) {
@@ -258,20 +357,32 @@ export async function POST(
         .filter(id => isValidUUID(id));
 
       return {
-        updated_topics: proposal.proposed_clusters.length,
+        updated_topics: applyTopicOps ? proposal.proposed_clusters.length : 0,
         updated_tasks: updatedTasksCount,
         consolidated_tasks: consolidatedCount,
         parentTaskIds,
+        operatedTopicIds: Array.from(operatedTopicIds),
       };
     }, {
       maxWait: 30000,
       timeout: 30000,
     });
 
+    console.log(`[APPLY-REORGANIZATION] Transaction 完成:`);
+    console.log(`  updated_topics: ${result.updated_topics}, updated_tasks: ${result.updated_tasks}, consolidated: ${result.consolidated_tasks}`);
+    console.log(`  operatedTopicIds: ${result.operatedTopicIds.join(', ')}`);
+
     // 雙寫：同步 sub_tasks → JSON（在 transaction 外執行）
     for (const taskId of result.parentTaskIds) {
       await syncSubTasksToJson(taskId);
     }
+
+    // 清理 zombie topics
+    await cleanupZombieTopics(prisma, {
+      productId,
+      operatedTopicIds: result.operatedTopicIds,
+      proposedTopicNames: proposal.proposed_clusters.map(c => c.topic_name),
+    });
 
     // 更新評估 Log 狀態為 APPLIED (如果有提供 logId)
     if (proposal.logId) {

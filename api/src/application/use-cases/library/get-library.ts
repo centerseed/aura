@@ -62,6 +62,11 @@ export interface TaskData {
   }>
 }
 
+export interface TopicData {
+  id: string
+  name: string
+}
+
 export interface ProductData {
   id: string
   name: string
@@ -70,6 +75,7 @@ export interface ProductData {
   lifecycle: string
   referenceCount: number
   tasks: TaskData[]
+  topics: TopicData[]
 }
 
 export interface AreaData {
@@ -160,6 +166,32 @@ export class GetLibraryUseCase {
     // 3. 將扁平結果轉換為巢狀結構
     const formattedAreas = this.transformToNestedStructure(rawRows)
 
+    // 4. 查詢所有 topics 並掛到對應 product
+    const allProductIds = formattedAreas.flatMap(a => a.products.map(p => p.id))
+    if (allProductIds.length > 0) {
+      const topics = await prisma.topic.findMany({
+        where: {
+          product_id: { in: allProductIds },
+          deleted_at: null,
+        },
+        select: { id: true, name: true, product_id: true },
+        orderBy: { name: 'asc' },
+      })
+
+      const topicsByProduct = new Map<string, TopicData[]>()
+      for (const t of topics) {
+        const list = topicsByProduct.get(t.product_id) || []
+        list.push({ id: t.id, name: t.name })
+        topicsByProduct.set(t.product_id, list)
+      }
+
+      for (const area of formattedAreas) {
+        for (const product of area.products) {
+          product.topics = topicsByProduct.get(product.id) || []
+        }
+      }
+    }
+
     return {
       areas: formattedAreas,
     }
@@ -197,6 +229,7 @@ export class GetLibraryUseCase {
           lifecycle: row.product_lifecycle!,
           referenceCount: productRefs.length, // 先計算 product refs，後面加 task refs
           tasks: [],
+          topics: [],
         }
         productsMap.set(row.product_id, product)
         area.products.push(product)

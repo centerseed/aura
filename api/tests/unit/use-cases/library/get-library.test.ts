@@ -11,6 +11,7 @@ import { prisma } from '@/lib/db'
 vi.mock('@/lib/db', () => ({
   prisma: {
     $queryRaw: vi.fn(),
+    topic: { findMany: vi.fn().mockResolvedValue([]) },
   },
 }))
 

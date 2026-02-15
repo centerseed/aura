@@ -252,7 +252,11 @@ export class PrismaTaskRepository implements ITaskRepository {
     await prisma.task.update({
       where: { id },
       data: {
-        ...(data.status && { status: this.toPrismaStatus(data.status) }),
+        ...(data.status && {
+          status: this.toPrismaStatus(data.status),
+          ...(data.status === 'ARCHIVE' ? { completed_at: new Date() } : {}),
+          ...(data.status !== 'ARCHIVE' ? { completed_at: null } : {}),
+        }),
         ...(data.productId && { product_id: data.productId }),
         ...(data.topicId !== undefined && { topic_id: data.topicId }),
         ...(data.content && { content: data.content.trim() }),
@@ -469,8 +473,8 @@ export class PrismaTaskRepository implements ITaskRepository {
       const archiveStatus = 'ARCHIVE'
 
       conditions.push(Prisma.sql`AND t.status = ${archiveStatus}::text::"statusenum"`)
-      conditions.push(Prisma.sql`AND t.updated_at >= ${todayStart}`)
-      conditions.push(Prisma.sql`AND t.updated_at < ${todayEnd}`)
+      conditions.push(Prisma.sql`AND t.completed_at >= ${todayStart}`)
+      conditions.push(Prisma.sql`AND t.completed_at < ${todayEnd}`)
     }
 
     // 更新時間範圍
@@ -540,7 +544,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
       where.status = PrismaStatus.ARCHIVE
-      where.updated_at = {
+      where.completed_at = {
         gte: todayStart,
         lt: todayEnd,
       }

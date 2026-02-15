@@ -64,6 +64,15 @@ export interface ProductContext {
   }>
 }
 
+export interface WeeklyDayInfo {
+  date: string          // YYYY-MM-DD
+  dayOfWeek: string     // 星期X
+  meetingMinutes: number
+  availableMinutes: number
+  tasksDue: number
+  totalEstimatedMinutes: number
+}
+
 export interface CollectedData {
   candidates: PlanCandidate[]
   unscheduledTasks: PlanCandidate[]
@@ -71,6 +80,7 @@ export interface CollectedData {
   productContexts: ProductContext[]
   meetingMinutes: number
   availableMinutes: number
+  weeklyOverview: WeeklyDayInfo[]
 }
 
 // ============================================================================
@@ -113,18 +123,20 @@ export class PlanCandidateCollector {
     const todayEnd = getEndOfDay(date, timezone)
     const threeDaysLater = new Date(todayEnd.getTime() + 3 * 24 * 60 * 60 * 1000)
 
-    const [candidateTasks, calendarEvents, unscheduledRaw, milestones] = await Promise.all([
+    const fiveDaysLater = new Date(todayStart.getTime() + 5 * 24 * 60 * 60 * 1000)
+    // 並行查詢（含 subtasks，不依賴 taskIds）
+    const [candidateTasks, calendarEvents, unscheduledRaw, milestones, weeklyMeetings, allSubTasks] = await Promise.all([
       this.queryCandidateTasks(userId, todayStart, threeDaysLater),
       this.queryMeetingMinutes(userId, todayStart, todayEnd),
       this.queryUnscheduledTasks(userId),
       this.queryMilestones(userId, todayStart),
+      this.queryWeeklyMeetingMinutes(userId, todayStart, fiveDaysLater),
+      this.queryAllActiveSubTasks(userId), // 查詢所有活躍任務的 subtasks
     ])
 
-    // Fetch subtasks for all candidate tasks
-    const taskIds = candidateTasks.map(t => t.id)
-    const subTasks = taskIds.length > 0
-      ? await this.querySubTasks(taskIds)
-      : []
+    // 篩選出 candidate tasks 的 subtasks（記憶體操作，很快）
+    const taskIds = new Set(candidateTasks.map(t => t.id))
+    const subTasks = allSubTasks.filter(st => taskIds.has(st.task_id))
 
     // Group subtasks by task_id
     const subTasksByTask = new Map<string, RawSubTask[]>()
@@ -211,6 +223,9 @@ export class PlanCandidateCollector {
     const meetingMinutes = calendarEvents
     const availableMinutes = WORK_HOURS_PER_DAY * 60 - meetingMinutes
 
+    // Build weekly overview (today + 4 days) — pure in-memory, no extra DB queries
+    const weeklyOverview = this.buildWeeklyOverview(todayStart, candidates, weeklyMeetings)
+
     return {
       candidates,
       unscheduledTasks,
@@ -218,6 +233,7 @@ export class PlanCandidateCollector {
       productContexts,
       meetingMinutes,
       availableMinutes,
+      weeklyOverview,
     }
   }
 
@@ -276,6 +292,31 @@ export class PlanCandidateCollector {
     `
   }
 
+  /**
+   * 查詢所有活躍任務的 subtasks（不依賴 taskIds，可並行）
+   */
+  private async queryAllActiveSubTasks(userId: string): Promise<RawSubTask[]> {
+    return prisma.$queryRaw<RawSubTask[]>`
+      SELECT
+        st.id::text,
+        st.task_id::text,
+        st.content,
+        st.completed,
+        st.due_date,
+        st.start_date,
+        st.estimated_minutes,
+        st.order
+      FROM sub_tasks st
+      JOIN tasks t ON t.id = st.task_id
+      WHERE t.user_id = ${userId}::uuid
+        AND t.deleted_at IS NULL
+        AND t.status IN ('ACTIVE', 'INBOX')
+        AND st.deleted_at IS NULL
+      ORDER BY st.task_id, st.order ASC
+    `
+  }
+
+  /** @deprecated 改用 queryAllActiveSubTasks 並在記憶體篩選 */
   private async querySubTasks(taskIds: string[]): Promise<RawSubTask[]> {
     return prisma.$queryRaw<RawSubTask[]>`
       SELECT
@@ -361,6 +402,76 @@ export class PlanCandidateCollector {
       ORDER BY m.target_date ASC
       LIMIT ${MAX_MILESTONES}
     `
+  }
+
+  // ============================================================================
+  // Weekly Overview
+  // ============================================================================
+
+  private buildWeeklyOverview(
+    todayStart: Date,
+    candidates: PlanCandidate[],
+    weeklyMeetings: Map<string, number>,
+  ): WeeklyDayInfo[] {
+    const dayNames = ['日', '一', '二', '三', '四', '五', '六']
+    const days: WeeklyDayInfo[] = []
+
+    for (let i = 0; i < 5; i++) {
+      const dayStart = new Date(todayStart.getTime() + i * 24 * 60 * 60 * 1000)
+      const dateStr = dayStart.toISOString().substring(0, 10)
+      const dayOfWeek = dayNames[dayStart.getDay()]
+      const meetingMins = weeklyMeetings.get(dateStr) ?? 0
+      const availableMins = WORK_HOURS_PER_DAY * 60 - meetingMins
+
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+      const dueTasks = candidates.filter(c => {
+        if (!c.dueDate) return false
+        const due = new Date(c.dueDate)
+        return due >= dayStart && due < dayEnd
+      })
+
+      days.push({
+        date: dateStr,
+        dayOfWeek: `星期${dayOfWeek}`,
+        meetingMinutes: meetingMins,
+        availableMinutes: availableMins,
+        tasksDue: dueTasks.length,
+        totalEstimatedMinutes: dueTasks.reduce(
+          (sum, c) => sum + (c.estimatedMinutes ?? 60), 0
+        ),
+      })
+    }
+
+    return days
+  }
+
+  /**
+   * 一次查詢 5 天的會議時間，按日分組回傳
+   */
+  private async queryWeeklyMeetingMinutes(
+    userId: string,
+    rangeStart: Date,
+    rangeEnd: Date,
+  ): Promise<Map<string, number>> {
+    const rows = await prisma.$queryRaw<Array<{ day: string; total_minutes: number }>>`
+      SELECT
+        TO_CHAR(ce.start_date_time AT TIME ZONE 'UTC', 'YYYY-MM-DD') as day,
+        COALESCE(
+          SUM(EXTRACT(EPOCH FROM (ce.end_date_time - ce.start_date_time)) / 60),
+          0
+        )::int as total_minutes
+      FROM calendar_events ce
+      WHERE ce.user_id = ${userId}::uuid
+        AND ce.deleted_at IS NULL
+        AND ce.start_date_time >= ${rangeStart}
+        AND ce.start_date_time < ${rangeEnd}
+      GROUP BY TO_CHAR(ce.start_date_time AT TIME ZONE 'UTC', 'YYYY-MM-DD')
+    `
+    const map = new Map<string, number>()
+    for (const row of rows) {
+      map.set(row.day, row.total_minutes)
+    }
+    return map
   }
 
   // ============================================================================

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../../domain/entities/reorganize_proposal.dart';
 
-class ReorganizeBottomSheet extends StatelessWidget {
+class ReorganizeBottomSheet extends StatefulWidget {
   final ReorganizeProposal proposal;
   final bool isApplying;
-  final VoidCallback onApply;
+  final void Function({required bool applyTopicOps, required bool applyConsolidations}) onApply;
 
   const ReorganizeBottomSheet({
     super.key,
@@ -14,16 +14,23 @@ class ReorganizeBottomSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final taskContextMap = {for (var task in proposal.tasksContext) task.id: task};
+  State<ReorganizeBottomSheet> createState() => _ReorganizeBottomSheetState();
+}
 
-    // 計算變化
+class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
+  bool _applyTopicOps = true;
+  bool _applyConsolidations = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final taskContextMap = {for (var task in widget.proposal.tasksContext) task.id: task};
+    final proposal = widget.proposal;
     final currentTopicCount = proposal.currentTopicCount ?? proposal.currentTopics.length;
     final newTopicCount = proposal.proposedClusters.length;
     final hasConsolidations = proposal.taskConsolidations.isNotEmpty;
-    final topicDiff = newTopicCount - currentTopicCount;
+    final visibleTopicOps = proposal.topicOperations.where((op) => op.action != 'keep').toList();
 
-    // 建立 consolidation map (用於顯示「主」「子」標記)
+    // 建立 consolidation map
     final consolidationMap = <String, String>{};
     for (var consolidation in proposal.taskConsolidations) {
       consolidationMap[consolidation.parentTaskId] = 'p';
@@ -32,18 +39,16 @@ class ReorganizeBottomSheet extends StatelessWidget {
       }
     }
 
-    // 計算每個分類的任務資訊
+    // 計算每個主題的任務資訊
     final topicChanges = <_TopicChange>[];
     for (var cluster in proposal.proposedClusters) {
       final isNew = !proposal.currentTopics.contains(cluster.topicName);
       final taskInfos = cluster.taskIds.map((id) {
         final context = taskContextMap[id];
         if (context == null) return null;
-
         final currentTopic = context.currentTopic;
         final isMoved = currentTopic != cluster.topicName;
         final isFromUncategorized = currentTopic == '未分類';
-
         return _TaskInfo(
           id: id,
           title: context.title,
@@ -61,14 +66,14 @@ class ReorganizeBottomSheet extends StatelessWidget {
       ));
     }
 
-    // 計算有多少任務被移動（排除從「未分類」來的）
-    final movedTasksCount = topicChanges
-        .expand((change) => change.tasks)
-        .where((task) => task.isMoved && !task.isFromUncategorized)
+    // 計算移動數
+    final changedCount = topicChanges
+        .expand((c) => c.tasks)
+        .where((t) => t.isMoved && !t.isFromUncategorized)
         .length;
-
-    // 判斷是否有實質性變化
-    final hasNoChanges = topicDiff == 0 && !hasConsolidations && movedTasksCount == 0;
+    final hasTopicOps = visibleTopicOps.isNotEmpty;
+    final hasChanges = changedCount > 0 || hasTopicOps || topicChanges.any((c) => c.isNew);
+    final nothingSelected = !_applyTopicOps && !_applyConsolidations;
 
     return Container(
       decoration: BoxDecoration(
@@ -94,7 +99,7 @@ class ReorganizeBottomSheet extends StatelessWidget {
           // Content
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -113,355 +118,152 @@ class ReorganizeBottomSheet extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                  // Before & After 對比
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                    ),
-                    child: Column(
-                      children: [
-                        // Before
-                        Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: 0.6),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '現在：$currentTopicCount 個分類',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 15,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Arrow
-                        Icon(
-                          Icons.arrow_downward,
-                          color: Colors.white.withValues(alpha: 0.3),
-                          size: 20,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // After
-                        Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF6C63FF),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '整理後：$newTopicCount 個分類',
-                              style: const TextStyle(
-                                color: Color(0xFF6C63FF),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 當 AI 判定不需要調整時的訊息
-                  if (hasNoChanges) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF064E3B),
-                            Color(0xFF0D1117),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check_circle,
-                              color: Color(0xFF10B981),
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  '✅ 目前的分類組織已經很合理',
-                                  style: TextStyle(
-                                    color: Color(0xFF6EE7B7),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'AI 分析後認為現有的 $currentTopicCount 個分類和任務分布都很清晰，不需要進行調整。',
-                                  style: TextStyle(
-                                    color: const Color(0xFF6EE7B7).withValues(alpha: 0.7),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // 任務整合說明（如果有）
-                  if (hasConsolidations) ...[
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.merge_type, color: Color(0xFF6C63FF), size: 18),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '「主」任務保留，「子」任務變成待辦事項',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // 分類列表標題
-                  Row(
-                    children: [
-                      const Text(
-                        '重組後的分類',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '($newTopicCount 個)',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 每個分類的任務列表
-                  ...topicChanges.map((change) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: change.isNew
-                              ? const Color(0xFF6C63FF).withValues(alpha: 0.4)
-                              : Colors.white.withValues(alpha: 0.1),
-                        ),
-                      ),
+                  // ═══════════════════════════════════════
+                  // Section 1: 主題重組（topic ops + cluster）
+                  // ═══════════════════════════════════════
+                  if (hasChanges) ...[
+                    _buildSection(
+                      color: const Color(0xFF6366F1),
+                      icon: Icons.auto_awesome,
+                      title: '主題重組',
+                      subtitle: '$currentTopicCount → $newTopicCount 個主題'
+                          '${changedCount > 0 ? '，$changedCount 個任務移動' : ''}',
+                      checked: _applyTopicOps,
+                      onChecked: (v) => setState(() => _applyTopicOps = v),
+                      dimmed: !_applyTopicOps,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 分類標題
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: change.isNew
-                                  ? const Color(0xFF6C63FF).withValues(alpha: 0.12)
-                                  : const Color(0xFF334155).withValues(alpha: 0.25),
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.folder_outlined,
-                                  size: 16,
-                                  color: change.isNew ? const Color(0xFF8B85FF) : Colors.white60,
+                          // Topic operations（rename / merge）
+                          if (hasTopicOps) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                '主題整理',
+                                style: TextStyle(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    change.topicName,
+                              ),
+                            ),
+                            ...visibleTopicOps.map((op) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _buildTopicOpItem(op),
+                            )),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                '任務分配',
+                                style: TextStyle(
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          // Cluster 分配
+                          ...topicChanges.map((change) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildClusterCard(change),
+                          )),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ═══════════════════════════════════════
+                  // Section 2: 任務整合 (violet)
+                  // ═══════════════════════════════════════
+                  if (hasConsolidations) ...[
+                    _buildSection(
+                      color: const Color(0xFF8B5CF6),
+                      icon: Icons.compress,
+                      title: '任務整合',
+                      subtitle: '${proposal.taskConsolidations.length} 組細碎任務合併',
+                      checked: _applyConsolidations,
+                      onChecked: (v) => setState(() => _applyConsolidations = v),
+                      dimmed: !_applyConsolidations,
+                      child: Column(
+                        children: proposal.taskConsolidations.map((c) {
+                          final parentCtx = taskContextMap[c.parentTaskId];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    c.consolidatedTitle,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                ),
-                                if (change.isNew)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    margin: const EdgeInsets.only(right: 6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      '新',
-                                      style: TextStyle(
-                                        color: Color(0xFF8B85FF),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                Text(
-                                  '${change.totalTasks}',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // 任務列表
-                          Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: change.tasks.map((task) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  const SizedBox(height: 6),
+                                  Row(
                                     children: [
-                                      // Bullet point
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Container(
-                                          width: 4,
-                                          height: 4,
-                                          decoration: BoxDecoration(
-                                            color: task.isMoved && !task.isFromUncategorized
-                                                ? const Color(0xFFF59E0B)
-                                                : Colors.white.withValues(alpha: 0.4),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      // 任務內容
+                                      _buildTag('主', const Color(0xFF8B5CF6)),
+                                      const SizedBox(width: 6),
                                       Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    task.title,
-                                                    style: TextStyle(
-                                                      color: task.isMoved && !task.isFromUncategorized
-                                                          ? const Color(0xFFF59E0B)
-                                                          : Colors.white.withValues(alpha: 0.85),
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                ),
-                                                // 「主」「子」標記
-                                                if (task.cRole != null) ...[
-                                                  const SizedBox(width: 6),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: task.cRole == 'p'
-                                                          ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
-                                                          : const Color(0xFF6C63FF).withValues(alpha: 0.1),
-                                                      borderRadius: BorderRadius.circular(3),
-                                                    ),
-                                                    child: Text(
-                                                      task.cRole == 'p' ? '主' : '子',
-                                                      style: TextStyle(
-                                                        color: task.cRole == 'p'
-                                                            ? const Color(0xFF8B85FF)
-                                                            : const Color(0xFF8B85FF).withValues(alpha: 0.6),
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                            // 只在真的從其他 topic 移動過來時才顯示來源（排除「未分類」）
-                                            if (task.isMoved && !task.isFromUncategorized) ...[
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                '← ${task.fromTopic}',
-                                                style: TextStyle(
-                                                  color: Colors.white.withValues(alpha: 0.35),
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
+                                        child: Text(
+                                          parentCtx?.title ?? c.parentTaskId,
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
                                         ),
                                       ),
                                     ],
                                   ),
-                                );
-                              }).toList(),
+                                  ...c.subTaskIds.map((subId) {
+                                    final subCtx = taskContextMap[subId];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Row(
+                                        children: [
+                                          _buildTag('子', const Color(0xFF8B5CF6).withValues(alpha: 0.5)),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              subCtx?.title ?? subId,
+                                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                  if (c.reasoning.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      c.reasoning,
+                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 11),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          );
+                        }).toList(),
                       ),
                     ),
-                  )),
+                    const SizedBox(height: 16),
+                  ],
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -469,7 +271,7 @@ class ReorganizeBottomSheet extends StatelessWidget {
 
           // 底部按鈕
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             decoration: BoxDecoration(
               border: Border(
                 top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
@@ -479,22 +281,27 @@ class ReorganizeBottomSheet extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: isApplying ? null : () => Navigator.pop(context),
+                    onPressed: widget.isApplying ? null : () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text(hasNoChanges ? '關閉' : '取消', style: const TextStyle(fontSize: 16)),
+                    child: const Text('取消', style: TextStyle(fontSize: 16)),
                   ),
                 ),
-                if (!hasNoChanges) ...[
+                if (hasChanges || hasConsolidations) ...[
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 2,
                     child: FilledButton(
-                      onPressed: isApplying ? null : onApply,
+                      onPressed: widget.isApplying || nothingSelected
+                          ? null
+                          : () => widget.onApply(
+                              applyTopicOps: _applyTopicOps,
+                              applyConsolidations: _applyConsolidations,
+                            ),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF6C63FF),
                         foregroundColor: Colors.white,
@@ -502,7 +309,7 @@ class ReorganizeBottomSheet extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
-                      child: isApplying
+                      child: widget.isApplying
                           ? const SizedBox(
                               width: 20,
                               height: 20,
@@ -512,7 +319,7 @@ class ReorganizeBottomSheet extends StatelessWidget {
                               ),
                             )
                           : const Text(
-                              '套用',
+                              '套用勾選項目',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                     ),
@@ -522,6 +329,306 @@ class ReorganizeBottomSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── Section with checkbox header ───
+  Widget _buildSection({
+    required Color color,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool checked,
+    required ValueChanged<bool> onChecked,
+    required bool dimmed,
+    required Widget child,
+  }) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: dimmed ? 0.45 : 1.0,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            // Header with checkbox
+            InkWell(
+              onTap: () => onChecked(!checked),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Checkbox(
+                        value: checked,
+                        onChanged: (v) => onChecked(v ?? true),
+                        activeColor: color,
+                        checkColor: Colors.white,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Icon(icon, color: color, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: color.withValues(alpha: 0.7),
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Body
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: child,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Topic operation item ───
+  Widget _buildTopicOpItem(TopicOperation op) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: op.action == 'rename'
+          ? Row(
+              children: [
+                _buildTag('改名', const Color(0xFFF59E0B)),
+                const SizedBox(width: 8),
+                Text(
+                  op.oldName ?? '',
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 13,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.arrow_forward, size: 12, color: Color(0xFF94A3B8)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    op.newName ?? '',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                _buildTag('合併', const Color(0xFFF59E0B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      ...(op.sourceNames ?? []).map((name) => Text(
+                        name,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                      )).toList().expand((w) => [w, const Text(' + ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11))]).toList()..removeLast(),
+                      const Icon(Icons.arrow_forward, size: 12, color: Color(0xFF94A3B8)),
+                      Text(
+                        op.targetName ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  // ─── Cluster card ───
+  Widget _buildClusterCard(_TopicChange change) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: change.isNew
+              ? const Color(0xFF6366F1).withValues(alpha: 0.4)
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 主題標題
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: change.isNew
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.12)
+                  : const Color(0xFF334155).withValues(alpha: 0.25),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.folder_outlined,
+                  size: 16,
+                  color: change.isNew ? const Color(0xFF818CF8) : Colors.white60,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    change.topicName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (change.isNew)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '新',
+                      style: TextStyle(
+                        color: Color(0xFF818CF8),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                Text(
+                  '${change.totalTasks} 個任務',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 任務列表
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              children: change.tasks.map((task) {
+                final showMovement = task.isMoved && !task.isFromUncategorized;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: showMovement
+                                ? const Color(0xFFF59E0B)
+                                : Colors.white.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task.title,
+                              style: TextStyle(
+                                color: showMovement
+                                    ? const Color(0xFFF59E0B)
+                                    : Colors.white.withValues(alpha: 0.85),
+                                fontSize: 13,
+                              ),
+                            ),
+                            if (showMovement)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  '從「${task.fromTopic}」移入',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.35),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Small tag widget ───
+  Widget _buildTag(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -539,7 +646,6 @@ class _TopicChange {
   });
 
   int get totalTasks => tasks.length;
-  List<_TaskInfo> get movedTasks => tasks.where((t) => t.isMoved && !t.isFromUncategorized).toList();
 }
 
 class _TaskInfo {
@@ -548,7 +654,7 @@ class _TaskInfo {
   final String fromTopic;
   final bool isMoved;
   final bool isFromUncategorized;
-  final String? cRole; // 'p' = parent, 's' = sub
+  final String? cRole;
 
   _TaskInfo({
     required this.id,

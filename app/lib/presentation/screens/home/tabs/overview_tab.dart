@@ -918,7 +918,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             builder: (context) => ReorganizeBottomSheet(
               proposal: proposal,
               isApplying: false,
-              onApply: () => _handleApplyReorganization(proposal),
+              onApply: ({required bool applyTopicOps, required bool applyConsolidations}) =>
+                _handleApplyReorganization(proposal, applyTopicOps: applyTopicOps, applyConsolidations: applyConsolidations),
             ),
           );
         },
@@ -942,14 +943,20 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   }
 
   Future<void> _handleApplyReorganization(
-    dynamic proposal,
-  ) async {
+    dynamic proposal, {
+    bool applyTopicOps = true,
+    bool applyConsolidations = true,
+  }) async {
     try {
       final useCase = ref.read(applyReorganizationUseCaseProvider);
+      final proposalWithFlags = proposal.copyWith(
+        applyTopicOperations: applyTopicOps,
+        applyTaskConsolidations: applyConsolidations,
+      );
       final result = await useCase(
         ApplyReorganizationParams(
           productId: proposal.productId,
-          proposal: proposal,
+          proposal: proposalWithFlags,
         ),
       );
 

@@ -370,7 +370,7 @@ export function DraggableTaskItem({
                         >
                           {subItem.content}
                         </span>
-                        {subItem.due_date && (() => {
+                        {subItem.due_date && !subItem.completed && (() => {
                           const info = getRelativeTimeDesc(new Date(subItem.due_date!))
                           return (
                             <span

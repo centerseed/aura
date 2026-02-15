@@ -66,7 +66,7 @@ import type {
   EntityType,
 } from "@/types";
 import { QuickCapture } from "@/components/quick-capture";
-import { TodayPlanSheet } from "@/components/today-plan-sheet";
+import { TodayOverviewSheet } from "@/components/today-overview-sheet";
 import { AIButtonTip } from "@/components/ai-button-tip";
 import { QuickInputGuide } from "@/components/quick-input-guide";
 import { TimelineView } from "@/components/timeline-view";
@@ -80,7 +80,6 @@ import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CoachAgent } from "@/components/coach-briefing-card";
 
 // 視圖類型
 type ViewMode = "structure" | "timeline" | "load";
@@ -111,6 +110,7 @@ interface ApiProduct {
   lifecycle: "FINITE" | "PERPETUAL";
   referenceCount: number;
   tasks: TaskCard[];
+  topics?: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -136,6 +136,8 @@ function cleanLibraryData(areas: any[]): ApiArea[] {
           status: product.status || 'ACTIVE',
           lifecycle: product.lifecycle || 'FINITE',
           referenceCount: Number(product.referenceCount) || 0,
+          topics: (Array.isArray(product.topics) ? product.topics : [])
+            .filter((t: any) => t != null && t.id && t.name),
           tasks: (Array.isArray(product.tasks) ? product.tasks : [])
             .filter((t: any) => t != null && t.id && t.title)
             .map((task: any) => ({
@@ -519,7 +521,7 @@ function DraggableTaskItem({
                         >
                           {subItem.content}
                         </span>
-                        {subItem.due_date && (() => {
+                        {subItem.due_date && !subItem.completed && (() => {
                           const dueInfo = getRelativeTimeDesc(new Date(subItem.due_date!));
                           return (
                             <span
@@ -1164,7 +1166,6 @@ function DashboardContent() {
 
   // 今日完成任務追蹤（從 API 獲取）
   const [completedTodayTasks, setCompletedTodayTasks] = useState<TaskCard[]>([]);
-  const [showCompletedSheet, setShowCompletedSheet] = useState(false);
   const [completionFeedback, setCompletionFeedback] = useState<string | null>(null);
 
   // 最近兩週已歸檔任務（用於「顯示已完成」功能）
@@ -1858,6 +1859,75 @@ function DashboardContent() {
       }
     } catch (error) {
       console.error("Failed to change task status:", error);
+    }
+  };
+
+  const handleTopicChange = async (taskId: string, topicId: string | null) => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ taskId, topicId }),
+      });
+
+      if (!res.ok) throw new Error("主題更新失敗");
+
+      const responseData = await res.json();
+      const { task: updatedTask } = responseData.data;
+
+      if (updatedTask) {
+        setAreas(prevAreas => updateAreasState(prevAreas, (areas) =>
+          areas.map(area => ({
+            ...area,
+            products: area.products.map(product => ({
+              ...product,
+              tasks: product.tasks.map(task =>
+                task.id === taskId ? updatedTask : task
+              ),
+            })),
+          }))
+        ));
+        if (selectedTask?.id === taskId) setSelectedTask(updatedTask);
+      }
+    } catch (error) {
+      console.error("Failed to change topic:", error);
+    }
+  };
+
+  const handleProductChange = async (taskId: string, newProductId: string) => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
+        body: JSON.stringify({ taskId, productId: newProductId }),
+      });
+
+      if (!res.ok) throw new Error("專案更新失敗");
+
+      // Product change moves task between products, reload all data
+      const libraryRes = await fetch(`${API_BASE_URL}/api/library`, {
+        headers: authHeaders,
+      });
+      if (libraryRes.ok) {
+        const libraryData = await libraryRes.json();
+        setAreas(cleanLibraryData(libraryData.data?.areas || []));
+
+        // Update selectedTask to reflect changes
+        const updatedTask = (libraryData.data?.areas || [])
+          .flatMap((a: any) => a.products?.flatMap((p: any) => p.tasks || []) || [])
+          .find((t: any) => t?.id === taskId);
+        if (updatedTask) setSelectedTask(updatedTask);
+      }
+    } catch (error) {
+      console.error("Failed to change product:", error);
     }
   };
 
@@ -2919,7 +2989,7 @@ function DashboardContent() {
   };
 
   // 應用 AI 重組建議
-  const handleApplyReorganization = async () => {
+  const handleApplyReorganization = async (options?: { applyTopicOps: boolean; applyConsolidations: boolean }) => {
     if (!reorganizeProposal || !userId) return;
 
     setIsApplying(true); // ✅ 開始 applying loading
@@ -2930,7 +3000,11 @@ function DashboardContent() {
           "Content-Type": "application/json",
           ...(await getAuthHeaders())
         },
-        body: JSON.stringify(reorganizeProposal),
+        body: JSON.stringify({
+          ...reorganizeProposal,
+          apply_topic_operations: options?.applyTopicOps ?? true,
+          apply_task_consolidations: options?.applyConsolidations ?? true,
+        }),
       });
 
       if (!res.ok) {
@@ -3241,17 +3315,24 @@ function DashboardContent() {
               {/* 主題切換 */}
               <ThemeToggle />
 
-              {/* 今日完成指標 */}
-              <button
-                onClick={() => setShowCompletedSheet(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-all"
-                title="查看今日計畫"
-              >
-                <CheckCircle2 className="w-4 h-4 text-green-400" />
-                <span className="text-sm text-green-400">
-                  今日計畫 ({completedTodayTasks.length}/{(stats.total || 0) + completedTodayTasks.length})
-                </span>
-              </button>
+              {/* 今日概覽 */}
+              <TodayOverviewSheet
+                completedTodayTasks={completedTodayTasks}
+                onCompleteTask={handleCompleteTask}
+                onOpenTask={(taskId, subTaskId) => {
+                  const task = areas
+                    .flatMap((a) => a.products.flatMap((p) => p.tasks))
+                    .filter((t) => t != null)
+                    .find((t) => t.id === taskId);
+                  if (task) {
+                    setInitialEditSubItemId(subTaskId || null);
+                    setSelectedTask(task);
+                    setSelectedTaskCalendarEvent(null);
+                    setIsTaskDetailModalOpen(true);
+                    fetchTaskCalendarEvent(task.id);
+                  }
+                }}
+              />
 
               {/* 視圖切換按鈕 */}
               <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
@@ -3290,8 +3371,6 @@ function DashboardContent() {
               </button>
             </div>
 
-              {/* Coach 教練按鈕 */}
-              <CoachAgent />
 
               {/* 設定按鈕 */}
               <button
@@ -3860,6 +3939,17 @@ function DashboardContent() {
             onComplete={handleCompleteTask}
             onDelete={handleDeleteTask}
             onStatusChange={handleTaskStatusChange}
+            onProductChange={handleProductChange}
+            onTopicChange={handleTopicChange}
+            areas={(Array.isArray(areas) ? areas : []).map((area) => ({
+              id: area.id,
+              name: area.name,
+              products: (Array.isArray(area.products) ? area.products : []).map((p) => ({
+                id: p.id,
+                name: p.name,
+                topics: p.topics || [],
+              })),
+            }))}
             onAddToCalendar={handleAddToCalendar}
             isCalendarConnected={calendarConnected}
             calendarEvent={selectedTaskCalendarEvent}
@@ -4115,28 +4205,6 @@ function DashboardContent() {
             </div>
           </div>
         )}
-
-        {/* 今日計畫 Sheet */}
-        <TodayPlanSheet
-          open={showCompletedSheet}
-          onClose={() => setShowCompletedSheet(false)}
-          completedTodayTasks={completedTodayTasks}
-          onCompleteTask={handleCompleteTask}
-          onOpenTask={(taskId, subTaskId) => {
-            const task = areas
-              .flatMap((a) => a.products.flatMap((p) => p.tasks))
-              .filter((t) => t != null)
-              .find((t) => t.id === taskId);
-            if (task) {
-              setShowCompletedSheet(false);
-              setInitialEditSubItemId(subTaskId || null);
-              setSelectedTask(task);
-              setSelectedTaskCalendarEvent(null);
-              setIsTaskDetailModalOpen(true);
-              fetchTaskCalendarEvent(task.id);
-            }
-          }}
-        />
 
         {/* 浮動快速輸入 */}
         <QuickCapture

@@ -547,6 +547,12 @@ function CoachDrawerContent({
   }
 
   // ---- Briefing Content ----
+  const isOutdated = (() => {
+    const today = new Date().toISOString().split("T")[0];
+    const briefingDate = briefing.briefing_date.split("T")[0];
+    return briefingDate !== today;
+  })();
+
   const hasConflicts = briefing.conflicts.length > 0;
   const hasOverdue = briefing.overdue_tasks.length > 0;
   const hasStagnation = briefing.stagnations.length > 0;
@@ -560,6 +566,23 @@ function CoachDrawerContent({
       {header}
 
       <div className="flex-1 overflow-y-auto">
+        {/* Outdated briefing banner */}
+        {isOutdated && (
+          <div className="mx-4 mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+            <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+              這是 {briefing.briefing_date.split("T")[0]} 的簡報
+            </p>
+            <button
+              onClick={() => onGenerate(activeTab)}
+              disabled={isGenerating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 text-white text-xs font-medium hover:bg-amber-600 transition-colors disabled:opacity-50"
+            >
+              {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              {isGenerating ? "生成中..." : `產生今日${activeTab === "MORNING" ? "晨報" : "晚報"}`}
+            </button>
+          </div>
+        )}
+
         {/* Conversational Summary */}
         <div className="px-5 py-4">
           <div className="bg-slate-100 dark:bg-white/5 rounded-2xl rounded-tl-sm p-4 border border-slate-300 dark:border-white/5 shadow-sm dark:shadow-none">

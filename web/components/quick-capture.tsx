@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   MessageSquarePlus,
   X,
@@ -19,15 +19,21 @@ import {
   Clock,
   Camera,
   ImageIcon,
+  Mic,
+  Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TaskDetailModal } from "@/components/task-detail-modal";
 import { auth } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
+import type { TaskCard } from "@/types";
+import type { DrawerStatus } from "@/types";
 
 interface ProcessedItem {
   id: string;
   title: string;
   narrative: string;
+  drawer?: string;
   tag: {
     area: string;
     product: string;
@@ -127,6 +133,7 @@ interface AreaWithProducts {
   products: Array<{
     id: string;
     name: string;
+    topics?: Array<{ id: string; name: string }>;
   }>;
 }
 
@@ -187,6 +194,126 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   const dropdownRef = useRef<HTMLDivElement>(null);
   // 追蹤輸入法組合狀態（注音選字等）
   const [isComposing, setIsComposing] = useState(false);
+
+  // Task Detail Modal 狀態
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<TaskCard | null>(null);
+  const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
+
+  // 語音辨識狀態（Web Speech API）
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // 將 ProcessedItem 轉換為 TaskCard（供 TaskDetailModal 使用）
+  const processedItemToTaskCard = (item: ProcessedItem): TaskCard => ({
+    id: item.id,
+    title: item.title,
+    narrative: item.narrative || null,
+    drawer: (item.drawer || "INBOX") as DrawerStatus,
+    lifecycle: "FINITE" as any,
+    tag: item.tag,
+    strategy_used: item.strategy_used,
+    reasoning: item.reasoning,
+    due_date: item.due_date || null,
+    time_confidence: item.time_confidence || null,
+    inferred_from_milestone: item.inferred_from_milestone || null,
+  });
+
+  // 處理 Task Detail Modal 中的狀態變更
+  const handleTaskStatusChange = async (taskId: string, newStatus: DrawerStatus) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ taskId, status: newStatus }),
+      });
+      if (!res.ok) throw new Error("狀態更新失敗");
+      const responseData = await res.json();
+      const updatedTask = responseData.data?.task;
+      if (updatedTask) setSelectedTaskForDetail(updatedTask);
+      onItemsCreated();
+    } catch (error) {
+      console.error("Failed to change status:", error);
+    }
+  };
+
+  const handleTaskProductChange = async (taskId: string, productId: string) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ taskId, productId }),
+      });
+      if (!res.ok) throw new Error("專案更新失敗");
+
+      // Product change 後重新 fetch library 以刷新 areas（含 topics）
+      const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: { "Authorization": `Bearer ${token}` } });
+      if (libraryRes.ok) {
+        const libraryData = await libraryRes.json();
+        const updatedTask = (libraryData.data?.areas || [])
+          .flatMap((a: any) => a.products?.flatMap((p: any) => p.tasks || []) || [])
+          .find((t: any) => t?.id === taskId);
+        if (updatedTask) setSelectedTaskForDetail(updatedTask);
+      }
+      onItemsCreated();
+    } catch (error) {
+      console.error("Failed to change product:", error);
+    }
+  };
+
+  const handleTaskTopicChange = async (taskId: string, topicId: string | null) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ taskId, topicId }),
+      });
+      if (!res.ok) throw new Error("主題更新失敗");
+      const responseData = await res.json();
+      const updatedTask = responseData.data?.task;
+      if (updatedTask) {
+        setSelectedTaskForDetail(updatedTask);
+      } else if (selectedTaskForDetail) {
+        // Fallback: 從 areas 找到 topic name 更新本地狀態
+        const topicName = topicId
+          ? areas.flatMap(a => a.products?.flatMap(p => p.topics || []) || []).find(t => t.id === topicId)?.name || ''
+          : '';
+        setSelectedTaskForDetail({ ...selectedTaskForDetail, tag: { ...selectedTaskForDetail.tag, topic: topicName } });
+      }
+      onItemsCreated();
+    } catch (error) {
+      console.error("Failed to change topic:", error);
+    }
+  };
+
+  const handleTaskTitleEdit = async (taskId: string, newTitle: string) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ taskId, content: newTitle }),
+      });
+      if (!res.ok) throw new Error("標題更新失敗");
+      const responseData = await res.json();
+      const updatedTask = responseData.data?.task;
+      if (updatedTask) setSelectedTaskForDetail(updatedTask);
+      onItemsCreated();
+    } catch (error) {
+      console.error("Failed to edit title:", error);
+    }
+  };
 
   // 從 areas 提取所有 products（帶有 area 資訊）
   const allProducts = (Array.isArray(areas) ? areas : []).flatMap(area =>
@@ -367,7 +494,13 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                       {message.data.items.map((item, index) => (
                         <div
                           key={item.id || index}
-                          className="p-2.5 rounded-lg bg-white/5 border border-white/10"
+                          className="p-2.5 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 transition-colors"
+                          onClick={() => {
+                            if (item.id) {
+                              setSelectedTaskForDetail(processedItemToTaskCard(item));
+                              setIsTaskDetailOpen(true);
+                            }
+                          }}
                         >
                           <h4 className="font-medium text-white text-sm mb-1">{item.title}</h4>
 
@@ -520,6 +653,52 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }
     }
   };
+
+  // ==================== 語音辨識（Web Speech API） ====================
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return; // 瀏覽器不支援
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-TW';
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      if (finalTranscript) {
+        setInput(prev => prev + finalTranscript);
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening]);
 
   const handleSubmit = async () => {
     if (!userId || (!input.trim() && !selectedImage)) return;
@@ -875,6 +1054,17 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                   >
                     <Camera className="w-5 h-5" />
                   </button>
+                  <button
+                    onClick={toggleListening}
+                    className={`p-2.5 rounded-lg border transition-colors ${
+                      isListening
+                        ? 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse'
+                        : 'bg-white/5 border-white/20 text-white/50 hover:text-white hover:bg-white/10'
+                    }`}
+                    title={isListening ? '停止語音辨識' : '語音輸入'}
+                  >
+                    {isListening ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
                 </div>
                 <Button
                   size="lg"
@@ -889,6 +1079,20 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             </div>
           </div>
         </div>
+
+        {/* Task Detail Modal */}
+        {selectedTaskForDetail && (
+          <TaskDetailModal
+            task={selectedTaskForDetail}
+            isOpen={isTaskDetailOpen}
+            onClose={() => { setIsTaskDetailOpen(false); setSelectedTaskForDetail(null); onItemsCreated(); }}
+            onEditTitle={handleTaskTitleEdit}
+            onStatusChange={handleTaskStatusChange}
+            onProductChange={handleTaskProductChange}
+            onTopicChange={handleTaskTopicChange}
+            areas={areas}
+          />
+        )}
       </>
     );
   }
@@ -1518,6 +1722,17 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
               >
                 <Camera className="w-4 h-4" />
               </button>
+              <button
+                onClick={toggleListening}
+                className={`p-1.5 rounded-lg border transition-colors ${
+                  isListening
+                    ? 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse'
+                    : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10'
+                }`}
+                title={isListening ? '停止語音辨識' : '語音輸入'}
+              >
+                {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
             </div>
             <Button
               size="sm"
@@ -1532,6 +1747,20 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         </div>
         </div>
       </div>
+
+      {/* Task Detail Modal */}
+      {selectedTaskForDetail && (
+        <TaskDetailModal
+          task={selectedTaskForDetail}
+          isOpen={isTaskDetailOpen}
+          onClose={() => { setIsTaskDetailOpen(false); setSelectedTaskForDetail(null); onItemsCreated(); }}
+          onEditTitle={handleTaskTitleEdit}
+          onStatusChange={handleTaskStatusChange}
+          onProductChange={handleTaskProductChange}
+          onTopicChange={handleTaskTopicChange}
+          areas={areas}
+        />
+      )}
     </>
   );
 }
