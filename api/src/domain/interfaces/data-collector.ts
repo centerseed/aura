@@ -63,14 +63,15 @@ export interface UnifiedRawData {
   unscheduledTasks: Array<{
     id: string
     content: string
+    status: string
     area_name: string
     product_id: string
     product_name: string
     product_description: string | null
-    estimated_minutes: number | null
     due_date: Date | null
     start_date: Date | null
     updated_at: Date
+    completed_at: Date | null
     inferred_from_milestone: string | null
     date_source: string | null
   }>
