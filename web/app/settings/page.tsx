@@ -147,14 +147,21 @@ function SettingsContent() {
 
   // 複製 MCP 設定到剪貼簿
   const handleCopyMcpConfig = async () => {
+    // MCP 客戶端需要完整的 API URL（不能是相對路徑）
+    // 優先使用環境變數，否則使用 API_BASE_URL，最後 fallback 到 Cloud Run URL
+    const mcpServerUrl =
+      process.env.NEXT_PUBLIC_MCP_SERVER_URL ||
+      (API_BASE_URL && API_BASE_URL.startsWith('http') ? API_BASE_URL : null) ||
+      'https://zentropy-api-isakqhri2a-de.a.run.app';
+
     const config = {
       "mcpServers": {
         "zentropy": {
-          "url": `${API_BASE_URL}/mcp`,
+          "url": `${mcpServerUrl}/mcp`,
           "transport": "streamableHttp",
           "oauth": {
-            "authorizationUrl": `${API_BASE_URL}/authorize`,
-            "tokenUrl": `${API_BASE_URL}/token`,
+            "authorizationUrl": `${mcpServerUrl}/authorize`,
+            "tokenUrl": `${mcpServerUrl}/token`,
             "clientId": "claude-code",
             "scopes": ["read:tasks", "write:inbox", "read:knowledge"]
           }
@@ -623,24 +630,32 @@ function SettingsContent() {
               {/* 設定檔內容 */}
               <div className="relative">
                 <pre className="bg-slate-950 border border-slate-700 rounded-lg p-4 text-xs text-slate-300 overflow-x-auto">
-{JSON.stringify({
-  "mcpServers": {
-    "zentropy": {
-      "url": `${API_BASE_URL}/mcp`,
-      "transport": "streamableHttp",
-      "oauth": {
-        "authorizationUrl": `${API_BASE_URL}/authorize`,
-        "tokenUrl": `${API_BASE_URL}/token`,
-        "clientId": "claude-code",
-        "scopes": [
-          "read:tasks",
-          "write:inbox",
-          "read:knowledge"
-        ]
+{(() => {
+  // 計算 MCP Server URL（與複製按鈕邏輯一致）
+  const mcpServerUrl =
+    process.env.NEXT_PUBLIC_MCP_SERVER_URL ||
+    (API_BASE_URL && API_BASE_URL.startsWith('http') ? API_BASE_URL : null) ||
+    'https://zentropy-api-isakqhri2a-de.a.run.app';
+
+  return JSON.stringify({
+    "mcpServers": {
+      "zentropy": {
+        "url": `${mcpServerUrl}/mcp`,
+        "transport": "streamableHttp",
+        "oauth": {
+          "authorizationUrl": `${mcpServerUrl}/authorize`,
+          "tokenUrl": `${mcpServerUrl}/token`,
+          "clientId": "claude-code",
+          "scopes": [
+            "read:tasks",
+            "write:inbox",
+            "read:knowledge"
+          ]
+        }
       }
     }
-  }
-}, null, 2)}
+  }, null, 2);
+})()}
                 </pre>
                 <Button
                   onClick={handleCopyMcpConfig}
