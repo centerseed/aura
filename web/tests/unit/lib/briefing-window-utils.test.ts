@@ -129,9 +129,9 @@ describe('isInBriefingWindow', () => {
       expect(isInBriefingWindow('MORNING', undefined, 15)).toBe(false)
     })
 
-    it('應該使用預設晚報窗口（19-24）', () => {
-      expect(isInBriefingWindow('EVENING', undefined, 20)).toBe(true)
-      expect(isInBriefingWindow('EVENING', undefined, 0)).toBe(false)
+    it('應該使用預設晚報窗口（21-24）', () => {
+      expect(isInBriefingWindow('EVENING', undefined, 22)).toBe(true)
+      expect(isInBriefingWindow('EVENING', undefined, 20)).toBe(false)
     })
   })
 
