@@ -623,14 +623,14 @@ function SettingsContent() {
               {/* 設定檔內容 */}
               <div className="relative">
                 <pre className="bg-slate-950 border border-slate-700 rounded-lg p-4 text-xs text-slate-300 overflow-x-auto">
-{`{
+{JSON.stringify({
   "mcpServers": {
     "zentropy": {
-      "url": "${API_BASE_URL}/mcp",
+      "url": `${API_BASE_URL}/mcp`,
       "transport": "streamableHttp",
       "oauth": {
-        "authorizationUrl": "${API_BASE_URL}/authorize",
-        "tokenUrl": "${API_BASE_URL}/token",
+        "authorizationUrl": `${API_BASE_URL}/authorize`,
+        "tokenUrl": `${API_BASE_URL}/token`,
         "clientId": "claude-code",
         "scopes": [
           "read:tasks",
@@ -640,7 +640,7 @@ function SettingsContent() {
       }
     }
   }
-}`}
+}, null, 2)}
                 </pre>
                 <Button
                   onClick={handleCopyMcpConfig}
