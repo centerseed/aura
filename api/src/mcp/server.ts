@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import { loadMcpConfig, type McpConfig } from "./config";
 import type { AuthContext, OAuthScope } from "./types";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 
 // Security
 import { authenticateMcpRequest } from "./security/auth-middleware";
@@ -92,17 +93,19 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
       input: Record<string, unknown>,
       sanitized: boolean,
     ) => Promise<unknown>,
-    /** The raw access token from the MCP client, used for auth verification */
-    accessToken?: string,
+    /** Auth info from MCP SDK (extra.authInfo), populated by req.auth in server.ts */
+    authInfo?: AuthInfo,
   ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
     const startTime = Date.now();
     let authContext: AuthContext | undefined;
     let sanitizationApplied = false;
 
     try {
-      // Step 1: Auth (use the token passed through or create dev context)
+      // Step 1: Auth — use token from SDK's authInfo (set via req.auth in server.ts)
+      console.log(`[mcp-pipeline] tool=${toolName} | authInfo present: ${!!authInfo} | authInfo.token present: ${!!authInfo?.token}`);
+      const token = authInfo?.token;
       authContext = authenticateMcpRequest(
-        accessToken ? `Bearer ${accessToken}` : undefined,
+        token ? `Bearer ${token}` : undefined,
       );
 
       // Step 2: Rate Limiting
@@ -264,12 +267,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .optional()
         .describe("Semantic hint for classification (max 200 chars)"),
     },
-    async (input) => {
+    async (input, extra) => {
       return executeToolPipeline(
         "capture_thought",
         input as Record<string, unknown>,
         ["write:inbox"],
         handleCaptureThought,
+        extra.authInfo,
       );
     },
   );
@@ -299,12 +303,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .max(50_000)
         .describe("Full content (max 50,000 chars)"),
     },
-    async (input) => {
+    async (input, extra) => {
       return executeToolPipeline(
         "append_to_knowledge",
         input as Record<string, unknown>,
         ["write:knowledge"],
         handleAppendToKnowledge,
+        extra.authInfo,
       );
     },
   );
@@ -324,12 +329,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .optional()
         .describe("Limit search to a specific Area/Product"),
     },
-    async (input) => {
+    async (input, extra) => {
       return executeToolPipeline(
         "query_memory",
         input as Record<string, unknown>,
         ["read:tasks"],
         handleQueryMemory,
+        extra.authInfo,
       );
     },
   );
@@ -364,12 +370,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .optional()
         .describe("Semantic hint (Area/Product) to help Gatekeeper classify"),
     },
-    async (input) => {
+    async (input, extra) => {
       return executeToolPipeline(
         "capture",
         input as Record<string, unknown>,
         ["write:inbox"],
         handleCapture,
+        extra.authInfo,
       );
     },
   );
@@ -398,12 +405,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .optional()
         .describe("Completion notes"),
     },
-    async (input) => {
+    async (input, extra) => {
       return executeToolPipeline(
         "report_done",
         input as Record<string, unknown>,
         ["write:inbox"],
         handleReportDone,
+        extra.authInfo,
       );
     },
   );
@@ -425,12 +433,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .optional()
         .describe("Limit search to a specific Area/Product"),
     },
-    async (input) => {
+    async (input, extra) => {
       return executeToolPipeline(
         "search",
         input as Record<string, unknown>,
         ["read:tasks"],
         handleQueryMemory, // reuse same handler
+        extra.authInfo,
       );
     },
   );
@@ -462,12 +471,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .max(50_000)
         .describe("Full content (max 50,000 chars)"),
     },
-    async (input) => {
+    async (input, extra) => {
       return executeToolPipeline(
         "save_knowledge",
         input as Record<string, unknown>,
         ["write:knowledge"],
         handleAppendToKnowledge, // reuse same handler
+        extra.authInfo,
       );
     },
   );

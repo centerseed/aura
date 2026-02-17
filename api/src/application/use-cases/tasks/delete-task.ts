@@ -10,6 +10,7 @@ import type {
   TaskData,
 } from '@/domain/interfaces/task-repository'
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
+import { PrismaCoachBriefingRepository } from '@/infrastructure/repositories/prisma-coach-briefing-repository'
 import { NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
 
@@ -51,13 +52,44 @@ export class DeleteTaskUseCase {
     // 2. 遷移 References 到 Product 層級
     const referencesMigrated = await this.migrateReferencesToProduct(task)
 
-    // 3. 執行軟刪除
+    // 3. 清理 plan items（移除孤兒）
+    await this.cleanupPlanItems(request.taskId)
+
+    // 4. 清理 briefing（移除已刪除的任務）
+    await this.cleanupBriefing(request.userId, request.taskId)
+
+    // 5. 執行軟刪除
     await this.taskRepository.softDelete(request.taskId, request.userId)
 
     return {
       taskId: request.taskId,
       referencesMigrated,
       message: 'Task deleted successfully',
+    }
+  }
+
+  /**
+   * 刪除對應的 daily_plan_item
+   */
+  private async cleanupPlanItems(taskId: string): Promise<void> {
+    try {
+      await prisma.dailyPlanItem.deleteMany({
+        where: { task_id: taskId },
+      })
+    } catch (error) {
+      console.error('[DeleteTaskUseCase] Failed to cleanup plan items:', error)
+    }
+  }
+
+  /**
+   * 從今日 briefing 中移除已刪除的任務
+   */
+  private async cleanupBriefing(userId: string, taskId: string): Promise<void> {
+    try {
+      const briefingRepo = new PrismaCoachBriefingRepository()
+      await briefingRepo.removeTaskFromBriefing(userId, taskId)
+    } catch (error) {
+      console.error('[DeleteTaskUseCase] Failed to cleanup briefing:', error)
     }
   }
 

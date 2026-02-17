@@ -2043,6 +2043,9 @@ function DashboardContent() {
         // 取消完成時，從已歸檔列表移除
         setRecentArchivedTasks(prev => prev.filter(t => t.id !== taskId));
       }
+
+      // 通知 TodayOverviewSheet 刷新 plan + briefing
+      window.dispatchEvent(new CustomEvent('plan-updated'));
     } catch (err) {
       console.error("Failed to complete task:", err);
     }
@@ -2075,6 +2078,9 @@ function DashboardContent() {
       if (!res.ok) {
         throw new Error("刪除任務失敗");
       }
+
+      // 通知 TodayOverviewSheet 刷新 plan + briefing
+      window.dispatchEvent(new CustomEvent('plan-updated'));
     } catch (err) {
       console.error("Failed to delete task:", err);
       alert("刪除任務失敗，請稍後再試");
@@ -2377,18 +2383,17 @@ function DashboardContent() {
         throw new Error("更新失敗");
       }
 
-      // 檢查是否所有 sub-items 都完成 (Task 自動歸檔)
+      // 檢查是否所有 sub-items 都完成
       const result = await res.json();
       if (result.task_completed) {
-        // Task 已自動歸檔,重新載入數據
-        if (userId) {
-          const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
-          if (libraryRes.ok) {
-            const libraryData = await libraryRes.json();
-            setAreas(cleanLibraryData(libraryData.data?.areas || []));
-          }
+        const confirmed = window.confirm('所有子任務都已完成，是否要將此任務標記為完成？');
+        if (confirmed) {
+          await handleCompleteTask(taskId);
         }
       }
+
+      // 通知 TodayOverviewSheet 刷新 plan + briefing
+      window.dispatchEvent(new CustomEvent('plan-updated'));
     } catch (err) {
       console.error("Failed to toggle sub-item:", err);
       // 錯誤時重新載入數據
@@ -3317,7 +3322,6 @@ function DashboardContent() {
 
               {/* 今日概覽 */}
               <TodayOverviewSheet
-                completedTodayTasks={completedTodayTasks}
                 onCompleteTask={handleCompleteTask}
                 onOpenTask={(taskId, subTaskId) => {
                   const task = areas
@@ -4220,6 +4224,9 @@ function DashboardContent() {
                 setAreas(areas);
                 setExpandedAreas(new Set((Array.isArray(areas) ? areas : []).map((a: ApiArea) => a.name)));
               }
+
+              // 🔔 觸發自定義事件，通知 TodayOverviewSheet 重新載入 plan
+              window.dispatchEvent(new CustomEvent('task-created'));
             }
           }}
         />

@@ -9,12 +9,16 @@ class UpdateSubItemParams {
   final String subItemId;
   final bool? completed;
   final String? content;
+  final DateTime? startDate;
+  final DateTime? dueDate;
 
   const UpdateSubItemParams({
     required this.taskId,
     required this.subItemId,
     this.completed,
     this.content,
+    this.startDate,
+    this.dueDate,
   });
 }
 
@@ -31,6 +35,8 @@ class UpdateSubItemUseCase extends UseCase<void, UpdateSubItemParams> {
       params.subItemId,
       completed: params.completed,
       content: params.content,
+      startDate: params.startDate,
+      dueDate: params.dueDate,
     );
   }
 }

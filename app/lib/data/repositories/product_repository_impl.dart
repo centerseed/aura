@@ -146,4 +146,56 @@ class ProductRepositoryImpl implements ProductRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, Product>> updateProduct({
+    required String productId,
+    String? name,
+    String? description,
+    String? areaId,
+    ProductStatus? status,
+    ProductLifecycle? lifecycle,
+  }) async {
+    try {
+      final payload = <String, dynamic>{};
+      if (name != null) payload['name'] = name;
+      if (description != null) payload['description'] = description;
+      if (areaId != null) payload['area_id'] = areaId;
+      if (status != null) payload['status'] = status.name.toUpperCase();
+      if (lifecycle != null) payload['lifecycle'] = lifecycle.name.toUpperCase();
+
+      final model = await _apiClient.updateProduct(productId, payload);
+      return Right(model.toEntity());
+    } catch (e) {
+      if (e is DioException) {
+        return Left(ServerFailure(e.message ?? 'Failed to update product'));
+      }
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteProduct(String productId) async {
+    try {
+      await _apiClient.deleteProduct(productId);
+      return const Right(null);
+    } catch (e) {
+      if (e is DioException) {
+        // 後端返回 409 Conflict 表示專案有進行中的任務
+        if (e.response?.statusCode == 409) {
+          final errorData = e.response?.data;
+          if (errorData is Map<String, dynamic> &&
+              errorData['success'] == false &&
+              errorData['error'] is Map<String, dynamic>) {
+            final errorMessage = errorData['error']['message'] as String?;
+            return Left(ServerFailure(
+              errorMessage ?? '此專案仍有進行中的任務，無法刪除'
+            ));
+          }
+        }
+        return Left(ServerFailure(e.message ?? 'Failed to delete product'));
+      }
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }

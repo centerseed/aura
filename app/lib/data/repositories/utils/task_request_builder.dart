@@ -43,10 +43,10 @@ class TaskRequestBuilder {
       body['status'] = status.name.toUpperCase();
     }
     if (startDate != null) {
-      body['start_date'] = startDate.toUtc().toIso8601String();
+      body['start_date'] = toDateOnlyUtcNoon(startDate);
     }
     if (dueDate != null) {
-      body['due_date'] = dueDate.toUtc().toIso8601String();
+      body['due_date'] = toDateOnlyUtcNoon(dueDate);
     }
     if (productId != null) {
       body['product_id'] = productId;
@@ -74,5 +74,14 @@ class TaskRequestBuilder {
     }
 
     return body;
+  }
+
+  /// 將日期轉為 UTC 中午的 ISO 字串，避免時區轉換導致日期偏移。
+  /// 例：台北 2/17 00:00 → UTC 2/17 12:00，而非 UTC 2/16 16:00。
+  /// 將日期轉為 UTC 中午的 ISO 字串，避免時區轉換導致日期偏移。
+  /// 公開供其他 repository 使用。
+  static String toDateOnlyUtcNoon(DateTime date) {
+    return DateTime.utc(date.year, date.month, date.day, 12, 0, 0)
+        .toIso8601String();
   }
 }

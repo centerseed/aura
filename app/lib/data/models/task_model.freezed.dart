@@ -717,6 +717,10 @@ mixin _$SubItemModel {
   bool get completed => throw _privateConstructorUsedError;
   @JsonKey(name: 'completed_at')
   DateTime? get completedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'start_date')
+  DateTime? get startDate => throw _privateConstructorUsedError;
+  @JsonKey(name: 'due_date')
+  DateTime? get dueDate => throw _privateConstructorUsedError;
 
   /// Serializes this SubItemModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -740,6 +744,8 @@ abstract class $SubItemModelCopyWith<$Res> {
     String content,
     bool completed,
     @JsonKey(name: 'completed_at') DateTime? completedAt,
+    @JsonKey(name: 'start_date') DateTime? startDate,
+    @JsonKey(name: 'due_date') DateTime? dueDate,
   });
 }
 
@@ -762,6 +768,8 @@ class _$SubItemModelCopyWithImpl<$Res, $Val extends SubItemModel>
     Object? content = null,
     Object? completed = null,
     Object? completedAt = freezed,
+    Object? startDate = freezed,
+    Object? dueDate = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -780,6 +788,14 @@ class _$SubItemModelCopyWithImpl<$Res, $Val extends SubItemModel>
             completedAt: freezed == completedAt
                 ? _value.completedAt
                 : completedAt // ignore: cast_nullable_to_non_nullable
+                      as DateTime?,
+            startDate: freezed == startDate
+                ? _value.startDate
+                : startDate // ignore: cast_nullable_to_non_nullable
+                      as DateTime?,
+            dueDate: freezed == dueDate
+                ? _value.dueDate
+                : dueDate // ignore: cast_nullable_to_non_nullable
                       as DateTime?,
           )
           as $Val,
@@ -801,6 +817,8 @@ abstract class _$$SubItemModelImplCopyWith<$Res>
     String content,
     bool completed,
     @JsonKey(name: 'completed_at') DateTime? completedAt,
+    @JsonKey(name: 'start_date') DateTime? startDate,
+    @JsonKey(name: 'due_date') DateTime? dueDate,
   });
 }
 
@@ -822,6 +840,8 @@ class __$$SubItemModelImplCopyWithImpl<$Res>
     Object? content = null,
     Object? completed = null,
     Object? completedAt = freezed,
+    Object? startDate = freezed,
+    Object? dueDate = freezed,
   }) {
     return _then(
       _$SubItemModelImpl(
@@ -841,6 +861,14 @@ class __$$SubItemModelImplCopyWithImpl<$Res>
             ? _value.completedAt
             : completedAt // ignore: cast_nullable_to_non_nullable
                   as DateTime?,
+        startDate: freezed == startDate
+            ? _value.startDate
+            : startDate // ignore: cast_nullable_to_non_nullable
+                  as DateTime?,
+        dueDate: freezed == dueDate
+            ? _value.dueDate
+            : dueDate // ignore: cast_nullable_to_non_nullable
+                  as DateTime?,
       ),
     );
   }
@@ -854,6 +882,8 @@ class _$SubItemModelImpl extends _SubItemModel {
     required this.content,
     required this.completed,
     @JsonKey(name: 'completed_at') this.completedAt,
+    @JsonKey(name: 'start_date') this.startDate,
+    @JsonKey(name: 'due_date') this.dueDate,
   }) : super._();
 
   factory _$SubItemModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -868,10 +898,16 @@ class _$SubItemModelImpl extends _SubItemModel {
   @override
   @JsonKey(name: 'completed_at')
   final DateTime? completedAt;
+  @override
+  @JsonKey(name: 'start_date')
+  final DateTime? startDate;
+  @override
+  @JsonKey(name: 'due_date')
+  final DateTime? dueDate;
 
   @override
   String toString() {
-    return 'SubItemModel(id: $id, content: $content, completed: $completed, completedAt: $completedAt)';
+    return 'SubItemModel(id: $id, content: $content, completed: $completed, completedAt: $completedAt, startDate: $startDate, dueDate: $dueDate)';
   }
 
   @override
@@ -884,13 +920,23 @@ class _$SubItemModelImpl extends _SubItemModel {
             (identical(other.completed, completed) ||
                 other.completed == completed) &&
             (identical(other.completedAt, completedAt) ||
-                other.completedAt == completedAt));
+                other.completedAt == completedAt) &&
+            (identical(other.startDate, startDate) ||
+                other.startDate == startDate) &&
+            (identical(other.dueDate, dueDate) || other.dueDate == dueDate));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, content, completed, completedAt);
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    content,
+    completed,
+    completedAt,
+    startDate,
+    dueDate,
+  );
 
   /// Create a copy of SubItemModel
   /// with the given fields replaced by the non-null parameter values.
@@ -912,6 +958,8 @@ abstract class _SubItemModel extends SubItemModel {
     required final String content,
     required final bool completed,
     @JsonKey(name: 'completed_at') final DateTime? completedAt,
+    @JsonKey(name: 'start_date') final DateTime? startDate,
+    @JsonKey(name: 'due_date') final DateTime? dueDate,
   }) = _$SubItemModelImpl;
   const _SubItemModel._() : super._();
 
@@ -927,6 +975,12 @@ abstract class _SubItemModel extends SubItemModel {
   @override
   @JsonKey(name: 'completed_at')
   DateTime? get completedAt;
+  @override
+  @JsonKey(name: 'start_date')
+  DateTime? get startDate;
+  @override
+  @JsonKey(name: 'due_date')
+  DateTime? get dueDate;
 
   /// Create a copy of SubItemModel
   /// with the given fields replaced by the non-null parameter values.

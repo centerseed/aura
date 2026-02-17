@@ -5,18 +5,29 @@ import 'package:intl/intl.dart';
 import '../../../domain/entities/product.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/reorganize_provider.dart';
+import '../../providers/dashboard_provider.dart';
+import '../../providers/product_provider.dart';
+import '../../../core/di/providers.dart';
+import '../../../application/use_cases/delete_product_use_case.dart';
 
 import '../../../domain/entities/reorganize_proposal.dart';
 import '../home/widgets/task_detail_bottom_sheet.dart';
 import 'widgets/milestone_section.dart';
 
-class ProjectDetailScreen extends ConsumerWidget {
+class ProjectDetailScreen extends ConsumerStatefulWidget {
   final Product product;
 
   const ProjectDetailScreen({super.key, required this.product});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProjectDetailScreen> createState() => _ProjectDetailScreenState();
+}
+
+class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
+  bool _isDeleting = false;
+
+  @override
+  Widget build(BuildContext context) {
     final taskState = ref.watch(activeTasksProvider);
 
     return Scaffold(
@@ -29,7 +40,7 @@ class ProjectDetailScreen extends ConsumerWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          product.name,
+          widget.product.name,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -60,6 +71,34 @@ class ProjectDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
+          // More Options Menu
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white70),
+              color: const Color(0xFF2c2c2e),
+              enabled: !_isDeleting,
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _handleDeleteProduct(context);
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 18,
+                        color: Colors.red.withOpacity(0.6)),
+                      const SizedBox(width: 8),
+                      Text('刪除專案',
+                        style: TextStyle(color: Colors.red.withOpacity(0.6))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       body: _buildBody(context, ref, taskState),
@@ -83,7 +122,7 @@ class ProjectDetailScreen extends ConsumerWidget {
     }
 
     final projectTasks = taskState.tasks!
-        .where((t) => t.productId == product.id)
+        .where((t) => t.productId == widget.product.id)
         .toList();
 
     return ListView(
@@ -91,8 +130,8 @@ class ProjectDetailScreen extends ConsumerWidget {
       children: [
         // 里程碑區塊
         MilestoneSection(
-          productId: product.id,
-          productName: product.name,
+          productId: widget.product.id,
+          productName: widget.product.name,
         ),
 
         // 任務區塊標題
@@ -352,7 +391,123 @@ class ProjectDetailScreen extends ConsumerWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _AIMagicSheet(productId: product.id),
+      builder: (context) => _AIMagicSheet(productId: widget.product.id),
+    );
+  }
+
+  Future<void> _handleDeleteProduct(BuildContext context) async {
+    // 1. 顯示確認對話框（包含警告訊息）
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2c2c2e),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('刪除專案', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '確定要刪除「${widget.product.name}」嗎？',
+              style: const TextStyle(color: Colors.white70, fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 16,
+                    color: Colors.orange.withOpacity(0.8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '如果專案內有進行中的任務，將無法刪除。',
+                      style: TextStyle(
+                        color: Colors.orange.withOpacity(0.9),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // 2. 執行刪除
+    setState(() => _isDeleting = true);
+
+    final useCase = ref.read(deleteProductUseCaseProvider);
+    final result = await useCase(
+      DeleteProductParams(productId: widget.product.id)
+    );
+
+    if (!mounted) return;
+    setState(() => _isDeleting = false);
+
+    // 3. 處理結果
+    result.fold(
+      (failure) {
+        // 顯示錯誤對話框（直接顯示後端訊息）
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xFF2c2c2e),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)
+            ),
+            title: const Text('無法刪除',
+              style: TextStyle(color: Colors.white)),
+            content: Text(
+              failure.message,
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('知道了',
+                  style: TextStyle(color: Color(0xFF6C63FF))),
+              ),
+            ],
+          ),
+        );
+      },
+      (_) {
+        // 成功：刷新資料並返回上一頁
+        ref.invalidate(dashboardProvider);
+        ref.invalidate(productsProvider);
+
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('專案「${widget.product.name}」已刪除'),
+              backgroundColor: const Color(0xFF6C63FF),
+            ),
+          );
+        }
+      },
     );
   }
 }

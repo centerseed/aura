@@ -49,6 +49,8 @@ export class CoachPlanGenerator {
     unscheduledTasks?: PlanCandidate[],
     milestones?: MilestoneContext[],
     weeklyOverview?: WeeklyDayInfo[],
+    planDate?: Date,
+    timezone?: string,
   ): Promise<{ output: DailyPlanOutput; prompt: string }> {
     if (candidates.length === 0 && (!unscheduledTasks || unscheduledTasks.length === 0)) {
       return {
@@ -62,7 +64,7 @@ export class CoachPlanGenerator {
       }
     }
 
-    const prompt = this.buildPrompt(candidates, availableMinutes, meetingMinutes, calibrationNote, unscheduledTasks, milestones, weeklyOverview)
+    const prompt = this.buildPrompt(candidates, availableMinutes, meetingMinutes, calibrationNote, unscheduledTasks, milestones, weeklyOverview, planDate, timezone)
 
     const start = Date.now()
     const { object } = await generateObject({
@@ -88,26 +90,33 @@ export class CoachPlanGenerator {
     unscheduledTasks?: PlanCandidate[],
     milestones?: MilestoneContext[],
     weeklyOverview?: WeeklyDayInfo[],
+    planDate?: Date,
+    timezone?: string,
   ): string {
     const sections: string[] = []
 
-    // 日期上下文
-    const now = new Date()
+    // 日期上下文（使用用戶時區計算正確的星期幾）
+    const tz = timezone || 'Asia/Taipei'
+    const targetDate = planDate || new Date()
+    const localeDateStr = targetDate.toLocaleDateString('en-CA', { timeZone: tz })
     const dayNames = ['日', '一', '二', '三', '四', '五', '六']
-    const dayOfWeek = dayNames[now.getDay()]
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    const isWeekend = now.getDay() === 0 || now.getDay() === 6
+    // 用 locale date string + 中午時間避免時區偏移
+    const dayOfWeekNum = new Date(localeDateStr + 'T12:00:00').getDay()
+    const dayOfWeek = dayNames[dayOfWeekNum]
+    const isWeekend = dayOfWeekNum === 0 || dayOfWeekNum === 6
 
     sections.push('你是 Zentropy 的營運教練（Coach Agent）。請為用戶排定今天的工作計畫。')
     sections.push('')
     sections.push(`## 今日資訊`)
-    sections.push(`- 日期: ${dateStr}（星期${dayOfWeek}）`)
+    sections.push(`- 日期: ${localeDateStr}（星期${dayOfWeek}）`)
     if (isWeekend) {
       sections.push(`- ⚠️ 今天是週末，請注意：`)
       sections.push(`  - 政府機關（區役所、公所、市政府等）週末不開放`)
       sections.push(`  - 銀行、郵局等公家機關週末不營業`)
       sections.push(`  - 與他人開會或討論的任務可能不適合排在週末`)
       sections.push(`  - 優先安排可以獨自完成的工作任務`)
+    } else {
+      sections.push(`- 今天是工作日（星期${dayOfWeek}）`)
     }
     sections.push('')
     sections.push('## 排序原則（嚴格遵守）')
@@ -220,7 +229,7 @@ export class CoachPlanGenerator {
 
     // Unscheduled tasks
     if (unscheduledTasks && unscheduledTasks.length > 0) {
-      const today = new Date().toISOString().substring(0, 10)
+      const today = localeDateStr
       sections.push('## 待排程任務（需建議日期）')
       for (const t of unscheduledTasks) {
         const dueStr = t.dueDate ? `due=${new Date(t.dueDate).toISOString().substring(0, 10)}` : '無日期'
@@ -239,7 +248,11 @@ export class CoachPlanGenerator {
     sections.push('## 回應要求')
     sections.push('1. daily_plan: 只放今天真正適合且來得及做的項目，按建議執行順序排列')
     sections.push('2. overflow_items: 不適合今天做的項目（太遠、週末限制、容量不足），suggestion 說明建議何時做')
-    sections.push('3. coach_message: 2-3 句親切的開場語，考慮今天是什麼日子')
+    if (isWeekend) {
+      sections.push('3. coach_message: 2-3 句親切的開場語。今天是週末，可以提到週末相關的話題')
+    } else {
+      sections.push(`3. coach_message: 2-3 句親切的開場語。今天是星期${dayOfWeek}（工作日），絕對不要提到週末、休息日、假日。直接聚焦今天的工作安排`)
+    }
     if (unscheduledTasks && unscheduledTasks.length > 0) {
       sections.push('4. scheduling: 為每個待排程任務建議 start_date 和 due_date')
     }

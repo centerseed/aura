@@ -86,13 +86,23 @@ _$SubItemModelImpl _$$SubItemModelImplFromJson(Map<String, dynamic> json) =>
       completedAt: json['completed_at'] == null
           ? null
           : DateTime.parse(json['completed_at'] as String),
+      startDate: json['start_date'] == null
+          ? null
+          : DateTime.parse(json['start_date'] as String),
+      dueDate: json['due_date'] == null
+          ? null
+          : DateTime.parse(json['due_date'] as String),
     );
 
-Map<String, dynamic> _$$SubItemModelImplToJson(_$SubItemModelImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'content': instance.content,
-      'completed': instance.completed,
-      if (instance.completedAt?.toIso8601String() case final value?)
-        'completed_at': value,
-    };
+Map<String, dynamic> _$$SubItemModelImplToJson(
+  _$SubItemModelImpl instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'content': instance.content,
+  'completed': instance.completed,
+  if (instance.completedAt?.toIso8601String() case final value?)
+    'completed_at': value,
+  if (instance.startDate?.toIso8601String() case final value?)
+    'start_date': value,
+  if (instance.dueDate?.toIso8601String() case final value?) 'due_date': value,
+};

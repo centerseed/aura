@@ -20,6 +20,7 @@ import '../../../../application/use_cases/cancel_task_reminder_use_case.dart';
 import '../../../providers/area_provider.dart';
 import '../../../providers/product_provider.dart';
 import '../../../providers/task_provider.dart';
+import 'sub_item_edit_dialog.dart';
 
 /// Task 細節畫面 (BottomSheet) - 直接可編輯的緊湊介面
 class TaskDetailBottomSheet extends ConsumerStatefulWidget {
@@ -55,6 +56,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   // Sub-items 本地狀態
   late List<_SubItemState> _subItems;
   bool _isSubItemEditMode = false;
+  final Set<String> _loadingSubItemIds = {};
 
 
   @override
@@ -74,6 +76,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               id: sub.id,
               content: sub.content,
               completed: sub.completed,
+              startDate: sub.startDate,
+              dueDate: sub.dueDate,
             ))
         .toList();
 
@@ -275,11 +279,35 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   Future<void> _handleSubItemToggle(String subItemId, bool completed) async {
     HapticFeedback.lightImpact();
     final newCompleted = !completed;
+
+    // 彈確認對話框
+    final confirmMessage = newCompleted ? '確定要標記為完成？' : '確定要取消完成？';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2c2c2e),
+        title: Text(
+          newCompleted ? '完成子任務' : '取消完成',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(confirmMessage, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('確定', style: TextStyle(color: Color(0xFF6C63FF))),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // 設為 loading 狀態
     setState(() {
-      final index = _subItems.indexWhere((s) => s.id == subItemId);
-      if (index != -1) {
-        _subItems[index] = _subItems[index].copyWith(completed: newCompleted);
-      }
+      _loadingSubItemIds.add(subItemId);
     });
 
     final useCase = ref.read(updateSubItemUseCaseProvider);
@@ -293,10 +321,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       (failure) {
         if (mounted) {
           setState(() {
-            final index = _subItems.indexWhere((s) => s.id == subItemId);
-            if (index != -1) {
-              _subItems[index] = _subItems[index].copyWith(completed: completed);
-            }
+            _loadingSubItemIds.remove(subItemId);
             _errorMessage = '更新失敗: ${failure.message}';
           });
           Future.delayed(const Duration(seconds: 3), () {
@@ -304,7 +329,41 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           });
         }
       },
-      (_) => silentRefreshTasks(ref),
+      (_) async {
+        if (mounted) {
+          setState(() {
+            _loadingSubItemIds.remove(subItemId);
+            final index = _subItems.indexWhere((s) => s.id == subItemId);
+            if (index != -1) {
+              _subItems[index] = _subItems[index].copyWith(completed: newCompleted);
+            }
+          });
+        }
+        await silentRefreshTasks(ref);
+        // 檢查是否所有 sub-items 都已完成
+        if (mounted && _subItems.isNotEmpty && _subItems.every((s) => s.completed)) {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('完成任務'),
+              content: const Text('所有子任務都已完成，是否要將此任務標記為完成？'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('稍後再說'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('完成'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true && mounted) {
+            await _handleComplete();
+          }
+        }
+      },
     );
   }
 
@@ -470,6 +529,150 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         }
       },
       (_) => silentRefreshTasks(ref),
+    );
+  }
+
+  /// 格式化 SubItem 的 due date 顯示
+  String _formatSubItemDueDate(DateTime dueDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final diffDays = due.difference(today).inDays;
+
+    if (diffDays < 0) return '逾期 ${-diffDays} 天';
+    if (diffDays == 0) return '今天';
+    if (diffDays == 1) return '明天';
+    if (diffDays <= 7) return '$diffDays 天後';
+    return '${dueDate.month}/${dueDate.day}';
+  }
+
+  /// 取得 SubItem due date 的顏色
+  Color _getSubItemDueDateColor(DateTime dueDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final diffDays = due.difference(today).inDays;
+
+    if (diffDays < 0) return Colors.red;
+    if (diffDays <= 3) return Colors.orange;
+    return Colors.blue.withValues(alpha: 0.7);
+  }
+
+  /// 處理 SubItem 點擊（打開編輯對話框）
+  Future<void> _handleSubItemTap(String subItemId) async {
+    final index = _subItems.indexWhere((s) => s.id == subItemId);
+    if (index == -1) return;
+    final subItem = _subItems[index];
+
+    // 找到對應的實體（包含完整的 startDate/dueDate）
+    final originalSubItem = widget.task.subItems?.firstWhere(
+      (s) => s.id == subItemId,
+      orElse: () => SubItem(
+        id: subItemId,
+        content: subItem.content,
+        completed: subItem.completed,
+        startDate: subItem.startDate,
+        dueDate: subItem.dueDate,
+      ),
+    );
+
+    await showDialog(
+      context: context,
+      builder: (context) => SubItemEditDialog(
+        subItem: originalSubItem!,
+        taskDueDate: _selectedDueDate,
+        onSave: (content, startDate, dueDate) async {
+          // 更新本地狀態
+          setState(() {
+            _subItems[index] = _subItems[index].copyWith(
+              content: content,
+              startDate: startDate,
+              dueDate: dueDate,
+            );
+          });
+
+          // 呼叫 API 更新
+          final useCase = ref.read(updateSubItemUseCaseProvider);
+          final result = await useCase(UpdateSubItemParams(
+            taskId: widget.task.id,
+            subItemId: subItemId,
+            content: content,
+            startDate: startDate,
+            dueDate: dueDate,
+          ));
+
+          result.fold(
+            (failure) {
+              if (mounted) {
+                setState(() {
+                  _subItems[index] = _subItems[index].copyWith(
+                    content: subItem.content,
+                    startDate: subItem.startDate,
+                    dueDate: subItem.dueDate,
+                  );
+                  _errorMessage = '更新失敗: ${failure.message}';
+                });
+              }
+            },
+            (_) => silentRefreshTasks(ref),
+          );
+        },
+        onDelete: () async {
+          // 先關閉對話框
+          Navigator.pop(context);
+
+          // 執行刪除
+          final originalLength = _subItems.length;
+          setState(() => _subItems.removeWhere((s) => s.id == subItemId));
+
+          final useCase = ref.read(deleteSubItemUseCaseProvider);
+          final result = await useCase(DeleteSubItemParams(
+            taskId: widget.task.id,
+            subItemId: subItemId,
+          ));
+
+          result.fold(
+            (failure) {
+              if (mounted && _subItems.length != originalLength) {
+                setState(() {
+                  _subItems.insert(index, subItem);
+                  _errorMessage = '刪除失敗: ${failure.message}';
+                });
+                Future.delayed(const Duration(seconds: 3), () {
+                  if (mounted) setState(() => _errorMessage = null);
+                });
+              }
+            },
+            (_) => silentRefreshTasks(ref),
+          );
+        },
+        onToggleCompleted: (completed) async {
+          setState(() {
+            _subItems[index] = _subItems[index].copyWith(completed: completed);
+          });
+
+          final useCase = ref.read(updateSubItemUseCaseProvider);
+          final result = await useCase(UpdateSubItemParams(
+            taskId: widget.task.id,
+            subItemId: subItemId,
+            completed: completed,
+          ));
+
+          result.fold(
+            (failure) {
+              if (mounted) {
+                setState(() {
+                  _subItems[index] = _subItems[index].copyWith(
+                    completed: subItem.completed,
+                  );
+                  _errorMessage = '更新失敗: ${failure.message}';
+                });
+              }
+            },
+            (_) => silentRefreshTasks(ref),
+          );
+        },
+      ),
     );
   }
 
@@ -1257,50 +1460,79 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           else
             ..._subItems.map((sub) => Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () => _handleSubItemToggle(sub.id, sub.completed),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          sub.completed ? Icons.check_circle : Icons.circle_outlined,
-                          key: ValueKey(sub.completed),
-                          size: 18,
-                          color: sub.completed ? Colors.green : Colors.white.withValues(alpha: 0.4),
+              child: GestureDetector(
+                onTap: () => _handleSubItemTap(sub.id),
+                child: Row(
+                  children: [
+                    _loadingSubItemIds.contains(sub.id)
+                      ? const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : InkWell(
+                          onTap: () => _handleSubItemToggle(sub.id, sub.completed),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(
+                                sub.completed ? Icons.check_circle : Icons.circle_outlined,
+                                key: ValueKey(sub.completed),
+                                size: 18,
+                                color: sub.completed ? Colors.green : Colors.white.withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ),
                         ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              color: sub.completed ? Colors.white.withValues(alpha: 0.5) : Colors.white,
+                              fontSize: 14,
+                              decoration: sub.completed ? TextDecoration.lineThrough : null,
+                            ),
+                            child: Text(sub.content),
+                          ),
+                          if (sub.dueDate != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                _formatSubItemDueDate(sub.dueDate!),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _getSubItemDueDateColor(sub.dueDate!),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        color: sub.completed ? Colors.white.withValues(alpha: 0.5) : Colors.white,
-                        fontSize: 14,
-                        decoration: sub.completed ? TextDecoration.lineThrough : null,
+                    GestureDetector(
+                      onTap: () => _handlePromoteSubItem(sub.id),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 16),
                       ),
-                      child: Text(sub.content),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: () => _handlePromoteSubItem(sub.id),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 16),
+                    GestureDetector(
+                      onTap: () => _handleDeleteSubItem(sub.id),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 16),
+                      ),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: () => _handleDeleteSubItem(sub.id),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 16),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             )),
         ],
@@ -1402,14 +1634,30 @@ class _SubItemState {
   final String id;
   final String content;
   final bool completed;
+  final DateTime? startDate;
+  final DateTime? dueDate;
 
-  _SubItemState({required this.id, required this.content, required this.completed});
+  _SubItemState({
+    required this.id,
+    required this.content,
+    required this.completed,
+    this.startDate,
+    this.dueDate,
+  });
 
-  _SubItemState copyWith({String? id, String? content, bool? completed}) {
+  _SubItemState copyWith({
+    String? id,
+    String? content,
+    bool? completed,
+    DateTime? startDate,
+    DateTime? dueDate,
+  }) {
     return _SubItemState(
       id: id ?? this.id,
       content: content ?? this.content,
       completed: completed ?? this.completed,
+      startDate: startDate ?? this.startDate,
+      dueDate: dueDate ?? this.dueDate,
     );
   }
 }

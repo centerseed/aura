@@ -159,6 +159,7 @@ sync_secret "firebase-admin-key" "FIREBASE_ADMIN_KEY"
 sync_secret "google-oauth-client-id" "GOOGLE_OAUTH_CLIENT_ID"
 sync_secret "google-oauth-client-secret" "GOOGLE_OAUTH_CLIENT_SECRET"
 sync_secret "oauth-encryption-key" "OAUTH_ENCRYPTION_KEY"
+sync_secret "ZENTROPY_MCP_JWT_SECRET" "ZENTROPY_MCP_JWT_SECRET"
 
 log_success "Secrets 同步完成"
 echo ""
@@ -185,11 +186,15 @@ if [ ! -f "Dockerfile" ]; then
 fi
 
 # 4. 建置並推送 Docker 映像
+IMAGE_REGISTRY="asia-east1-docker.pkg.dev"
+IMAGE_REPO="zentropy-images"
+IMAGE_TAG="${IMAGE_REGISTRY}/${PROJECT_ID}/${IMAGE_REPO}/${SERVICE_NAME}:latest"
+
 log_info "建置並推送 Docker 映像..."
-log_info "Image: gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
+log_info "Image: ${IMAGE_TAG}"
 
 gcloud builds submit \
-    --tag "gcr.io/${PROJECT_ID}/${SERVICE_NAME}" \
+    --tag "${IMAGE_TAG}" \
     --project "${PROJECT_ID}" \
     --timeout=20m
 
@@ -200,7 +205,7 @@ log_info "部署到 Cloud Run..."
 
 # 基本配置
 DEPLOY_ARGS=(
-    --image "gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
+    --image "${IMAGE_TAG}"
     --platform managed
     --region "${REGION}"
     --project "${PROJECT_ID}"
@@ -224,9 +229,11 @@ DEPLOY_ARGS=(
     --update-secrets GOOGLE_OAUTH_CLIENT_ID=google-oauth-client-id:latest
     --update-secrets GOOGLE_OAUTH_CLIENT_SECRET=google-oauth-client-secret:latest
     --update-secrets OAUTH_ENCRYPTION_KEY=oauth-encryption-key:latest
+    --update-secrets ZENTROPY_MCP_JWT_SECRET=ZENTROPY_MCP_JWT_SECRET:latest
 
     # Node.js 環境變數
-    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://zentropy.cc"
+    # NEXT_PUBLIC_API_URL 必須指向 API Backend，用於 OAuth Discovery metadata
+    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://zentropy-api-894512935237.asia-east1.run.app"
 )
 
 if [ "$ENVIRONMENT" = "staging" ]; then

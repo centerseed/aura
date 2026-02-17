@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskDetailModal } from "@/components/task-detail-modal";
+import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { auth } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
 import type { TaskCard } from "@/types";
@@ -198,6 +199,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   // Task Detail Modal 狀態
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<TaskCard | null>(null);
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
+
+  // Due Date Modal 狀態
+  const [editingTaskForDueDate, setEditingTaskForDueDate] = useState<TaskCard | null>(null);
+  const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
+  const [dateModalType, setDateModalType] = useState<"due" | "start">("due");
 
   // 語音辨識狀態（Web Speech API）
   const [isListening, setIsListening] = useState(false);
@@ -1090,7 +1096,55 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             onStatusChange={handleTaskStatusChange}
             onProductChange={handleTaskProductChange}
             onTopicChange={handleTaskTopicChange}
+            onSetDueDate={(taskId) => {
+              const task = selectedTaskForDetail?.id === taskId ? selectedTaskForDetail : null;
+              if (task) {
+                setEditingTaskForDueDate(task);
+                setDateModalType("due");
+                setIsDueDateModalOpen(true);
+              }
+            }}
+            onSetStartDate={(taskId) => {
+              const task = selectedTaskForDetail?.id === taskId ? selectedTaskForDetail : null;
+              if (task) {
+                setEditingTaskForDueDate(task);
+                setDateModalType("start");
+                setIsDueDateModalOpen(true);
+              }
+            }}
             areas={areas}
+          />
+        )}
+
+        {/* Due Date Modal */}
+        {editingTaskForDueDate && (
+          <TaskDueDateModal
+            isOpen={isDueDateModalOpen}
+            onClose={() => { setIsDueDateModalOpen(false); setEditingTaskForDueDate(null); setDateModalType("due"); }}
+            onSuccess={async () => {
+              // 重新取得更新後的任務資料
+              try {
+                const user = auth.currentUser;
+                if (!user) return;
+                const token = await user.getIdToken();
+                const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: { "Authorization": `Bearer ${token}` } });
+                if (libraryRes.ok) {
+                  const libraryData = await libraryRes.json();
+                  const updatedTask = (libraryData.data?.areas || [])
+                    .flatMap((a: any) => a.products?.flatMap((p: any) => p.tasks || []) || [])
+                    .find((t: any) => t?.id === editingTaskForDueDate.id);
+                  if (updatedTask) setSelectedTaskForDetail(updatedTask);
+                }
+              } catch (e) {
+                console.error("Failed to refresh task after date change:", e);
+              }
+              onItemsCreated();
+            }}
+            taskId={editingTaskForDueDate.id}
+            taskTitle={editingTaskForDueDate.title}
+            dateType={dateModalType}
+            currentDueDate={editingTaskForDueDate.due_date}
+            currentStartDate={editingTaskForDueDate.start_date}
           />
         )}
       </>
@@ -1758,7 +1812,54 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
           onStatusChange={handleTaskStatusChange}
           onProductChange={handleTaskProductChange}
           onTopicChange={handleTaskTopicChange}
+          onSetDueDate={(taskId) => {
+            const task = selectedTaskForDetail?.id === taskId ? selectedTaskForDetail : null;
+            if (task) {
+              setEditingTaskForDueDate(task);
+              setDateModalType("due");
+              setIsDueDateModalOpen(true);
+            }
+          }}
+          onSetStartDate={(taskId) => {
+            const task = selectedTaskForDetail?.id === taskId ? selectedTaskForDetail : null;
+            if (task) {
+              setEditingTaskForDueDate(task);
+              setDateModalType("start");
+              setIsDueDateModalOpen(true);
+            }
+          }}
           areas={areas}
+        />
+      )}
+
+      {/* Due Date Modal */}
+      {editingTaskForDueDate && (
+        <TaskDueDateModal
+          isOpen={isDueDateModalOpen}
+          onClose={() => { setIsDueDateModalOpen(false); setEditingTaskForDueDate(null); setDateModalType("due"); }}
+          onSuccess={async () => {
+            try {
+              const user = auth.currentUser;
+              if (!user) return;
+              const token = await user.getIdToken();
+              const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: { "Authorization": `Bearer ${token}` } });
+              if (libraryRes.ok) {
+                const libraryData = await libraryRes.json();
+                const updatedTask = (libraryData.data?.areas || [])
+                  .flatMap((a: any) => a.products?.flatMap((p: any) => p.tasks || []) || [])
+                  .find((t: any) => t?.id === editingTaskForDueDate.id);
+                if (updatedTask) setSelectedTaskForDetail(updatedTask);
+              }
+            } catch (e) {
+              console.error("Failed to refresh task after date change:", e);
+            }
+            onItemsCreated();
+          }}
+          taskId={editingTaskForDueDate.id}
+          taskTitle={editingTaskForDueDate.title}
+          dateType={dateModalType}
+          currentDueDate={editingTaskForDueDate.due_date}
+          currentStartDate={editingTaskForDueDate.start_date}
         />
       )}
     </>

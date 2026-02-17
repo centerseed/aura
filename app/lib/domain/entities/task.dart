@@ -148,28 +148,36 @@ class SubItem extends Equatable {
   final String content;
   final bool completed;
   final DateTime? completedAt;
+  final DateTime? startDate;
+  final DateTime? dueDate;
 
   const SubItem({
     required this.id,
     required this.content,
     required this.completed,
     this.completedAt,
+    this.startDate,
+    this.dueDate,
   });
 
   @override
-  List<Object?> get props => [id, content, completed];
+  List<Object?> get props => [id, content, completed, startDate, dueDate];
 
   SubItem copyWith({
     String? id,
     String? content,
     bool? completed,
     DateTime? completedAt,
+    DateTime? startDate,
+    DateTime? dueDate,
   }) {
     return SubItem(
       id: id ?? this.id,
       content: content ?? this.content,
       completed: completed ?? this.completed,
       completedAt: completedAt ?? this.completedAt,
+      startDate: startDate ?? this.startDate,
+      dueDate: dueDate ?? this.dueDate,
     );
   }
 }

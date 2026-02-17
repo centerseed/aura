@@ -66,12 +66,17 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
             children: [
               Row(
                 children: [
-                  const Text(
-                    '負載視圖',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFFF59E0B)],
+                    ).createShader(bounds),
+                    child: const Text(
+                      '負載視圖',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   if (isRefreshing) ...[

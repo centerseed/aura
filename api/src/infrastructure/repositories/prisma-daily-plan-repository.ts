@@ -23,6 +23,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       include: {
         items: {
           orderBy: { order: 'asc' },
+          include: { task: { select: { content: true } } },
         },
       },
     })
@@ -102,6 +103,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
         include: {
           items: {
             orderBy: { order: 'asc' },
+            include: { task: { select: { content: true } } },
           },
         },
       })
@@ -149,6 +151,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
         include: {
           items: {
             orderBy: { order: 'asc' },
+            include: { task: { select: { content: true } } },
           },
         },
       })
@@ -250,6 +253,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       status: row.status ?? 'today',
       userAdjusted: row.user_adjusted ?? false,
       adjustedAt: row.adjusted_at ?? null,
+      taskName: row.task?.content ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }

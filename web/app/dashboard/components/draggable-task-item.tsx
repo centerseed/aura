@@ -364,7 +364,11 @@ export function DraggableTaskItem({
                           onClick={(e) => {
                             e.stopPropagation()
                             e.preventDefault()
-                            onOpenSubItemDetail?.(subItem.id) || onOpenDetail?.()
+                            if (onOpenSubItemDetail) {
+                              onOpenSubItemDetail(subItem.id)
+                            } else {
+                              onOpenDetail?.()
+                            }
                           }}
                           title="點擊編輯"
                         >

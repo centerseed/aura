@@ -100,6 +100,51 @@ export class PrismaCoachBriefingRepository implements ICoachBriefingRepository {
     return this.toDomain(row)
   }
 
+  async removeTaskFromBriefing(userId: string, taskId: string): Promise<void> {
+    const today = new Date()
+    const todayDate = today.toISOString().slice(0, 10)
+
+    const row = await prisma.coachBriefing.findUnique({
+      where: {
+        user_id_type_briefing_date: {
+          user_id: userId,
+          type: 'MORNING',
+          briefing_date: todayDate,
+        },
+      },
+    })
+
+    if (!row) return
+
+    const overdueTasks = (row.overdue_tasks || []) as any[]
+    const approachingTasks = (row.approaching_tasks || []) as any[]
+    const remainingTasks = (row.remaining_tasks || []) as any[]
+    const completedTasks = (row.completed_tasks || []) as any[]
+
+    // Find the task in any of the arrays
+    const removedTask =
+      overdueTasks.find((t: any) => t.id === taskId) ||
+      approachingTasks.find((t: any) => t.id === taskId) ||
+      remainingTasks.find((t: any) => t.id === taskId)
+
+    if (!removedTask) return
+
+    const updatedOverdue = overdueTasks.filter((t: any) => t.id !== taskId)
+    const updatedApproaching = approachingTasks.filter((t: any) => t.id !== taskId)
+    const updatedRemaining = remainingTasks.filter((t: any) => t.id !== taskId)
+    completedTasks.push(removedTask)
+
+    await prisma.coachBriefing.update({
+      where: { id: row.id },
+      data: {
+        overdue_tasks: updatedOverdue as any,
+        approaching_tasks: updatedApproaching as any,
+        remaining_tasks: updatedRemaining as any,
+        completed_tasks: completedTasks as any,
+      },
+    })
+  }
+
   // ============================================================================
   // 轉換方法
   // ============================================================================

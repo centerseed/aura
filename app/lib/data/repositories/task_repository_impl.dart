@@ -117,6 +117,8 @@ class TaskRepositoryImpl implements TaskRepository {
     String subItemId, {
     bool? completed,
     String? content,
+    DateTime? startDate,
+    DateTime? dueDate,
   }) async {
     try {
       final requestBody = <String, dynamic>{};
@@ -125,6 +127,12 @@ class TaskRepositoryImpl implements TaskRepository {
       }
       if (content != null) {
         requestBody['content'] = content;
+      }
+      if (startDate != null) {
+        requestBody['start_date'] = TaskRequestBuilder.toDateOnlyUtcNoon(startDate);
+      }
+      if (dueDate != null) {
+        requestBody['due_date'] = TaskRequestBuilder.toDateOnlyUtcNoon(dueDate);
       }
 
       await _apiClient.updateSubItem(taskId, subItemId, requestBody);

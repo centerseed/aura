@@ -18,7 +18,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$REPO_ROOT/poc-librarian-js"
 
 cd "$PROJECT_DIR"
 

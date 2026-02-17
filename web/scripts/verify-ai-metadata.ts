@@ -24,8 +24,8 @@ interface AIAnalysis {
 async function verifyAIMetadata() {
   console.log('\n🔍 開始驗證 AI metadata 遷移...\n');
 
-  let errors: string[] = [];
-  let warnings: string[] = [];
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   // 1. 檢查資料表是否存在
   console.log('📋 Step 1: 檢查資料表結構\n');

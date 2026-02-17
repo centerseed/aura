@@ -19,10 +19,12 @@ vi.mock('@/lib/db', () => ({
 // Mock repository
 const mockFindByDate = vi.fn()
 const mockAddItem = vi.fn()
+const mockUpdateItem = vi.fn()
 vi.mock('@/infrastructure/repositories/prisma-daily-plan-repository', () => ({
   PrismaDailyPlanRepository: vi.fn().mockImplementation(() => ({
     findByDate: mockFindByDate,
     addItem: mockAddItem,
+    updateItem: mockUpdateItem,
   })),
 }))
 
@@ -67,7 +69,7 @@ describe('syncPlanOnTaskChange', () => {
     vi.useRealTimers()
   })
 
-  it('有 plan 且 due_date 在 3 天內 → 插入 overflow item', async () => {
+  it('有 plan 且 due_date 在 3 天內 → 插入 item（status 根據日期決定）', async () => {
     const plan = makePlan([
       { taskId: 'other-task', subTaskId: null, order: 0 },
     ])
@@ -83,7 +85,7 @@ describe('syncPlanOnTaskChange', () => {
     await syncPlanOnTaskChange({
       userId: 'user-1',
       taskId: 'task-1',
-      dueDate: '2026-02-17',
+      dueDate: '2026-02-17', // 明天
       timezone: 'Asia/Taipei',
     })
 
@@ -93,25 +95,61 @@ describe('syncPlanOnTaskChange', () => {
       content: '測試任務',
       areaName: '領域A',
       productName: '產品A',
-      status: 'overflow',
+      status: 'tomorrow', // ✅ 明天應該是 'tomorrow'
       order: 1,
     }))
   })
 
-  it('已存在相同 task → 不重複插入', async () => {
+  it('已存在相同 task 且 status 相同 → 不重複插入也不更新', async () => {
     const plan = makePlan([
-      { taskId: 'task-1', subTaskId: null, order: 0 },
+      { id: 'item-1', taskId: 'task-1', subTaskId: null, order: 0, status: 'tomorrow', userAdjusted: false },
     ])
     mockFindByDate.mockResolvedValue(plan)
 
     await syncPlanOnTaskChange({
       userId: 'user-1',
       taskId: 'task-1',
-      dueDate: '2026-02-17',
+      dueDate: '2026-02-17', // 明天 → status 應為 tomorrow
       timezone: 'Asia/Taipei',
     })
 
     expect(mockAddItem).not.toHaveBeenCalled()
+    expect(mockUpdateItem).not.toHaveBeenCalled()
+  })
+
+  it('已存在相同 task 但 status 變了 → 更新 status', async () => {
+    const plan = makePlan([
+      { id: 'item-1', taskId: 'task-1', subTaskId: null, order: 0, status: 'tomorrow', userAdjusted: false },
+    ])
+    mockFindByDate.mockResolvedValue(plan)
+    mockUpdateItem.mockResolvedValue({})
+
+    await syncPlanOnTaskChange({
+      userId: 'user-1',
+      taskId: 'task-1',
+      dueDate: '2026-02-16', // 今天 → status 應為 today
+      timezone: 'Asia/Taipei',
+    })
+
+    expect(mockAddItem).not.toHaveBeenCalled()
+    expect(mockUpdateItem).toHaveBeenCalledWith('item-1', { status: 'today' })
+  })
+
+  it('已存在且 userAdjusted → 不更新 status', async () => {
+    const plan = makePlan([
+      { id: 'item-1', taskId: 'task-1', subTaskId: null, order: 0, status: 'today', userAdjusted: true },
+    ])
+    mockFindByDate.mockResolvedValue(plan)
+
+    await syncPlanOnTaskChange({
+      userId: 'user-1',
+      taskId: 'task-1',
+      dueDate: '2026-02-17', // 明天，但用戶手動調整過
+      timezone: 'Asia/Taipei',
+    })
+
+    expect(mockAddItem).not.toHaveBeenCalled()
+    expect(mockUpdateItem).not.toHaveBeenCalled()
   })
 
   it('due_date 超過 3 天 → 不插入', async () => {
@@ -160,7 +198,7 @@ describe('syncPlanOnTaskChange', () => {
     expect(mockFindByDate).not.toHaveBeenCalled()
   })
 
-  it('subtask → 使用 subtask content', async () => {
+  it('subtask → 使用 subtask content 和 due_date', async () => {
     const plan = makePlan([
       { taskId: 'other', subTaskId: null, order: 0 },
     ])
@@ -174,14 +212,14 @@ describe('syncPlanOnTaskChange', () => {
     })
     ;(prisma.subTask.findUnique as any).mockResolvedValue({
       content: '子任務內容',
-      due_date: new Date('2026-02-16'),
+      due_date: new Date('2026-02-16'), // 今天
     })
 
     await syncPlanOnTaskChange({
       userId: 'user-1',
       taskId: 'task-1',
       subTaskId: 'sub-1',
-      dueDate: '2026-02-17',
+      dueDate: '2026-02-17', // 參數是明天，但會被 subtask 的今天覆蓋
       timezone: 'Asia/Taipei',
     })
 
@@ -189,7 +227,7 @@ describe('syncPlanOnTaskChange', () => {
       taskId: 'task-1',
       subTaskId: 'sub-1',
       content: '子任務內容',
-      status: 'overflow',
+      status: 'today', // ✅ subtask 的 due_date 是今天，應該是 'today'
     }))
   })
 
@@ -215,6 +253,54 @@ describe('syncPlanOnTaskChange', () => {
       order: 0,
       areaName: 'Unknown',
       productName: 'Unknown',
+    }))
+  })
+
+  it('due_date 為今天 → status 為 today', async () => {
+    const plan = makePlan([])
+    mockFindByDate.mockResolvedValue(plan)
+    mockAddItem.mockResolvedValue({})
+    ;(prisma.task.findUnique as any).mockResolvedValue({
+      content: '今日任務',
+      estimated_minutes: 60,
+      due_date: new Date('2026-02-16'),
+      product: { name: '產品C', area: { name: '領域C' } },
+    })
+
+    await syncPlanOnTaskChange({
+      userId: 'user-1',
+      taskId: 'task-today',
+      dueDate: '2026-02-16', // 今天
+      timezone: 'Asia/Taipei',
+    })
+
+    expect(mockAddItem).toHaveBeenCalledWith('plan-1', expect.objectContaining({
+      taskId: 'task-today',
+      status: 'today',
+    }))
+  })
+
+  it('due_date 為後天 → status 為 overflow', async () => {
+    const plan = makePlan([])
+    mockFindByDate.mockResolvedValue(plan)
+    mockAddItem.mockResolvedValue({})
+    ;(prisma.task.findUnique as any).mockResolvedValue({
+      content: '後天任務',
+      estimated_minutes: 30,
+      due_date: new Date('2026-02-18'),
+      product: { name: '產品D', area: { name: '領域D' } },
+    })
+
+    await syncPlanOnTaskChange({
+      userId: 'user-1',
+      taskId: 'task-overflow',
+      dueDate: '2026-02-18', // 後天
+      timezone: 'Asia/Taipei',
+    })
+
+    expect(mockAddItem).toHaveBeenCalledWith('plan-1', expect.objectContaining({
+      taskId: 'task-overflow',
+      status: 'overflow',
     }))
   })
 })

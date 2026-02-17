@@ -282,6 +282,67 @@ class ApiClient {
     return response.data['data'] as Map<String, dynamic>;
   }
 
+  // ==================== Coach Briefing ====================
+
+  Future<Map<String, dynamic>?> getLatestBriefing({String? type}) async {
+    final queryParams = <String, dynamic>{};
+    if (type != null) queryParams['type'] = type;
+
+    final response = await _dio.get(
+      '/coach/briefing/latest',
+      queryParameters: queryParams,
+    );
+    final data = response.data['data'] as Map<String, dynamic>;
+    return data['briefing'] as Map<String, dynamic>?;
+  }
+
+  Future<Map<String, dynamic>> generateBriefing({String? type}) async {
+    final body = <String, dynamic>{};
+    if (type != null) body['type'] = type;
+
+    final response = await _dio.post('/coach/briefing', data: body);
+    final data = response.data['data'] as Map<String, dynamic>;
+    return data['briefing'] as Map<String, dynamic>;
+  }
+
+  // ==================== Coach Plan ====================
+
+  Future<Map<String, dynamic>?> getPlan({
+    String? date,
+    String? timezone,
+  }) async {
+    final queryParams = <String, dynamic>{};
+    if (date != null) queryParams['date'] = date;
+    if (timezone != null) queryParams['timezone'] = timezone;
+
+    final response = await _dio.get(
+      '/coach/plan',
+      queryParameters: queryParams,
+    );
+    final data = response.data['data'] as Map<String, dynamic>;
+    return data['plan'] as Map<String, dynamic>?;
+  }
+
+  Future<Map<String, dynamic>> generatePlan({
+    String? date,
+    String? timezone,
+  }) async {
+    final body = <String, dynamic>{};
+    if (date != null) body['date'] = date;
+    if (timezone != null) body['timezone'] = timezone;
+
+    final response = await _dio.post('/coach/plan', data: body);
+    final data = response.data['data'] as Map<String, dynamic>;
+    return data['plan'] as Map<String, dynamic>;
+  }
+
+  Future<void> updatePlanItem(
+    String itemId,
+    Map<String, dynamic> body,
+  ) async {
+    await _dio.patch('/coach/plan/items/$itemId', data: body);
+  }
+
   Future<Map<String, dynamic>> updateCurrentUser(Map<String, dynamic> body) async {
     final response = await _dio.patch('/me', data: body);
     return response.data;

@@ -85,6 +85,8 @@ class SubItemModel with _$SubItemModel {
     required String content,
     required bool completed,
     @JsonKey(name: 'completed_at') DateTime? completedAt,
+    @JsonKey(name: 'start_date') DateTime? startDate,
+    @JsonKey(name: 'due_date') DateTime? dueDate,
   }) = _SubItemModel;
 
   factory SubItemModel.fromJson(Map<String, dynamic> json) =>
@@ -96,6 +98,8 @@ class SubItemModel with _$SubItemModel {
     id: id,
     content: content,
     completed: completed,
-    completedAt: completedAt,
+    completedAt: completedAt?.toLocal(),
+    startDate: startDate?.toLocal(),
+    dueDate: dueDate?.toLocal(),
   );
 }

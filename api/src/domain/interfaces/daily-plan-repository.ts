@@ -10,7 +10,7 @@
 
 export type PlanItemType = 'task' | 'subtask'
 
-export type PlanItemStatus = 'today' | 'overflow'
+export type PlanItemStatus = 'today' | 'tomorrow' | 'overflow'
 
 export interface DailyPlanItemData {
   id: string
@@ -33,6 +33,7 @@ export interface DailyPlanItemData {
   status: PlanItemStatus
   userAdjusted: boolean
   adjustedAt: Date | null
+  taskName: string | null
   createdAt: Date
   updatedAt: Date
 }

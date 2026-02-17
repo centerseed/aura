@@ -20,6 +20,8 @@ import {
 } from '@/lib/api-response'
 import { librarianObserve } from '@/lib/librarian-client'
 import { prisma } from '@/lib/db'
+import { syncSubTasksToJson } from '@/infrastructure/repositories/sub-task-sync'
+import { PrismaCoachBriefingRepository } from '@/infrastructure/repositories/prisma-coach-briefing-repository'
 
 // ============================================================================
 // DTOs
@@ -201,6 +203,29 @@ export class UpdateTaskUseCase {
       updateData
     )
 
+    // 6.5. Task 完成連動：同步更新對應的 DailyPlanItem
+    if (request.status && updateData.status) {
+      const isNowArchived = updateData.status === TaskStatus.ARCHIVE
+      const wasArchived = existingTaskData.status === TaskStatus.ARCHIVE
+
+      // 狀態變更為 ARCHIVE 或從 ARCHIVE 變回其他狀態時，同步更新 plan item
+      if (isNowArchived !== wasArchived) {
+        await this.syncPlanItemCompletion(
+          request.taskId,
+          null, // 不是 subtask
+          isNowArchived,
+          isNowArchived ? updatedTask : null // 傳入任務資料用於自動補入 plan
+        )
+
+        // 父 task 完成時，自動完成所有未完成的 subtask
+        if (isNowArchived) {
+          await this.completeAllSubItems(request.taskId)
+          // 從今日 briefing 移除已完成的任務
+          await this.removeTaskFromBriefing(request.userId, request.taskId)
+        }
+      }
+    }
+
     // 7. 非同步推送分類修正到 Librarian Service
     if (request.productId && request.productId !== existingTaskData.productId) {
       // 查詢 product names（Librarian 需要可讀文字，不能用 UUID）
@@ -263,6 +288,135 @@ export class UpdateTaskUseCase {
     return {
       task: updatedTask,
       message: statusMessage,
+    }
+  }
+
+  /**
+   * 同步更新對應的 DailyPlanItem 的完成狀態
+   *
+   * @param taskId - Task ID
+   * @param subTaskId - SubTask ID (如果是 subtask)
+   * @param completed - 是否完成
+   */
+  private async syncPlanItemCompletion(
+    taskId: string,
+    subTaskId: string | null,
+    completed: boolean,
+    taskData?: TaskData | null
+  ): Promise<void> {
+    try {
+      // 查找對應的 plan item
+      const planItem = await prisma.dailyPlanItem.findFirst({
+        where: {
+          task_id: taskId,
+          ...(subTaskId ? { sub_task_id: subTaskId } : { sub_task_id: null }),
+        },
+      })
+
+      if (planItem) {
+        // 更新 plan item 的完成狀態
+        await prisma.dailyPlanItem.update({
+          where: { id: planItem.id },
+          data: {
+            completed,
+            completed_at: completed ? new Date() : null,
+          },
+        })
+      } else if (completed && taskData) {
+        // Plan 裡沒有對應 item，自動創建一個已完成的 plan item
+        const today = new Date()
+        const todayDate = today.toISOString().slice(0, 10)
+
+        const todayPlan = await prisma.dailyPlan.findFirst({
+          where: {
+            user_id: taskData.userId,
+            plan_date: todayDate,
+          },
+        })
+
+        if (todayPlan) {
+          // 查詢 product name 和 area name
+          const product = await prisma.product.findUnique({
+            where: { id: taskData.productId },
+            select: { name: true, area: { select: { name: true } } },
+          })
+
+          await prisma.dailyPlanItem.create({
+            data: {
+              plan_id: todayPlan.id,
+              task_id: taskId,
+              sub_task_id: subTaskId,
+              item_type: 'task',
+              content: taskData.content,
+              area_name: product?.area?.name ?? '',
+              product_name: product?.name ?? '',
+              estimated_minutes: 30,
+              status: 'today',
+              completed: true,
+              completed_at: new Date(),
+              order: 9999,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      // 非關鍵操作，失敗不影響主流程
+      console.error('[UpdateTaskUseCase] Failed to sync plan item:', error)
+    }
+  }
+
+  /**
+   * 父 task 完成時，自動完成所有未完成的 subtask
+   */
+  private async completeAllSubItems(taskId: string): Promise<void> {
+    try {
+      const now = new Date()
+
+      // 批次更新所有未完成的 subtask
+      const { count } = await prisma.subTask.updateMany({
+        where: {
+          task_id: taskId,
+          completed: false,
+          deleted_at: null,
+        },
+        data: {
+          completed: true,
+          completed_at: now,
+        },
+      })
+
+      if (count > 0) {
+        // 同步 JSON
+        await syncSubTasksToJson(taskId)
+
+        // 同步對應的 DailyPlanItem 完成狀態
+        await prisma.dailyPlanItem.updateMany({
+          where: {
+            task_id: taskId,
+            sub_task_id: { not: null },
+            completed: false,
+          },
+          data: {
+            completed: true,
+            completed_at: now,
+          },
+        })
+      }
+    } catch (error) {
+      console.error('[UpdateTaskUseCase] Failed to complete sub-items:', error)
+    }
+  }
+
+  /**
+   * 從今日 briefing 的所有任務列表中移除已完成的任務
+   */
+  private async removeTaskFromBriefing(userId: string, taskId: string): Promise<void> {
+    try {
+      const briefingRepo = new PrismaCoachBriefingRepository()
+      await briefingRepo.removeTaskFromBriefing(userId, taskId)
+    } catch (error) {
+      // 非關鍵操作，失敗不影響主流程
+      console.error('[UpdateTaskUseCase] Failed to remove briefing overdue task:', error)
     }
   }
 

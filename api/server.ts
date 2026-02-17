@@ -18,6 +18,7 @@ import { createServer as createHttpServer } from "node:http";
 import { parse } from "node:url";
 import next from "next";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { createMcpServer } from "./src/mcp/server";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -43,6 +44,24 @@ function cleanupStaleSessions() {
     if (now - session.createdAt > SESSION_TTL_MS) {
       session.transport.close?.();
       mcpSessions.delete(id);
+    }
+  }
+}
+
+/**
+ * Extract Bearer token from Authorization header and attach as req.auth
+ * so the MCP SDK passes it to tool handlers via extra.authInfo.
+ */
+function attachAuthInfo(req: import("node:http").IncomingMessage & { auth?: AuthInfo }) {
+  const authHeader = req.headers.authorization;
+  if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length);
+    if (token) {
+      req.auth = {
+        token,
+        clientId: "claude-code",
+        scopes: [],
+      };
     }
   }
 }
@@ -82,12 +101,16 @@ async function main() {
 
       // ── MCP Endpoint (Streamable HTTP) ────────────────
       if (pathname === "/mcp") {
+        console.log(`[mcp] ${req.method} /mcp | auth header present: ${!!req.headers.authorization} | session: ${req.headers["mcp-session-id"] || "none"}`);
         // Check for existing session
         const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
         if (sessionId && mcpSessions.has(sessionId)) {
           // Reuse existing session's transport
           const session = mcpSessions.get(sessionId)!;
+
+          // Attach auth info to req so SDK passes it to tool handlers via extra.authInfo
+          attachAuthInfo(req);
           await session.transport.handleRequest(req, res);
           return;
         }
@@ -116,6 +139,9 @@ async function main() {
         };
 
         await mcpServer.connect(transport);
+
+        // Attach auth info to req so SDK passes it to tool handlers via extra.authInfo
+        attachAuthInfo(req);
         await transport.handleRequest(req, res);
 
         // Store session for reuse
@@ -123,6 +149,27 @@ async function main() {
         if (sid) {
           mcpSessions.set(sid, { transport, createdAt: Date.now() });
         }
+        return;
+      }
+
+      // ── OAuth Protected Resource Metadata (RFC 9728, required by MCP clients) ──
+      if (pathname === "/.well-known/oauth-protected-resource") {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || `http://${hostname}:${port}`;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            resource: `${baseUrl}/mcp`,
+            authorization_servers: [baseUrl],
+            scopes_supported: [
+              "read:tasks",
+              "read:knowledge",
+              "read:profile",
+              "write:inbox",
+              "write:knowledge",
+              "trigger:librarian",
+            ],
+          }),
+        );
         return;
       }
 
@@ -149,6 +196,13 @@ async function main() {
             token_endpoint_auth_methods_supported: ["none"],
           }),
         );
+        return;
+      }
+
+      // ── Catch unmatched OAuth discovery paths (return JSON, not HTML) ──
+      if (pathname?.startsWith("/.well-known/") || pathname === "/register") {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "not_found" }));
         return;
       }
 

@@ -8,6 +8,7 @@ import type {
   IDailyPlanRepository,
   DailyPlanData,
   CreateDailyPlanData,
+  PlanItemStatus,
 } from '@/domain/interfaces/daily-plan-repository'
 import type { IDataCollector, UnifiedRawData } from '@/domain/interfaces/data-collector'
 import type { IDataTransformer } from '@/domain/interfaces/data-transformer'
@@ -99,6 +100,8 @@ export class GeneratePlanUseCase {
       collected.unscheduledTasks,
       collected.milestones,
       collected.weeklyOverview,
+      planDate,
+      timezone,
     )
     timings.ai = Date.now() - start
     console.log('[GeneratePlan] Prompt length:', aiPrompt.length, 'chars')
@@ -115,7 +118,7 @@ export class GeneratePlanUseCase {
       taskId: string; subTaskId: string | null; content: string;
       areaName: string; productName: string; estimatedMinutes: number | null;
       dueDate: Date | null; order: number; reasoning: string;
-      status: 'today' | 'overflow';
+      status: PlanItemStatus;
     }> = []
     let accumulatedMinutes = 0
 
@@ -131,13 +134,34 @@ export class GeneratePlanUseCase {
 
       const estimatedMinutes = item.estimated_minutes ?? candidate.estimatedMinutes ?? 60
       // 安全網：超過 availableMinutes 就放入 overflow（讓 AI 根據週表自行控制 3-5 項）
+      // 但 due today / overdue 項目強制納入，避免用戶忽略而逾期
+      const todayEnd = new Date(planDate)
+      todayEnd.setHours(23, 59, 59, 999)
+      const isDueTodayOrOverdue = candidate.dueDate && candidate.dueDate <= todayEnd
+
       if (accumulatedMinutes + estimatedMinutes > collected.availableMinutes && plannedItems.length > 0) {
-        console.log('[GeneratePlan] Capacity cutoff at item %d (%s), accumulated=%dmin, available=%dmin',
-          item.order, candidate.content.substring(0, 20), accumulatedMinutes, collected.availableMinutes)
-        capacityCutoffItems.push({ candidate, estimatedMinutes, reasoning: item.reasoning })
-        continue
+        if (!isDueTodayOrOverdue) {
+          console.log('[GeneratePlan] Capacity cutoff at item %d (%s), accumulated=%dmin, available=%dmin',
+            item.order, candidate.content.substring(0, 20), accumulatedMinutes, collected.availableMinutes)
+          capacityCutoffItems.push({ candidate, estimatedMinutes, reasoning: item.reasoning })
+          continue
+        }
+        console.log('[GeneratePlan] Force-including due/overdue item: %s (due: %s)',
+          candidate.content.substring(0, 30), candidate.dueDate?.toISOString())
       }
       accumulatedMinutes += estimatedMinutes
+
+      // 根據 dueDate 決定正確的 status，而非一律設 'today'
+      let itemStatus: PlanItemStatus = 'today'
+      if (candidate.dueDate) {
+        const dueDateOnly = toDateOnly(candidate.dueDate, timezone)
+        const tomorrow = new Date(planDateOnly.getTime() + 24 * 60 * 60 * 1000)
+        if (dueDateOnly.getTime() > tomorrow.getTime()) {
+          itemStatus = 'overflow'
+        } else if (dueDateOnly.getTime() === tomorrow.getTime()) {
+          itemStatus = 'tomorrow'
+        }
+      }
 
       plannedItems.push({
         taskId: candidate.taskId,
@@ -149,7 +173,7 @@ export class GeneratePlanUseCase {
         dueDate: candidate.dueDate,
         order: plannedItems.length + 1,
         reasoning: item.reasoning,
-        status: 'today',
+        status: itemStatus,
       })
     }
 
@@ -166,7 +190,17 @@ export class GeneratePlanUseCase {
 
     // 6d. 建構 overflow items 為 DailyPlanItem rows（不再用 JSONB）
     // 合併 AI 回傳的 overflow + 被容量截斷的項目
-    const aiOverflowRows = (aiResult.overflow_items || []).map((oi) => {
+    // 先收集 plannedItems 的 key set，用於去重
+    const plannedTaskKeys = new Set(
+      plannedItems.map(i => `${i.taskId}:${i.subTaskId || ''}`)
+    )
+    const aiOverflowRows = (aiResult.overflow_items || [])
+      .filter((oi) => {
+        const candidate = candidateMap.get(oi.item_id)
+        if (!candidate) return false
+        return !plannedTaskKeys.has(`${candidate.taskId}:${candidate.subTaskId || ''}`)
+      })
+      .map((oi) => {
       const candidate = candidateMap.get(oi.item_id)
       return {
         taskId: candidate?.taskId ?? '',

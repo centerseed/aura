@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sheet";
 import { BriefingSchedule } from "@/domain/entities/user.entity";
 import { isInBriefingWindow, getCurrentLocalHour } from "@/lib/briefing-window-utils";
-import type { TaskCard } from "@/types";
+
 import {
   DndContext,
   closestCenter,
@@ -170,7 +170,6 @@ function setLastSeenId(id: string) {
 // ============================================================================
 
 interface TodayOverviewSheetProps {
-  completedTodayTasks: TaskCard[];
   onCompleteTask: (taskId: string) => void;
   onOpenTask?: (taskId: string, subTaskId?: string | null) => void;
 }
@@ -180,7 +179,6 @@ interface TodayOverviewSheetProps {
 // ============================================================================
 
 export function TodayOverviewSheet({
-  completedTodayTasks,
   onCompleteTask,
   onOpenTask,
 }: TodayOverviewSheetProps) {
@@ -213,7 +211,7 @@ export function TodayOverviewSheet({
 
   // Count stats for the header button
   const todayPlanItems = plan?.items.filter((i) => !i.completed && i.status === "today") ?? [];
-  const completedPlanItems = plan?.items.filter((i) => i.completed && i.status === "today") ?? [];
+  const completedPlanItems = plan?.items.filter((i) => i.completed) ?? [];
   const totalPlanItems = plan?.items.filter((i) => i.status === "today").length ?? 0;
 
   const loadBriefings = useCallback(async () => {
@@ -293,6 +291,23 @@ export function TodayOverviewSheet({
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
     };
   }, [loadBriefings, loadPlan]);
+
+  // 🔔 監聽新增 task 和更新 due_date 事件，重新載入 plan
+  useEffect(() => {
+    const handlePlanUpdate = () => {
+      console.log('[TodayOverview] Plan update event received, reloading plan + briefings...');
+      loadPlan();
+      loadBriefings();
+    };
+
+    window.addEventListener('task-created', handlePlanUpdate);
+    window.addEventListener('plan-updated', handlePlanUpdate);
+
+    return () => {
+      window.removeEventListener('task-created', handlePlanUpdate);
+      window.removeEventListener('plan-updated', handlePlanUpdate);
+    };
+  }, [loadPlan]);
 
   const handleOpen = () => {
     setIsOpen(true);
@@ -428,7 +443,6 @@ export function TodayOverviewSheet({
             setPlan={setPlan}
             completingItems={completingItems}
             setCompletingItems={setCompletingItems}
-            completedTodayTasks={completedTodayTasks}
             onCompleteTask={onCompleteTask}
             onOpenTask={onOpenTask}
             loadPlan={loadPlan}
@@ -460,7 +474,6 @@ function TodaySheetContent({
   setPlan,
   completingItems,
   setCompletingItems,
-  completedTodayTasks,
   onCompleteTask,
   onOpenTask,
   loadPlan,
@@ -481,7 +494,6 @@ function TodaySheetContent({
   setPlan: React.Dispatch<React.SetStateAction<DailyPlan | null>>;
   completingItems: Set<string>;
   setCompletingItems: React.Dispatch<React.SetStateAction<Set<string>>>;
-  completedTodayTasks: TaskCard[];
   onCompleteTask: (taskId: string) => void;
   onOpenTask?: (taskId: string, subTaskId?: string | null) => void;
   loadPlan: () => Promise<void>;
@@ -974,7 +986,6 @@ function TodaySheetContent({
               isLoading={isLoadingPlan}
               completingItems={completingItems}
               setCompletingItems={setCompletingItems}
-              completedTodayTasks={completedTodayTasks}
               onCompleteTask={onCompleteTask}
               onOpenTask={onOpenTask}
               loadPlan={loadPlan}
@@ -982,7 +993,6 @@ function TodaySheetContent({
           ) : (
             <EveningCompletedSection
               plan={plan}
-              completedTodayTasks={completedTodayTasks}
             />
           )}
         </div>
@@ -1009,16 +1019,11 @@ function TodaySheetContent({
 
 function EveningCompletedSection({
   plan,
-  completedTodayTasks,
 }: {
   plan: DailyPlan | null;
-  completedTodayTasks: TaskCard[];
 }) {
   const completedItems = plan?.items.filter((i) => i.completed && i.status === "today") ?? [];
-  const extraCompleted = completedTodayTasks.filter(
-    (t) => !completedItems.some((i) => i.task_id === t.id)
-  );
-  const totalCompleted = completedItems.length + extraCompleted.length;
+  const totalCompleted = completedItems.length;
 
   if (totalCompleted === 0) {
     return (
@@ -1046,12 +1051,6 @@ function EveningCompletedSection({
             <p className="text-sm text-slate-600 dark:text-white/60 truncate">{item.content}</p>
           </li>
         ))}
-        {extraCompleted.map((task) => (
-          <li key={task.id} className="flex items-start gap-2 py-1">
-            <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-400 shrink-0" />
-            <p className="text-sm text-slate-600 dark:text-white/60 truncate">{task.title}</p>
-          </li>
-        ))}
       </ul>
     </div>
   );
@@ -1067,7 +1066,6 @@ function PlanSection({
   isLoading,
   completingItems,
   setCompletingItems,
-  completedTodayTasks,
   onCompleteTask,
   onOpenTask,
   loadPlan,
@@ -1077,7 +1075,6 @@ function PlanSection({
   isLoading: boolean;
   completingItems: Set<string>;
   setCompletingItems: React.Dispatch<React.SetStateAction<Set<string>>>;
-  completedTodayTasks: TaskCard[];
   onCompleteTask: (taskId: string) => void;
   onOpenTask?: (taskId: string, subTaskId?: string | null) => void;
   loadPlan: () => Promise<void>;
@@ -1108,6 +1105,8 @@ function PlanSection({
         };
       });
       if (item.task_id) onCompleteTask(item.task_id);
+      // Trigger plan + briefing reload via event
+      window.dispatchEvent(new CustomEvent('plan-updated'));
     } catch {
       // ignore
     } finally {
@@ -1293,13 +1292,13 @@ function PlanSection({
         </DragOverlay>
       </DndContext>
 
-      {/* Today's completed items */}
-      {(completedItems.length > 0 || completedTodayTasks.length > 0) && (
+      {/* Today's completed items — 只從 plan 計算 */}
+      {completedItems.length > 0 && (
         <div className="px-5 pb-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-slate-400 dark:text-white/30">今日已完成</span>
             <span className="text-[10px] text-slate-400 dark:text-white/30 bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">
-              {completedItems.length + completedTodayTasks.filter((t) => !completedItems.some((i) => i.task_id === t.id)).length}
+              {completedItems.length}
             </span>
           </div>
           <ul className="space-y-0.5">
@@ -1309,14 +1308,6 @@ function PlanSection({
                 <p className="text-sm text-slate-400 dark:text-white/40 line-through truncate">{item.content}</p>
               </li>
             ))}
-            {completedTodayTasks
-              .filter((t) => !completedItems.some((i) => i.task_id === t.id))
-              .map((task) => (
-                <li key={task.id} className="flex items-start gap-2 py-1">
-                  <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-400 shrink-0" />
-                  <p className="text-sm text-slate-400 dark:text-white/40 line-through truncate">{task.title}</p>
-                </li>
-              ))}
           </ul>
         </div>
       )}

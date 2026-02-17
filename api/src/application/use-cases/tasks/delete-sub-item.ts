@@ -93,7 +93,19 @@ export class DeleteSubItemUseCase {
     // 6. 雙寫：同步到 JSON
     await syncSubTasksToJson(request.taskId)
 
-    // 7. 計算統計資訊
+    // 7. 清理對應的 plan item
+    try {
+      await prisma.dailyPlanItem.deleteMany({
+        where: {
+          task_id: request.taskId,
+          sub_task_id: request.subItemId,
+        },
+      })
+    } catch (error) {
+      console.error('[DeleteSubItemUseCase] Failed to cleanup plan item:', error)
+    }
+
+    // 8. 計算統計資訊
     const meta = await getSubTasksMeta(request.taskId)
 
     return {

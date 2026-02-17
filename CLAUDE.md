@@ -20,8 +20,9 @@
 
 | 服務 | 部署命令 | 腳本位置 |
 |------|---------|---------|
-| **API** (zentropy-api) | `cd api && bash scripts/deploy-api.sh` | `api/scripts/deploy-api.sh` |
-| **Librarian** (librarian-service) | `cd poc-librarian-js && bash scripts/deploy.sh` | `poc-librarian-js/scripts/deploy.sh` |
+| **API** (zentropy-api) | `./scripts/deploy-api.sh` | `scripts/deploy-api.sh` |
+| **Librarian** (librarian-service) | `./scripts/deploy-librarian.sh` | `scripts/deploy-librarian.sh` |
+| **Web** (Firebase Hosting) | `./scripts/deploy-web.sh` | `scripts/deploy-web.sh` |
 
 **腳本內建安全機制**：
 - 自動檢查 GCP project 是否為 `zentropy-4f7a5`，不是則自動切換

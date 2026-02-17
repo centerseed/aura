@@ -4,6 +4,7 @@ import '../../core/di/providers.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/task.dart';
 import '../../application/use_cases/update_sub_item_use_case.dart';
+import 'coach_provider.dart';
 import 'dashboard_provider.dart';
 
 // ==================== Cache-Based Task Providers ====================
@@ -90,27 +91,37 @@ class DailyProgress {
   double get percentage => total > 0 ? completed / total : 0.0;
 }
 
-/// 每日進度 Provider
+/// 每日進度 Provider — 以 Daily Plan 為唯一真實來源
 final dailyProgressProvider = Provider<DailyProgress>((ref) {
-  final activeState = ref.watch(activeTasksProvider);
-  final completedAsync = ref.watch(completedTodayTasksProvider);
+  final coachState = ref.watch(coachBriefingProvider);
+  final plan = coachState.plan;
 
-  // 從 FutureProvider 解包 completedToday
-  final completed = completedAsync.maybeWhen(
-    data: (state) => state.tasks?.length ?? 0,
-    orElse: () => 0,
-  );
-
-  // Active Today includes ONLY Due Today (to match Web logic, excluding Overdue)
-  int activeToday = 0;
-  if (activeState.hasData) {
-    activeToday = activeState.tasks!.where((t) => t.isToday).length;
+  if (plan == null) {
+    // 沒有 plan 時，fallback 到舊邏輯
+    final activeState = ref.watch(activeTasksProvider);
+    final completedAsync = ref.watch(completedTodayTasksProvider);
+    final completed = completedAsync.maybeWhen(
+      data: (state) => state.tasks?.length ?? 0,
+      orElse: () => 0,
+    );
+    int activeToday = 0;
+    if (activeState.hasData) {
+      activeToday = activeState.tasks!.where((t) => t.isToday).length;
+    }
+    return DailyProgress(
+      completed: completed,
+      total: completed + activeToday,
+      isRefreshing: activeState.isRefreshing,
+    );
   }
+
+  final todayItems = plan.items.where((i) => i.status == 'today').toList();
+  final completed = plan.items.where((i) => i.completed).length;
 
   return DailyProgress(
     completed: completed,
-    total: completed + activeToday,
-    isRefreshing: activeState.isRefreshing,
+    total: todayItems.length,
+    isRefreshing: coachState.isLoading,
   );
 });
 
@@ -249,6 +260,8 @@ class TaskController extends StateNotifier<TaskControllerState> {
         state = const TaskControllerState(isLoading: false);
         // 變更後觸發靜默刷新
         silentRefresh();
+        // 通知 coach provider 重新載入 plan + briefing
+        _ref.read(coachBriefingProvider.notifier).loadLatest();
       },
     );
   }
@@ -283,4 +296,6 @@ Future<void> silentRefreshTasks(WidgetRef ref) async {
   await repo.silentRefresh();
   // 同時刷新 Dashboard（用於 OverviewTab）
   ref.invalidate(dashboardProvider);
+  // 同時刷新 Coach plan + briefing
+  ref.read(coachBriefingProvider.notifier).loadLatest();
 }

@@ -28,6 +28,7 @@ export function formatPlanItem(item: DailyPlanItemData) {
     pinned: item.pinned,
     deferred: item.deferred,
     status: item.status,
+    task_name: item.taskName,
     user_adjusted: item.userAdjusted,
     adjusted_at: item.adjustedAt instanceof Date
       ? item.adjustedAt.toISOString()

@@ -16,14 +16,39 @@ interface SyncParams {
   timezone?: string
 }
 
+/**
+ * 根據 dueDate 決定 plan item 的 status
+ */
+function determineItemStatus(
+  dueDateOnly: Date,
+  todayStart: Date
+): 'today' | 'tomorrow' | 'overflow' {
+  const tomorrow = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+
+  if (dueDateOnly.getTime() === todayStart.getTime()) {
+    return 'today'
+  } else if (dueDateOnly.getTime() === tomorrow.getTime()) {
+    return 'tomorrow'
+  } else {
+    return 'overflow'
+  }
+}
+
 export async function syncPlanOnTaskChange(params: SyncParams): Promise<void> {
   const { userId, taskId, subTaskId, dueDate, timezone = 'Asia/Taipei' } = params
+  console.log('[PlanSync] called:', { taskId, subTaskId, dueDate, timezone })
 
   // 1. 無 dueDate 則不處理
-  if (!dueDate) return
+  if (!dueDate) {
+    console.log('[PlanSync] skip: no dueDate')
+    return
+  }
 
   const dueDateObj = typeof dueDate === 'string' ? new Date(dueDate) : dueDate
-  if (isNaN(dueDateObj.getTime())) return
+  if (isNaN(dueDateObj.getTime())) {
+    console.log('[PlanSync] skip: invalid dueDate')
+    return
+  }
 
   // 2. 判斷 dueDate 是否在 3 天內
   const now = new Date()
@@ -31,19 +56,39 @@ export async function syncPlanOnTaskChange(params: SyncParams): Promise<void> {
   const threeDaysLater = new Date(todayStart.getTime() + 3 * 24 * 60 * 60 * 1000)
   const dueDateOnly = toDateOnly(dueDateObj, timezone)
 
-  if (dueDateOnly < todayStart || dueDateOnly >= threeDaysLater) return
+  console.log('[PlanSync] dates:', { todayStart: todayStart.toISOString(), dueDateOnly: dueDateOnly.toISOString(), threeDaysLater: threeDaysLater.toISOString() })
+
+  if (dueDateOnly < todayStart || dueDateOnly >= threeDaysLater) {
+    console.log('[PlanSync] skip: dueDate out of 3-day range')
+    return
+  }
 
   // 3. 查今天的 plan
   const repo = new PrismaDailyPlanRepository()
   const plan = await repo.findByDate(userId, todayStart)
-  if (!plan) return
+  if (!plan) {
+    console.log('[PlanSync] skip: no plan found for today')
+    return
+  }
+  console.log('[PlanSync] found plan:', plan.id, 'with', plan.items.length, 'items')
 
   // 4. 檢查是否已有此 task/subtask
-  const alreadyExists = plan.items.some(item =>
+  const existingItem = plan.items.find(item =>
     item.taskId === taskId &&
     (subTaskId ? item.subTaskId === subTaskId : !item.subTaskId)
   )
-  if (alreadyExists) return
+  if (existingItem) {
+    // 已存在：更新 status（due_date 可能變了）
+    const finalDueDateOnly = toDateOnly(dueDateObj, timezone)
+    const newStatus = determineItemStatus(finalDueDateOnly, todayStart)
+    if (existingItem.status !== newStatus && !existingItem.userAdjusted) {
+      console.log('[PlanSync] updating existing item status:', existingItem.id, existingItem.status, '→', newStatus)
+      await repo.updateItem(existingItem.id, { status: newStatus })
+    } else {
+      console.log('[PlanSync] skip: task already in plan with correct status')
+    }
+    return
+  }
 
   // 5. 查 task 資訊
   const task = await prisma.task.findUnique({
@@ -82,7 +127,11 @@ export async function syncPlanOnTaskChange(params: SyncParams): Promise<void> {
     ? Math.max(...plan.items.map(i => i.order))
     : -1
 
-  // 7. 插入 overflow item
+  // 7. 根據最終的 dueDate 決定 status（考慮 subtask 可能覆蓋 task 的 due_date）
+  const finalDueDateOnly = itemDueDate ? toDateOnly(itemDueDate, timezone) : dueDateOnly
+  const itemStatus = determineItemStatus(finalDueDateOnly, todayStart)
+  console.log('[PlanSync] inserting item for task:', taskId, 'with status:', itemStatus)
+
   await repo.addItem(plan.id, {
     taskId,
     subTaskId: subTaskId ?? null,
@@ -93,6 +142,6 @@ export async function syncPlanOnTaskChange(params: SyncParams): Promise<void> {
     dueDate: itemDueDate,
     order: maxOrder + 1,
     reasoning: null,
-    status: 'overflow',
+    status: itemStatus,
   })
 }

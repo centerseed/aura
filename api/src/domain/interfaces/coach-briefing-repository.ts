@@ -72,4 +72,6 @@ export interface ICoachBriefingRepository {
   findByDate(userId: string, type: BriefingType, date: Date): Promise<CoachBriefingData | null>
 
   upsertByDate(data: CreateCoachBriefingData): Promise<CoachBriefingData>
+
+  removeTaskFromBriefing(userId: string, taskId: string): Promise<void>
 }

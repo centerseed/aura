@@ -128,6 +128,15 @@ export class UpdateSubItemUseCase {
     // 5. 雙寫：同步到 JSON
     await syncSubTasksToJson(request.taskId)
 
+    // 5.5. SubTask 完成連動：同步更新對應的 DailyPlanItem
+    if (request.completed !== undefined) {
+      await this.syncPlanItemCompletion(
+        request.taskId,
+        request.subItemId,
+        request.completed
+      )
+    }
+
     // 6. 計算統計資訊
     const meta = await getSubTasksMeta(request.taskId)
     const allCompleted = meta.completed === meta.total && meta.total > 0
@@ -148,6 +157,92 @@ export class UpdateSubItemUseCase {
       meta,
       taskCompleted: allCompleted,
       message: 'Sub-item updated successfully',
+    }
+  }
+
+  /**
+   * 同步更新對應的 DailyPlanItem 的完成狀態
+   *
+   * @param taskId - Task ID
+   * @param subTaskId - SubTask ID
+   * @param completed - 是否完成
+   */
+  private async syncPlanItemCompletion(
+    taskId: string,
+    subTaskId: string,
+    completed: boolean,
+    taskContent?: string
+  ): Promise<void> {
+    try {
+      // 查找對應的 plan item
+      const planItem = await prisma.dailyPlanItem.findFirst({
+        where: {
+          task_id: taskId,
+          sub_task_id: subTaskId,
+        },
+      })
+
+      if (planItem) {
+        // 更新 plan item 的完成狀態
+        await prisma.dailyPlanItem.update({
+          where: { id: planItem.id },
+          data: {
+            completed,
+            completed_at: completed ? new Date() : null,
+          },
+        })
+      } else if (completed) {
+        // Plan 裡沒有對應 item，自動創建一個已完成的 plan item
+        const today = new Date()
+        const todayDate = today.toISOString().slice(0, 10)
+
+        // 需要 userId 來找 plan，從 task 查
+        const taskRecord = await prisma.task.findUnique({
+          where: { id: taskId },
+          select: {
+            user_id: true,
+            content: true,
+            product: { select: { name: true, area: { select: { name: true } } } },
+          },
+        })
+
+        if (taskRecord) {
+          const todayPlan = await prisma.dailyPlan.findFirst({
+            where: {
+              user_id: taskRecord.user_id,
+              plan_date: todayDate,
+            },
+          })
+
+          if (todayPlan) {
+            // 查 sub_task content
+            const subTask = await prisma.subTask.findUnique({
+              where: { id: subTaskId },
+              select: { content: true },
+            })
+
+            await prisma.dailyPlanItem.create({
+              data: {
+                plan_id: todayPlan.id,
+                task_id: taskId,
+                sub_task_id: subTaskId,
+                item_type: 'task',
+                content: subTask?.content ?? taskContent ?? '',
+                area_name: taskRecord.product?.area?.name ?? '',
+                product_name: taskRecord.product?.name ?? '',
+                estimated_minutes: 30,
+                status: 'today',
+                completed: true,
+                completed_at: new Date(),
+                order: 9999,
+              },
+            })
+          }
+        }
+      }
+    } catch (error) {
+      // 非關鍵操作，失敗不影響主流程
+      console.error('[UpdateSubItemUseCase] Failed to sync plan item:', error)
     }
   }
 

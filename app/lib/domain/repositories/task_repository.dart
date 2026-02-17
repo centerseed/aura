@@ -29,12 +29,14 @@ abstract class TaskRepository {
 
   Future<Either<Failure, void>> deleteTask(String taskId);
 
-  /// 更新 sub-item (支援 completed 和 content)
+  /// 更新 sub-item (支援 completed、content、startDate 和 dueDate)
   Future<Either<Failure, void>> updateSubItem(
     String taskId,
     String subItemId, {
     bool? completed,
     String? content,
+    DateTime? startDate,
+    DateTime? dueDate,
   });
 
   /// 新增 sub-item

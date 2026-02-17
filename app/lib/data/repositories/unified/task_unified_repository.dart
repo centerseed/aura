@@ -195,6 +195,8 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
     String subItemId, {
     bool? completed,
     String? content,
+    DateTime? startDate,
+    DateTime? dueDate,
   }) async {
     try {
       final requestBody = <String, dynamic>{};
@@ -203,6 +205,12 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
       }
       if (content != null) {
         requestBody['content'] = content;
+      }
+      if (startDate != null) {
+        requestBody['start_date'] = TaskRequestBuilder.toDateOnlyUtcNoon(startDate);
+      }
+      if (dueDate != null) {
+        requestBody['due_date'] = TaskRequestBuilder.toDateOnlyUtcNoon(dueDate);
       }
 
       await _apiClient.updateSubItem(taskId, subItemId, requestBody);

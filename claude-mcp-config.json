@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "zentropy": {
+      "url": "https://zentropy-api-894512935237.asia-east1.run.app/mcp",
+      "transport": "sse"
+    }
+  }
+}

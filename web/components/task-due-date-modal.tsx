@@ -11,6 +11,7 @@ import { zhTW } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
+import { isWithinThreeDays, toDateOnlyISOString } from "@/lib/date-utils";
 
 interface TaskDueDateModalProps {
   isOpen: boolean;
@@ -69,7 +70,7 @@ export function TaskDueDateModal({
         },
         body: JSON.stringify({
           taskId,
-          [fieldName]: newDate?.toISOString() || null,
+          [fieldName]: newDate ? toDateOnlyISOString(newDate) : null,
         }),
       });
 
@@ -79,6 +80,16 @@ export function TaskDueDateModal({
       }
 
       onSuccess();
+
+      // 🔔 如果更新 due_date 到三天內，通知 TodayOverviewSheet 刷新 plan
+      if (dateType === "due" && newDate && isWithinThreeDays(newDate)) {
+        // 延遲觸發，確保 Backend plan-sync 已完成
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("plan-updated"));
+          console.log("[TaskDueDateModal] plan-updated event dispatched");
+        }, 300);
+      }
+
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "更新失敗");
