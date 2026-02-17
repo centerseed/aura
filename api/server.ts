@@ -15,8 +15,17 @@
  */
 
 import { createServer as createHttpServer } from "node:http";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { parse } from "node:url";
 import next from "next";
+
+let versionInfo = { api: 0, mcp: 0 };
+try {
+  versionInfo = JSON.parse(readFileSync(join(__dirname, "version.json"), "utf-8"));
+} catch {
+  console.warn("[server] version.json not found, using default version 0");
+}
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { createMcpServer } from "./src/mcp/server";
@@ -91,6 +100,7 @@ async function main() {
           JSON.stringify({
             status: "ok",
             service: "zentropy-api",
+            version: versionInfo,
             mcp: true,
             activeSessions: mcpSessions.size,
             timestamp: new Date().toISOString(),
@@ -152,6 +162,26 @@ async function main() {
         return;
       }
 
+      // ── OAuth root-level redirects (MCP SDK uses /authorize and /token) ──
+      if (pathname === "/authorize") {
+        const qs = parsedUrl.search || "";
+        res.writeHead(302, { Location: `/api/oauth/mcp/authorize${qs}` });
+        res.end();
+        return;
+      }
+      if (pathname === "/token" && req.method === "POST") {
+        // Proxy to Next.js route
+        const nextUrl = parse(`/api/oauth/mcp/token${parsedUrl.search || ""}`, true);
+        await handleNextRequest(req, res, nextUrl);
+        return;
+      }
+      if (pathname === "/register") {
+        // Dynamic client registration not supported
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "registration_not_supported" }));
+        return;
+      }
+
       // ── OAuth Protected Resource Metadata (RFC 9728, required by MCP clients) ──
       if (pathname === "/.well-known/oauth-protected-resource") {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || `http://${hostname}:${port}`;
@@ -180,8 +210,8 @@ async function main() {
         res.end(
           JSON.stringify({
             issuer: baseUrl,
-            authorization_endpoint: `${baseUrl}/api/oauth/mcp/authorize`,
-            token_endpoint: `${baseUrl}/api/oauth/mcp/token`,
+            authorization_endpoint: `${baseUrl}/authorize`,
+            token_endpoint: `${baseUrl}/token`,
             scopes_supported: [
               "read:tasks",
               "read:knowledge",

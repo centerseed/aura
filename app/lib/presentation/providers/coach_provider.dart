@@ -71,7 +71,7 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
   /// 根據時間自動判斷應該顯示晨報還是晚報
   BriefingType get currentBriefingType {
     final hour = DateTime.now().hour;
-    return (hour >= 6 && hour < 14) ? BriefingType.morning : BriefingType.evening;
+    return (hour >= 21) ? BriefingType.evening : BriefingType.morning;
   }
 
   /// 載入最新的 briefing + plan（三階段：今日 → 昨日快取 → 骨架屏+自動生成）
@@ -253,5 +253,5 @@ final coachBriefingProvider =
 /// 當前應顯示的 briefing 類型
 final currentBriefingTypeProvider = Provider<BriefingType>((ref) {
   final hour = DateTime.now().hour;
-  return (hour >= 6 && hour < 14) ? BriefingType.morning : BriefingType.evening;
+  return (hour >= 21) ? BriefingType.evening : BriefingType.morning;
 });

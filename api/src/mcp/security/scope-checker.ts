@@ -24,6 +24,17 @@ const TOOL_SCOPE_MAP: Record<string, OAuthScope[]> = {
   capture_thought: ["write:inbox"],
   append_to_knowledge: ["write:knowledge"],
   query_memory: ["read:tasks"],
+  // v2 tools
+  capture: ["write:inbox"],
+  report_done: ["write:inbox"],
+  search: ["read:tasks"],
+  save_knowledge: ["write:knowledge"],
+  // dev tools
+  list_tasks: ["read:tasks"],
+  create_task: ["write:inbox"],
+  update_task: ["write:inbox"],
+  list_products: ["read:tasks"],
+  get_plan: ["read:tasks"],
 };
 
 /** Mapping of resource URI patterns to required scopes */

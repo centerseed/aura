@@ -185,7 +185,20 @@ if [ ! -f "Dockerfile" ]; then
     exit 1
 fi
 
-# 4. 建置並推送 Docker 映像
+# 4. 自動遞增版號
+VERSION_FILE="$API_DIR/version.json"
+if [ -f "$VERSION_FILE" ]; then
+    OLD_API_VER=$(python3 -c "import json; print(json.load(open('$VERSION_FILE'))['api'])")
+    OLD_MCP_VER=$(python3 -c "import json; print(json.load(open('$VERSION_FILE'))['mcp'])")
+    NEW_API_VER=$((OLD_API_VER + 1))
+    NEW_MCP_VER=$((OLD_MCP_VER + 1))
+    echo "{\"api\": $NEW_API_VER, \"mcp\": $NEW_MCP_VER}" > "$VERSION_FILE"
+    log_success "版號更新: api $OLD_API_VER → $NEW_API_VER, mcp $OLD_MCP_VER → $NEW_MCP_VER"
+else
+    log_warning "找不到 version.json，跳過版號更新"
+fi
+
+# 5. 建置並推送 Docker 映像
 IMAGE_REGISTRY="asia-east1-docker.pkg.dev"
 IMAGE_REPO="zentropy-images"
 IMAGE_TAG="${IMAGE_REGISTRY}/${PROJECT_ID}/${IMAGE_REPO}/${SERVICE_NAME}:latest"
@@ -200,7 +213,7 @@ gcloud builds submit \
 
 log_success "Docker 映像建置完成"
 
-# 5. 部署到 Cloud Run
+# 6. 部署到 Cloud Run
 log_info "部署到 Cloud Run..."
 
 # 基本配置
@@ -233,7 +246,7 @@ DEPLOY_ARGS=(
 
     # Node.js 環境變數
     # NEXT_PUBLIC_API_URL 必須指向 API Backend，用於 OAuth Discovery metadata
-    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://zentropy-api-894512935237.asia-east1.run.app"
+    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://zentropy-api-894512935237.asia-east1.run.app,NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAJYyZ1wfUHyxaCpI11Z2c3SH44Qi7lg-E,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5"
 )
 
 if [ "$ENVIRONMENT" = "staging" ]; then
@@ -246,7 +259,7 @@ gcloud run deploy "${SERVICE_NAME}" "${DEPLOY_ARGS[@]}"
 
 log_success "部署完成！"
 
-# 6. 清理舊的 Docker images (只保留最新兩個)
+# 7. 清理舊的 Docker images (只保留最新兩個)
 log_info "清理舊的 Docker images..."
 
 IMAGE_PATH="${IMAGE_REGISTRY}/${PROJECT_ID}/${IMAGE_REPO}/${SERVICE_NAME}"
@@ -291,7 +304,7 @@ fi
 
 echo ""
 
-# 7. 取得服務 URL
+# 8. 取得服務 URL
 echo ""
 log_info "取得服務資訊..."
 

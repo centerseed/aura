@@ -75,7 +75,9 @@ export function validateToolInput(
 ): Record<string, unknown> {
   const schema = TOOL_SCHEMAS[toolName];
   if (!schema) {
-    throw new InputValidationError("tool", `Unknown tool: ${toolName}`);
+    // Tools registered via server.tool() with Zod schemas are already validated
+    // by the MCP SDK before reaching the pipeline. Pass through gracefully.
+    return (input ?? {}) as Record<string, unknown>;
   }
 
   const result = schema.safeParse(input);

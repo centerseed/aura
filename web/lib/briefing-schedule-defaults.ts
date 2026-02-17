@@ -12,7 +12,7 @@ export const DEFAULT_BRIEFING_SCHEDULE: BriefingSchedule = {
   },
   evening: {
     enabled: true,
-    windowStart: 19,
+    windowStart: 21,
     windowEnd: 24,
   },
 }

@@ -39,6 +39,13 @@ import { handleQueryMemory } from "./tools/query-memory";
 import { handleCapture } from "./tools/capture";
 import { handleReportDone } from "./tools/report-done";
 
+// Tools (dev dashboard)
+import { handleListTasks } from "./tools/list-tasks";
+import { handleCreateTask } from "./tools/create-task";
+import { handleUpdateTask } from "./tools/update-task";
+import { handleListProducts } from "./tools/list-products";
+import { handleGetPlan } from "./tools/get-plan";
+
 // Resources (legacy)
 import { readKnowledgeAsset } from "./resources/knowledge-assets";
 import { readRollingSaga } from "./resources/rolling-sagas";
@@ -257,7 +264,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .string()
         .min(1)
         .max(10_000)
-        .describe("Content to capture (max 10,000 chars)"),
+        .describe("要記錄的內容，建議精簡扼要（1-3 句話，100 字以內最佳）。系統會用 AI 分類，過長的內容可能導致處理失敗。"),
       source: z
         .string()
         .describe("Source of the content: Claude Code, Cursor, Claude Desktop, or API"),
@@ -352,7 +359,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .string()
         .min(1)
         .max(50_000)
-        .describe("Content (free text or JSON structured content, max 50,000 chars)"),
+        .describe("要記錄的內容，建議精簡扼要（1-3 句話，100 字以內最佳）。系統會用 AI 分類，過長的內容可能導致處理失敗。支援純文字或 JSON 結構化內容。"),
       source: z
         .string()
         .describe("Source: Claude Code, Cursor, Claude Desktop, or API"),
@@ -477,6 +484,140 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         input as Record<string, unknown>,
         ["write:knowledge"],
         handleAppendToKnowledge, // reuse same handler
+        extra.authInfo,
+      );
+    },
+  );
+
+  // ─── Register Dev Dashboard Tools ──────────────────────────
+
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "list_tasks",
+    "查看任務清單 — 列出指定狀態的任務（精簡版，適合 Claude Code context）。\n\n" +
+      "回傳格式: { tasks: [{ id, title, status, area, product, topic, due_date, sub_items_progress }], total }\n" +
+      "area/product/topic 只回傳名稱字串（非完整物件）。sub_items_progress 格式為 '完成數/總數'（如 '2/3'）。",
+    {
+      status: z
+        .enum(["INBOX", "ACTIVE", "MAINTAIN", "REFERENCE", "ARCHIVE"])
+        .optional()
+        .describe("Filter by task status"),
+    },
+    async (input, extra) => {
+      return executeToolPipeline(
+        "list_tasks",
+        input as Record<string, unknown>,
+        ["read:tasks"],
+        handleListTasks,
+        extra.authInfo,
+      );
+    },
+  );
+
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "create_task",
+    "建立代辦事項 — 快速新增任務到 Zentropy。\n\n" +
+      "不指定 status 時預設為 INBOX。回傳格式: { id, title, status, message }",
+    {
+      content: z
+        .string()
+        .min(1)
+        .max(5000)
+        .describe("任務內容"),
+      product_id: z
+        .string()
+        .optional()
+        .describe("Target product ID"),
+      topic_id: z
+        .string()
+        .optional()
+        .describe("Target topic ID"),
+      status: z
+        .enum(["INBOX", "ACTIVE", "MAINTAIN", "REFERENCE"])
+        .optional()
+        .describe("Initial status (default: INBOX)"),
+      due_date: z
+        .string()
+        .optional()
+        .describe("Due date in YYYY-MM-DD format"),
+    },
+    async (input, extra) => {
+      return executeToolPipeline(
+        "create_task",
+        input as Record<string, unknown>,
+        ["write:inbox"],
+        handleCreateTask,
+        extra.authInfo,
+      );
+    },
+  );
+
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "update_task",
+    "更新任務 — 修改任務狀態或內容。至少需提供 status 或 content 其中之一。\n\n" +
+      "回傳格式: { id, title, status, message }",
+    {
+      task_id: z
+        .string()
+        .min(1)
+        .describe("Task ID to update"),
+      status: z
+        .enum(["INBOX", "ACTIVE", "MAINTAIN", "REFERENCE", "ARCHIVE"])
+        .optional()
+        .describe("New status"),
+      content: z
+        .string()
+        .max(5000)
+        .optional()
+        .describe("Updated content"),
+    },
+    async (input, extra) => {
+      return executeToolPipeline(
+        "update_task",
+        input as Record<string, unknown>,
+        ["write:inbox"],
+        handleUpdateTask,
+        extra.authInfo,
+      );
+    },
+  );
+
+  server.tool(
+    "list_products",
+    "查看專案結構 — 列出所有 Area/Product/Topic 結構（精簡版）。\n\n" +
+      "回傳格式: { products: [{ id, name, area, status, topics: [{ id, name }] }], total }\n" +
+      "area 只回傳名稱字串。用於取得 product_id/topic_id 以供 create_task 使用。",
+    {},
+    async (input, extra) => {
+      return executeToolPipeline(
+        "list_products",
+        input as Record<string, unknown>,
+        ["read:tasks"],
+        handleListProducts,
+        extra.authInfo,
+      );
+    },
+  );
+
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "get_plan",
+    "取得今日計畫 — Coach 生成的每日行動計畫（精簡版）。不帶 date 參數時預設為今天。\n\n" +
+      "回傳格式: { date, coach_message, items: [{ content, product, estimated_minutes, completed, task_id }], total }",
+    {
+      date: z
+        .string()
+        .optional()
+        .describe("Date in YYYY-MM-DD format (default: today)"),
+    },
+    async (input, extra) => {
+      return executeToolPipeline(
+        "get_plan",
+        input as Record<string, unknown>,
+        ["read:tasks"],
+        handleGetPlan,
         extra.authInfo,
       );
     },

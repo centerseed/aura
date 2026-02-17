@@ -188,7 +188,7 @@ export function TodayOverviewSheet({
   const [morningBriefing, setMorningBriefing] = useState<BriefingData | null>(null);
   const [eveningBriefing, setEveningBriefing] = useState<BriefingData | null>(null);
   const [activeTab, setActiveTab] = useState<"MORNING" | "EVENING">(
-    new Date().getHours() < 14 ? "MORNING" : "EVENING"
+    new Date().getHours() >= 21 ? "EVENING" : "MORNING"
   );
   const [isLoadingBriefing, setIsLoadingBriefing] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);

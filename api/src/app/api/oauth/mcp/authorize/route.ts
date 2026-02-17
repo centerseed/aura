@@ -177,7 +177,7 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
       <li>寫入想法到 Inbox</li>
       <li>寫入知識庫</li>
     </ul>
-    <button id="signInBtn" onclick="startSignIn()">使用 Google 帳號登入並授權</button>
+    <button id="signInBtn" disabled>載入中...</button>
     <div id="spinner" class="spinner">處理中...</div>
     <p id="error" class="error"></p>
   </div>
@@ -192,11 +192,15 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
     const app = initializeApp(pageData.firebaseConfig);
     const auth = getAuth(app);
 
-    window.startSignIn = async function() {
-      const btn = document.getElementById("signInBtn");
-      const spinner = document.getElementById("spinner");
-      const errorEl = document.getElementById("error");
+    const btn = document.getElementById("signInBtn");
+    const spinner = document.getElementById("spinner");
+    const errorEl = document.getElementById("error");
 
+    // Enable button only after module is loaded
+    btn.textContent = "使用 Google 帳號登入並授權";
+    btn.disabled = false;
+
+    btn.addEventListener("click", async () => {
       btn.disabled = true;
       spinner.style.display = "block";
       errorEl.textContent = "";
@@ -231,7 +235,7 @@ function buildSignInPage(callbackUrl: string, encodedState: string): string {
         errorEl.textContent = "登入失敗: " + (err.message || "Unknown error");
         console.error("Sign-in error:", err);
       }
-    };
+    });
   </script>
 </body>
 </html>`;

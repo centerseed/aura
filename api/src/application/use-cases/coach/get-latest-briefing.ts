@@ -15,6 +15,7 @@ import { PrismaCoachBriefingRepository } from '@/infrastructure/repositories/pri
 import { GenerateBriefingUseCase } from '@/application/use-cases/coach/generate-briefing'
 import { ValidationException } from '@/lib/api-response'
 import { resolveTimezone, toDateOnly } from '@/lib/timezone-utils'
+import { prisma } from '@/lib/db'
 
 // ============================================================================
 // DTOs
@@ -56,7 +57,8 @@ export class GetLatestBriefingUseCase {
     )
 
     if (todayBriefing) {
-      return { briefing: todayBriefing }
+      const refreshed = await this.refreshTaskStatuses(todayBriefing)
+      return { briefing: refreshed }
     }
 
     // 4. 今天沒有 → 自動生成
@@ -73,6 +75,70 @@ export class GetLatestBriefingUseCase {
       // 生成失敗時，fallback 到最新的（避免白屏）
       const fallback = await this.repository.findLatest(request.userId, request.type)
       return { briefing: fallback }
+    }
+  }
+
+  private async refreshTaskStatuses(briefing: CoachBriefingData): Promise<CoachBriefingData> {
+    const taskIds = [
+      ...briefing.overdueTasks.map(t => t.id),
+      ...briefing.approachingTasks.map(t => t.id),
+      ...briefing.remainingTasks.map(t => t.id),
+    ]
+    if (taskIds.length === 0) return briefing
+
+    const currentStatuses = await prisma.task.findMany({
+      where: { id: { in: taskIds } },
+      select: { id: true, status: true },
+    })
+
+    const statusMap = new Map(currentStatuses.map(t => [t.id, t.status]))
+    const completedIds = new Set<string>()
+
+    const isCompleted = (taskId: string) => {
+      const status = statusMap.get(taskId)
+      return !status || status === 'ARCHIVE'
+    }
+
+    const filteredOverdue = briefing.overdueTasks.filter(task => {
+      if (isCompleted(task.id)) {
+        completedIds.add(task.id)
+        return false
+      }
+      return true
+    })
+
+    const filteredApproaching = briefing.approachingTasks.filter(task => {
+      if (isCompleted(task.id)) {
+        completedIds.add(task.id)
+        return false
+      }
+      return true
+    })
+
+    const filteredRemaining = briefing.remainingTasks.filter(task => {
+      if (isCompleted(task.id)) {
+        completedIds.add(task.id)
+        return false
+      }
+      return true
+    })
+
+    // 合併新完成的任務（去重）
+    const existingCompletedIds = new Set(briefing.completedTasks.map(t => t.id))
+    const newlyCompleted = [
+      ...briefing.overdueTasks,
+      ...briefing.approachingTasks,
+      ...briefing.remainingTasks,
+    ]
+      .filter(t => completedIds.has(t.id) && !existingCompletedIds.has(t.id))
+      .map(t => ({ ...t, status: 'completed' }))
+
+    return {
+      ...briefing,
+      overdueTasks: filteredOverdue,
+      approachingTasks: filteredApproaching,
+      remainingTasks: filteredRemaining,
+      completedTasks: [...briefing.completedTasks, ...newlyCompleted],
     }
   }
 

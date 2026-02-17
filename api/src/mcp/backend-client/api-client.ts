@@ -105,6 +105,51 @@ export class BackendApiClient {
     return this.get("/api/me", userId);
   }
 
+  async listTasks(
+    userId: string,
+    params?: { status?: string },
+  ): Promise<unknown> {
+    const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : "";
+    return this.get(`/api/tasks${query}`, userId);
+  }
+
+  async createTask(
+    userId: string,
+    params: {
+      content: string;
+      product_id?: string;
+      topic_id?: string;
+      status?: string;
+      due_date?: string;
+    },
+  ): Promise<unknown> {
+    return this.post("/api/tasks", userId, params);
+  }
+
+  async updateTask(
+    userId: string,
+    params: {
+      task_id: string;
+      status?: string;
+      content?: string;
+    },
+  ): Promise<unknown> {
+    const { task_id, ...body } = params;
+    return this.patch(`/api/tasks/${encodeURIComponent(task_id)}`, userId, body);
+  }
+
+  async listProducts(userId: string): Promise<unknown> {
+    return this.get("/api/products", userId);
+  }
+
+  async getPlan(
+    userId: string,
+    params?: { date?: string },
+  ): Promise<unknown> {
+    const query = params?.date ? `?date=${encodeURIComponent(params.date)}` : "";
+    return this.get(`/api/coach/plan${query}`, userId);
+  }
+
   /**
    * Build auth headers for internal API calls.
    *
@@ -150,7 +195,30 @@ export class BackendApiClient {
       throw new BackendApiError(response.status, text);
     }
 
-    return response.json() as Promise<T>;
+    return this.unwrapResponse<T>(await response.json());
+  }
+
+  private async patch<T>(
+    path: string,
+    userId: string,
+    body: unknown,
+  ): Promise<T> {
+    const url = `${this.baseUrl}${path}`;
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...this.getInternalAuthHeaders(userId),
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "Unknown error");
+      throw new BackendApiError(response.status, text);
+    }
+
+    return this.unwrapResponse<T>(await response.json());
   }
 
   private async get<T>(path: string, userId: string): Promise<T> {
@@ -167,6 +235,22 @@ export class BackendApiClient {
       throw new BackendApiError(response.status, text);
     }
 
-    return response.json() as Promise<T>;
+    return this.unwrapResponse<T>(await response.json());
+  }
+
+  /**
+   * Unwrap ApiResponseBuilder envelope { success, data } if present.
+   */
+  private unwrapResponse<T>(json: unknown): T {
+    if (
+      json !== null &&
+      typeof json === "object" &&
+      "success" in json &&
+      (json as Record<string, unknown>).success === true &&
+      "data" in json
+    ) {
+      return (json as Record<string, unknown>).data as T;
+    }
+    return json as T;
   }
 }
