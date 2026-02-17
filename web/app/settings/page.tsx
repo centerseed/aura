@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, User, Mail, Shield, Loader2, ArrowLeft, Wrench, RotateCcw, Eye, Link2, Calendar, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { LogOut, User, Mail, Shield, Loader2, ArrowLeft, Wrench, RotateCcw, Eye, Link2, Calendar, CheckCircle2, XCircle, AlertCircle, Plug, Copy, Check } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-client";
 import {
   OAuthProvider,
@@ -46,6 +46,8 @@ function SettingsContent() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [oauthMessage, setOauthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [userToken, setUserToken] = useState<string>('');
+
+  const [mcpConfigCopied, setMcpConfigCopied] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
@@ -140,6 +142,33 @@ function SettingsContent() {
       setCalendarStatus(null);
     } finally {
       setLoadingCalendar(false);
+    }
+  };
+
+  // 複製 MCP 設定到剪貼簿
+  const handleCopyMcpConfig = async () => {
+    const config = {
+      "mcpServers": {
+        "zentropy": {
+          "url": `${API_BASE_URL}/mcp`,
+          "transport": "streamableHttp",
+          "oauth": {
+            "authorizationUrl": `${API_BASE_URL}/authorize`,
+            "tokenUrl": `${API_BASE_URL}/token`,
+            "clientId": "claude-code",
+            "scopes": ["read:tasks", "write:inbox", "read:knowledge"]
+          }
+        }
+      }
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      setMcpConfigCopied(true);
+      setTimeout(() => setMcpConfigCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy config:', error);
+      alert('複製失敗，請手動複製下方設定');
     }
   };
 
@@ -532,6 +561,113 @@ function SettingsContent() {
               </AlertDescription>
             </Alert>
           )}
+
+          {/* MCP (Model Context Protocol) 設定 */}
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle className="flex items-center text-white">
+                <Plug className="w-5 h-5 mr-2 text-purple-400" />
+                MCP Integration
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                在 Claude Code 中連接 Zentropy MCP Server，讓 AI 直接存取你的任務資料
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* 功能說明 */}
+              <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
+                <p className="text-slate-300 text-sm mb-3">
+                  連接後，Claude Code 可以：
+                </p>
+                <ul className="space-y-2 text-sm text-slate-400">
+                  <li className="flex items-start">
+                    <span className="text-purple-400 mr-2">✓</span>
+                    查看你的任務清單和今日計畫
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-purple-400 mr-2">✓</span>
+                    新增任務到 Inbox
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-purple-400 mr-2">✓</span>
+                    搜尋知識庫內容
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-purple-400 mr-2">✓</span>
+                    查看專案結構（Areas/Products/Topics）
+                  </li>
+                </ul>
+              </div>
+
+              {/* 設定步驟 */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-white">設定步驟：</p>
+                <ol className="space-y-3 text-sm text-slate-300">
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 font-bold">1.</span>
+                    <div>
+                      打開 Claude Code 設定檔（<code className="bg-slate-800 px-1 py-0.5 rounded text-xs">~/.claude/config.json</code>）
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 font-bold">2.</span>
+                    <div>複製下方設定並貼到 <code className="bg-slate-800 px-1 py-0.5 rounded text-xs">mcpServers</code> 區塊</div>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 font-bold">3.</span>
+                    <div>重新啟動 Claude Code，首次使用時會自動進行 OAuth 授權</div>
+                  </li>
+                </ol>
+              </div>
+
+              {/* 設定檔內容 */}
+              <div className="relative">
+                <pre className="bg-slate-950 border border-slate-700 rounded-lg p-4 text-xs text-slate-300 overflow-x-auto">
+{`{
+  "mcpServers": {
+    "zentropy": {
+      "url": "${API_BASE_URL}/mcp",
+      "transport": "streamableHttp",
+      "oauth": {
+        "authorizationUrl": "${API_BASE_URL}/authorize",
+        "tokenUrl": "${API_BASE_URL}/token",
+        "clientId": "claude-code",
+        "scopes": [
+          "read:tasks",
+          "write:inbox",
+          "read:knowledge"
+        ]
+      }
+    }
+  }
+}`}
+                </pre>
+                <Button
+                  onClick={handleCopyMcpConfig}
+                  size="sm"
+                  variant="outline"
+                  className="absolute top-2 right-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                >
+                  {mcpConfigCopied ? (
+                    <>
+                      <Check className="w-3 h-3 mr-1" />
+                      已複製
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 mr-1" />
+                      複製設定
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* 支援的客戶端 */}
+              <p className="text-xs text-slate-500">
+                支援的 MCP 客戶端：Claude Code、Cursor、Cline、Continue 等
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Google Calendar 連接 */}
           <Card className="bg-slate-900 border-slate-800">
