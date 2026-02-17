@@ -246,7 +246,52 @@ gcloud run deploy "${SERVICE_NAME}" "${DEPLOY_ARGS[@]}"
 
 log_success "部署完成！"
 
-# 6. 取得服務 URL
+# 6. 清理舊的 Docker images (只保留最新兩個)
+log_info "清理舊的 Docker images..."
+
+IMAGE_PATH="${IMAGE_REGISTRY}/${PROJECT_ID}/${IMAGE_REPO}/${SERVICE_NAME}"
+
+# 列出所有 digest，按建立時間排序（最新的在前）
+DIGESTS=$(gcloud artifacts docker images list "${IMAGE_PATH}" \
+    --include-tags \
+    --format="value(digest)" \
+    --sort-by="~CREATE_TIME" \
+    --project="${PROJECT_ID}" \
+    2>/dev/null || echo "")
+
+if [ -z "$DIGESTS" ]; then
+    log_warning "找不到任何 image，跳過清理"
+else
+    # 計算總數
+    TOTAL_IMAGES=$(echo "$DIGESTS" | wc -l | tr -d ' ')
+    log_info "找到 $TOTAL_IMAGES 個 image"
+
+    # 保留最新兩個，刪除其他
+    if [ "$TOTAL_IMAGES" -gt 2 ]; then
+        IMAGES_TO_DELETE=$(echo "$DIGESTS" | tail -n +3)
+        DELETE_COUNT=$(echo "$IMAGES_TO_DELETE" | wc -l | tr -d ' ')
+
+        log_info "刪除 $DELETE_COUNT 個舊 image（保留最新 2 個）..."
+
+        echo "$IMAGES_TO_DELETE" | while read -r digest; do
+            if [ -n "$digest" ]; then
+                log_info "刪除: ${IMAGE_PATH}@${digest}"
+                gcloud artifacts docker images delete \
+                    "${IMAGE_PATH}@${digest}" \
+                    --quiet \
+                    --project="${PROJECT_ID}" 2>/dev/null || log_warning "刪除失敗: ${digest}"
+            fi
+        done
+
+        log_success "清理完成，已保留最新 2 個 image"
+    else
+        log_info "只有 $TOTAL_IMAGES 個 image，無需清理"
+    fi
+fi
+
+echo ""
+
+# 7. 取得服務 URL
 echo ""
 log_info "取得服務資訊..."
 
