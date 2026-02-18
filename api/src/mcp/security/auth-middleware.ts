@@ -7,6 +7,7 @@
 
 import type { AuthContext, OAuthScope } from "../types";
 import { verifyAccessToken, type McpTokenPayload } from "../oauth/jwt";
+import { prisma } from "@/lib/db";
 
 export class AuthenticationError extends Error {
   constructor(message: string) {
@@ -21,7 +22,7 @@ export class AuthenticationError extends Error {
  * Production: Verifies the JWT signature and extracts user context.
  * Development: Falls back to dev context if JWT secret is not configured.
  */
-export function authenticateMcpRequest(authHeader?: string): AuthContext {
+export async function authenticateMcpRequest(authHeader?: string): Promise<AuthContext> {
   // If no JWT secret configured...
   if (!process.env.ZENTROPY_MCP_JWT_SECRET) {
     // In production, refuse to start without a secret — silent dev bypass is dangerous
@@ -31,9 +32,11 @@ export function authenticateMcpRequest(authHeader?: string): AuthContext {
           "MCP authentication is disabled in production without a secret.",
       );
     }
-    // Dev only: use dev context
+    // Dev only: decode token without verification, then resolve Firebase UID → DB UUID
     if (authHeader && authHeader.startsWith("Bearer ")) {
-      return decodeTokenUnsafe(authHeader.slice("Bearer ".length));
+      const ctx = decodeTokenUnsafe(authHeader.slice("Bearer ".length));
+      ctx.userId = await resolveUserId(ctx.userId);
+      return ctx;
     }
     return createDevContext();
   }
@@ -57,6 +60,22 @@ export function authenticateMcpRequest(authHeader?: string): AuthContext {
     const message = error instanceof Error ? error.message : "Invalid token";
     throw new AuthenticationError(message);
   }
+}
+
+/**
+ * Resolve a Firebase UID to a DB UUID.
+ * If the userId is already a UUID (contains hyphens), return as-is.
+ * Otherwise look up by auth_provider_id and auto-create if not found.
+ */
+async function resolveUserId(userId: string): Promise<string> {
+  if (userId.includes("-")) return userId; // already a UUID
+  const user = await prisma.user.findFirst({ where: { auth_provider_id: userId } });
+  if (user) return user.id;
+  // Auto-create the user so dev bypass works end-to-end
+  const created = await prisma.user.create({
+    data: { auth_provider: "GOOGLE", auth_provider_id: userId },
+  });
+  return created.id;
 }
 
 function payloadToAuthContext(payload: McpTokenPayload): AuthContext {

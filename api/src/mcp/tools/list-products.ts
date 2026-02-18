@@ -25,10 +25,23 @@ export async function handleListProducts(
   _input: Record<string, unknown>,
   _sanitized: boolean,
 ) {
-  const data = await apiClient.listProducts(authContext.userId) as
-    ProductItem[] | { products: ProductItem[] }
+  const data = await apiClient.listProducts(authContext.userId)
 
-  const products = Array.isArray(data) ? data : (data.products ?? [])
+  // 驗證 API 回應格式
+  if (!data) {
+    console.error('[list_products] API returned null or undefined')
+    return { products: [], total: 0 }
+  }
+
+  let products: ProductItem[]
+  if (Array.isArray(data)) {
+    products = data
+  } else if (typeof data === 'object' && 'products' in data && Array.isArray(data.products)) {
+    products = data.products
+  } else {
+    console.error('[list_products] Unexpected API response format:', typeof data)
+    return { products: [], total: 0 }
+  }
 
   const slim = products.map((p: ProductItem) => ({
     id: p.id,

@@ -40,14 +40,12 @@ describe('handleListTasks', () => {
           id: 't1',
           title: 'Fix bug',
           status: 'ACTIVE',
-          area: { id: 'a1', name: 'Engineering' },
-          product: { id: 'p1', name: 'Zentropy' },
-          topic: { id: 'tp1', name: 'Backend' },
+          tag: { area: 'Engineering', product: 'Zentropy', topic: 'Backend' },
           due_date: '2026-02-17',
           sub_items: [
-            { id: 's1', title: 'Sub 1', status: 'DONE' },
-            { id: 's2', title: 'Sub 2', status: 'PENDING' },
-            { id: 's3', title: 'Sub 3', status: 'DONE' },
+            { id: 's1', content: 'Sub 1', completed: true },
+            { id: 's2', content: 'Sub 2', completed: false },
+            { id: 's3', content: 'Sub 3', completed: true },
           ],
         },
       ]),
@@ -90,11 +88,69 @@ describe('handleListTasks', () => {
     const result = await handleListTasks(api, authContext, {}, true)
     expect(result).toEqual({ tasks: [], total: 0 })
   })
+
+  it('should pass product_id parameter to apiClient', async () => {
+    const listTasks = vi.fn().mockResolvedValue([
+      {
+        id: 't1',
+        title: 'Task in Product A',
+        status: 'ACTIVE',
+        product: { id: 'prod-a', name: 'Product A' },
+      },
+    ])
+    const api = mockApiClient({ listTasks })
+
+    await handleListTasks(api, authContext, { product_id: 'prod-a' }, true)
+
+    expect(listTasks).toHaveBeenCalledWith('user-123', {
+      status: undefined,
+      product_id: 'prod-a',
+      topic_id: undefined,
+    })
+  })
+
+  it('should pass topic_id parameter to apiClient', async () => {
+    const listTasks = vi.fn().mockResolvedValue([
+      {
+        id: 't1',
+        title: 'Task in Topic B',
+        status: 'ACTIVE',
+        topic: { id: 'topic-b', name: 'Topic B' },
+      },
+    ])
+    const api = mockApiClient({ listTasks })
+
+    await handleListTasks(api, authContext, { topic_id: 'topic-b' }, true)
+
+    expect(listTasks).toHaveBeenCalledWith('user-123', {
+      status: undefined,
+      product_id: undefined,
+      topic_id: 'topic-b',
+    })
+  })
+
+  it('should pass combined filters to apiClient', async () => {
+    const listTasks = vi.fn().mockResolvedValue([])
+    const api = mockApiClient({ listTasks })
+
+    await handleListTasks(
+      api,
+      authContext,
+      { status: 'ACTIVE', product_id: 'prod-a', topic_id: 'topic-b' },
+      true,
+    )
+
+    expect(listTasks).toHaveBeenCalledWith('user-123', {
+      status: 'ACTIVE',
+      product_id: 'prod-a',
+      topic_id: 'topic-b',
+    })
+  })
 })
 
 describe('handleCreateTask', () => {
   it('should call apiClient.createTask with correct params', async () => {
-    const createTask = vi.fn().mockResolvedValue({ id: 'new-1', title: 'My task', status: 'INBOX' })
+    const createTask = vi.fn().mockResolvedValue({ task: { id: 'new-1', title: 'My task', status: 'INBOX' } })
     const api = mockApiClient({ createTask })
 
     await handleCreateTask(api, authContext, { content: 'My task', product_id: 'p1' }, true)
@@ -110,7 +166,7 @@ describe('handleCreateTask', () => {
 
   it('should return id/title/status/message', async () => {
     const api = mockApiClient({
-      createTask: vi.fn().mockResolvedValue({ id: 'new-1', title: 'My task', status: 'INBOX' }),
+      createTask: vi.fn().mockResolvedValue({ task: { id: 'new-1', title: 'My task', status: 'INBOX' }, message: 'Task created successfully' }),
     })
 
     const result = await handleCreateTask(api, authContext, { content: 'My task' }, true)
@@ -126,7 +182,7 @@ describe('handleCreateTask', () => {
 
 describe('handleUpdateTask', () => {
   it('should call apiClient.updateTask with correct params', async () => {
-    const updateTask = vi.fn().mockResolvedValue({ id: 't1', title: 'Updated', status: 'ACTIVE' })
+    const updateTask = vi.fn().mockResolvedValue({ task: { id: 't1', title: 'Updated', status: 'ACTIVE' } })
     const api = mockApiClient({ updateTask })
 
     await handleUpdateTask(api, authContext, { task_id: 't1', status: 'ACTIVE' }, true)
@@ -140,7 +196,7 @@ describe('handleUpdateTask', () => {
 
   it('should return id/title/status/message', async () => {
     const api = mockApiClient({
-      updateTask: vi.fn().mockResolvedValue({ id: 't1', title: 'Updated', status: 'ACTIVE' }),
+      updateTask: vi.fn().mockResolvedValue({ task: { id: 't1', title: 'Updated', status: 'ACTIVE' }, message: 'Task updated successfully' }),
     })
 
     const result = await handleUpdateTask(api, authContext, { task_id: 't1', status: 'ACTIVE' }, true)

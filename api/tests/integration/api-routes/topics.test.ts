@@ -3,10 +3,12 @@
  *
  * 測試 /api/products/[id]/topics 的 GET 操作
  *
- * 使用 withTestTransaction 確保測試隔離（自動 rollback）
+ * 注意：呼叫 API Route 的測試不能使用 withTestTransaction，
+ * 因為 API Route 使用獨立的 Prisma 連線，看不到未 commit 的 transaction 資料。
+ * 改用 prisma 直接建立資料（committed），afterEach 清理。
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
 import {
   setupIntegrationTests,
   cleanupIntegrationTests,
@@ -14,6 +16,7 @@ import {
   TEST_FIREBASE_UID,
   withTestTransaction,
 } from '../setup'
+import { prisma } from '@/lib/db'
 import { GET } from '@/app/api/products/[id]/topics/route'
 import { NextRequest } from 'next/server'
 
@@ -24,190 +27,173 @@ vi.mock('@/lib/firebase-admin', () => ({
   })),
 }))
 
+// 記錄每個測試建立的資料 ID，用於清理
+let testAreaIds: string[] = []
+let testProductIds: string[] = []
+let testTopicIds: string[] = []
+
+async function cleanupTestData() {
+  if (testTopicIds.length > 0) {
+    await prisma.topic.deleteMany({ where: { id: { in: testTopicIds } } }).catch(() => {})
+    testTopicIds = []
+  }
+  if (testProductIds.length > 0) {
+    await prisma.product.deleteMany({ where: { id: { in: testProductIds } } }).catch(() => {})
+    testProductIds = []
+  }
+  if (testAreaIds.length > 0) {
+    await prisma.area.deleteMany({ where: { id: { in: testAreaIds } } }).catch(() => {})
+    testAreaIds = []
+  }
+}
+
 describe('Topics API - Integration Tests', () => {
   beforeAll(async () => {
     await setupIntegrationTests()
   })
 
   afterAll(async () => {
+    await cleanupTestData()
     await cleanupIntegrationTests()
+  })
+
+  afterEach(async () => {
+    await cleanupTestData()
   })
 
   describe('GET /api/products/[id]/topics', () => {
     it('應該成功列出產品的所有 topics', async () => {
-      await withTestTransaction(async (tx) => {
-        // 建立測試資料：area → product → topics
-        const area = await tx.area.create({
-          data: {
-            user_id: TEST_USER_ID,
-            name: 'Test Area',
-            is_custom: true,
-          },
-        })
-
-        const product = await tx.product.create({
-          data: {
-            user_id: TEST_USER_ID,
-            area_id: area.id,
-            name: 'Test Product',
-            description: 'Test Description',
-          },
-        })
-
-        const topic1 = await tx.topic.create({
-          data: {
-            user_id: TEST_USER_ID,
-            product_id: product.id,
-            name: 'Topic A',
-          },
-        })
-
-        const topic2 = await tx.topic.create({
-          data: {
-            user_id: TEST_USER_ID,
-            product_id: product.id,
-            name: 'Topic B',
-          },
-        })
-
-        // 發送 GET 請求
-        const request = new NextRequest(
-          `http://localhost/api/products/${product.id}/topics`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Bearer test-token',
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
-        const data = await response.json()
-
-        expect(response.status).toBe(200)
-        expect(data).toHaveProperty('data')
-        expect(data.data).toHaveProperty('topics')
-        expect(data.data.topics).toHaveLength(2)
-
-        // 驗證 topic 名稱
-        const topicNames = data.data.topics.map((t: any) => t.name).sort()
-        expect(topicNames).toEqual(['Topic A', 'Topic B'])
-
-        // 驗證 topic 結構
-        expect(data.data.topics[0]).toHaveProperty('id')
-        expect(data.data.topics[0]).toHaveProperty('name')
+      // 建立測試資料（committed，API Route 可見）
+      const area = await prisma.area.create({
+        data: { user_id: TEST_USER_ID, name: 'Test Area', is_custom: true },
       })
+      testAreaIds.push(area.id)
+
+      const product = await prisma.product.create({
+        data: {
+          user_id: TEST_USER_ID,
+          area_id: area.id,
+          name: 'Test Product',
+          description: 'Test Description',
+          status: 'ACTIVE',
+          lifecycle: 'FINITE',
+        },
+      })
+      testProductIds.push(product.id)
+
+      const topic1 = await prisma.topic.create({
+        data: { user_id: TEST_USER_ID, product_id: product.id, name: 'Topic A' },
+      })
+      const topic2 = await prisma.topic.create({
+        data: { user_id: TEST_USER_ID, product_id: product.id, name: 'Topic B' },
+      })
+      testTopicIds.push(topic1.id, topic2.id)
+
+      const request = new NextRequest(
+        `http://localhost/api/products/${product.id}/topics`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer test-token', 'Content-Type': 'application/json' },
+        }
+      )
+
+      const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data).toHaveProperty('data')
+      expect(data.data).toHaveProperty('topics')
+      expect(data.data.topics).toHaveLength(2)
+
+      const topicNames = data.data.topics.map((t: any) => t.name).sort()
+      expect(topicNames).toEqual(['Topic A', 'Topic B'])
+      expect(data.data.topics[0]).toHaveProperty('id')
+      expect(data.data.topics[0]).toHaveProperty('name')
     })
 
     it('應該返回空陣列當產品沒有 topics', async () => {
-      await withTestTransaction(async (tx) => {
-        // 建立沒有 topics 的產品
-        const area = await tx.area.create({
-          data: {
-            user_id: TEST_USER_ID,
-            name: 'Test Area',
-            is_custom: true,
-          },
-        })
-
-        const product = await tx.product.create({
-          data: {
-            user_id: TEST_USER_ID,
-            area_id: area.id,
-            name: 'Product Without Topics',
-          },
-        })
-
-        // 發送 GET 請求
-        const request = new NextRequest(
-          `http://localhost/api/products/${product.id}/topics`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Bearer test-token',
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
-        const data = await response.json()
-
-        expect(response.status).toBe(200)
-        expect(data.data.topics).toEqual([])
+      const area = await prisma.area.create({
+        data: { user_id: TEST_USER_ID, name: 'Test Area', is_custom: true },
       })
+      testAreaIds.push(area.id)
+
+      const product = await prisma.product.create({
+        data: {
+          user_id: TEST_USER_ID,
+          area_id: area.id,
+          name: 'Product Without Topics',
+          status: 'ACTIVE',
+          lifecycle: 'FINITE',
+        },
+      })
+      testProductIds.push(product.id)
+
+      const request = new NextRequest(
+        `http://localhost/api/products/${product.id}/topics`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer test-token', 'Content-Type': 'application/json' },
+        }
+      )
+
+      const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.data.topics).toEqual([])
     })
 
     it('應該排除已刪除的 topics (soft delete)', async () => {
-      await withTestTransaction(async (tx) => {
-        const area = await tx.area.create({
-          data: {
-            user_id: TEST_USER_ID,
-            name: 'Test Area',
-            is_custom: true,
-          },
-        })
-
-        const product = await tx.product.create({
-          data: {
-            user_id: TEST_USER_ID,
-            area_id: area.id,
-            name: 'Test Product',
-          },
-        })
-
-        // 建立一個正常 topic 和一個已刪除的 topic
-        await tx.topic.create({
-          data: {
-            user_id: TEST_USER_ID,
-            product_id: product.id,
-            name: 'Active Topic',
-          },
-        })
-
-        await tx.topic.create({
-          data: {
-            user_id: TEST_USER_ID,
-            product_id: product.id,
-            name: 'Deleted Topic',
-            deleted_at: new Date(),
-          },
-        })
-
-        // 發送 GET 請求
-        const request = new NextRequest(
-          `http://localhost/api/products/${product.id}/topics`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Bearer test-token',
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
-        const data = await response.json()
-
-        expect(response.status).toBe(200)
-        expect(data.data.topics).toHaveLength(1)
-        expect(data.data.topics[0].name).toBe('Active Topic')
+      const area = await prisma.area.create({
+        data: { user_id: TEST_USER_ID, name: 'Test Area', is_custom: true },
       })
+      testAreaIds.push(area.id)
+
+      const product = await prisma.product.create({
+        data: {
+          user_id: TEST_USER_ID,
+          area_id: area.id,
+          name: 'Test Product',
+          status: 'ACTIVE',
+          lifecycle: 'FINITE',
+        },
+      })
+      testProductIds.push(product.id)
+
+      const activeTopic = await prisma.topic.create({
+        data: { user_id: TEST_USER_ID, product_id: product.id, name: 'Active Topic' },
+      })
+      const deletedTopic = await prisma.topic.create({
+        data: { user_id: TEST_USER_ID, product_id: product.id, name: 'Deleted Topic', deleted_at: new Date() },
+      })
+      testTopicIds.push(activeTopic.id, deletedTopic.id)
+
+      const request = new NextRequest(
+        `http://localhost/api/products/${product.id}/topics`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer test-token', 'Content-Type': 'application/json' },
+        }
+      )
+
+      const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.data.topics).toHaveLength(1)
+      expect(data.data.topics[0].name).toBe('Active Topic')
     })
 
     it('應該返回 404 當產品不存在', async () => {
-      await withTestTransaction(async (tx) => {
+      // 不需要建立任何資料，直接用 fake ID
+      await withTestTransaction(async () => {
         const fakeProductId = '00000000-0000-0000-0000-000000000099'
 
         const request = new NextRequest(
           `http://localhost/api/products/${fakeProductId}/topics`,
           {
             method: 'GET',
-            headers: {
-              'Authorization': 'Bearer test-token',
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Authorization': 'Bearer test-token', 'Content-Type': 'application/json' },
           }
         )
 
@@ -220,123 +206,99 @@ describe('Topics API - Integration Tests', () => {
     })
 
     it('應該返回 404 當產品屬於其他用戶', async () => {
-      await withTestTransaction(async (tx) => {
-        // 建立另一個用戶的產品
-        const otherUserId = '00000000-0000-0000-0000-000000000002'
+      const otherUserId = '00000000-0000-0000-0000-000000000002'
 
-        await tx.user.create({
-          data: {
-            id: otherUserId,
-            email: 'other@example.com',
-            name: 'Other User',
-            auth_provider: 'GOOGLE',
-            auth_provider_id: 'other-firebase-uid',
-          },
-        })
-
-        const area = await tx.area.create({
-          data: {
-            user_id: otherUserId,
-            name: 'Other User Area',
-            is_custom: true,
-          },
-        })
-
-        const product = await tx.product.create({
-          data: {
-            user_id: otherUserId,
-            area_id: area.id,
-            name: 'Other User Product',
-          },
-        })
-
-        // TEST_USER_ID 嘗試訪問其他用戶的產品
-        const request = new NextRequest(
-          `http://localhost/api/products/${product.id}/topics`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Bearer test-token',
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
-        const data = await response.json()
-
-        expect(response.status).toBe(404)
-        expect(data).toHaveProperty('error', 'Product not found')
+      // 建立另一個用戶
+      await prisma.user.upsert({
+        where: { id: otherUserId },
+        create: {
+          id: otherUserId,
+          email: 'other@example.com',
+          name: 'Other User',
+          auth_provider: 'GOOGLE',
+          auth_provider_id: 'other-firebase-uid',
+        },
+        update: {},
       })
+
+      const area = await prisma.area.create({
+        data: { user_id: otherUserId, name: 'Other User Area', is_custom: true },
+      })
+      testAreaIds.push(area.id)
+
+      const product = await prisma.product.create({
+        data: {
+          user_id: otherUserId,
+          area_id: area.id,
+          name: 'Other User Product',
+          status: 'ACTIVE',
+          lifecycle: 'FINITE',
+        },
+      })
+      testProductIds.push(product.id)
+
+      const request = new NextRequest(
+        `http://localhost/api/products/${product.id}/topics`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer test-token', 'Content-Type': 'application/json' },
+        }
+      )
+
+      const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
+      const data = await response.json()
+
+      // 清理 other user（需要先清 products/areas）
+      await prisma.user.delete({ where: { id: otherUserId } }).catch(() => {})
+
+      expect(response.status).toBe(404)
+      expect(data).toHaveProperty('error', 'Product not found')
     })
 
     it('應該按 created_at 升序排序 topics', async () => {
-      await withTestTransaction(async (tx) => {
-        const area = await tx.area.create({
-          data: {
-            user_id: TEST_USER_ID,
-            name: 'Test Area',
-            is_custom: true,
-          },
-        })
-
-        const product = await tx.product.create({
-          data: {
-            user_id: TEST_USER_ID,
-            area_id: area.id,
-            name: 'Test Product',
-          },
-        })
-
-        // 建立三個 topics（時間先後順序）
-        const topic1 = await tx.topic.create({
-          data: {
-            user_id: TEST_USER_ID,
-            product_id: product.id,
-            name: 'Topic 1',
-            created_at: new Date('2024-01-01'),
-          },
-        })
-
-        const topic2 = await tx.topic.create({
-          data: {
-            user_id: TEST_USER_ID,
-            product_id: product.id,
-            name: 'Topic 2',
-            created_at: new Date('2024-01-02'),
-          },
-        })
-
-        const topic3 = await tx.topic.create({
-          data: {
-            user_id: TEST_USER_ID,
-            product_id: product.id,
-            name: 'Topic 3',
-            created_at: new Date('2024-01-03'),
-          },
-        })
-
-        const request = new NextRequest(
-          `http://localhost/api/products/${product.id}/topics`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Bearer test-token',
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
-        const data = await response.json()
-
-        expect(response.status).toBe(200)
-        expect(data.data.topics).toHaveLength(3)
-
-        // 驗證順序
-        const names = data.data.topics.map((t: any) => t.name)
-        expect(names).toEqual(['Topic 1', 'Topic 2', 'Topic 3'])
+      const area = await prisma.area.create({
+        data: { user_id: TEST_USER_ID, name: 'Test Area', is_custom: true },
       })
+      testAreaIds.push(area.id)
+
+      const product = await prisma.product.create({
+        data: {
+          user_id: TEST_USER_ID,
+          area_id: area.id,
+          name: 'Test Product',
+          status: 'ACTIVE',
+          lifecycle: 'FINITE',
+        },
+      })
+      testProductIds.push(product.id)
+
+      const topic1 = await prisma.topic.create({
+        data: { user_id: TEST_USER_ID, product_id: product.id, name: 'Topic 1', created_at: new Date('2024-01-01') },
+      })
+      const topic2 = await prisma.topic.create({
+        data: { user_id: TEST_USER_ID, product_id: product.id, name: 'Topic 2', created_at: new Date('2024-01-02') },
+      })
+      const topic3 = await prisma.topic.create({
+        data: { user_id: TEST_USER_ID, product_id: product.id, name: 'Topic 3', created_at: new Date('2024-01-03') },
+      })
+      testTopicIds.push(topic1.id, topic2.id, topic3.id)
+
+      const request = new NextRequest(
+        `http://localhost/api/products/${product.id}/topics`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer test-token', 'Content-Type': 'application/json' },
+        }
+      )
+
+      const response = await GET(request, { params: Promise.resolve({ id: product.id }) })
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.data.topics).toHaveLength(3)
+
+      const names = data.data.topics.map((t: any) => t.name)
+      expect(names).toEqual(['Topic 1', 'Topic 2', 'Topic 3'])
     })
   })
 })

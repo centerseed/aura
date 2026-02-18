@@ -29,10 +29,14 @@ const TOOL_SCOPE_MAP: Record<string, OAuthScope[]> = {
   report_done: ["write:inbox"],
   search: ["read:tasks"],
   save_knowledge: ["write:knowledge"],
+  add_reference: ["write:knowledge"],
+  get_reference: ["read:knowledge"],
   // dev tools
   list_tasks: ["read:tasks"],
   create_task: ["write:inbox"],
   update_task: ["write:inbox"],
+  add_sub_item: ["write:inbox"],
+  update_sub_item: ["write:inbox"],
   list_products: ["read:tasks"],
   get_plan: ["read:tasks"],
 };

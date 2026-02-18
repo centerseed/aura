@@ -76,7 +76,7 @@ export class UnifiedDataTransformer implements IDataTransformer {
   ): CollectedData {
     const now = new Date()
     const threeDaysLater = new Date(todayStart.getTime() + 3 * 24 * 60 * 60 * 1000)
-    const sevenDaysLater = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const fifteenDaysLater = new Date(todayStart.getTime() + 15 * 24 * 60 * 60 * 1000)
 
     // 子任務按 task_id 分組（提前建立，供候選篩選使用）
     const subTasksByTaskForFilter = new Map<string, typeof raw.allSubTasks[0][]>()
@@ -86,22 +86,22 @@ export class UnifiedDataTransformer implements IDataTransformer {
       subTasksByTaskForFilter.set(st.task_id, arr)
     }
 
-    // 篩選候選任務 (逾期 + 7天內到期 + 已開始 + 子任務到期)
+    // 篩選候選任務 (逾期 + 15天內到期 + 已開始 + 子任務到期)
     const candidateTasks = raw.allTasks.filter(task => {
       // 1. 逾期
       if (task.due_date && task.due_date < todayStart) return true
-      // 2. 7天內到期 + 可開始
+      // 2. 15天內到期 + 可開始
       if (
         task.due_date &&
-        task.due_date < sevenDaysLater &&
+        task.due_date < fifteenDaysLater &&
         (!task.start_date || task.start_date <= todayStart)
       ) return true
       // 3. 已開始
       if (task.start_date && task.start_date <= todayStart) return true
-      // 4. 子任務有自己的 due_date 且在 7 天內到期
+      // 4. 子任務有自己的 due_date 且在 15 天內到期
       const subTasks = subTasksByTaskForFilter.get(task.id) || []
       const hasUrgentSubTask = subTasks.some(st =>
-        !st.completed && st.due_date && st.due_date < sevenDaysLater
+        !st.completed && st.due_date && st.due_date < fifteenDaysLater
       )
       if (hasUrgentSubTask) return true
       return false
@@ -330,7 +330,7 @@ export class UnifiedDataTransformer implements IDataTransformer {
     const weekDays = ['日', '一', '二', '三', '四', '五', '六']
     const overview: WeeklyDayInfo[] = []
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       const dayDate = new Date(todayStart.getTime() + i * 24 * 60 * 60 * 1000)
       const dateStr = dayDate.toISOString().substring(0, 10)
       const dayOfWeek = `星期${weekDays[dayDate.getDay()]}`

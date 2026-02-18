@@ -128,6 +128,14 @@ export class UpdateSubItemUseCase {
     // 5. 雙寫：同步到 JSON
     await syncSubTasksToJson(request.taskId)
 
+    // 5.1 子任務完成時 touch 母任務 updated_at（避免停滯警告誤報）
+    if (request.completed) {
+      await prisma.task.update({
+        where: { id: request.taskId },
+        data: { updated_at: new Date() },
+      })
+    }
+
     // 5.5. SubTask 完成連動：同步更新對應的 DailyPlanItem
     if (request.completed !== undefined) {
       await this.syncPlanItemCompletion(

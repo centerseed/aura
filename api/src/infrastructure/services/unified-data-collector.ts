@@ -86,7 +86,7 @@ export class UnifiedDataCollector implements IDataCollector {
     const todayEnd = getEndOfDay(date, timezone)
     const tomorrowStart = new Date(todayEnd.getTime())
     const tomorrowEnd = new Date(tomorrowStart.getTime() + 24 * 60 * 60 * 1000)
-    const fiveDaysLater = new Date(todayStart.getTime() + 5 * 24 * 60 * 60 * 1000)
+    const tenDaysLater = new Date(todayStart.getTime() + 10 * 24 * 60 * 60 * 1000)
 
     // 3 個並行查詢（任務全部一次查出，行事曆一次查出）
     const queryStart = Date.now()
@@ -99,7 +99,7 @@ export class UnifiedDataCollector implements IDataCollector {
       })(),
       (async () => {
         const start = Date.now()
-        const result = await this.queryWeeklyCalendarEvents(userId, todayStart, fiveDaysLater)
+        const result = await this.queryWeeklyCalendarEvents(userId, todayStart, tenDaysLater)
         console.log('[UnifiedCollector] queryWeeklyCalendarEvents:', Date.now() - start, 'ms')
         return result
       })(),
@@ -313,9 +313,9 @@ export class UnifiedDataCollector implements IDataCollector {
   private buildWeeklyMeetingMap(events: RawCalendarEvent[], todayStart: Date): Map<string, number> {
     const map = new Map<string, number>()
 
-    // 計算 5 天的邊界（基於 todayStart 的時區）
+    // 計算 10 天的邊界（基於 todayStart 的時區）
     const dayBoundaries: Array<{ start: Date; dateStr: string }> = []
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 11; i++) {
       const dayStart = new Date(todayStart.getTime() + i * 24 * 60 * 60 * 1000)
       const dateStr = dayStart.toISOString().substring(0, 10)
       dayBoundaries.push({ start: dayStart, dateStr })

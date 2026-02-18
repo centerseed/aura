@@ -151,17 +151,8 @@ export class GeneratePlanUseCase {
       }
       accumulatedMinutes += estimatedMinutes
 
-      // 根據 dueDate 決定正確的 status，而非一律設 'today'
-      let itemStatus: PlanItemStatus = 'today'
-      if (candidate.dueDate) {
-        const dueDateOnly = toDateOnly(candidate.dueDate, timezone)
-        const tomorrow = new Date(planDateOnly.getTime() + 24 * 60 * 60 * 1000)
-        if (dueDateOnly.getTime() > tomorrow.getTime()) {
-          itemStatus = 'overflow'
-        } else if (dueDateOnly.getTime() === tomorrow.getTime()) {
-          itemStatus = 'tomorrow'
-        }
-      }
+      // AI 已決定這個項目排入 daily_plan，一律設 'today'
+      const itemStatus: PlanItemStatus = 'today'
 
       plannedItems.push({
         taskId: candidate.taskId,

@@ -51,6 +51,13 @@ export class ReportDoneUseCase {
       throw new ValidationException('Action ID is required', 'actionId')
     }
 
+    // Resolve Firebase UID → DB UUID if needed (dev bypass mode passes Firebase UID directly)
+    let resolvedUserId = request.userId
+    if (!request.userId.includes('-')) {
+      const user = await prisma.user.findFirst({ where: { auth_provider_id: request.userId } })
+      if (user) resolvedUserId = user.id
+    }
+
     const outcome = request.outcome ?? 'completed'
 
     // 1. Find the task (with ownership check)

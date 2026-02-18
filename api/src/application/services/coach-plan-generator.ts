@@ -122,13 +122,17 @@ export class CoachPlanGenerator {
     sections.push('## 排序原則（嚴格遵守）')
     sections.push('1. 逾期任務最優先')
     sections.push('2. 今日到期必須排入')
-    sections.push('3. **看週表決定**：如果某天負荷率 > 80%，提前拉部分任務到前面較空的日子')
-    sections.push('4. **如果某天很空（負荷率 < 30%），可以從後面拉任務過來填充**')
-    sections.push('5. daily_plan 控制在 3-5 項，overflow 的 suggestion 說明建議哪天做（如「建議週三做，當天負荷較低」）')
+    sections.push('3. **週表只用來找過載日**：如果未來某天負荷率 > 80%，把那天的任務提前到今天處理。週表不是把今天任務推給未來的理由')
+    sections.push('4. **今天容量優先消化**：今天有空就盡量做，不要把今天能做的任務推給明後天')
+    if (isWeekend) {
+      sections.push('5. daily_plan 控制在 2-3 項，優先選擇生活相關、個人專案、可獨自完成的任務。其餘放 overflow')
+    } else {
+      sections.push('5. daily_plan 目標 5 項左右（3-7 項）。只要今天容量許可且任務沒有特殊限制（需特定地點、需他人配合），就排進今天，不要推給未來')
+    }
     sections.push('6. 容量上限 80%，留 20% 緩衝給意外事務')
     sections.push('7. 同 Product 任務排一起減少上下文切換')
     sections.push('8. 考慮任務的現實可行性（需要到特定地點、需要他人配合的任務是否今天能做）')
-    sections.push('9. 寧可少排確保完成，也不要塞太多全部做不完。**少即是多**')
+    sections.push(`9. 容量利用目標：今天有 ${availableMinutes} 分鐘，目標使用 60-80%（${Math.round(availableMinutes * 0.6)}-${Math.round(availableMinutes * 0.8)} 分鐘）。在容量許可內盡量多排，但確保每項都是真正能完成的`)
     sections.push('')
     sections.push('## 估時指引')
     sections.push('- 為每個項目估計完成時間（分鐘），填入 estimated_minutes')
@@ -153,7 +157,7 @@ export class CoachPlanGenerator {
 
     // Weekly overview
     if (weeklyOverview && weeklyOverview.length > 0) {
-      sections.push('## 本週容量與負荷（週視野）')
+      sections.push('## 未來 10 天容量與負荷')
       sections.push('')
       sections.push('| 日期 | 星期 | 可用時間 | 會議 | 到期任務 | 任務估時 | 負荷率 |')
       sections.push('|------|------|---------|------|---------|---------|-------|')

@@ -193,30 +193,46 @@ export class PrismaTaskRepository implements ITaskRepository {
   async create(
     data: Omit<TaskData, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<TaskData> {
-    // 🚀 Step 1: 執行 INSERT（不帶 include）
-    const task = await prisma.task.create({
-      data: {
-        user_id: data.userId,
-        product_id: data.productId,
-        topic_id: data.topicId,
-        content: data.content,
-        status: this.toPrismaStatus(data.status),
-        ai_analysis: this.serializeAIAnalysis(data.aiAnalysis) as any,
-        references: data.references || [] as any,
-        sub_items: data.subItems || [],
-        start_date: data.startDate,
-        due_date: data.dueDate,
-        time_confidence: data.timeConfidence,
-        inferred_from_milestone: data.inferredFromMilestone,
-        remind_at: data.remindAt,
-        reminder_enabled: data.reminderEnabled,
-        reminder_timezone: data.reminderTimezone,
-        notification_id: data.notificationId,
-      },
-    })
+    // 🚀 Step 1: 使用 raw SQL INSERT 以支援 nullable product_id（INBOX 任務）
+    const aiAnalysis = this.serializeAIAnalysis(data.aiAnalysis)
+    const refsJson = JSON.stringify(data.references || [])
+    const subItemsJson = JSON.stringify(data.subItems || [])
+    const prismaStatus = this.toPrismaStatus(data.status)
+
+    const inserted = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO tasks (
+        id, updated_at,
+        user_id, product_id, topic_id, content, status,
+        ai_analysis, "references", sub_items,
+        start_date, due_date, time_confidence, inferred_from_milestone,
+        remind_at, reminder_enabled, reminder_timezone, notification_id
+      ) VALUES (
+        gen_random_uuid(),
+        NOW(),
+        ${data.userId}::uuid,
+        ${data.productId ? Prisma.sql`${data.productId}::uuid` : Prisma.sql`NULL`},
+        ${data.topicId ? Prisma.sql`${data.topicId}::uuid` : Prisma.sql`NULL`},
+        ${data.content},
+        ${prismaStatus}::statusenum,
+        ${aiAnalysis ? Prisma.sql`${JSON.stringify(aiAnalysis)}::json` : Prisma.sql`NULL`},
+        ${refsJson}::json,
+        ${subItemsJson}::json,
+        ${data.startDate ?? null},
+        ${data.dueDate ?? null},
+        ${data.timeConfidence ?? null},
+        ${data.inferredFromMilestone ? Prisma.sql`${data.inferredFromMilestone}::uuid` : Prisma.sql`NULL`},
+        ${data.remindAt ?? null},
+        ${data.reminderEnabled ?? false},
+        ${data.reminderTimezone ?? null},
+        ${data.notificationId ?? null}
+      )
+      RETURNING id
+    `
+
+    const taskId = inserted[0].id
 
     // 🚀 Step 2: 用優化的查詢返回完整資料
-    const result = await this.findById(task.id, data.userId)
+    const result = await this.findById(taskId, data.userId)
     return result!
   }
 

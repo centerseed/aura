@@ -1,3 +1,8 @@
+// Polyfill: Node.js v20 doesn't expose AsyncLocalStorage on globalThis,
+// but Next.js internals expect it there when loaded outside of `next dev`.
+import { AsyncLocalStorage } from "node:async_hooks";
+(globalThis as any).AsyncLocalStorage = AsyncLocalStorage;
+
 /**
  * Zentropy Custom Server
  *

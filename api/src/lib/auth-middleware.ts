@@ -90,16 +90,26 @@ export async function authenticateRequest(
       console.warn("[auth] MCP internal auth HMAC mismatch, falling through");
     }
 
-    // 測試模式：允許使用 X-Test-User-Id header（僅限本地環境）
+    // 測試模式：允許使用 X-Test-User-Id header（本地環境或 MCP dev bypass 模式）
     const isLocalDb = process.env.DATABASE_URL?.includes('localhost') ||
                       process.env.DATABASE_URL?.includes('127.0.0.1');
     const isTest = process.env.NODE_ENV === 'test';
+    // 當 ZENTROPY_MCP_JWT_SECRET 未設定時，MCP server 處於 dev bypass 模式，
+    // 後端同樣允許 X-Test-User-Id，確保兩端 dev bypass 邏輯一致。
+    const isMcpDevMode = !process.env.ZENTROPY_MCP_JWT_SECRET;
 
-    if ((isLocalDb || isTest)) {
+    if ((isLocalDb || isTest || isMcpDevMode)) {
       const testUserId = request.headers.get("x-test-user-id");
       if (testUserId) {
-        console.log(`Test mode: Using test user ID: ${testUserId}`);
-        return testUserId;
+        // 若已是 UUID（MCP auth layer 已解析過），直接回傳，避免雙重解析
+        if (testUserId.includes('-')) {
+          console.log(`Test mode: Using resolved UUID ${testUserId}`);
+          return testUserId;
+        }
+        // 否則是 Firebase UID，透過 getOrCreateUser 解析成 DB UUID
+        const resolvedId = await getOrCreateUser(testUserId, { uid: testUserId }, prisma);
+        console.log(`Test mode: Firebase UID ${testUserId} → DB UUID ${resolvedId}`);
+        return resolvedId;
       }
     }
 

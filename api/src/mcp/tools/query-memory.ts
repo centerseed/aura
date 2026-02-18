@@ -6,6 +6,7 @@
  * Required Scope: read:tasks OR read:knowledge
  */
 
+import { ValidationException } from "@/lib/api-response";
 import type { BackendApiClient } from "../backend-client/api-client";
 import type { AuthContext } from "../types";
 
@@ -33,7 +34,9 @@ export async function handleQueryMemory(
   input: Record<string, unknown>,
   sanitized: boolean,
 ): Promise<QueryMemoryResult> {
-  const params = input as unknown as QueryMemoryInput;
+  // 驗證並轉換參數
+  const params = validateQueryMemoryInput(input);
+
   const response = await apiClient.queryMemory(authContext.userId, {
     query: params.query,
     scope: params.scope,
@@ -49,4 +52,36 @@ export async function handleQueryMemory(
   }
 
   return result;
+}
+
+/**
+ * 驗證 query_memory 的輸入參數
+ */
+function validateQueryMemoryInput(
+  input: Record<string, unknown>,
+): QueryMemoryInput {
+  // 驗證 query（必填）
+  if (!input.query || typeof input.query !== "string") {
+    throw new ValidationException(
+      "query is required and must be a string",
+      "query",
+    );
+  }
+
+  if (input.query.trim().length === 0) {
+    throw new ValidationException(
+      "query cannot be empty or contain only whitespace",
+      "query",
+    );
+  }
+
+  // 驗證 scope（可選）
+  if (input.scope !== undefined && typeof input.scope !== "string") {
+    throw new ValidationException("scope must be a string", "scope");
+  }
+
+  return {
+    query: input.query as string,
+    scope: input.scope as string | undefined,
+  };
 }

@@ -72,14 +72,14 @@ describe('CreateTaskUseCase', () => {
       ).rejects.toThrow('Task content cannot be empty')
     })
 
-    it('應該拋出錯誤當 content 超過 500 字元', async () => {
+    it('應該拋出錯誤當 content 超過 300 字元', async () => {
       await expect(
         useCase.execute({
           userId: VALID_USER_ID,
           productId: VALID_PRODUCT_ID,
-          content: 'a'.repeat(501),
+          content: 'a'.repeat(301),
         })
-      ).rejects.toThrow('Task content must be less than 500 characters')
+      ).rejects.toThrow('Task content must be less than 300 characters')
     })
 
     it('應該拋出錯誤當 timeConfidence 不在 0-1 之間', async () => {

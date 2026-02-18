@@ -27,7 +27,7 @@ import { CoachAIGenerator } from '@/application/services/coach-ai-generator'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
-import { resolveTimezone, toDateOnly } from '@/lib/timezone-utils'
+import { resolveTimezone, toDateOnly, getStartOfDay } from '@/lib/timezone-utils'
 
 // ============================================================================
 // DTOs
@@ -83,8 +83,7 @@ export class GenerateBriefingUseCase {
 
     // 5. 轉換成 briefing 格式（記憶體操作，極快）
     start = Date.now()
-    const todayStart = new Date(briefingDate)
-    todayStart.setHours(0, 0, 0, 0)
+    const todayStart = getStartOfDay(briefingDate, timezone)
     const threeDaysLater = new Date(todayStart.getTime() + 3 * 24 * 60 * 60 * 1000)
     const aggregatedData = this.transformer.toBriefingData(rawData, todayStart, threeDaysLater)
     timings.transform = Date.now() - start

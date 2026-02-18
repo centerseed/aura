@@ -140,7 +140,7 @@ describe('CoachPlanGenerator', () => {
         [makeCandidate()], 480, 0,
       )
 
-      expect(prompt).toContain('週表決定')
+      expect(prompt).toContain('週表只用來找過載日')
       expect(prompt).toContain('overflow')
     })
   })
@@ -237,7 +237,7 @@ describe('CoachPlanGenerator', () => {
         weeklyOverview,
       )
 
-      expect(prompt).toContain('本週容量與負荷')
+      expect(prompt).toContain('未來 10 天容量與負荷')
       expect(prompt).toContain('2026-02-15')
       expect(prompt).toContain('星期一')
       expect(prompt).toContain('← 今天')

@@ -935,37 +935,38 @@ export default function HomeDemo() {
                     period: "永久",
                     highlight: false,
                     features: [
-                      "每月 50 次 AI 自動分類",
-                      "每月 10 次零碎整理、智能重組",
-                      "一個用戶地圖",
-                      "無限使用"
+                      "每月 50 則 AI 處理",
+                      "1 個 Area 管理",
+                      "無限基礎任務管理",
+                      "無 Coach 功能"
                     ],
                     cta: "立即開始"
                   },
                   {
                     name: "Fusion",
-                    price: "NT$ 240",
+                    price: "$5.99 USD",
                     period: "月",
                     highlight: true,
                     isActive: true,
                     features: [
-                      "Atom 版所有功能，無限制",
-                      "無限輸入和整理",
-                      "語音/圖片輸入（開發中）",
-                      "Google 日曆串接（開發中）"
+                      "Atom 所有功能，無限制",
+                      "多 Area 管理",
+                      "Coach 晨晚報",
+                      "衝突偵測與停滯警示",
+                      "語音/圖片輸入（M2，即將推出）"
                     ],
                     cta: "限時免費"
                   },
                   {
-                    name: "Cosmos",
-                    price: "近期登場",
+                    name: "Nexus",
+                    price: "即將推出",
                     period: "",
                     highlight: false,
                     features: [
                       "Fusion 所有功能",
-                      "MCP 支援",
-                      "多人協作模式",
-                      "智慧行程管理"
+                      "MCP Server 支援",
+                      "API 存取",
+                      "優先客戶支援"
                     ],
                     cta: "敬請期待"
                   }

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3002",
-    "dev:mcp": "npx tsx watch server.ts",
+    "dev:mcp": "NODE_OPTIONS='--require /Users/wubaizong/Naruvia/api/preload.cjs' npx tsx watch server.ts",
     "build": "next build",
     "start": "node --import tsx/esm server.ts",
     "start:next-only": "next start -p 3002",

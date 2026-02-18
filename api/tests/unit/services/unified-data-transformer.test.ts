@@ -10,6 +10,7 @@ const TODAY = new Date('2026-02-16T00:00:00Z')
 const TOMORROW = new Date('2026-02-17T00:00:00Z')
 const IN_3_DAYS = new Date('2026-02-19T00:00:00Z')
 const IN_7_DAYS = new Date('2026-02-23T00:00:00Z')
+const BEYOND_15_DAYS = new Date('2026-03-06T00:00:00Z')
 const YESTERDAY = new Date('2026-02-15T00:00:00Z')
 
 function makeTask(overrides: Partial<UnifiedRawData['allTasks'][0]> = {}): UnifiedRawData['allTasks'][0] {
@@ -133,10 +134,10 @@ describe('UnifiedDataTransformer', () => {
         expect(result.candidates[0].subTaskId).toBe('s1')
       })
 
-      it('父任務無日期且子任務 7 天後到期 → 不應成為候選', () => {
+      it('父任務無日期且子任務 15 天後到期 → 不應成為候選', () => {
         const raw = makeRawData({
           allTasks: [makeTask({ id: 't1', due_date: null, start_date: null })],
-          allSubTasks: [makeSubTask({ id: 's1', task_id: 't1', due_date: IN_7_DAYS })],
+          allSubTasks: [makeSubTask({ id: 's1', task_id: 't1', due_date: BEYOND_15_DAYS })],
         })
         const result = transformer.toPlanCollectedData(raw, TODAY, 'Asia/Taipei')
         expect(result.candidates).toHaveLength(0)

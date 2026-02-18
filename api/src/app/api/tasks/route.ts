@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
     const result = await useCase.execute({
       userId,
       status: searchParams.get('status') || undefined,
+      productId: searchParams.get('product_id') || undefined,
+      topicId: searchParams.get('topic_id') || undefined,
       completedToday: searchParams.get('completed_today') === 'true',
       updatedAtFrom: searchParams.get('from') || undefined,
       updatedAtTo: searchParams.get('to') || undefined,

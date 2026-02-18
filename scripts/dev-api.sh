@@ -3,10 +3,10 @@
 # dev-api.sh - API Backend 本地開發伺服器
 # ==============================================================================
 #
-# 用途: 啟動 Next.js API Backend 開發伺服器
+# 用途: 啟動 API Backend 開發伺服器（Next.js + MCP endpoint）
 #
 # 使用方式:
-#   ./scripts/dev-api.sh              # 開發模式 (next dev)
+#   ./scripts/dev-api.sh              # 開發模式 (server.ts = Next.js + /mcp)
 #   ./scripts/dev-api.sh prod         # 生產模式 (next build && next start)
 #   ./scripts/dev-api.sh standalone   # Standalone 模式 (node server.js)
 #   ./scripts/dev-api.sh docker       # Docker 模式 (模擬 Cloud Run 環境)
@@ -195,9 +195,13 @@ start_api() {
             cd "$PROJECT_ROOT/api/.next/standalone/api"
             PORT=$API_PORT node server.js
         else
-            # 開發模式
+            # 開發模式：使用 server.ts（同時包含 Next.js + MCP endpoint）
+            # 清除 JWT secret，讓 MCP 接受假 token（fake JWT dev bypass）
+            # 用環境變數覆蓋 .env 裡的值（Next.js 優先使用環境變數）
             log_success "API 啟動中 (開發模式): http://localhost:$API_PORT"
-            PORT=$API_PORT npm run dev
+            log_info "MCP:  http://localhost:$API_PORT/mcp"
+            log_warning "MCP dev bypass 已啟用（ZENTROPY_MCP_JWT_SECRET 已清除）"
+            ZENTROPY_MCP_JWT_SECRET="" PORT=$API_PORT npm run dev:mcp
         fi
     fi
 }

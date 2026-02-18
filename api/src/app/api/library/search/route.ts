@@ -21,6 +21,13 @@ interface SearchRequestBody {
   limit?: number;
 }
 
+interface ReferenceMetadata {
+  id: string;
+  type: "url" | "note";
+  title?: string | null;
+  created_at: string;
+}
+
 interface SearchResultItem {
   id: string;
   title: string;
@@ -28,6 +35,7 @@ interface SearchResultItem {
   score: number;
   product_name?: string;
   area_name?: string;
+  references?: ReferenceMetadata[];
 }
 
 export async function POST(request: NextRequest) {
@@ -58,8 +66,8 @@ export async function POST(request: NextRequest) {
     >`
       SELECT
         t.id::text,
-        COALESCE(t.title, t.narrative, LEFT(t.content, 100)) as title,
-        COALESCE(t.content, t.narrative, '') as content,
+        LEFT(t.content, 100) as title,
+        t.content as content,
         1 - (t.embedding <=> ${vectorStr}::vector) as similarity,
         p.name as product_name,
         a.name as area_name
@@ -81,6 +89,7 @@ export async function POST(request: NextRequest) {
         content: string;
         similarity: number;
         area_name: string | null;
+        references: any;
       }>
     >`
       SELECT
@@ -88,7 +97,8 @@ export async function POST(request: NextRequest) {
         p.name as title,
         COALESCE(p.description, '') as content,
         1 - (p.embedding <=> ${vectorStr}::vector) as similarity,
-        a.name as area_name
+        a.name as area_name,
+        p.references
       FROM products p
       LEFT JOIN areas a ON p.area_id = a.id
       WHERE p.user_id = ${userId}::uuid
@@ -115,6 +125,13 @@ export async function POST(request: NextRequest) {
         score: Number(r.similarity),
         product_name: r.title, // product itself
         area_name: r.area_name ?? undefined,
+        references: (r.references || []).map((ref: any) => ({
+          id: ref.id,
+          type: ref.type,
+          title: ref.title,
+          created_at: ref.created_at,
+          // 不包含 content，避免 response 太大
+        })),
       })),
     ]
       .sort((a, b) => b.score - a.score)

@@ -136,9 +136,9 @@ export class CreateTaskUseCase {
       throw new ValidationException('Task content cannot be empty', 'content')
     }
 
-    if (request.content.length > 500) {
+    if (request.content.length > 300) {
       throw new ValidationException(
-        'Task content must be less than 500 characters',
+        'Task content must be less than 300 characters. For longer content, use add_reference to store documents.',
         'content'
       )
     }

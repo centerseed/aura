@@ -107,10 +107,40 @@ export class BackendApiClient {
 
   async listTasks(
     userId: string,
-    params?: { status?: string },
+    params?: {
+      status?: string;
+      product_id?: string;
+      topic_id?: string;
+    },
   ): Promise<unknown> {
-    const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : "";
+    const queryParts: string[] = []
+    if (params?.status) queryParts.push(`status=${encodeURIComponent(params.status)}`)
+    if (params?.product_id) queryParts.push(`product_id=${encodeURIComponent(params.product_id)}`)
+    if (params?.topic_id) queryParts.push(`topic_id=${encodeURIComponent(params.topic_id)}`)
+
+    const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : ""
     return this.get(`/api/tasks${query}`, userId);
+  }
+
+  async addSubItem(
+    userId: string,
+    taskId: string,
+    content: string,
+  ): Promise<unknown> {
+    return this.post(`/api/tasks/${encodeURIComponent(taskId)}/sub-items`, userId, { content });
+  }
+
+  async updateSubItem(
+    userId: string,
+    taskId: string,
+    subItemId: string,
+    params: { completed?: boolean; content?: string },
+  ): Promise<unknown> {
+    return this.patch(
+      `/api/tasks/${encodeURIComponent(taskId)}/sub-items/${encodeURIComponent(subItemId)}`,
+      userId,
+      params,
+    );
   }
 
   async createTask(
@@ -120,6 +150,7 @@ export class BackendApiClient {
       product_id?: string;
       topic_id?: string;
       status?: string;
+      start_date?: string;
       due_date?: string;
     },
   ): Promise<unknown> {
@@ -132,6 +163,8 @@ export class BackendApiClient {
       task_id: string;
       status?: string;
       content?: string;
+      start_date?: string | null;
+      due_date?: string | null;
     },
   ): Promise<unknown> {
     const { task_id, ...body } = params;
@@ -148,6 +181,39 @@ export class BackendApiClient {
   ): Promise<unknown> {
     const query = params?.date ? `?date=${encodeURIComponent(params.date)}` : "";
     return this.get(`/api/coach/plan${query}`, userId);
+  }
+
+  async getReference(
+    userId: string,
+    params: {
+      reference_id: string;
+      product_id?: string;
+      task_id?: string;
+    },
+  ): Promise<unknown> {
+    const queryParts: string[] = [
+      `reference_id=${encodeURIComponent(params.reference_id)}`,
+    ];
+    if (params.product_id) {
+      queryParts.push(`product_id=${encodeURIComponent(params.product_id)}`);
+    }
+    if (params.task_id) {
+      queryParts.push(`task_id=${encodeURIComponent(params.task_id)}`);
+    }
+    const query = `?${queryParts.join("&")}`;
+    return this.get(`/api/library/references${query}`, userId);
+  }
+
+  async addProductReference(
+    userId: string,
+    productId: string,
+    params: {
+      type: "url" | "note";
+      content: string;
+      title?: string;
+    },
+  ): Promise<unknown> {
+    return this.post(`/api/products/${productId}/references`, userId, params);
   }
 
   /**
