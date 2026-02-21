@@ -1,11 +1,11 @@
 {
-    "name": "app",
-    "short_name": "app",
+    "name": "Zentropy",
+    "short_name": "Zentropy",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0A192F",
-    "theme_color": "#0A192F",
-    "description": "A new Flutter project.",
+    "background_color": "#09090b",
+    "theme_color": "#09090b",
+    "description": "Zentropy - Your personal Zen and Entropy balancer.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

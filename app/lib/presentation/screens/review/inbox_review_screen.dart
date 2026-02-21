@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_dual_cache/flutter_dual_cache.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,7 +36,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
+      backgroundColor: AppColors.deepBlack,
       body: SafeArea(
         child: Column(
           children: [
@@ -181,7 +182,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6C63FF),
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -257,7 +258,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
     return Container(
       width: 260,
       decoration: BoxDecoration(
-        color: const Color(0xFF1c1c1e),
+        color: AppColors.darkBackground,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),

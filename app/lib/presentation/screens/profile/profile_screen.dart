@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -20,7 +21,7 @@ class ProfileScreen extends ConsumerWidget {
     final isAnonymous = authRepo.isAnonymous;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
+      backgroundColor: AppColors.deepBlack,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -66,14 +67,14 @@ class ProfileScreen extends ConsumerWidget {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1c1c1e),
+                    color: AppColors.darkBackground,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     children: [
                       Icon(
                         Icons.error_outline,
-                        color: Colors.orange.withOpacity(0.7),
+                        color: AppColors.statusInbox.withOpacity(0.7),
                         size: 32,
                       ),
                       const SizedBox(height: 8),
@@ -179,20 +180,20 @@ class ProfileScreen extends ConsumerWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              const Color(0xFF6C63FF).withOpacity(0.15),
+              AppColors.primary.withOpacity(0.15),
               const Color(0xFF5E9FFF).withOpacity(0.10),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFF6C63FF).withOpacity(0.3),
+            color: AppColors.primary.withOpacity(0.3),
           ),
         ),
         child: Column(
           children: [
             const Icon(
               Icons.link_rounded,
-              color: Color(0xFF6C63FF),
+              color: AppColors.primary,
               size: 32,
             ),
             const SizedBox(height: 12),
@@ -219,7 +220,7 @@ class ProfileScreen extends ConsumerWidget {
               child: FilledButton.icon(
                 onPressed: () => _linkWithGoogle(context, ref),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -282,7 +283,7 @@ class ProfileScreen extends ConsumerWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF6C63FF).withOpacity(0.2),
+                      color: AppColors.primary.withOpacity(0.2),
                       blurRadius: 15,
                       spreadRadius: 2,
                     ),
@@ -295,7 +296,7 @@ class ProfileScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF6C63FF), Color(0xFF8F8AFF)],
+                    colors: [AppColors.primary, Color(0xFF8F8AFF)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -305,7 +306,7 @@ class ProfileScreen extends ConsumerWidget {
                   backgroundImage: user?.photoURL != null
                       ? NetworkImage(user!.photoURL!)
                       : null,
-                  backgroundColor: const Color(0xFF1c1c1e),
+                  backgroundColor: AppColors.darkBackground,
                   child: user?.photoURL == null
                       ? const Icon(Icons.person, size: 36, color: Colors.white24)
                       : null,
@@ -411,7 +412,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.activeTasks,
                         label: '進行中',
                         icon: Icons.play_circle_outline,
-                        color: const Color(0xFF6C63FF), // 紫色
+                        color: AppColors.primary, // 紫色
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -465,7 +466,7 @@ class ProfileScreen extends ConsumerWidget {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1c1c1e),
+            color: AppColors.darkBackground,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
@@ -483,7 +484,7 @@ class ProfileScreen extends ConsumerWidget {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1c1c1e),
+      backgroundColor: AppColors.darkBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -500,7 +501,7 @@ class ProfileScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF6C63FF), Color(0xFF5E9FFF)],
+                      colors: [AppColors.primary, Color(0xFF5E9FFF)],
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -524,7 +525,7 @@ class ProfileScreen extends ConsumerWidget {
               lifecycleData.lastKnownTimezone ?? '未設定',
               Icons.history,
             ),
-            const Divider(height: 32, color: Color(0xFF2c2c2e)),
+            const Divider(height: 32, color: AppColors.darkCard),
             _buildTimezoneInfoRow(
               '本地時間',
               _formatDetailedDateTime(now),
@@ -539,17 +540,17 @@ class ProfileScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF6C63FF).withOpacity(0.1),
+                color: AppColors.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFF6C63FF).withOpacity(0.3),
+                  color: AppColors.primary.withOpacity(0.3),
                 ),
               ),
               child: Row(
                 children: [
                   const Icon(
                     Icons.info_outline,
-                    color: Color(0xFF6C63FF),
+                    color: AppColors.primary,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -576,7 +577,7 @@ class ProfileScreen extends ConsumerWidget {
   void _showAboutDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1c1c1e),
+      backgroundColor: AppColors.darkBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -590,7 +591,7 @@ class ProfileScreen extends ConsumerWidget {
               height: 80,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF5E9FFF)],
+                  colors: [AppColors.primary, Color(0xFF5E9FFF)],
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -644,7 +645,7 @@ class ProfileScreen extends ConsumerWidget {
         children: [
           Icon(
             icon,
-            color: const Color(0xFF6C63FF),
+            color: AppColors.primary,
             size: 20,
           ),
           const SizedBox(width: 12),

@@ -80,18 +80,10 @@ import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { DRAWER_CONFIG } from "@/domain/constants/drawer-config";
 
 // 視圖類型
 type ViewMode = "structure" | "timeline" | "load";
-
-// Drawer 狀態配置
-const DRAWER_CONFIG: Record<DrawerStatus, { label: string; icon: typeof Inbox; color: string; dotColor: string }> = {
-  INBOX: { label: "規劃中", icon: Inbox, color: "text-amber-500", dotColor: "bg-amber-500" },
-  ACTIVE: { label: "進行中", icon: Rocket, color: "text-blue-500", dotColor: "bg-blue-500" },
-  MAINTAIN: { label: "維護中", icon: RefreshCw, color: "text-indigo-500", dotColor: "bg-indigo-500" },
-  REFERENCE: { label: "參考資料", icon: BookOpen, color: "text-green-500", dotColor: "bg-green-500" },
-  ARCHIVE: { label: "已歸檔", icon: Archive, color: "text-slate-400", dotColor: "bg-slate-400" },
-};
 
 // API 返回的 Area 結構
 interface ApiArea {

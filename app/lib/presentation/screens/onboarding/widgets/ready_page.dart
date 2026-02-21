@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/onboarding_provider.dart';
@@ -82,8 +83,8 @@ class ReadyPage extends ConsumerWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF6366F1).withValues(alpha: 0.3),
-                    const Color(0xFF10B981).withValues(alpha: 0.3),
+                    AppColors.onboardingIndigo.withValues(alpha: 0.3),
+                    AppColors.accentEmerald.withValues(alpha: 0.3),
                   ],
                 ),
               ),
@@ -99,7 +100,7 @@ class ReadyPage extends ConsumerWidget {
             // 標題
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF10B981)],
+                colors: [AppColors.onboardingIndigo, AppColors.accentEmerald],
               ).createShader(bounds),
               child: const Text(
                 '準備就緒！',
@@ -139,7 +140,7 @@ class ReadyPage extends ConsumerWidget {
                     children: [
                       const Icon(
                         Icons.check_circle,
-                        color: Color(0xFF10B981),
+                        color: AppColors.accentEmerald,
                         size: 24,
                       ),
                       const SizedBox(width: 12),
@@ -177,7 +178,7 @@ class ReadyPage extends ConsumerWidget {
               child: FilledButton(
                 onPressed: isSubmitting ? null : () => _createAreas(context, ref),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -221,8 +222,8 @@ class ReadyPage extends ConsumerWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF6366F1).withValues(alpha: 0.2),
-            const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+            AppColors.onboardingIndigo.withValues(alpha: 0.2),
+            AppColors.statusMaintain.withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(20),

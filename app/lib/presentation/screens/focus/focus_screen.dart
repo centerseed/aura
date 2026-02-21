@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/core/di/providers.dart';
@@ -170,11 +171,11 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
   Color get _phaseColor {
     switch (_currentPhase) {
       case FocusPhase.focus:
-        return const Color(0xFFff6b6b); // Red/Orange for Focus
+        return AppColors.pomodoroFocus; // Red/Orange for Focus
       case FocusPhase.shortBreak:
-        return const Color(0xFF4ecdc4); // Teal for Short break
+        return AppColors.pomodoroShortBreak; // Teal for Short break
       case FocusPhase.longBreak:
-        return const Color(0xFF1a535c); // Deep teal/blue for Long break
+        return AppColors.pomodoroLongBreak; // Deep teal/blue for Long break
     }
   }
 
@@ -229,7 +230,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1c1c1e),
+      backgroundColor: AppColors.darkBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -452,7 +453,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
 
   Widget _buildSetupScreen(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000), // Deep Black
+      backgroundColor: AppColors.deepBlack, // Deep Black
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -475,7 +476,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1c1c1e),
+                        color: AppColors.darkBackground,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: Colors.white.withOpacity(0.08),
@@ -606,7 +607,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                           child: _buildLargeTimePicker(
                             label: '專注時間',
                             value: _focusMinutes,
-                            color: const Color(0xFFff6b6b),
+                            color: AppColors.pomodoroFocus,
                             onChanged: (val) =>
                                 setState(() => _focusMinutes = val),
                           ),
@@ -616,7 +617,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                           child: _buildLargeTimePicker(
                             label: '休息時間',
                             value: _shortBreakMinutes,
-                            color: const Color(0xFF4ecdc4),
+                            color: AppColors.pomodoroShortBreak,
                             onChanged: (val) =>
                                 setState(() => _shortBreakMinutes = val),
                           ),

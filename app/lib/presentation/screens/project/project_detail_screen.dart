@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../domain/entities/product.dart';
@@ -56,10 +57,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
+                  color: AppColors.primary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFF6C63FF).withValues(alpha: 0.5),
+                    color: AppColors.primary.withValues(alpha: 0.5),
                     width: 1,
                   ),
                 ),
@@ -76,7 +77,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             padding: const EdgeInsets.only(right: 8.0),
             child: PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: Colors.white70),
-              color: const Color(0xFF2c2c2e),
+              color: AppColors.darkCard,
               enabled: !_isDeleting,
               onSelected: (value) {
                 if (value == 'delete') {
@@ -350,7 +351,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                                       : Icons.circle_outlined,
                                                   size: 16,
                                                   color: sub.completed
-                                                      ? Colors.green
+                                                      ? AppColors.success
                                                       : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                                                 ),
                                               ),
@@ -400,7 +401,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2c2c2e),
+        backgroundColor: AppColors.darkCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('刪除專案', style: TextStyle(color: Colors.white)),
         content: Column(
@@ -415,21 +416,21 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: AppColors.statusInbox.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                border: Border.all(color: AppColors.statusInbox.withOpacity(0.3)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.info_outline, size: 16,
-                    color: Colors.orange.withOpacity(0.8)),
+                    color: AppColors.statusInbox.withOpacity(0.8)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '如果專案內有進行中的任務，將無法刪除。',
                       style: TextStyle(
-                        color: Colors.orange.withOpacity(0.9),
+                        color: AppColors.statusInbox.withOpacity(0.9),
                         fontSize: 12,
                       ),
                     ),
@@ -473,7 +474,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            backgroundColor: const Color(0xFF2c2c2e),
+            backgroundColor: AppColors.darkCard,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)
             ),
@@ -487,7 +488,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('知道了',
-                  style: TextStyle(color: Color(0xFF6C63FF))),
+                  style: TextStyle(color: AppColors.primary)),
               ),
             ],
           ),
@@ -503,7 +504,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('專案「${widget.product.name}」已刪除'),
-              backgroundColor: const Color(0xFF6C63FF),
+              backgroundColor: AppColors.primary,
             ),
           );
         }
@@ -655,7 +656,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
       child: Container(
         height: 600,
         decoration: BoxDecoration(
-          color: const Color(0xFF1c1c1e).withOpacity(0.9),
+          color: AppColors.darkBackground.withOpacity(0.9),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
@@ -707,12 +708,12 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF6C63FF).withOpacity(0.1),
+                color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.auto_awesome,
-                color: Color(0xFF6C63FF),
+                color: AppColors.primary,
                 size: 48,
               ),
             ),
@@ -766,7 +767,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
             children: [
               const Row(
                 children: [
-                  Icon(Icons.auto_awesome, color: Color(0xFF6C63FF), size: 24),
+                  Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
                   SizedBox(width: 8),
                   Text(
                     "AI 重組建議",
@@ -818,7 +819,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                     Text(
                       "$newTopicCount",
                       style: const TextStyle(
-                        color: Color(0xFF6C63FF),
+                        color: AppColors.primary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -853,13 +854,13 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                       Icon(
                         Icons.layers,
                         size: 14,
-                        color: const Color(0xFF6C63FF).withOpacity(0.8),
+                        color: AppColors.primary.withOpacity(0.8),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         "${proposal.taskConsolidations.length} 組整合",
                         style: TextStyle(
-                          color: const Color(0xFF6C63FF).withOpacity(0.8),
+                          color: AppColors.primary.withOpacity(0.8),
                           fontSize: 13,
                         ),
                       ),
@@ -944,7 +945,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                       }
                     },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
+                backgroundColor: AppColors.primary,
                 disabledBackgroundColor: const Color(
                   0xFF6C63FF,
                 ).withOpacity(0.5),
@@ -983,7 +984,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1c1c1e).withOpacity(0.5),
+        color: AppColors.darkBackground.withOpacity(0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
@@ -1046,13 +1047,13 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6C63FF).withOpacity(0.2),
+                      color: AppColors.primary.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       "新",
                       style: TextStyle(
-                        color: Color(0xFF6C63FF),
+                        color: AppColors.primary,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1082,7 +1083,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
       decoration: BoxDecoration(
         color: const Color(0xFF161621),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,7 +1091,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
           // 整合標題
           Row(
             children: [
-              const Icon(Icons.layers, color: Color(0xFF6C63FF), size: 18),
+              const Icon(Icons.layers, color: AppColors.primary, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1131,7 +1132,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                       width: 6,
                       height: 6,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF6C63FF),
+                        color: AppColors.primary,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -1149,7 +1150,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6C63FF).withOpacity(0.2),
+                        color: AppColors.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: const Text(

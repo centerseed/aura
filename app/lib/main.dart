@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/di/providers.dart';
+import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'presentation/providers/app_lifecycle_provider.dart';
 import 'presentation/routes/app_router.dart';
@@ -68,20 +69,8 @@ class ZentropyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Zentropy',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF667eea),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF667eea),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       locale: const Locale('zh', 'TW'),
       localizationsDelegates: const [

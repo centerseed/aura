@@ -195,14 +195,6 @@ extension TaskStatusDisplay on TaskStatus {
     TaskStatus.archive => '已歸檔',
   };
 
-  Color get color => switch (this) {
-    TaskStatus.inbox => const Color(0xFFF59E0B),
-    TaskStatus.active => const Color(0xFF3B82F6),
-    TaskStatus.maintain => const Color(0xFF8B5CF6),
-    TaskStatus.reference => const Color(0xFF22C55E),
-    TaskStatus.archive => const Color(0xFF64748B),
-  };
-
   IconData get icon => switch (this) {
     TaskStatus.inbox => Icons.assignment_outlined,
     TaskStatus.active => Icons.rocket_launch_outlined,

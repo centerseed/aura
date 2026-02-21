@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/onboarding_provider.dart';
 import 'widgets/identity_setup_page.dart';
@@ -60,7 +61,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final canProceed = ref.watch(canProceedProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppColors.githubDark,
       body: Stack(
         children: [
           // 背景漸層

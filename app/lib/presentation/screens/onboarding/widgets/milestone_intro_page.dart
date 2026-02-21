@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 
 /// Page 3: 里程碑介紹
 class MilestoneIntroPage extends StatelessWidget {
@@ -15,7 +16,7 @@ class MilestoneIntroPage extends StatelessWidget {
             // 標題
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
               ).createShader(bounds),
               child: const Text(
                 '什麼是里程碑？',
@@ -48,7 +49,7 @@ class MilestoneIntroPage extends StatelessWidget {
               title: '你需要自己設定里程碑',
               description: '為重要的事情設定明確的完成日期',
               icon: Icons.edit_calendar,
-              color: const Color(0xFF6366F1),
+              color: AppColors.onboardingIndigo,
             ),
 
             const SizedBox(height: 20),
@@ -58,7 +59,7 @@ class MilestoneIntroPage extends StatelessWidget {
               title: '里程碑是時間錨點',
               description: '讓系統知道什麼時候必須完成',
               icon: Icons.anchor,
-              color: const Color(0xFF8B5CF6),
+              color: AppColors.statusMaintain,
             ),
 
             const SizedBox(height: 20),
@@ -68,7 +69,7 @@ class MilestoneIntroPage extends StatelessWidget {
               title: 'AI 會自動安排任務',
               description: '根據你的里程碑倒推任務時間',
               icon: Icons.auto_awesome,
-              color: const Color(0xFF10B981),
+              color: AppColors.accentEmerald,
             ),
 
             const SizedBox(height: 48),
@@ -81,13 +82,13 @@ class MilestoneIntroPage extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                    AppColors.statusInbox.withValues(alpha: 0.15),
                     const Color(0xFFF97316).withValues(alpha: 0.15),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                  color: AppColors.statusInbox.withValues(alpha: 0.4),
                   width: 2,
                 ),
               ),
@@ -99,12 +100,12 @@ class MilestoneIntroPage extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                          color: AppColors.statusInbox.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
                           Icons.lightbulb_outline,
-                          color: Color(0xFFF59E0B),
+                          color: AppColors.statusInbox,
                           size: 24,
                         ),
                       ),
@@ -112,7 +113,7 @@ class MilestoneIntroPage extends StatelessWidget {
                       const Text(
                         '舉例',
                         style: TextStyle(
-                          color: Color(0xFFF59E0B),
+                          color: AppColors.statusInbox,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),

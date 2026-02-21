@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import '../../../../domain/entities/reorganize_proposal.dart';
 
 class ReorganizeBottomSheet extends StatefulWidget {
@@ -77,7 +78,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1117),
+        color: AppColors.githubDark,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
       ),
@@ -106,7 +107,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                   // 標題
                   const Row(
                     children: [
-                      Icon(Icons.auto_awesome, color: Color(0xFF6C63FF), size: 24),
+                      Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
                       SizedBox(width: 12),
                       Text(
                         'AI 整理建議',
@@ -125,7 +126,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                   // ═══════════════════════════════════════
                   if (hasChanges) ...[
                     _buildSection(
-                      color: const Color(0xFF6366F1),
+                      color: AppColors.onboardingIndigo,
                       icon: Icons.auto_awesome,
                       title: '主題重組',
                       subtitle: '$currentTopicCount → $newTopicCount 個主題'
@@ -143,7 +144,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                               child: Text(
                                 '主題整理',
                                 style: TextStyle(
-                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.8),
+                                  color: AppColors.statusInbox.withValues(alpha: 0.8),
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1,
@@ -160,7 +161,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                               child: Text(
                                 '任務分配',
                                 style: TextStyle(
-                                  color: const Color(0xFF6366F1).withValues(alpha: 0.8),
+                                  color: AppColors.onboardingIndigo.withValues(alpha: 0.8),
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1,
@@ -185,7 +186,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                   // ═══════════════════════════════════════
                   if (hasConsolidations) ...[
                     _buildSection(
-                      color: const Color(0xFF8B5CF6),
+                      color: AppColors.statusMaintain,
                       icon: Icons.compress,
                       title: '任務整合',
                       subtitle: '${proposal.taskConsolidations.length} 組細碎任務合併',
@@ -218,7 +219,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                   const SizedBox(height: 6),
                                   Row(
                                     children: [
-                                      _buildTag('主', const Color(0xFF8B5CF6)),
+                                      _buildTag('主', AppColors.statusMaintain),
                                       const SizedBox(width: 6),
                                       Expanded(
                                         child: Text(
@@ -234,7 +235,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                       padding: const EdgeInsets.only(top: 4),
                                       child: Row(
                                         children: [
-                                          _buildTag('子', const Color(0xFF8B5CF6).withValues(alpha: 0.5)),
+                                          _buildTag('子', AppColors.statusMaintain.withValues(alpha: 0.5)),
                                           const SizedBox(width: 6),
                                           Expanded(
                                             child: Text(
@@ -303,7 +304,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                               applyConsolidations: _applyConsolidations,
                             ),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C63FF),
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -426,18 +427,18 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
       child: op.action == 'rename'
           ? Row(
               children: [
-                _buildTag('改名', const Color(0xFFF59E0B)),
+                _buildTag('改名', AppColors.statusInbox),
                 const SizedBox(width: 8),
                 Text(
                   op.oldName ?? '',
                   style: const TextStyle(
-                    color: Color(0xFF94A3B8),
+                    color: AppColors.statusArchive,
                     fontSize: 13,
                     decoration: TextDecoration.lineThrough,
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Icon(Icons.arrow_forward, size: 12, color: Color(0xFF94A3B8)),
+                const Icon(Icons.arrow_forward, size: 12, color: AppColors.statusArchive),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -453,7 +454,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
             )
           : Row(
               children: [
-                _buildTag('合併', const Color(0xFFF59E0B)),
+                _buildTag('合併', AppColors.statusInbox),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Wrap(
@@ -464,8 +465,8 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                       ...(op.sourceNames ?? []).map((name) => Text(
                         name,
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
-                      )).toList().expand((w) => [w, const Text(' + ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11))]).toList()..removeLast(),
-                      const Icon(Icons.arrow_forward, size: 12, color: Color(0xFF94A3B8)),
+                      )).toList().expand((w) => [w, const Text(' + ', style: TextStyle(color: AppColors.statusArchive, fontSize: 11))]).toList()..removeLast(),
+                      const Icon(Icons.arrow_forward, size: 12, color: AppColors.statusArchive),
                       Text(
                         op.targetName ?? '',
                         style: const TextStyle(
@@ -490,7 +491,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: change.isNew
-              ? const Color(0xFF6366F1).withValues(alpha: 0.4)
+              ? AppColors.onboardingIndigo.withValues(alpha: 0.4)
               : Colors.white.withValues(alpha: 0.08),
         ),
       ),
@@ -502,7 +503,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: change.isNew
-                  ? const Color(0xFF6366F1).withValues(alpha: 0.12)
+                  ? AppColors.onboardingIndigo.withValues(alpha: 0.12)
                   : const Color(0xFF334155).withValues(alpha: 0.25),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
             ),
@@ -529,7 +530,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     margin: const EdgeInsets.only(right: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                      color: AppColors.onboardingIndigo.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -569,7 +570,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                           height: 5,
                           decoration: BoxDecoration(
                             color: showMovement
-                                ? const Color(0xFFF59E0B)
+                                ? AppColors.statusInbox
                                 : Colors.white.withValues(alpha: 0.3),
                             shape: BoxShape.circle,
                           ),
@@ -584,7 +585,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                               task.title,
                               style: TextStyle(
                                 color: showMovement
-                                    ? const Color(0xFFF59E0B)
+                                    ? AppColors.statusInbox
                                     : Colors.white.withValues(alpha: 0.85),
                                 fontSize: 13,
                               ),

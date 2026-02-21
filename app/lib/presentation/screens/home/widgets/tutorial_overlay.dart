@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/first_time_tutorial_provider.dart';
 
@@ -87,12 +88,12 @@ class TutorialOverlay extends ConsumerWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFF6366F1),
+                color: AppColors.onboardingIndigo,
                 width: 3,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.5),
+                  color: AppColors.onboardingIndigo.withValues(alpha: 0.5),
                   blurRadius: 20,
                   spreadRadius: 5,
                 ),
@@ -108,7 +109,7 @@ class TutorialOverlay extends ConsumerWidget {
           child: Icon(
             Icons.arrow_downward,
             size: 40,
-            color: const Color(0xFF6366F1),
+            color: AppColors.onboardingIndigo,
           ),
         ),
 
@@ -147,13 +148,13 @@ class TutorialOverlay extends ConsumerWidget {
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
-                color: const Color(0xFF6366F1),
+                color: AppColors.onboardingIndigo,
                 width: 3,
               ),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.5),
+                  color: AppColors.onboardingIndigo.withValues(alpha: 0.5),
                   blurRadius: 20,
                   spreadRadius: 5,
                 ),
@@ -169,7 +170,7 @@ class TutorialOverlay extends ConsumerWidget {
           child: Icon(
             Icons.arrow_downward,
             size: 40,
-            color: const Color(0xFF6366F1),
+            color: AppColors.onboardingIndigo,
           ),
         ),
 
@@ -259,12 +260,12 @@ class TutorialOverlay extends ConsumerWidget {
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF6366F1).withValues(alpha: 0.5),
+          color: AppColors.onboardingIndigo.withValues(alpha: 0.5),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+            color: AppColors.onboardingIndigo.withValues(alpha: 0.3),
             blurRadius: 30,
             spreadRadius: 5,
           ),
@@ -326,7 +327,7 @@ class TutorialOverlay extends ConsumerWidget {
               ElevatedButton(
                 onPressed: onNext,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
+                  backgroundColor: AppColors.onboardingIndigo,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,

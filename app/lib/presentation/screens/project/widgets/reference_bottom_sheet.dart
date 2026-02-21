@@ -1,5 +1,6 @@
 import 'dart:ui' as dart_ui;
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -132,7 +133,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: const Color(0xFF1c1c1e).withValues(alpha: 0.95),
+        color: AppColors.darkBackground.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
@@ -163,7 +164,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                         setState(() => _isFormVisible = true);
                         HapticFeedback.mediumImpact();
                       },
-                      backgroundColor: const Color(0xFF6C63FF),
+                      backgroundColor: AppColors.primary,
                       child: const Icon(Icons.add, color: Colors.white),
                     ),
                   ),
@@ -175,7 +176,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                 const Expanded(
                   child: Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C63FF)),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                     ),
                   ),
                 ),
@@ -325,7 +326,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                 // Icon
                 Icon(
                   isUrl ? Icons.link : Icons.note_outlined,
-                  color: isUrl ? const Color(0xFF6C63FF) : const Color(0xFF4ADE80),
+                  color: isUrl ? AppColors.primary : AppColors.success,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -406,7 +407,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                       child: Text(
                         reference.content,
                         style: const TextStyle(
-                          color: Color(0xFF6C63FF),
+                          color: AppColors.primary,
                           fontSize: 13,
                           decoration: TextDecoration.underline,
                         ),
@@ -440,7 +441,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                         ),
                         code: TextStyle(
                           backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          color: const Color(0xFF4ADE80),
+                          color: AppColors.success,
                           fontFamily: 'monospace',
                           fontSize: 12,
                         ),
@@ -450,7 +451,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                           border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                         ),
                         listBullet: const TextStyle(
-                          color: Color(0xFF4ADE80),
+                          color: AppColors.success,
                           fontSize: 13,
                         ),
                         blockquote: TextStyle(
@@ -460,7 +461,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                         blockquoteDecoration: BoxDecoration(
                           border: Border(
                             left: BorderSide(
-                              color: const Color(0xFF4ADE80).withValues(alpha: 0.5),
+                              color: AppColors.success.withValues(alpha: 0.5),
                               width: 3,
                             ),
                           ),
@@ -491,7 +492,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     Text(
                       isExpanded ? '收起' : '展開更多',
                       style: const TextStyle(
-                        color: Color(0xFF6C63FF),
+                        color: AppColors.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -499,7 +500,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     const SizedBox(width: 4),
                     Icon(
                       isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                      color: const Color(0xFF6C63FF),
+                      color: AppColors.primary,
                       size: 16,
                     ),
                   ],
@@ -515,7 +516,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1c1c1e),
+        color: AppColors.darkBackground,
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
@@ -527,7 +528,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
             children: [
               Icon(
                 _editingReferenceId != null ? Icons.edit : Icons.add_circle_outline,
-                color: const Color(0xFF6C63FF),
+                color: AppColors.primary,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -545,7 +546,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                   onPressed: _cancelEditing,
                   child: const Text(
                     '取消',
-                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                    style: TextStyle(color: AppColors.error, fontSize: 13),
                   ),
                 ),
             ],
@@ -581,7 +582,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6C63FF)),
+                borderSide: const BorderSide(color: AppColors.primary),
               ),
             ),
           ),
@@ -607,7 +608,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6C63FF)),
+                borderSide: const BorderSide(color: AppColors.primary),
               ),
             ),
           ),
@@ -630,7 +631,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                   : Icon(_editingReferenceId != null ? Icons.check : Icons.add),
               label: Text(_editingReferenceId != null ? '更新' : '新增'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
+                backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -652,12 +653,12 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF6C63FF)
+              ? AppColors.primary
               : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF6C63FF)
+                ? AppColors.primary
                 : Colors.white.withValues(alpha: 0.2),
           ),
         ),

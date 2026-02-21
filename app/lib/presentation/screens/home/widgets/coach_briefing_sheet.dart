@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,7 +23,7 @@ class CoachBriefingSheet extends ConsumerWidget {
       maxChildSize: 0.95,
       builder: (context, scrollController) => Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF1A1F2E),
+          color: AppColors.purpleTinted,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -167,15 +168,15 @@ class CoachBriefingSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('💬', 'AI 摘要', const Color(0xFF6366F1)),
+        _buildSectionTitle('💬', 'AI 摘要', AppColors.onboardingIndigo),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+            color: AppColors.onboardingIndigo.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+              color: AppColors.onboardingIndigo.withValues(alpha: 0.15),
             ),
           ),
           child: Text(
@@ -209,7 +210,7 @@ class CoachBriefingSheet extends ConsumerWidget {
       children: [
         Row(
           children: [
-            _buildSectionTitle('📋', '今日計畫', const Color(0xFF3B82F6)),
+            _buildSectionTitle('📋', '今日計畫', AppColors.statusActive),
             const Spacer(),
             if (plan.coachMessage != null)
               Flexible(
@@ -232,18 +233,18 @@ class CoachBriefingSheet extends ConsumerWidget {
             children: [
               _buildCapacityChip(
                 '可用 ${plan.availableMinutes}分',
-                const Color(0xFF10B981),
+                AppColors.accentEmerald,
               ),
               const SizedBox(width: 6),
               if (plan.meetingMinutes != null && plan.meetingMinutes! > 0)
                 _buildCapacityChip(
                   '會議 ${plan.meetingMinutes}分',
-                  const Color(0xFFF59E0B),
+                  AppColors.statusInbox,
                 ),
               const SizedBox(width: 6),
               _buildCapacityChip(
                 '已排 ${plan.plannedMinutes ?? plan.totalEstimatedMinutes}分',
-                const Color(0xFF3B82F6),
+                AppColors.statusActive,
               ),
             ],
           ),
@@ -328,10 +329,10 @@ class CoachBriefingSheet extends ConsumerWidget {
     final isCompleted = item.completed;
     final isDeferred = item.deferred;
     final accentColor = isCompleted
-        ? const Color(0xFF10B981)
+        ? AppColors.accentEmerald
         : isDeferred
-            ? const Color(0xFF64748B)
-            : const Color(0xFF6366F1);
+            ? AppColors.statusArchive
+            : AppColors.onboardingIndigo;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -359,10 +360,10 @@ class CoachBriefingSheet extends ConsumerWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color:
-                      isCompleted ? const Color(0xFF10B981) : Colors.transparent,
+                      isCompleted ? AppColors.accentEmerald : Colors.transparent,
                   border: Border.all(
                     color: isCompleted
-                        ? const Color(0xFF10B981)
+                        ? AppColors.accentEmerald
                         : Colors.white.withValues(alpha: 0.2),
                     width: 1.5,
                   ),
@@ -429,7 +430,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                   item.pinned ? Icons.push_pin : Icons.push_pin_outlined,
                   size: 16,
                   color: item.pinned
-                      ? const Color(0xFFF59E0B)
+                      ? AppColors.statusInbox
                       : Colors.white.withValues(alpha: 0.2),
                 ),
               ),
@@ -454,7 +455,7 @@ class CoachBriefingSheet extends ConsumerWidget {
         _buildSectionTitle(
           '🎯',
           '今日計畫成果 (${completedItems.length})',
-          const Color(0xFF10B981),
+          AppColors.accentEmerald,
         ),
         const SizedBox(height: 10),
         ...completedItems.map((item) => Padding(
@@ -463,10 +464,10 @@ class CoachBriefingSheet extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.06),
+                  color: AppColors.accentEmerald.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    color: AppColors.accentEmerald.withValues(alpha: 0.12),
                   ),
                 ),
                 child: Row(
@@ -474,7 +475,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     Icon(
                       Icons.check_circle,
                       size: 16,
-                      color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                      color: AppColors.accentEmerald.withValues(alpha: 0.6),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -508,7 +509,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('📅', '行事曆', const Color(0xFF3B82F6)),
+        _buildSectionTitle('📅', '行事曆', AppColors.statusActive),
         const SizedBox(height: 10),
         ...briefing.calendarEvents.map((event) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
@@ -516,10 +517,10 @@ class CoachBriefingSheet extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.06),
+                  color: AppColors.statusActive.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                    color: AppColors.statusActive.withValues(alpha: 0.12),
                   ),
                 ),
                 child: Row(
@@ -527,7 +528,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     Icon(
                       Icons.event,
                       size: 16,
-                      color: const Color(0xFF3B82F6).withValues(alpha: 0.6),
+                      color: AppColors.statusActive.withValues(alpha: 0.6),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -555,7 +556,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                       Icon(
                         Icons.videocam_outlined,
                         size: 16,
-                        color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                        color: AppColors.accentEmerald.withValues(alpha: 0.6),
                       ),
                   ],
                 ),
@@ -580,11 +581,11 @@ class CoachBriefingSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('🔴', '逾期任務', const Color(0xFFEF4444)),
+        _buildSectionTitle('🔴', '逾期任務', AppColors.error),
         const SizedBox(height: 10),
         ...briefing.overdueTasks.map((task) => _buildTaskSummaryTile(
               task,
-              const Color(0xFFEF4444),
+              AppColors.error,
               suffix: task.daysOverdue != null ? '逾期 ${task.daysOverdue} 天' : null,
             )),
       ],
@@ -595,7 +596,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('⚠️', '衝突偵測', const Color(0xFFF59E0B)),
+        _buildSectionTitle('⚠️', '衝突偵測', AppColors.statusInbox),
         const SizedBox(height: 10),
         ...briefing.conflicts.map((conflict) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
@@ -603,10 +604,10 @@ class CoachBriefingSheet extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.06),
+                  color: AppColors.statusInbox.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                    color: AppColors.statusInbox.withValues(alpha: 0.12),
                   ),
                 ),
                 child: Text(
@@ -626,7 +627,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('💡', 'AI 建議', const Color(0xFF10B981)),
+        _buildSectionTitle('💡', 'AI 建議', AppColors.accentEmerald),
         const SizedBox(height: 10),
         ...briefing.recommendations.map((rec) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
@@ -634,10 +635,10 @@ class CoachBriefingSheet extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.06),
+                  color: AppColors.accentEmerald.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    color: AppColors.accentEmerald.withValues(alpha: 0.12),
                   ),
                 ),
                 child: Column(
@@ -674,11 +675,11 @@ class CoachBriefingSheet extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle(
-            '✅', '今日完成 (${briefing.completedTasks.length})', const Color(0xFF4ADE80)),
+            '✅', '今日完成 (${briefing.completedTasks.length})', AppColors.success),
         const SizedBox(height: 10),
         ...briefing.completedTasks.map((task) => _buildTaskSummaryTile(
               task,
-              const Color(0xFF4ADE80),
+              AppColors.success,
               isCompleted: true,
             )),
       ],
@@ -689,7 +690,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('⏳', '延後建議', const Color(0xFF64748B)),
+        _buildSectionTitle('⏳', '延後建議', AppColors.statusArchive),
         const SizedBox(height: 10),
         ...briefing.deferSuggestions.map((suggestion) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
@@ -697,10 +698,10 @@ class CoachBriefingSheet extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF64748B).withValues(alpha: 0.06),
+                  color: AppColors.statusArchive.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF64748B).withValues(alpha: 0.12),
+                    color: AppColors.statusArchive.withValues(alpha: 0.12),
                   ),
                 ),
                 child: Column(
@@ -790,7 +791,7 @@ class CoachBriefingSheet extends ConsumerWidget {
 
   Widget _buildGeneratePrompt(WidgetRef ref, bool isMorning) {
     final accentColor =
-        isMorning ? const Color(0xFFF59E0B) : const Color(0xFF8B5CF6);
+        isMorning ? AppColors.statusInbox : AppColors.statusMaintain;
 
     return Center(
       child: Column(

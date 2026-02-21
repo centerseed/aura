@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -49,14 +50,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: const Color(0xFF0D1117), // GitHub dark
+          backgroundColor: AppColors.githubDark, // GitHub dark
           body: IndexedStack(
         index: _currentIndex,
         children: _tabs,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
+          color: AppColors.githubDarkLight,
           border: Border(
             top: BorderSide(
               color: Colors.white.withValues(alpha: 0.08),
@@ -95,7 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showQuickCapture(context),
-        backgroundColor: const Color(0xFF6C63FF),
+        backgroundColor: AppColors.primary,
         elevation: 4,
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
@@ -125,7 +126,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Icon(
               isSelected ? activeIcon : icon,
               color: isSelected
-                  ? const Color(0xFF6C63FF)
+                  ? AppColors.primary
                   : Colors.white.withValues(alpha: 0.5),
               size: 24,
             ),
@@ -134,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               label,
               style: TextStyle(
                 color: isSelected
-                    ? const Color(0xFF6C63FF)
+                    ? AppColors.primary
                     : Colors.white.withValues(alpha: 0.5),
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,

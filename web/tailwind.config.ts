@@ -43,13 +43,25 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        // Drawer 狀態色彩
+        // Drawer 狀態色彩（橋接 CSS Variables）
         drawer: {
-          inbox: "#FFF8E1",
-          active: "#E3F2FD",
-          maintain: "#F3E5F5",
-          reference: "#E8F5E9",
-          archive: "#ECEFF1",
+          inbox:     { bg: "hsl(var(--drawer-inbox-bg))",     fg: "hsl(var(--drawer-inbox-fg))" },
+          active:    { bg: "hsl(var(--drawer-active-bg))",    fg: "hsl(var(--drawer-active-fg))" },
+          maintain:  { bg: "hsl(var(--drawer-maintain-bg))",  fg: "hsl(var(--drawer-maintain-fg))" },
+          reference: { bg: "hsl(var(--drawer-reference-bg))", fg: "hsl(var(--drawer-reference-fg))" },
+          archive:   { bg: "hsl(var(--drawer-archive-bg))",   fg: "hsl(var(--drawer-archive-fg))" },
+        },
+        // 狀態語意色 token
+        status: {
+          overdue: "hsl(var(--color-status-overdue))",
+          urgent:  "hsl(var(--color-status-urgent))",
+          active:  "hsl(var(--color-status-active))",
+          success: "hsl(var(--color-status-success))",
+          warning: "hsl(var(--color-status-warning))",
+        },
+        // Panel 深色背景
+        panel: {
+          dark: "hsl(var(--panel-bg-dark))",
         },
       },
       boxShadow: {

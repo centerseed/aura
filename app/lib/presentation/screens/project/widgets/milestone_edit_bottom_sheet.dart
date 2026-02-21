@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -464,7 +465,7 @@ class _MilestoneEditBottomSheetState
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: _priority >= 8
-                    ? Colors.orange
+                    ? AppColors.statusInbox
                     : _priority >= 5
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
@@ -488,14 +489,14 @@ class _MilestoneEditBottomSheetState
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: _priority >= 8
-                ? Colors.orange
+                ? AppColors.statusInbox
                 : _priority >= 5
                     ? colorScheme.primary
                     : colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
             inactiveTrackColor:
                 colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
             thumbColor: _priority >= 8
-                ? Colors.orange
+                ? AppColors.statusInbox
                 : _priority >= 5
                     ? colorScheme.primary
                     : colorScheme.onSurfaceVariant,

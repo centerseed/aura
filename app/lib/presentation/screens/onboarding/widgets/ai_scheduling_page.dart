@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 
 /// Page 3: AI 自動排程演示
 class AiSchedulingPage extends StatelessWidget {
@@ -15,7 +16,7 @@ class AiSchedulingPage extends StatelessWidget {
             // 標題
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF10B981)],
+                colors: [AppColors.onboardingIndigo, AppColors.accentEmerald],
               ).createShader(bounds),
               child: const Text(
                 'AI 會自動整理\n並安排時間',
@@ -46,7 +47,7 @@ class AiSchedulingPage extends StatelessWidget {
               title: '你輸入',
               content: '完成 OAuth 登入功能',
               icon: Icons.edit_outlined,
-              color: const Color(0xFF6366F1),
+              color: AppColors.onboardingIndigo,
             ),
 
             const SizedBox(height: 16),
@@ -61,7 +62,7 @@ class AiSchedulingPage extends StatelessWidget {
 評估複雜度: 中等，預留 5 天
 計算時間: 2026-02-24''',
               icon: Icons.psychology_outlined,
-              color: const Color(0xFF8B5CF6),
+              color: AppColors.statusMaintain,
             ),
 
             const SizedBox(height: 16),
@@ -74,7 +75,7 @@ class AiSchedulingPage extends StatelessWidget {
               content: '''✓ 推斷完成日期：2026-02-24
 ✓ 已自動排程至合適日期''',
               icon: Icons.check_circle_outline,
-              color: const Color(0xFF10B981),
+              color: AppColors.accentEmerald,
               isResult: true,
             ),
 
@@ -88,13 +89,13 @@ class AiSchedulingPage extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF10B981).withValues(alpha: 0.1),
+                    AppColors.accentEmerald.withValues(alpha: 0.1),
                     const Color(0xFF06B6D4).withValues(alpha: 0.1),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                  color: AppColors.accentEmerald.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -102,12 +103,12 @@ class AiSchedulingPage extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                      color: AppColors.accentEmerald.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.event_available,
-                      color: Color(0xFF10B981),
+                      color: AppColors.accentEmerald,
                       size: 24,
                     ),
                   ),

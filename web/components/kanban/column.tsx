@@ -1,37 +1,9 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import { ClipboardList, Rocket, RefreshCw, BookOpen, Archive } from "lucide-react";
 import type { TaskCard, DrawerStatus } from "@/types";
+import { DRAWER_CONFIG } from "@/domain/constants/drawer-config";
 import { TaskCardComponent } from "./task-card";
-
-const COLUMN_CONFIG: Record<DrawerStatus, { icon: typeof ClipboardList; gradient: string; border: string }> = {
-  INBOX: {
-    icon: ClipboardList,
-    gradient: "from-amber-500/10 to-orange-500/5",
-    border: "border-amber-200 dark:border-amber-800",
-  },
-  ACTIVE: {
-    icon: Rocket,
-    gradient: "from-blue-500/10 to-cyan-500/5",
-    border: "border-blue-200 dark:border-blue-800",
-  },
-  MAINTAIN: {
-    icon: RefreshCw,
-    gradient: "from-indigo-500/10 to-emerald-500/5",
-    border: "border-indigo-200 dark:border-purple-800",
-  },
-  REFERENCE: {
-    icon: BookOpen,
-    gradient: "from-green-500/10 to-emerald-500/5",
-    border: "border-green-200 dark:border-green-800",
-  },
-  ARCHIVE: {
-    icon: Archive,
-    gradient: "from-slate-500/10 to-slate-500/5",
-    border: "border-slate-200 dark:border-slate-700",
-  },
-};
 
 interface KanbanColumnProps {
   id: DrawerStatus;
@@ -45,14 +17,14 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({ id, title, color, tasks, onToggleSubItem, onSetDueDate, onComplete }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  const config = COLUMN_CONFIG[id];
+  const config = DRAWER_CONFIG[id];
   const Icon = config.icon;
 
   return (
     <div
       ref={setNodeRef}
       className={`
-        flex flex-col card-float bg-gradient-to-b ${config.gradient}
+        flex flex-col card-float bg-gradient-to-b ${config.columnGradient}
         min-h-[500px]
         ${isOver ? "ring-2 ring-indigo-500 ring-offset-2 scale-[1.02]" : ""}
       `}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 
 /// Onboarding 背景漸層元件
 class OnboardingBackground extends StatelessWidget {
@@ -8,7 +9,7 @@ class OnboardingBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0D1117),
+        color: AppColors.githubDark,
       ),
       child: Stack(
         children: [
@@ -23,7 +24,7 @@ class OnboardingBackground extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF6366F1).withValues(alpha: 0.2),
+                    AppColors.onboardingIndigo.withValues(alpha: 0.2),
                     Colors.transparent,
                   ],
                 ),
@@ -42,7 +43,7 @@ class OnboardingBackground extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF10B981).withValues(alpha: 0.15),
+                    AppColors.accentEmerald.withValues(alpha: 0.15),
                     Colors.transparent,
                   ],
                 ),

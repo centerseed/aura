@@ -418,7 +418,7 @@ export function TodayOverviewSheet({
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent
           side="right"
-          className="w-[460px] sm:max-w-[460px] bg-white dark:bg-[#0f1729] border-slate-200 dark:border-white/10 p-0 flex flex-col"
+          className="w-[460px] sm:max-w-[460px] bg-white dark:bg-panel-dark border-slate-200 dark:border-white/10 p-0 flex flex-col"
         >
           <SheetTitle className="sr-only">今日概覽</SheetTitle>
           <SheetDescription className="sr-only">今日態勢摘要與計畫</SheetDescription>

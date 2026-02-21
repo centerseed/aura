@@ -42,6 +42,34 @@
     /* 內層卡片 */
     --card-inner-bg: 220 20% 96% / 0.6;
     --card-inner-border: 0 0% 100% / 0.5;
+
+    /* Drawer 狀態背景色 */
+    --drawer-inbox-bg:     45 100% 94%;
+    --drawer-active-bg:    207 89% 94%;
+    --drawer-maintain-bg:  293 50% 93%;
+    --drawer-reference-bg: 125 39% 93%;
+    --drawer-archive-bg:   204 14% 94%;
+
+    /* Drawer 狀態前景色 */
+    --drawer-inbox-fg:     37 91% 55%;
+    --drawer-active-fg:    217 91% 60%;
+    --drawer-maintain-fg:  239 84% 67%;
+    --drawer-reference-fg: 142 71% 45%;
+    --drawer-archive-fg:   215 16% 66%;
+
+    /* 狀態語意色 */
+    --color-status-overdue:  0 63% 66%;
+    --color-status-urgent:   24 65% 61%;
+    --color-status-active:   217 91% 60%;
+    --color-status-success:  142 72% 36%;
+    --color-status-warning:  37 60% 56%;
+
+    /* Panel 深色背景 */
+    --panel-bg-dark: 222 47% 11%;
+
+    /* 品牌 Accent */
+    --color-accent:       245 76% 59%;
+    --color-accent-hover: 244 57% 51%;
   }
 
   .dark {
@@ -82,6 +110,34 @@
     /* 內層卡片 */
     --card-inner-bg: 225 20% 16% / 0.6;
     --card-inner-border: 0 0% 100% / 0.06;
+
+    /* Drawer 狀態背景色（暗色模式） */
+    --drawer-inbox-bg:     45 80% 12%;
+    --drawer-active-bg:    213 80% 12%;
+    --drawer-maintain-bg:  239 60% 15%;
+    --drawer-reference-bg: 142 60% 12%;
+    --drawer-archive-bg:   217 20% 16%;
+
+    /* Drawer 狀態前景色（暗色模式） */
+    --drawer-inbox-fg:     45 96% 56%;
+    --drawer-active-fg:    213 93% 68%;
+    --drawer-maintain-fg:  234 89% 74%;
+    --drawer-reference-fg: 142 71% 58%;
+    --drawer-archive-fg:   215 16% 66%;
+
+    /* 狀態語意色（暗色模式） */
+    --color-status-overdue:  0 63% 66%;
+    --color-status-urgent:   24 65% 61%;
+    --color-status-active:   217 91% 60%;
+    --color-status-success:  142 72% 36%;
+    --color-status-warning:  37 60% 56%;
+
+    /* Panel 深色背景 */
+    --panel-bg-dark: 222 47% 11%;
+
+    /* 品牌 Accent */
+    --color-accent:       245 76% 59%;
+    --color-accent-hover: 244 57% 51%;
   }
 }
 

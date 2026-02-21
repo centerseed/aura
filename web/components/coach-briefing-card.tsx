@@ -331,7 +331,7 @@ export function CoachAgent() {
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent
           side="right"
-          className="w-[420px] sm:max-w-[420px] bg-white dark:bg-[#0f1729] border-slate-200 dark:border-white/10 p-0 flex flex-col"
+          className="w-[420px] sm:max-w-[420px] bg-white dark:bg-panel-dark border-slate-200 dark:border-white/10 p-0 flex flex-col"
         >
           <SheetTitle className="sr-only">營運顧問簡報</SheetTitle>
           <SheetDescription className="sr-only">AI 營運顧問的每日簡報與建議</SheetDescription>

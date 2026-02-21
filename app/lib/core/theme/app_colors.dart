@@ -56,6 +56,38 @@ class AppColors {
   static const Color info = Color(0xFF3B82F6);
   static const Color infoLight = Color(0xFF60A5FA);
 
+  // ==================== Drawer / Task Status 顏色 ====================
+
+  /// 規劃中 (Inbox) - Amber
+  static const Color statusInbox = Color(0xFFF59E0B);
+
+  /// 進行中 (Active) - Blue
+  static const Color statusActive = Color(0xFF3B82F6);
+
+  /// 維護中 (Maintain) - Violet/Purple
+  static const Color statusMaintain = Color(0xFF8B5CF6);
+
+  /// 參考資料 (Reference) - Green
+  static const Color statusReference = Color(0xFF22C55E);
+
+  /// 已歸檔 (Archive) - Slate
+  static const Color statusArchive = Color(0xFF64748B);
+
+  // ==================== Accent 擴充 ====================
+
+  /// Emerald - 用於成功/完成動作
+  static const Color accentEmerald = Color(0xFF10B981);
+
+  // ==================== Onboarding 專用 ====================
+
+  /// Onboarding Indigo - 與主色區分
+  static const Color onboardingIndigo = Color(0xFF6366F1);
+
+  // ==================== 卡片 / 表面色 ====================
+
+  /// 深色卡片背景 (iOS 風格)
+  static const Color darkCard = Color(0xFF2C2C2E);
+
   // ==================== Pomodoro 計時器色彩 ====================
 
   /// 專注模式 - 紅橙色

@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart' hide Task;
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -297,10 +298,10 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppColors.githubDark,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppColors.githubDarkLight,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
@@ -346,7 +347,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppColors.githubDarkLight,
         border: Border(
           top: BorderSide(
             color: Colors.white.withValues(alpha: 0.08),
@@ -369,7 +370,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             style: TextButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: AppColors.accentEmerald,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               shape: RoundedRectangleBorder(
@@ -426,7 +427,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF6C63FF),
+                    color: AppColors.primary,
                   ),
                 ),
               ),
@@ -509,7 +510,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF6C63FF),
+                    color: AppColors.primary,
                   ),
                 ),
               ),
@@ -540,12 +541,12 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
+              ? AppColors.primary.withValues(alpha: 0.2)
               : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF6C63FF)
+                ? AppColors.primary
                 : Colors.white.withValues(alpha: 0.15),
             width: 1,
           ),
@@ -553,7 +554,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
         child: Text(
           area.name,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF6C63FF) : Colors.white,
+            color: isSelected ? AppColors.primary : Colors.white,
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -574,12 +575,12 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF10B981).withValues(alpha: 0.2)
+              ? AppColors.accentEmerald.withValues(alpha: 0.2)
               : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF10B981)
+                ? AppColors.accentEmerald
                 : Colors.white.withValues(alpha: 0.15),
             width: 1,
           ),
@@ -591,14 +592,14 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               Icons.folder_outlined,
               size: 14,
               color: isSelected
-                  ? const Color(0xFF10B981)
+                  ? AppColors.accentEmerald
                   : Colors.white.withValues(alpha: 0.6),
             ),
             const SizedBox(width: 6),
             Text(
               product.name,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF10B981) : Colors.white,
+                color: isSelected ? AppColors.accentEmerald : Colors.white,
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -679,13 +680,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
+                    color: AppColors.primary.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.auto_awesome,
                     size: 16,
-                    color: Color(0xFF6C63FF),
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -695,7 +696,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: isUser
-                        ? const Color(0xFF6C63FF)
+                        ? AppColors.primary
                         : Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
@@ -759,10 +760,10 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
+          color: AppColors.primary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
+            color: AppColors.primary.withValues(alpha: 0.3),
             width: 1,
           ),
         ),
@@ -772,14 +773,14 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
             Icon(
               Icons.edit,
               size: 14,
-              color: const Color(0xFF6C63FF).withValues(alpha: 0.9),
+              color: AppColors.primary.withValues(alpha: 0.9),
             ),
             const SizedBox(width: 4),
             Text(
               '編輯',
               style: TextStyle(
                 fontSize: 12,
-                color: const Color(0xFF6C63FF).withValues(alpha: 0.9),
+                color: AppColors.primary.withValues(alpha: 0.9),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -840,13 +841,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
+              color: AppColors.primary.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.auto_awesome,
               size: 16,
-              color: Color(0xFF6C63FF),
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(width: 8),
@@ -901,7 +902,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1117),
+        color: AppColors.githubDark,
         border: Border(
           top: BorderSide(
             color: Colors.white.withValues(alpha: 0.08),
@@ -931,16 +932,16 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEC4899).withValues(alpha: 0.15),
+                      color: AppColors.accentPink.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFFEC4899).withValues(alpha: 0.3),
+                        color: AppColors.accentPink.withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
                     child: const Icon(
                       Icons.mic_rounded,
-                      color: Color(0xFFEC4899),
+                      color: AppColors.accentPink,
                       size: 22,
                     ),
                   ),
@@ -975,8 +976,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     height: 48,
                     decoration: BoxDecoration(
                       color: _isLoading
-                          ? const Color(0xFF6C63FF).withValues(alpha: 0.5)
-                          : const Color(0xFF6C63FF),
+                          ? AppColors.primary.withValues(alpha: 0.5)
+                          : AppColors.primary,
                       shape: BoxShape.circle,
                     ),
                     child: _isLoading
@@ -1069,13 +1070,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: isListening
-                          ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                          : [const Color(0xFFEC4899), const Color(0xFFBE185D)],
+                          ? [AppColors.error, const Color(0xFFDC2626)]
+                          : [AppColors.accentPink, AppColors.accentPinkDark],
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: (isListening ? const Color(0xFFEF4444) : const Color(0xFFEC4899))
+                        color: (isListening ? AppColors.error : AppColors.accentPink)
                             .withValues(alpha: 0.4),
                         blurRadius: 20,
                         spreadRadius: 2,
@@ -1098,7 +1099,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   height: 48,
                   decoration: BoxDecoration(
                     color: _lastWords.isNotEmpty
-                        ? const Color(0xFF10B981)
+                        ? AppColors.accentEmerald
                         : Colors.white.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
@@ -1154,8 +1155,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: isProduct
-            ? const Color(0xFF10B981).withValues(alpha: 0.15)
-            : const Color(0xFF6C63FF).withValues(alpha: 0.15),
+            ? AppColors.accentEmerald.withValues(alpha: 0.15)
+            : AppColors.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1164,13 +1165,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           Icon(
             Icons.alternate_email,
             size: 14,
-            color: isProduct ? const Color(0xFF10B981) : const Color(0xFF6C63FF),
+            color: isProduct ? AppColors.accentEmerald : AppColors.primary,
           ),
           const SizedBox(width: 4),
           Text(
             displayText,
             style: TextStyle(
-              color: isProduct ? const Color(0xFF10B981) : const Color(0xFF6C63FF),
+              color: isProduct ? AppColors.accentEmerald : AppColors.primary,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -1190,8 +1191,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               Icons.close,
               size: 14,
               color: isProduct
-                  ? const Color(0xFF10B981).withValues(alpha: 0.6)
-                  : const Color(0xFF6C63FF).withValues(alpha: 0.6),
+                  ? AppColors.accentEmerald.withValues(alpha: 0.6)
+                  : AppColors.primary.withValues(alpha: 0.6),
             ),
           ),
         ],

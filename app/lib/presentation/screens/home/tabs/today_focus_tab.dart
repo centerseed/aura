@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -48,8 +49,8 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           ref.invalidate(completedTodayTasksProvider);
           ref.read(coachBriefingProvider.notifier).loadLatest();
         },
-        color: const Color(0xFF6C63FF),
-        backgroundColor: const Color(0xFF161B22),
+        color: AppColors.primary,
+        backgroundColor: AppColors.githubDarkLight,
         child: CustomScrollView(
           slivers: [
             // Header with refresh indicator
@@ -85,7 +86,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 children: [
                   ShaderMask(
                     shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF10B981)],
+                      colors: [AppColors.onboardingIndigo, AppColors.accentEmerald],
                     ).createShader(bounds),
                     child: const Text(
                       'Zentropy',
@@ -142,10 +143,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
 
     // 根據進度選色
     final progressColor = progressValue >= 1.0
-        ? const Color(0xFF10B981) // 完成：翠綠
+        ? AppColors.accentEmerald // 完成：翠綠
         : progressValue >= 0.5
-            ? const Color(0xFF4ADE80) // 過半：淺綠
-            : const Color(0xFF6366F1); // 未過半：靛藍
+            ? AppColors.success // 過半：淺綠
+            : AppColors.onboardingIndigo; // 未過半：靛藍
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -300,7 +301,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                       gradient: const LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
                       ),
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -321,10 +322,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                  color: AppColors.onboardingIndigo.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                    color: AppColors.onboardingIndigo.withValues(alpha: 0.15),
                   ),
                 ),
                 child: Text(
@@ -344,7 +345,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           child: Center(
             child: Padding(
               padding: EdgeInsets.all(48.0),
-              child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
+              child: CircularProgressIndicator(color: AppColors.primary),
             ),
           ),
         )
@@ -394,7 +395,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                       gradient: const LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                        colors: [AppColors.statusActive, AppColors.onboardingIndigo],
                       ),
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -426,16 +427,16 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   children: [
                     _buildCapacityChip(
                       '可用 ${plan.availableMinutes}分',
-                      const Color(0xFF10B981),
+                      AppColors.accentEmerald,
                     ),
                     if (plan.meetingMinutes != null && plan.meetingMinutes! > 0)
                       _buildCapacityChip(
                         '會議 ${plan.meetingMinutes}分',
-                        const Color(0xFFF59E0B),
+                        AppColors.statusInbox,
                       ),
                     _buildCapacityChip(
                       '已排 ${plan.plannedMinutes ?? plan.totalEstimatedMinutes}分',
-                      const Color(0xFF3B82F6),
+                      AppColors.statusActive,
                     ),
                   ],
                 ),
@@ -520,14 +521,14 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   children: [
                     const Icon(
                       Icons.check_circle,
-                      color: Color(0xFF4ADE80),
+                      color: AppColors.success,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       '今日完成 (${completedPlanItems.length})',
                       style: const TextStyle(
-                        color: Color(0xFF4ADE80),
+                        color: AppColors.success,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -561,7 +562,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   Widget _buildPlanItemCard(DailyPlanItem item) {
     final isOverflow = item.status == 'overflow';
     final accentColor =
-        isOverflow ? const Color(0xFF64748B) : const Color(0xFF6366F1);
+        isOverflow ? AppColors.statusArchive : AppColors.onboardingIndigo;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 3),
@@ -681,7 +682,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 isOverflow ? Icons.north : Icons.south,
                 size: 18,
                 color: isOverflow
-                    ? const Color(0xFF3B82F6)
+                    ? AppColors.statusActive
                     : Colors.white.withValues(alpha: 0.35),
               ),
             ),
@@ -700,7 +701,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           children: [
             Icon(
               Icons.check_circle,
-              color: const Color(0xFF4ADE80).withValues(alpha: 0.6),
+              color: AppColors.success.withValues(alpha: 0.6),
               size: 18,
             ),
             const SizedBox(width: 10),
@@ -765,10 +766,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+          color: AppColors.statusInbox.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+            color: AppColors.statusInbox.withValues(alpha: 0.15),
           ),
         ),
         child: Row(
@@ -778,14 +779,14 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               height: 14,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.7),
+                color: AppColors.statusInbox.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '正在更新今日計畫...',
               style: TextStyle(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.8),
+                color: AppColors.statusInbox.withValues(alpha: 0.8),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -902,7 +903,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: const Color(0xFF6366F1).withValues(alpha: 0.5),
+                    color: AppColors.onboardingIndigo.withValues(alpha: 0.5),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -952,10 +953,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
 
   Widget _buildTaskCard(Task task, {bool expanded = false}) {
     final accentColor = task.isOverdue
-        ? const Color(0xFFEF4444)
+        ? AppColors.error
         : task.isToday
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFF6366F1);
+            ? AppColors.statusInbox
+            : AppColors.onboardingIndigo;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
@@ -1183,11 +1184,11 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(5),
                             color: isCompleted
-                                ? const Color(0xFF10B981)
+                                ? AppColors.accentEmerald
                                 : Colors.transparent,
                             border: Border.all(
                               color: isCompleted
-                                  ? const Color(0xFF10B981)
+                                  ? AppColors.accentEmerald
                                   : Colors.white.withValues(alpha: 0.2),
                               width: 1.5,
                             ),
@@ -1245,14 +1246,14 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               children: [
                 Icon(
                   Icons.check_circle,
-                  color: Color(0xFF4ADE80),
+                  color: AppColors.success,
                   size: 20,
                 ),
                 SizedBox(width: 8),
                 Text(
                   '今日完成',
                   style: TextStyle(
-                    color: Color(0xFF4ADE80),
+                    color: AppColors.success,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1279,7 +1280,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           children: [
             Icon(
               Icons.check_circle,
-              color: const Color(0xFF4ADE80).withValues(alpha: 0.6),
+              color: AppColors.success.withValues(alpha: 0.6),
               size: 18,
             ),
             const SizedBox(width: 10),
@@ -1315,15 +1316,15 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF10B981).withValues(alpha: 0.2),
-                    const Color(0xFF6366F1).withValues(alpha: 0.2),
+                    AppColors.accentEmerald.withValues(alpha: 0.2),
+                    AppColors.onboardingIndigo.withValues(alpha: 0.2),
                   ],
                 ),
               ),
               child: const Icon(
                 Icons.check_circle_outline,
                 size: 40,
-                color: Color(0xFF10B981),
+                color: AppColors.accentEmerald,
               ),
             ),
             const SizedBox(height: 16),
@@ -1369,9 +1370,9 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Color _getDueDateColor(Task task) {
-    if (task.isOverdue) return const Color(0xFFEF4444);
-    if (task.isToday) return const Color(0xFFF59E0B);
-    return const Color(0xFF3B82F6);
+    if (task.isOverdue) return AppColors.error;
+    if (task.isToday) return AppColors.statusInbox;
+    return AppColors.statusActive;
   }
 
   String _formatDueDate(DateTime date) {
@@ -1436,7 +1437,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2c2c2e),
+        backgroundColor: AppColors.darkCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -1459,14 +1460,14 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
-              backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.15),
+              backgroundColor: AppColors.success.withValues(alpha: 0.15),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: const Text(
               '完成',
-              style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w600),
+              style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -1494,7 +1495,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4ADE80),
+                  color: AppColors.success,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check, size: 16, color: Colors.white),
@@ -1504,7 +1505,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
             ],
           ),
           duration: const Duration(seconds: 2),
-          backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.2),
+          backgroundColor: AppColors.success.withValues(alpha: 0.2),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1572,7 +1573,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2c2c2e),
+        backgroundColor: AppColors.darkCard,
         title: Text(
           newCompleted ? '完成子任務' : '取消完成',
           style: const TextStyle(color: Colors.white),
@@ -1585,7 +1586,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('確定', style: TextStyle(color: Color(0xFF6C63FF))),
+            child: const Text('確定', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),

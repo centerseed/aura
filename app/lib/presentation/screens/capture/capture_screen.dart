@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/domain/entities/task.dart' as entity;
 import 'package:app/domain/entities/brain_dump_result.dart';
@@ -97,7 +98,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     final items = result.items;
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1c1c1e),
+      backgroundColor: AppColors.darkBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -127,7 +128,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      const Icon(Icons.auto_awesome, color: Color(0xFF6C63FF)),
+                      const Icon(Icons.auto_awesome, color: AppColors.primary),
                       const SizedBox(width: 8),
                       Text(
                         'AI 分析結果',
@@ -254,13 +255,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                         Icon(
                                           Icons.folder_outlined,
                                           size: 12,
-                                          color: const Color(0xFF8B85FF),
+                                          color: AppColors.primaryLight,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${item.areaName} / ${item.productName}',
                                           style: const TextStyle(
-                                            color: Color(0xFF8B85FF),
+                                            color: AppColors.primaryLight,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -276,7 +277,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.orange.withOpacity(0.2),
+                                        color: AppColors.statusInbox.withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Row(
@@ -285,13 +286,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                           Icon(
                                             Icons.calendar_today_outlined,
                                             size: 12,
-                                            color: Colors.orange[300],
+                                            color: AppColors.warningOrange,
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
                                             "${item.dueDate!.month}/${item.dueDate!.day}",
                                             style: TextStyle(
-                                              color: Colors.orange[300],
+                                              color: AppColors.warningOrange,
                                               fontSize: 11,
                                               fontWeight: FontWeight.w500,
                                             ),
@@ -315,7 +316,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     child: FilledButton(
                       onPressed: () => Navigator.pop(context),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C63FF),
+                        backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: const Text('完成'),
@@ -334,7 +335,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   void _showAppendSubItemResult(AppendSubItemInfo info) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1c1c1e),
+      backgroundColor: AppColors.darkBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -360,7 +361,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               // 標題
               Row(
                 children: [
-                  const Icon(Icons.playlist_add, color: Color(0xFF10B981), size: 28),
+                  const Icon(Icons.playlist_add, color: AppColors.accentEmerald, size: 28),
                   const SizedBox(width: 12),
                   Text(
                     '已追加到既有任務',
@@ -396,13 +397,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6C63FF).withOpacity(0.2),
+                        color: AppColors.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         info.targetProductName,
                         style: const TextStyle(
-                          color: Color(0xFF8B85FF),
+                          color: AppColors.primaryLight,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -428,7 +429,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     Icon(
                       Icons.add_circle_outline,
                       size: 16,
-                      color: const Color(0xFF10B981),
+                      color: AppColors.accentEmerald,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -450,7 +451,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF6C63FF),
+                    backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text('完成'),
@@ -567,9 +568,9 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF0D1117), // Deep dark blue (GitHub dark)
-              Color(0xFF161B22), // Slightly lighter
-              Color(0xFF1A1F2E), // With purple tint
+              AppColors.githubDark, // Deep dark blue (GitHub dark)
+              AppColors.githubDarkLight, // Slightly lighter
+              AppColors.purpleTinted, // With purple tint
             ],
           ),
         ),
@@ -688,13 +689,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.2),
+                                    color: AppColors.statusInbox.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     "${task.dueDate!.month}/${task.dueDate!.day}",
                                     style: TextStyle(
-                                      color: Colors.orange[300],
+                                      color: AppColors.warningOrange,
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -927,7 +928,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   ),
                   decoration: BoxDecoration(
                     // Glassmorphism bottom bar
-                    color: const Color(0xFF1A1F2E).withOpacity(0.8),
+                    color: AppColors.purpleTinted.withOpacity(0.8),
                     border: Border(
                       top: BorderSide(
                         color: Colors.white.withOpacity(0.1),
@@ -1043,12 +1044,12 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                         gradient: LinearGradient(
                                           colors: hasText
                                               ? [
-                                                  const Color(0xFF7C3AED),
-                                                  const Color(0xFF5B21B6),
+                                                  AppColors.primaryDeep,
+                                                  AppColors.primaryDark,
                                                 ]
                                               : [
-                                                  const Color(0xFFEC4899),
-                                                  const Color(0xFFBE185D),
+                                                  AppColors.accentPink,
+                                                  AppColors.accentPinkDark,
                                                 ],
                                         ),
                                         shape: BoxShape.circle,
@@ -1112,7 +1113,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     required VoidCallback onTap,
   }) {
     // Web version's indigo blue color (lower saturation & brightness)
-    const indigoBlue = Color(0xFF4B4B99); // Muted, darker indigo
+    const indigoBlue = AppColors.indigoBlue; // Muted, darker indigo
 
     return GestureDetector(
       onTap: onTap,

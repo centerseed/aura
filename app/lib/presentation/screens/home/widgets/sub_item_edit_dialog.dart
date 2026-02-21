@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import '../../../../domain/entities/task.dart';
 
 /// SubItem 編輯對話框
@@ -160,7 +161,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                     ),
                     decoration: BoxDecoration(
                       color: widget.subItem.completed
-                          ? Colors.green.withOpacity(0.2)
+                          ? AppColors.success.withOpacity(0.2)
                           : Colors.grey.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -172,7 +173,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                               : Icons.circle_outlined,
                           size: 16,
                           color: widget.subItem.completed
-                              ? Colors.green
+                              ? AppColors.success
                               : Colors.grey,
                         ),
                         const SizedBox(width: 4),
@@ -180,7 +181,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                           widget.subItem.completed ? '已完成' : '未完成',
                           style: TextStyle(
                             color: widget.subItem.completed
-                                ? Colors.green
+                                ? AppColors.success
                                 : Colors.grey,
                             fontSize: 12,
                           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -48,8 +49,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           // 只需 invalidate dashboardProvider，areas 和 products 會自動重新載入
           ref.invalidate(dashboardProvider);
         },
-        color: const Color(0xFF6C63FF),
-        backgroundColor: const Color(0xFF161B22),
+        color: AppColors.primary,
+        backgroundColor: AppColors.githubDarkLight,
         child: CustomScrollView(
           slivers: [
             // Header
@@ -76,7 +77,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                   child: Center(
                     child: Padding(
                       padding: EdgeInsets.all(48.0),
-                      child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
+                      child: CircularProgressIndicator(color: AppColors.primary),
                     ),
                   ),
                 ),
@@ -88,7 +89,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 child: Center(
                   child: Padding(
                     padding: EdgeInsets.all(48.0),
-                    child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ),
                 ),
               ),
@@ -113,7 +114,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             children: [
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
                 ).createShader(bounds),
                 child: const Text(
                   '全視圖',
@@ -193,12 +194,12 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+              color: AppColors.onboardingIndigo.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.folder_outlined,
-              color: Color(0xFF6366F1),
+              color: AppColors.onboardingIndigo,
               size: 18,
             ),
           ),
@@ -248,13 +249,13 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF3B82F6).withValues(alpha: 0.08),
+              AppColors.statusActive.withValues(alpha: 0.08),
               Colors.white.withValues(alpha: 0.03),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF3B82F6).withValues(alpha: 0.18),
+            color: AppColors.statusActive.withValues(alpha: 0.18),
           ),
         ),
         child: Row(
@@ -268,8 +269,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0xFF3B82F6),
-                    Color(0xFF6366F1),
+                    AppColors.statusActive,
+                    AppColors.onboardingIndigo,
                   ],
                 ),
                 borderRadius: BorderRadius.only(
@@ -358,7 +359,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                           _buildActionButton(
                             icon: Icons.library_books,
                             label: '${product.referenceCount}',
-                            color: const Color(0xFFF59E0B),
+                            color: AppColors.statusInbox,
                             onTap: () => _showReferences(product),
                           ),
                           const SizedBox(width: 6),
@@ -367,7 +368,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                         _buildActionButton(
                           icon: Icons.auto_awesome,
                           label: 'AI',
-                          color: const Color(0xFF8B5CF6),
+                          color: AppColors.statusMaintain,
                           onTap: () => _handleReorganize(product),
                         ),
                       ],
@@ -394,7 +395,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                           child: Text(
                             '+ ${product.taskCount - 3} 更多任務',
                             style: TextStyle(
-                              color: const Color(0xFF6366F1).withValues(alpha: 0.6),
+                              color: AppColors.onboardingIndigo.withValues(alpha: 0.6),
                               fontSize: 12,
                             ),
                           ),
@@ -420,13 +421,13 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                              color: AppColors.statusActive.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               '${displayTasks.length} 個任務',
                               style: TextStyle(
-                                color: const Color(0xFF3B82F6).withValues(alpha: 0.8),
+                                color: AppColors.statusActive.withValues(alpha: 0.8),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -466,10 +467,10 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   /// 展開模式中的任務卡片
   Widget _buildExpandedTaskCard(Task task) {
     final accentColor = task.isOverdue
-        ? const Color(0xFFEF4444)
+        ? AppColors.error
         : task.isToday
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFF6366F1);
+            ? AppColors.statusInbox
+            : AppColors.onboardingIndigo;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -577,11 +578,11 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(4),
                                 color: subItem.completed
-                                    ? const Color(0xFF10B981)
+                                    ? AppColors.accentEmerald
                                     : Colors.transparent,
                                 border: Border.all(
                                   color: subItem.completed
-                                      ? const Color(0xFF10B981)
+                                      ? AppColors.accentEmerald
                                       : Colors.white.withValues(alpha: 0.2),
                                   width: 1.5,
                                 ),
@@ -668,10 +669,10 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
 
   Widget _buildTaskPreview(Task task) {
     final dotColor = task.isOverdue
-        ? const Color(0xFFEF4444)
+        ? AppColors.error
         : task.isToday
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFF6366F1);
+            ? AppColors.statusInbox
+            : AppColors.onboardingIndigo;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -774,7 +775,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('新增失敗：${failure.message}'),
-                    backgroundColor: const Color(0xFFEF4444),
+                    backgroundColor: AppColors.error,
                   ),
                 );
               },
@@ -784,7 +785,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('已新增 Reference'),
-                    backgroundColor: Color(0xFF4ADE80),
+                    backgroundColor: AppColors.success,
                   ),
                 );
               },
@@ -808,7 +809,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('更新失敗：${failure.message}'),
-                    backgroundColor: const Color(0xFFEF4444),
+                    backgroundColor: AppColors.error,
                   ),
                 );
               },
@@ -817,7 +818,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('已更新 Reference'),
-                    backgroundColor: Color(0xFF4ADE80),
+                    backgroundColor: AppColors.success,
                   ),
                 );
               },
@@ -839,7 +840,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('刪除失敗：${failure.message}'),
-                    backgroundColor: const Color(0xFFEF4444),
+                    backgroundColor: AppColors.error,
                   ),
                 );
               },
@@ -849,7 +850,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('已刪除 Reference'),
-                    backgroundColor: Color(0xFF4ADE80),
+                    backgroundColor: AppColors.success,
                   ),
                 );
               },
@@ -872,7 +873,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C63FF)),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
             ),
             const SizedBox(height: 16),
             Text(
@@ -906,7 +907,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('AI 分析失敗：${failure.message}'),
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AppColors.error,
             ),
           );
         },
@@ -930,7 +931,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('發生錯誤：$e'),
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: AppColors.error,
         ),
       );
     } finally {
@@ -967,7 +968,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('應用失敗：${failure.message}'),
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AppColors.error,
             ),
           );
         },
@@ -977,7 +978,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('已應用 AI 整理建議'),
-              backgroundColor: Color(0xFF4ADE80),
+              backgroundColor: AppColors.success,
             ),
           );
         },
@@ -987,7 +988,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('發生錯誤：$e'),
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -1007,15 +1008,15 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF6366F1).withValues(alpha: 0.2),
-                    const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                    AppColors.onboardingIndigo.withValues(alpha: 0.2),
+                    AppColors.statusMaintain.withValues(alpha: 0.2),
                   ],
                 ),
               ),
               child: const Icon(
                 Icons.dashboard_outlined,
                 size: 40,
-                color: Color(0xFF6366F1),
+                color: AppColors.onboardingIndigo,
               ),
             ),
             const SizedBox(height: 16),

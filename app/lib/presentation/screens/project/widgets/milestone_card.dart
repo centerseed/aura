@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../domain/entities/milestone.dart';
@@ -37,10 +38,10 @@ class MilestoneCard extends StatelessWidget {
       statusBgColor = colorScheme.error.withValues(alpha: 0.1);
     } else if (milestone.isUrgent && milestone.isActive) {
       // 緊急（7天內）
-      cardColor = Colors.orange.withValues(alpha: 0.1);
-      borderColor = Colors.orange.withValues(alpha: 0.3);
-      statusColor = Colors.orange;
-      statusBgColor = Colors.orange.withValues(alpha: 0.1);
+      cardColor = AppColors.statusInbox.withValues(alpha: 0.1);
+      borderColor = AppColors.statusInbox.withValues(alpha: 0.3);
+      statusColor = AppColors.statusInbox;
+      statusBgColor = AppColors.statusInbox.withValues(alpha: 0.1);
     } else if (milestone.status == MilestoneStatus.inProgress) {
       // 進行中
       cardColor = colorScheme.primaryContainer.withValues(alpha: 0.1);
@@ -49,10 +50,10 @@ class MilestoneCard extends StatelessWidget {
       statusBgColor = colorScheme.primary.withValues(alpha: 0.1);
     } else if (milestone.status == MilestoneStatus.completed) {
       // 已完成
-      cardColor = Colors.green.withValues(alpha: 0.1);
-      borderColor = Colors.green.withValues(alpha: 0.3);
-      statusColor = Colors.green;
-      statusBgColor = Colors.green.withValues(alpha: 0.1);
+      cardColor = AppColors.success.withValues(alpha: 0.1);
+      borderColor = AppColors.success.withValues(alpha: 0.3);
+      statusColor = AppColors.success;
+      statusBgColor = AppColors.success.withValues(alpha: 0.1);
     } else {
       // 計畫中或其他
       cardColor = colorScheme.surfaceContainerHighest;
@@ -172,14 +173,14 @@ class MilestoneCard extends StatelessWidget {
                     Icon(
                       Icons.priority_high_rounded,
                       size: 14,
-                      color: Colors.orange.withValues(alpha: 0.8),
+                      color: AppColors.statusInbox.withValues(alpha: 0.8),
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '高優先級',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.orange.withValues(alpha: 0.8),
+                        color: AppColors.statusInbox.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -201,16 +202,16 @@ class MilestoneCard extends StatelessWidget {
 
     if (milestone.status == MilestoneStatus.completed) {
       text = '已完成';
-      color = Colors.green;
+      color = AppColors.success;
     } else if (days < 0) {
       text = '逾期 ${days.abs()} 天';
       color = colorScheme.error;
     } else if (days == 0) {
       text = '今天截止';
-      color = Colors.orange;
+      color = AppColors.statusInbox;
     } else if (days <= 7) {
       text = '剩餘 $days 天';
-      color = Colors.orange;
+      color = AppColors.statusInbox;
     } else {
       text = '剩餘 $days 天';
       color = colorScheme.onSurfaceVariant.withValues(alpha: 0.6);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,8 +26,8 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () => refreshTasks(ref),
-        color: const Color(0xFF6C63FF),
-        backgroundColor: const Color(0xFF161B22),
+        color: AppColors.primary,
+        backgroundColor: AppColors.githubDarkLight,
         child: CustomScrollView(
           slivers: [
             // Header with refresh indicator
@@ -39,7 +40,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 child: Center(
                   child: Padding(
                     padding: EdgeInsets.all(48.0),
-                    child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ),
                 ),
               )
@@ -68,7 +69,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 children: [
                   ShaderMask(
                     shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFFF59E0B)],
+                      colors: [AppColors.onboardingIndigo, AppColors.statusInbox],
                     ).createShader(bounds),
                     child: const Text(
                       '負載視圖',
@@ -178,7 +179,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 Text(
                   '最高 $maxLoad',
                   style: const TextStyle(
-                    color: Color(0xFFF59E0B),
+                    color: AppColors.statusInbox,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -189,7 +190,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    color: AppColors.error.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -197,14 +198,14 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                     children: [
                       const Icon(
                         Icons.warning_rounded,
-                        color: Color(0xFFEF4444),
+                        color: AppColors.error,
                         size: 12,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '$overloadedWeeks 週超載',
                         style: const TextStyle(
-                          color: Color(0xFFEF4444),
+                          color: AppColors.error,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -234,11 +235,11 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
+          color: AppColors.githubDarkLight,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isCurrent
-                ? const Color(0xFF3B82F6).withValues(alpha: 0.5)
+                ? AppColors.statusActive.withValues(alpha: 0.5)
                 : loadColor.withValues(alpha: 0.2),
             width: 1,
           ),
@@ -287,7 +288,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6),
+                          color: AppColors.statusActive,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(
@@ -439,10 +440,10 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
         spacing: 16,
         runSpacing: 8,
         children: [
-          _buildLegendItem('輕鬆 (0-2)', const Color(0xFF10B981)),
-          _buildLegendItem('適中 (3-4)', const Color(0xFF3B82F6)),
-          _buildLegendItem('忙碌 (5-7)', const Color(0xFFF59E0B)),
-          _buildLegendItem('爆炸 (8+)', const Color(0xFFEF4444)),
+          _buildLegendItem('輕鬆 (0-2)', AppColors.accentEmerald),
+          _buildLegendItem('適中 (3-4)', AppColors.statusActive),
+          _buildLegendItem('忙碌 (5-7)', AppColors.statusInbox),
+          _buildLegendItem('爆炸 (8+)', AppColors.error),
         ],
       ),
     );
@@ -575,10 +576,10 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
   }
 
   Color _getLoadColor(int load) {
-    if (load < _LoadThresholds.low) return const Color(0xFF10B981);
-    if (load < _LoadThresholds.medium) return const Color(0xFF3B82F6);
-    if (load < _LoadThresholds.warning) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
+    if (load < _LoadThresholds.low) return AppColors.accentEmerald;
+    if (load < _LoadThresholds.medium) return AppColors.statusActive;
+    if (load < _LoadThresholds.warning) return AppColors.statusInbox;
+    return AppColors.error;
   }
 
   String _getLoadLabel(int load) {

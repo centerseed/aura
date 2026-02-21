@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
@@ -33,13 +34,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppColors.githubDark,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(
-              color: Color(0xFF6C63FF),
+              color: AppColors.primary,
             ),
             const SizedBox(height: 24),
             Text(
@@ -61,7 +62,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 child: ElevatedButton(
                   onPressed: () => ref.refresh(authStateProvider),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6C63FF),
+                    backgroundColor: AppColors.primary,
                   ),
                   child: const Text('Retry'),
                 ),

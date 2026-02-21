@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
 
 /// 頁面進度指示器
@@ -42,11 +43,11 @@ class PageIndicator extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                     gradient: isActive
                         ? const LinearGradient(
-                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                            colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
                           )
                         : null,
                     color: isPassed
-                        ? const Color(0xFF6366F1).withValues(alpha: 0.5)
+                        ? AppColors.onboardingIndigo.withValues(alpha: 0.5)
                         : Colors.white.withValues(alpha: 0.2),
                   ),
                 );
@@ -89,7 +90,7 @@ class PageIndicator extends StatelessWidget {
                     icon: const Icon(Icons.arrow_forward, size: 20),
                     label: const Text('下一步'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF6C63FF),
+                      backgroundColor: AppColors.primary,
                       disabledBackgroundColor: Colors.white.withValues(alpha: 0.1),
                     ),
                   )

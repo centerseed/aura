@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,7 +27,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final dailyProgress = ref.watch(dailyProgressProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
+      backgroundColor: AppColors.deepBlack,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => refreshTasks(ref),
@@ -58,7 +59,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showQuickCapture(context),
-        backgroundColor: const Color(0xFF6C63FF),
+        backgroundColor: AppColors.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -109,15 +110,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF6C63FF).withValues(alpha: 0.3),
-                  const Color(0xFF6C63FF).withValues(alpha: 0.1),
+                  AppColors.primary.withValues(alpha: 0.3),
+                  AppColors.primary.withValues(alpha: 0.1),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
+                color: AppColors.primary.withValues(alpha: 0.3),
               ),
             ),
             child: Row(
@@ -157,7 +158,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         strokeWidth: 6,
                         backgroundColor: Colors.white.withValues(alpha: 0.1),
                         valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF4ADE80),
+                          AppColors.success,
                         ),
                       ),
                       Center(
@@ -292,7 +293,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1c1c1e),
+              color: AppColors.darkBackground,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
@@ -305,17 +306,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4ADE80).withValues(alpha: 0.1),
+                      color: AppColors.success.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFF4ADE80).withValues(alpha: 0.4),
+                        color: AppColors.success.withValues(alpha: 0.4),
                         width: 2,
                       ),
                     ),
                     child: Icon(
                       Icons.check_rounded,
                       size: 16,
-                      color: const Color(0xFF4ADE80).withValues(alpha: 0.6),
+                      color: AppColors.success.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -414,7 +415,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2c2c2e),
+        backgroundColor: AppColors.darkCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -437,14 +438,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
-              backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.15),
+              backgroundColor: AppColors.success.withValues(alpha: 0.15),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: const Text(
               '完成',
-              style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w600),
+              style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -472,7 +473,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4ADE80),
+                  color: AppColors.success,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check, size: 16, color: Colors.white),
@@ -482,7 +483,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
           ),
           duration: const Duration(seconds: 2),
-          backgroundColor: const Color(0xFF4ADE80).withValues(alpha: 0.2),
+          backgroundColor: AppColors.success.withValues(alpha: 0.2),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -604,7 +605,7 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       decoration: const BoxDecoration(
-        color: Color(0xFF1c1c1e),
+        color: AppColors.darkBackground,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Padding(
@@ -643,7 +644,7 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
               child: FilledButton(
                 onPressed: _isLoading ? null : _submit,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

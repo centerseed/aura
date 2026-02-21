@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/onboarding_provider.dart';
 
@@ -35,7 +36,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
 
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
               ).createShader(bounds),
               child: const Text(
                 '「身份地圖」',
@@ -65,7 +66,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
               title: 'Area (身份)',
               subtitle: '你是誰？',
               example: exampleArea,
-              color: const Color(0xFF6366F1),
+              color: AppColors.onboardingIndigo,
               indent: 0,
             ),
 
@@ -76,7 +77,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
               title: 'Project (專案)',
               subtitle: '在做什麼？',
               example: exampleArea == '事業' ? 'Mobile App' : '健康計畫',
-              color: const Color(0xFF3B82F6),
+              color: AppColors.statusActive,
               indent: 24,
             ),
 
@@ -87,7 +88,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
               title: 'Topic (主題)',
               subtitle: '怎麼做？',
               example: '功能開發',
-              color: const Color(0xFFF59E0B),
+              color: AppColors.statusInbox,
               indent: 48,
             ),
 
@@ -101,13 +102,13 @@ class ArchitectureIntroPage extends ConsumerWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF6366F1).withValues(alpha: 0.1),
-                    const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                    AppColors.onboardingIndigo.withValues(alpha: 0.1),
+                    AppColors.statusMaintain.withValues(alpha: 0.1),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                  color: AppColors.onboardingIndigo.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -115,12 +116,12 @@ class ArchitectureIntroPage extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                      color: AppColors.onboardingIndigo.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.auto_awesome,
-                      color: Color(0xFF6366F1),
+                      color: AppColors.onboardingIndigo,
                       size: 24,
                     ),
                   ),

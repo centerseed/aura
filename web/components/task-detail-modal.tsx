@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Calendar, AlertCircle, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight, Package, FolderOpen, Tag } from "lucide-react";
 import type { DrawerStatus } from "@/types";
+import { DRAWER_CONFIG } from "@/domain/constants/drawer-config";
 import {
   DndContext,
   DragOverlay,
@@ -394,14 +395,11 @@ export function TaskDetailModal({
               <div className="relative">
                 <button
                   onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowProductDropdown(false); setShowTopicDropdown(false); }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    {
-                      INBOX: "bg-amber-500/20 text-amber-400 border border-amber-500/30",
-                      ACTIVE: "bg-blue-500/20 text-blue-400 border border-blue-500/30",
-                      MAINTAIN: "bg-purple-500/20 text-purple-400 border border-purple-500/30",
-                      REFERENCE: "bg-green-500/20 text-green-400 border border-green-500/30",
-                      ARCHIVE: "bg-slate-500/20 text-slate-400 border border-slate-500/30",
-                    }[task.drawer]
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                    (() => {
+                      const dc = DRAWER_CONFIG[task.drawer as DrawerStatus];
+                      return `${dc.badgeBg} ${dc.badgeText} ${dc.badgeBorder}`;
+                    })()
                   }`}
                 >
                   {({ INBOX: ClipboardList, ACTIVE: Rocket, MAINTAIN: RefreshCw, REFERENCE: BookOpen, ARCHIVE: Archive } as Record<string, typeof ClipboardList>)[task.drawer] &&
@@ -411,13 +409,7 @@ export function TaskDetailModal({
                 </button>
                 {showStatusDropdown && (
                   <div className="absolute top-full left-0 mt-1 z-10 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
-                    {([
-                      { id: "INBOX" as DrawerStatus, label: "規劃中", icon: ClipboardList, color: "text-amber-400" },
-                      { id: "ACTIVE" as DrawerStatus, label: "進行中", icon: Rocket, color: "text-blue-400" },
-                      { id: "MAINTAIN" as DrawerStatus, label: "維護中", icon: RefreshCw, color: "text-purple-400" },
-                      { id: "REFERENCE" as DrawerStatus, label: "參考資料", icon: BookOpen, color: "text-green-400" },
-                      { id: "ARCHIVE" as DrawerStatus, label: "已歸檔", icon: Archive, color: "text-slate-400" },
-                    ]).map(({ id, label, icon: StatusIcon, color }) => (
+                    {(Object.entries(DRAWER_CONFIG) as [DrawerStatus, typeof DRAWER_CONFIG[DrawerStatus]][]).map(([id, dc]) => (
                       <button
                         key={id}
                         onClick={() => {
@@ -428,8 +420,8 @@ export function TaskDetailModal({
                           id === task.drawer ? "bg-white/5 font-medium" : ""
                         }`}
                       >
-                        <StatusIcon className={`w-4 h-4 ${color}`} />
-                        <span className="text-white/80">{label}</span>
+                        <dc.icon className={`w-4 h-4 ${dc.badgeText}`} />
+                        <span className="text-white/80">{dc.label}</span>
                         {id === task.drawer && <CheckCircle className="w-3.5 h-3.5 ml-auto text-indigo-400" />}
                       </button>
                     ))}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/onboarding_provider.dart';
 import '../models/preset_area.dart';
@@ -106,12 +107,12 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFF6366F1).withValues(alpha: 0.15),
-                            const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                            AppColors.onboardingIndigo.withValues(alpha: 0.15),
+                            AppColors.statusMaintain.withValues(alpha: 0.15),
                           ],
                         ),
                         border: Border.all(
-                          color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                          color: AppColors.onboardingIndigo.withValues(alpha: 0.4),
                           width: 1.5,
                         ),
                         borderRadius: BorderRadius.circular(12),
@@ -121,7 +122,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                           Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                              color: AppColors.onboardingIndigo.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: AnimatedRotation(
@@ -129,7 +130,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                               turns: _showCustomArea ? 0.25 : 0,
                               child: const Icon(
                                 Icons.add,
-                                color: Color(0xFF6366F1),
+                                color: AppColors.onboardingIndigo,
                                 size: 20,
                               ),
                             ),
@@ -157,7 +158,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                         color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: const Color(0xFF6C63FF).withValues(alpha: 0.3),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Column(
@@ -241,7 +242,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                     : '請至少選擇 1 個身份',
                 style: TextStyle(
                   color: totalSelected > 0
-                      ? const Color(0xFF4ADE80)
+                      ? AppColors.success
                       : Colors.white.withValues(alpha: 0.5),
                   fontSize: 13,
                 ),

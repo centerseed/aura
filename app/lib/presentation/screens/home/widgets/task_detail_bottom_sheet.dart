@@ -1,5 +1,7 @@
 import 'dart:ui' as dart_ui;
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
+import '../../../utils/task_status_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -231,8 +233,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF6C63FF),
-              surface: Color(0xFF1c1c1e),
+              primary: AppColors.primary,
+              surface: AppColors.darkBackground,
             ),
           ),
           child: child!,
@@ -258,7 +260,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
               primary: Color(0xFFFFB020),
-              surface: Color(0xFF1c1c1e),
+              surface: AppColors.darkBackground,
             ),
           ),
           child: child!,
@@ -277,7 +279,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             data: ThemeData.dark().copyWith(
               colorScheme: const ColorScheme.dark(
                 primary: Color(0xFFFFB020),
-                surface: Color(0xFF1c1c1e),
+                surface: AppColors.darkBackground,
               ),
             ),
             child: child!,
@@ -316,7 +318,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2c2c2e),
+        backgroundColor: AppColors.darkCard,
         title: Text(
           newCompleted ? '完成子任務' : '取消完成',
           style: const TextStyle(color: Colors.white),
@@ -329,7 +331,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('確定', style: TextStyle(color: Color(0xFF6C63FF))),
+            child: const Text('確定', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -480,14 +482,14 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2c2c2e),
+        backgroundColor: AppColors.darkCard,
         title: const Text('升級為獨立任務', style: TextStyle(color: Colors.white)),
         content: const Text('確定要將此待辦項目升級為獨立任務嗎？', style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('確定', style: TextStyle(color: Color(0xFF6C63FF))),
+            child: const Text('確定', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -523,7 +525,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('已升級為獨立任務: ${newTask.content}'),
-              backgroundColor: const Color(0xFF6C63FF),
+              backgroundColor: AppColors.primary,
             ),
           );
         }
@@ -747,7 +749,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2c2c2e),
+        backgroundColor: AppColors.darkCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('刪除任務', style: TextStyle(color: Colors.white)),
         content: Text(
@@ -804,7 +806,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   Future<void> _showAreaSelector(List<Area> areas) async {
     final selected = await showModalBottomSheet<Area>(
       context: context,
-      backgroundColor: const Color(0xFF2c2c2e),
+      backgroundColor: AppColors.darkCard,
       builder: (context) => Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
@@ -813,10 +815,10 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             const Text("選擇領域", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ...areas.map((area) => ListTile(
-              leading: const Icon(Icons.category, color: Color(0xFF6C63FF)),
+              leading: const Icon(Icons.category, color: AppColors.primary),
               title: Text(area.name, style: const TextStyle(color: Colors.white)),
               selected: area.id == _selectedAreaId,
-              selectedTileColor: const Color(0xFF6C63FF).withValues(alpha: 0.2),
+              selectedTileColor: AppColors.primary.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, area),
             )),
           ],
@@ -835,7 +837,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   Future<void> _showProductSelector(List<Product> products) async {
     final selected = await showModalBottomSheet<Product>(
       context: context,
-      backgroundColor: const Color(0xFF2c2c2e),
+      backgroundColor: AppColors.darkCard,
       builder: (context) => Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
@@ -868,7 +870,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final topics = _availableTopics;
     final selected = await showModalBottomSheet<Map<String, dynamic>?>(
       context: context,
-      backgroundColor: const Color(0xFF2c2c2e),
+      backgroundColor: AppColors.darkCard,
       builder: (context) => Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
@@ -908,7 +910,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: const Color(0xFF1c1c1e).withValues(alpha: 0.95),
+        color: AppColors.darkBackground.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
@@ -1325,7 +1327,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                         (a) => a.id == _selectedAreaId,
                         orElse: () => areas.first,
                       );
-                      return _buildChip(selectedArea.name, const Color(0xFF6C63FF),
+                      return _buildChip(selectedArea.name, AppColors.primary,
                         onTap: () => _showAreaSelector(areas));
                     },
                   ),
@@ -1412,7 +1414,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         children: [
           Row(
             children: [
-              const Icon(Icons.checklist, size: 18, color: Color(0xFF6C63FF)),
+              const Icon(Icons.checklist, size: 18, color: AppColors.primary),
               const SizedBox(width: 6),
               Text('待辦 $completedCount/$total',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
@@ -1435,7 +1437,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                 onTap: _handleAddSubItem,
                 child: const Padding(
                   padding: EdgeInsets.all(4),
-                  child: Icon(Icons.add_circle_outline, color: Color(0xFF6C63FF), size: 20),
+                  child: Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
                 ),
               ),
             ],
@@ -1579,7 +1581,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            const Icon(Icons.center_focus_strong_rounded, size: 18, color: Color(0xFF6C63FF)),
+            const Icon(Icons.center_focus_strong_rounded, size: 18, color: AppColors.primary),
             const SizedBox(width: 8),
             const Text(
               '專注模式',
@@ -1601,11 +1603,11 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            const Icon(Icons.check_circle_outline, size: 18, color: Color(0xFF4ADE80)),
+            const Icon(Icons.check_circle_outline, size: 18, color: AppColors.success),
             const SizedBox(width: 8),
             const Text(
               '標記為已完成',
-              style: TextStyle(color: Color(0xFF4ADE80), fontSize: 15),
+              style: TextStyle(color: AppColors.success, fontSize: 15),
             ),
             const Spacer(),
             Icon(Icons.chevron_right, size: 20, color: Colors.white.withValues(alpha: 0.3)),
@@ -1649,7 +1651,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             : const Icon(Icons.save_rounded, size: 18),
           label: Text(_isLoading ? "儲存中..." : "儲存"),
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF6C63FF),
+            backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

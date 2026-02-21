@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../domain/entities/coach_briefing.dart';
@@ -87,7 +88,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
     final briefing = state.briefing;
     final plan = state.plan;
     final accentColor =
-        isMorning ? const Color(0xFFF59E0B) : const Color(0xFF8B5CF6);
+        isMorning ? AppColors.statusInbox : AppColors.statusMaintain;
 
     final overdueCount = briefing?.overdueTasks.length ?? 0;
     final conflictCount = briefing?.conflicts.length ?? 0;
@@ -174,17 +175,17 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
               if (planItemCount > 0)
                 _buildChip(
                   '📋 今日計畫 ($planItemCount項/$planMinutes分鐘)',
-                  const Color(0xFF3B82F6),
+                  AppColors.statusActive,
                 ),
               if (conflictCount > 0)
                 _buildChip(
                   '⚠️ $conflictCount 個衝突',
-                  const Color(0xFFF59E0B),
+                  AppColors.statusInbox,
                 ),
               if (overdueCount > 0)
                 _buildChip(
                   '🔴 $overdueCount 個逾期',
-                  const Color(0xFFEF4444),
+                  AppColors.error,
                 ),
             ],
           ),
@@ -286,15 +287,15 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
       key: const ValueKey('error'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFEF4444).withValues(alpha: 0.06),
+        color: AppColors.error.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+          color: AppColors.error.withValues(alpha: 0.15),
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 20),
+          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -310,7 +311,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
             child: Text(
               '重試',
               style: TextStyle(
-                color: const Color(0xFF6366F1).withValues(alpha: 0.8),
+                color: AppColors.onboardingIndigo.withValues(alpha: 0.8),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -324,7 +325,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
   Widget _buildEmptyCard(BriefingType type) {
     final isMorning = type == BriefingType.morning;
     final accentColor =
-        isMorning ? const Color(0xFFF59E0B) : const Color(0xFF8B5CF6);
+        isMorning ? AppColors.statusInbox : AppColors.statusMaintain;
 
     return Container(
       key: const ValueKey('empty'),
