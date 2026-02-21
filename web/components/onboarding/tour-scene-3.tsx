@@ -48,7 +48,7 @@ export function TourScene3() {
           {/* AI 整理與分析 */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-lg">
+              <div className="w-6 h-6 rounded-full bg-cta flex items-center justify-center text-white text-xs font-bold shadow-lg">
                 2
               </div>
               <h3 className="text-white font-bold">AI 整理與分析</h3>

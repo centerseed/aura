@@ -16,7 +16,7 @@ class AiSchedulingPage extends StatelessWidget {
             // 標題
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.onboardingIndigo, AppColors.accentEmerald],
+                colors: [AppColors.brandTeal, AppColors.accentEmerald],
               ).createShader(bounds),
               child: const Text(
                 'AI 會自動整理\n並安排時間',
@@ -47,7 +47,7 @@ class AiSchedulingPage extends StatelessWidget {
               title: '你輸入',
               content: '完成 OAuth 登入功能',
               icon: Icons.edit_outlined,
-              color: AppColors.onboardingIndigo,
+              color: AppColors.brandTeal,
             ),
 
             const SizedBox(height: 16),

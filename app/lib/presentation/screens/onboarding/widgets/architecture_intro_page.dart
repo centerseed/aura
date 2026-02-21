@@ -36,7 +36,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
 
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
+                colors: [AppColors.brandTeal, AppColors.brandBlue],
               ).createShader(bounds),
               child: const Text(
                 '「身份地圖」',
@@ -66,7 +66,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
               title: 'Area (身份)',
               subtitle: '你是誰？',
               example: exampleArea,
-              color: AppColors.onboardingIndigo,
+              color: AppColors.brandTeal,
               indent: 0,
             ),
 
@@ -102,13 +102,13 @@ class ArchitectureIntroPage extends ConsumerWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    AppColors.onboardingIndigo.withValues(alpha: 0.1),
-                    AppColors.statusMaintain.withValues(alpha: 0.1),
+                    AppColors.brandTeal.withValues(alpha: 0.1),
+                    AppColors.brandBlue.withValues(alpha: 0.1),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: AppColors.onboardingIndigo.withValues(alpha: 0.3),
+                  color: AppColors.brandTeal.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -116,12 +116,12 @@ class ArchitectureIntroPage extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.onboardingIndigo.withValues(alpha: 0.2),
+                      color: AppColors.brandTeal.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.auto_awesome,
-                      color: AppColors.onboardingIndigo,
+                      color: AppColors.brandTeal,
                       size: 24,
                     ),
                   ),

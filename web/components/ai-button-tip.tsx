@@ -28,7 +28,7 @@ export function AIButtonTip({ show, onClose }: AIButtonTipProps) {
 
   return (
     <div className="fixed top-20 right-6 z-[100] animate-in slide-in-from-right-4 fade-in duration-300">
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 shadow-2xl shadow-indigo-500/30 max-w-sm border border-white/20">
+      <div className="bg-slate-800 rounded-xl p-4 shadow-2xl max-w-sm border border-white/20">
         <button
           onClick={handleClose}
           className="absolute top-2 right-2 p-1 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-all"

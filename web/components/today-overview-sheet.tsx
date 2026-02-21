@@ -407,7 +407,7 @@ export function TodayOverviewSheet({
               setShowBubble(false);
               handleOpen();
             }}
-            className="absolute top-full right-0 mt-2 animate-in fade-in slide-in-from-top-2 duration-300 px-3 py-1.5 rounded-lg bg-indigo-500/90 backdrop-blur-sm text-white text-xs font-medium shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-colors whitespace-nowrap z-50"
+            className="absolute top-full right-0 mt-2 animate-in fade-in slide-in-from-top-2 duration-300 px-3 py-1.5 rounded-lg bg-indigo-500/90 backdrop-blur-sm text-white text-xs font-medium shadow-lg shadow-indigo-500/20 hover:bg-blue-500 transition-colors whitespace-nowrap z-50"
           >
             新簡報已產生
           </button>
@@ -574,7 +574,7 @@ function TodaySheetContent({
         >
           <Moon className="w-3.5 h-3.5" />
           晚
-          {eveningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />}
+          {eveningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-indigo-400" />}
         </button>
       </div>
     </div>

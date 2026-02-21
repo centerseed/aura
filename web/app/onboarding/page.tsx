@@ -224,7 +224,7 @@ function OnboardingContent() {
                       absolute top-4 right-4 w-6 h-6 rounded-full flex items-center justify-center
                       transition-all duration-300 shadow-lg
                       ${isSelected
-                        ? "bg-gradient-to-br from-indigo-500 to-indigo-600 scale-110 rotate-12"
+                        ? "bg-cta scale-110 rotate-12"
                         : "bg-white/10 group-hover:bg-white/20 group-hover:scale-105"
                       }
                     `}

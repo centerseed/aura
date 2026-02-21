@@ -320,7 +320,7 @@ export function CoachAgent() {
         {showBubble && !isLoading && (
           <button
             onClick={() => { setShowBubble(false); handleOpen(); }}
-            className="absolute top-full right-0 mt-2 animate-in fade-in slide-in-from-top-2 duration-300 px-3 py-1.5 rounded-lg bg-indigo-500/90 backdrop-blur-sm text-white text-xs font-medium shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-colors whitespace-nowrap z-50"
+            className="absolute top-full right-0 mt-2 animate-in fade-in slide-in-from-top-2 duration-300 px-3 py-1.5 rounded-lg bg-indigo-500/90 backdrop-blur-sm text-white text-xs font-medium shadow-lg shadow-indigo-500/20 hover:bg-cta transition-colors whitespace-nowrap z-50"
           >
             {briefingLabel}已產生
           </button>
@@ -420,7 +420,7 @@ function CoachDrawerContent({
   const header = (
     <div className="border-b border-slate-200 dark:border-white/5">
       <div className="px-5 pt-5 pb-3 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full bg-cta flex items-center justify-center">
           <Sparkles className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
@@ -467,7 +467,7 @@ function CoachDrawerContent({
         >
           <Moon className="w-3.5 h-3.5" />
           晚報
-          {eveningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />}
+          {eveningBriefing && <span className="w-1.5 h-1.5 rounded-full bg-cta dark:bg-indigo-400" />}
         </button>
       </div>
     </div>
@@ -551,7 +551,7 @@ function CoachDrawerContent({
             <button
               onClick={() => onGenerate(activeTab)}
               disabled={isGenerating}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cta text-white text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
             >
               {isGenerating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

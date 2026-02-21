@@ -63,6 +63,11 @@ export default {
         panel: {
           dark: "hsl(var(--panel-bg-dark))",
         },
+        // CTA 按鈕（實心藍，無漸層）
+        cta: {
+          DEFAULT: "hsl(var(--color-cta))",
+          hover:   "hsl(var(--color-cta-hover))",
+        },
       },
       boxShadow: {
         'float-sm': 'var(--card-shadow-sm)',

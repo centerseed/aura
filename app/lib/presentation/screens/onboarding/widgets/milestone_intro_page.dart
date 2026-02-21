@@ -16,7 +16,7 @@ class MilestoneIntroPage extends StatelessWidget {
             // 標題
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
+                colors: [AppColors.brandTeal, AppColors.brandBlue],
               ).createShader(bounds),
               child: const Text(
                 '什麼是里程碑？',
@@ -49,7 +49,7 @@ class MilestoneIntroPage extends StatelessWidget {
               title: '你需要自己設定里程碑',
               description: '為重要的事情設定明確的完成日期',
               icon: Icons.edit_calendar,
-              color: AppColors.onboardingIndigo,
+              color: AppColors.brandTeal,
             ),
 
             const SizedBox(height: 20),

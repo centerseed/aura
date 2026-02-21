@@ -83,7 +83,7 @@ class ReadyPage extends ConsumerWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    AppColors.onboardingIndigo.withValues(alpha: 0.3),
+                    AppColors.brandTeal.withValues(alpha: 0.3),
                     AppColors.accentEmerald.withValues(alpha: 0.3),
                   ],
                 ),
@@ -100,7 +100,7 @@ class ReadyPage extends ConsumerWidget {
             // 標題
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.onboardingIndigo, AppColors.accentEmerald],
+                colors: [AppColors.brandTeal, AppColors.accentEmerald],
               ).createShader(bounds),
               child: const Text(
                 '準備就緒！',
@@ -222,8 +222,8 @@ class ReadyPage extends ConsumerWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.onboardingIndigo.withValues(alpha: 0.2),
-            AppColors.statusMaintain.withValues(alpha: 0.2),
+            AppColors.brandTeal.withValues(alpha: 0.2),
+            AppColors.brandBlue.withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(20),

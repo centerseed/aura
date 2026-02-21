@@ -35,7 +35,7 @@ export function BrainDumpModal({ isOpen, onClose, onSubmit, isLoading }: BrainDu
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-cta flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -82,7 +82,7 @@ export function BrainDumpModal({ isOpen, onClose, onSubmit, isLoading }: BrainDu
           <Button
             onClick={handleSubmit}
             disabled={!text.trim() || isLoading}
-            className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white min-w-[120px]"
+            variant="cta" className="min-w-[120px]"
           >
             {isLoading ? (
               <>

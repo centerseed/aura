@@ -272,7 +272,7 @@ export function DraggableTaskItem({
             <div className="flex items-center gap-2 mt-2">
               <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all"
+                  className="h-full bg-gradient-to-r from-blue-500 to-fuchsia-500 transition-all"
                   style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
                 />
               </div>

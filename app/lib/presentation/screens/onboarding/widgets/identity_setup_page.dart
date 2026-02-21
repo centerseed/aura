@@ -107,12 +107,12 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            AppColors.onboardingIndigo.withValues(alpha: 0.15),
-                            AppColors.statusMaintain.withValues(alpha: 0.15),
+                            AppColors.brandTeal.withValues(alpha: 0.15),
+                            AppColors.brandBlue.withValues(alpha: 0.15),
                           ],
                         ),
                         border: Border.all(
-                          color: AppColors.onboardingIndigo.withValues(alpha: 0.4),
+                          color: AppColors.brandTeal.withValues(alpha: 0.4),
                           width: 1.5,
                         ),
                         borderRadius: BorderRadius.circular(12),
@@ -122,7 +122,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                           Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: AppColors.onboardingIndigo.withValues(alpha: 0.3),
+                              color: AppColors.brandTeal.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: AnimatedRotation(
@@ -130,7 +130,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                               turns: _showCustomArea ? 0.25 : 0,
                               child: const Icon(
                                 Icons.add,
-                                color: AppColors.onboardingIndigo,
+                                color: AppColors.brandTeal,
                                 size: 20,
                               ),
                             ),

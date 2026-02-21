@@ -179,7 +179,7 @@ export function StructureView({
                 </div>
                 <Button
                   onClick={() => onAddProduct(area.id, area.name)}
-                  className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
+                  variant="cta"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   立即新增

@@ -43,7 +43,7 @@ class PageIndicator extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                     gradient: isActive
                         ? const LinearGradient(
-                            colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
+                            colors: [AppColors.brandTeal, AppColors.brandBlue],
                           )
                         : null,
                     color: isPassed

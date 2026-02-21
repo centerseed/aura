@@ -86,7 +86,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 children: [
                   ShaderMask(
                     shaderCallback: (bounds) => const LinearGradient(
-                      colors: [AppColors.onboardingIndigo, AppColors.accentEmerald],
+                      colors: [AppColors.brandTeal, AppColors.brandBlue],
                     ).createShader(bounds),
                     child: const Text(
                       'Zentropy',
@@ -301,7 +301,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                       gradient: const LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
+                        colors: [AppColors.brandTeal, AppColors.brandBlue],
                       ),
                       borderRadius: BorderRadius.circular(2),
                     ),

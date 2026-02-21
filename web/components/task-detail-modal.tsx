@@ -723,7 +723,7 @@ export function TaskDetailModal({
                   </div>
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-300"
+                      className="h-full bg-gradient-to-r from-blue-500 to-fuchsia-500 transition-all duration-300"
                       style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
                     />
                   </div>
@@ -781,7 +781,7 @@ export function TaskDetailModal({
                         />
                         <button
                           onClick={handleAddSubItem}
-                          className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors"
+                          className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
                         >
                           新增
                         </button>
@@ -868,7 +868,7 @@ export function TaskDetailModal({
                       onClick={() => setNewRefType("url")}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                         newRefType === "url"
-                          ? "bg-indigo-500 text-white"
+                          ? "bg-blue-500 text-white"
                           : "bg-white/10 text-white/70 hover:bg-white/20"
                       }`}
                     >
@@ -879,7 +879,7 @@ export function TaskDetailModal({
                       onClick={() => setNewRefType("note")}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                         newRefType === "note"
-                          ? "bg-indigo-500 text-white"
+                          ? "bg-blue-500 text-white"
                           : "bg-white/10 text-white/70 hover:bg-white/20"
                       }`}
                     >
@@ -914,7 +914,7 @@ export function TaskDetailModal({
                     <button
                       onClick={handleAddReference}
                       disabled={!newRefContent.trim() || isSubmittingReference}
-                      className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                     >
                       {isSubmittingReference && <Loader2 className="w-4 h-4 animate-spin" />}
                       {isSubmittingReference ? "新增中..." : "新增"}
@@ -1172,7 +1172,7 @@ export function TaskDetailModal({
                     }
                   }}
                   disabled={!editDialogContent.trim()}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   儲存
                 </button>
@@ -1227,7 +1227,7 @@ export function TaskDetailModal({
                             }
                           }}
                           disabled={!moveTargetTaskId || isMoving}
-                          className="px-3 py-2 text-xs font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1 shrink-0"
+                          className="px-3 py-2 text-xs font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1 shrink-0"
                         >
                           {isMoving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MoveRight className="w-3.5 h-3.5" />}
                           {isMoving ? "移動中" : "移動"}

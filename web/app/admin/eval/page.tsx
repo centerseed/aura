@@ -187,7 +187,7 @@ export default function EvaluationDashboard() {
               size="sm"
               onClick={fetchLogs}
               disabled={isLoading}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white"
+              className="bg-blue-600 hover:bg-blue-500 text-white"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
               重新整理

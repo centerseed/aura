@@ -114,7 +114,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             children: [
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.onboardingIndigo, AppColors.statusMaintain],
+                  colors: [AppColors.brandTeal, AppColors.brandBlue],
                 ).createShader(bounds),
                 child: const Text(
                   '全視圖',
@@ -1008,8 +1008,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
-                    AppColors.onboardingIndigo.withValues(alpha: 0.2),
-                    AppColors.statusMaintain.withValues(alpha: 0.2),
+                    AppColors.brandTeal.withValues(alpha: 0.2),
+                    AppColors.brandBlue.withValues(alpha: 0.2),
                   ],
                 ),
               ),

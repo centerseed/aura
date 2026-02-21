@@ -169,7 +169,7 @@ export default function TestCalendarPage() {
               <button
                 onClick={copyToken}
                 disabled={!token}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white rounded font-medium text-sm"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-medium text-sm"
               >
                 {copied ? '✅ 已複製' : '📋 複製完整 Token'}
               </button>
@@ -192,7 +192,7 @@ export default function TestCalendarPage() {
           <button
             onClick={testFreeBusy}
             disabled={isLoading || !token}
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white rounded-lg font-medium"
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg font-medium"
           >
             {isLoading ? '測試中...' : '測試 Free/Busy API（查詢本週空檔）'}
           </button>

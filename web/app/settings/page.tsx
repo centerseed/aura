@@ -401,7 +401,7 @@ function SettingsContent() {
                         size="sm"
                         onClick={handleSaveName}
                         disabled={isSavingName}
-                        className="h-7 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                        className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-white text-xs"
                       >
                         {isSavingName ? <Loader2 className="w-3 h-3 animate-spin" /> : '儲存'}
                       </Button>
@@ -671,7 +671,7 @@ function SettingsContent() {
                   </div>
                   <Button
                     onClick={() => setShowConnectDialog(true)}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Calendar className="w-4 h-4 mr-2" />
                     連接 Google Calendar

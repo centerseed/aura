@@ -129,6 +129,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final oauthCredential = OAuthProvider('apple.com').credential(
         idToken: appleCredential.identityToken,
         rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
       );
 
       // 4. 登入 Firebase

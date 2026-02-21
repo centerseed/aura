@@ -25,9 +25,9 @@ export function QuickInputGuide({ onClose }: QuickInputGuideProps) {
       <div className="absolute bottom-32 right-6 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="relative max-w-sm">
           {/* 箭頭指向下方 */}
-          <div className="absolute -bottom-3 right-8 w-6 h-6 bg-gradient-to-br from-indigo-600 to-purple-600 rotate-45 border-b border-r border-white/20" />
+          <div className="absolute -bottom-3 right-8 w-6 h-6 bg-slate-800 rotate-45 border-b border-r border-white/20" />
 
-          <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-6 shadow-2xl border border-white/20">
+          <div className="bg-slate-800 rounded-2xl p-6 shadow-2xl border border-white/20">
             <button
               onClick={onClose}
               className="absolute top-3 right-3 p-1 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-all"

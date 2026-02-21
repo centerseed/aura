@@ -72,7 +72,7 @@ export function TourNavigation({
           <div className="w-32 flex justify-end">
             <Button
               onClick={onNext}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white font-medium rounded-lg transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/40"
+              variant="cta" className="flex items-center gap-2 px-6 py-2 font-medium rounded-lg transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/40"
             >
               <span className="text-sm">
                 {currentScene === totalScenes ? "開始使用" : "下一步"}

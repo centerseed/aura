@@ -67,9 +67,13 @@
     /* Panel 深色背景 */
     --panel-bg-dark: 222 47% 11%;
 
-    /* 品牌 Accent */
-    --color-accent:       245 76% 59%;
-    --color-accent-hover: 244 57% 51%;
+    /* 品牌 Accent（Brand Blue）*/
+    --color-accent:       222 81% 65%;   /* #5B7FF0 blue */
+    --color-accent-hover: 222 81% 55%;   /* darker blue */
+
+    /* CTA 按鈕（實心藍，無漸層）*/
+    --color-cta:       224 71% 47%;   /* #2563eb — blue-600，白字對比 ~5.2:1 ✓ WCAG AA */
+    --color-cta-hover: 224 71% 40%;   /* 深一階 */
   }
 
   .dark {
@@ -135,9 +139,13 @@
     /* Panel 深色背景 */
     --panel-bg-dark: 222 47% 11%;
 
-    /* 品牌 Accent */
-    --color-accent:       245 76% 59%;
-    --color-accent-hover: 244 57% 51%;
+    /* 品牌 Accent（Brand Blue）*/
+    --color-accent:       222 81% 65%;   /* #5B7FF0 blue */
+    --color-accent-hover: 222 81% 55%;   /* darker blue */
+
+    /* CTA 按鈕（實心藍，無漸層）*/
+    --color-cta:       222 75% 55%;   /* 稍深品牌藍，白字對比 ~4.7:1 ✓ WCAG AA */
+    --color-cta-hover: 222 75% 48%;   /* 稍暗 */
   }
 }
 
@@ -308,6 +316,14 @@
   .hover\:border-indigo-400\/50:hover { border-color: rgba(99, 102, 241, 0.4); }
   .hover\:border-amber-400\/50:hover  { border-color: rgba(245, 158, 11, 0.4); }
 
+  /* === CTA 按鈕與彩色 icon 容器：文字固定白色 === */
+  .bg-blue-500 .text-white,
+  .bg-blue-600 .text-white,
+  .bg-cta .text-white,
+  .bg-cta > .text-white {
+    color: white !important;
+  }
+
   /* === Gradient text 修正 === */
   .bg-clip-text.text-transparent {
     -webkit-text-fill-color: #1a1f36;
@@ -345,23 +361,6 @@
   .bg-indigo-500\/20.ring-2 {
     background-color: rgba(99, 102, 241, 0.08);
   }
-
-  /* === Area icon — 淺色柔和漸層 === */
-  .bg-gradient-to-br.from-indigo-500.to-indigo-600,
-  .bg-gradient-to-br.from-indigo-500.to-purple-600 {
-    background: linear-gradient(135deg, #c7d2fe, #a5b4fc) !important;
-    color: #4338ca !important;
-  }
-  .bg-gradient-to-br.from-indigo-500.to-indigo-600 .text-white,
-  .bg-gradient-to-br.from-indigo-500.to-purple-600 .text-white {
-    color: #4338ca !important;
-  }
-
-  /* === Quick Capture 按鈕 — 柔化 === */
-  .bg-gradient-to-r.from-indigo-600 {
-    background: linear-gradient(135deg, #818cf8, #6366f1) !important;
-  }
-
   /* === Modal — 淺色底 === */
   .bg-slate-900.border-white\/10,
   .bg-slate-900.border.border-white\/20 {
@@ -375,11 +374,6 @@
     background-color: rgba(243, 245, 248, 0.9) !important;
   }
 
-  /* === Modal 內 gradient header === */
-  .bg-gradient-to-r.from-purple-900\/30,
-  .bg-gradient-to-r.from-purple-900\/20 {
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.06), rgba(129, 140, 248, 0.04)) !important;
-  }
 
   /* === Task 項目 — 內嵌卡片質感 === */
   .hover\:bg-white\/5.rounded,
@@ -463,10 +457,6 @@
   .hover\:bg-slate-700:hover {
     background-color: rgba(0, 0, 0, 0.05) !important;
   }
-  .bg-gradient-to-r.from-indigo-400.to-emerald-400 {
-    -webkit-text-fill-color: transparent !important;
-    background-image: linear-gradient(to right, #4f46e5, #059669) !important;
-  }
   .border-amber-500\/30 {
     border-color: rgba(245, 158, 11, 0.25) !important;
   }
@@ -497,17 +487,6 @@
   .hover\:bg-red-500\/10:hover {
     background-color: rgba(224, 112, 112, 0.06) !important;
   }
-  .bg-indigo-600 {
-    background-color: #4f46e5 !important;
-  }
-  .hover\:bg-indigo-700:hover {
-    background-color: #4338ca !important;
-  }
-  /* Settings gradient card for anonymous binding */
-  .bg-gradient-to-r.from-indigo-950 {
-    background: linear-gradient(90deg, rgba(99,102,241,0.08), rgba(255,255,255,0.6)) !important;
-    border-color: rgba(99, 102, 241, 0.2) !important;
-  }
 
   /* === Quick Capture 浮動面板 === */
   .bg-slate-900\/95 {
@@ -518,9 +497,6 @@
   .bg-slate-900\/80 {
     background-color: rgba(255, 255, 255, 0.88) !important;
     backdrop-filter: blur(24px) saturate(1.6) !important;
-  }
-  .shadow-indigo-500\/20 {
-    --tw-shadow-color: rgba(99, 102, 241, 0.08) !important;
   }
   /* Quick capture input */
   textarea.bg-white\/5 {
@@ -548,17 +524,9 @@
     color: #3b82f6 !important;
   }
 
-  /* === AI chat bubble in quick capture === */
-  .bg-indigo-600.text-white.rounded-2xl {
-    background-color: #4f46e5 !important;
-    color: #ffffff !important;
-  }
-  .bg-indigo-600.text-white.rounded-2xl .text-white,
-  .bg-indigo-600.text-white.rounded-2xl p {
-    color: #ffffff !important;
-  }
 
   /* === Scrollbar 淺色 === */
   ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.12); }
   ::-webkit-scrollbar-track { background: transparent; }
 }
+

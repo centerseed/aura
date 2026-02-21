@@ -4,17 +4,31 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._(); // 私有構造函數，防止實例化
 
-  // ==================== 品牌主色 ====================
+  // ==================== Logo 品牌色 ====================
 
-  /// 主要紫色 - 用於主要操作、強調元素
-  static const Color primary = Color(0xFF6C63FF);
+  /// Logo 上方 Z 左端 — 青藍色
+  static const Color brandTeal   = Color(0xFF2DD4BF);
 
-  /// 次要紫色 - 用於輔助操作
-  static const Color primaryLight = Color(0xFF8B85FF);
+  /// Logo 上方 Z 右端 — 藍色
+  static const Color brandBlue   = Color(0xFF3B82F6);
 
-  /// 深紫色 - 用於漸變
-  static const Color primaryDeep = Color(0xFF7C3AED);
-  static const Color primaryDark = Color(0xFF5B21B6);
+  /// Logo 下方 Z 左端 — 活力紫（非 AI 平板紫）
+  static const Color brandPurple = Color(0xFFA855F7);
+
+  /// Logo 下方 Z 右端 — 熱粉紅
+  static const Color brandPink   = Color(0xFFF43F5E);
+
+  // ==================== 品牌主色（來自 Logo）====================
+
+  /// 主色 — Blue（Logo 上方 Z 右端藍色）
+  static const Color primary = Color(0xFF5B7FF0);
+
+  /// 主色亮版 — Blue（Logo 上方 Z 右端）
+  static const Color primaryLight = Color(0xFF60A5FA);
+
+  /// 深藍 - 用於深色漸變（保留舊名，改為藍色系）
+  static const Color primaryDeep = Color(0xFF2563EB);
+  static const Color primaryDark = Color(0xFF1D4ED8);
 
   /// 粉紅色系 - 用於漸變
   static const Color accentPink = Color(0xFFEC4899);
@@ -80,8 +94,8 @@ class AppColors {
 
   // ==================== Onboarding 專用 ====================
 
-  /// Onboarding Indigo - 與主色區分
-  static const Color onboardingIndigo = Color(0xFF6366F1);
+  /// Onboarding 主色 — Blue（與 Logo 一致）
+  static const Color onboardingIndigo = Color(0xFF5B7FF0);
 
   // ==================== 卡片 / 表面色 ====================
 
@@ -180,11 +194,11 @@ class AppColors {
 
   // ==================== 漸變色 ====================
 
-  /// 主要漸變 (紫色系)
+  /// 主要漸變（Logo：Blue → Magenta）
   static const Gradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [primaryDeep, primaryDark],
+    colors: [Color(0xFF5B7FF0), Color(0xFFD946EF)],
   );
 
   /// 強調漸變 (紫色到粉色)

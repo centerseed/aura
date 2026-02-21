@@ -436,7 +436,7 @@ export function ReorganizeModal({
             <Button
               onClick={() => onApply({ applyTopicOps, applyConsolidations })}
               disabled={isApplying || (!applyTopicOps && !applyConsolidations)}
-              className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
+              variant="cta"
             >
               {isApplying ? "應用中..." : "套用勾選項目"}
             </Button>

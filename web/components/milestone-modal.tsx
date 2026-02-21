@@ -438,7 +438,7 @@ export function MilestoneModal({
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white min-w-[100px]"
+              variant="cta" className="min-w-[100px]"
             >
               {isSubmitting ? (
                 <>

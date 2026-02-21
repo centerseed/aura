@@ -224,7 +224,7 @@ export function BriefingScheduleSettings({
           <Button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
           >
             {isSaving ? (
               <>

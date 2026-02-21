@@ -92,7 +92,7 @@ export function DashboardWelcome({
         <div className="w-full max-w-xl text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Welcome Message */}
           <div className="space-y-4">
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-cta flex items-center justify-center shadow-lg shadow-indigo-500/30">
               <Sparkles className="w-10 h-10 text-white" />
             </div>
             <h2 className="text-3xl font-bold text-white">

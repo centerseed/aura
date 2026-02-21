@@ -38,7 +38,7 @@ export function TourScene1({ userAreas }: Props) {
           {/* Area 層 */}
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/50">
+              <div className="w-12 h-12 rounded-xl bg-cta flex items-center justify-center shadow-lg shadow-indigo-500/50">
                 <FolderOpen className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">

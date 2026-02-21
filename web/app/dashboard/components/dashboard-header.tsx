@@ -50,7 +50,7 @@ export function DashboardHeader({ userName, viewMode, onViewModeChange }: Dashbo
                 onClick={() => onViewModeChange(mode)}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
                   viewMode === mode
-                    ? 'bg-indigo-500 text-white'
+                    ? 'bg-blue-500 text-white'
                     : 'text-white/60 hover:text-white hover:bg-white/10'
                 }`}
               >

@@ -472,7 +472,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       >
         {/* AI 頭像 */}
         {!isUser && (
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-cta flex items-center justify-center flex-shrink-0">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
         )}
@@ -481,7 +481,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         <div className={`flex-1 max-w-[85%] ${isUser ? 'ml-auto' : ''}`}>
           {/* 用戶訊息 */}
           {isUser && (
-            <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5">
+            <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5">
               <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
             </div>
           )}
@@ -890,7 +890,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     return (
       <button
         onClick={() => setIsExpanded(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/30 flex items-center justify-center transition-all hover:scale-110 group"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-cta hover:bg-cta-hover shadow-lg shadow-blue-500/30 flex items-center justify-center transition-all hover:scale-110 group"
       >
         <MessageSquarePlus className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
       </button>
@@ -1076,7 +1076,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
                   size="lg"
                   onClick={handleSubmit}
                   disabled={!input.trim() && !selectedImage}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-6"
+                  variant="cta" className="px-6"
                 >
                   <Send className="w-5 h-5 mr-2" />
                   送出
@@ -1792,7 +1792,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
               size="sm"
               onClick={handleSubmit}
               disabled={!input.trim() && !selectedImage}
-              className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
+              variant="cta"
             >
               <Send className="w-4 h-4 mr-1" />
               送出

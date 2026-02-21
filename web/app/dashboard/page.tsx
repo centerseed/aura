@@ -413,7 +413,7 @@ function DraggableTaskItem({
             <div className="flex items-center gap-2 mt-2">
               <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all"
+                  className="h-full bg-gradient-to-r from-blue-500 to-fuchsia-500 transition-all"
                   style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
                 />
               </div>
@@ -1067,7 +1067,7 @@ function DroppableAreaHeader({
       }`}
     >
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-cta flex items-center justify-center">
           <FolderOpen className="w-5 h-5 text-white" />
         </div>
         <div>
@@ -3147,9 +3147,9 @@ function DashboardContent() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         {/* Background Effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
         </div>
 
         {/* Minimal Header */}
@@ -3173,7 +3173,7 @@ function DashboardContent() {
           <div className="w-full max-w-xl text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Welcome Message */}
             <div className="space-y-4">
-              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-cta flex items-center justify-center shadow-lg shadow-blue-500/30">
                 <Sparkles className="w-10 h-10 text-white" />
               </div>
               <h2 className="text-3xl font-bold text-white">
@@ -3250,9 +3250,9 @@ function DashboardContent() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         {/* Background Effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
         </div>
 
         {/* Quick Input Guide - 優先顯示 */}
@@ -3692,7 +3692,7 @@ function DashboardContent() {
                                 setSelectedAreaForProduct({ id: area.id, name: area.name });
                                 setIsProductModalOpen(true);
                               }}
-                              className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
+                              variant="cta"
                             >
                               <Plus className="w-4 h-4 mr-2" />
                               立即新增
@@ -4097,9 +4097,9 @@ function DashboardContent() {
             {/* Modal */}
             <Card className="relative w-full max-w-lg mx-4 bg-slate-900 border-white/10 shadow-2xl">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-indigo-900/30 to-indigo-900/30">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-blue-900/20 to-fuchsia-900/20">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-cta flex items-center justify-center">
                     <Target className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -4173,7 +4173,7 @@ function DashboardContent() {
                 <Button
                   onClick={handleConfirmMerge}
                   disabled={isMerging}
-                  className="bg-gradient-to-r from-indigo-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white"
+                  variant="cta"
                 >
                   {isMerging ? (
                     <>
