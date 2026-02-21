@@ -16,14 +16,14 @@ export interface GetPlanInput {
 
 interface PlanItem {
   content?: string
-  product?: { name: string }
+  product?: { name?: string } | string
   estimated_minutes?: number
   completed?: boolean
   task_id?: string
   [key: string]: unknown
 }
 
-interface PlanData {
+interface ApiResponse {
   date?: string
   coach_message?: string
   items?: PlanItem[]
@@ -53,18 +53,20 @@ export async function handleGetPlan(
     }
   }
 
-  const planData = data as PlanData
-  const items = (planData.items ?? []).map((item: PlanItem) => ({
+  // API 回傳格式：{ date, coach_message, items: [{ product: { name }, ... }] }
+  const apiResponse = data as ApiResponse
+
+  const items = (apiResponse.items ?? []).map((item: PlanItem) => ({
     content: item.content,
-    product: item.product?.name,
+    product: typeof item.product === 'object' ? item.product?.name : item.product,
     estimated_minutes: item.estimated_minutes,
     completed: item.completed,
     task_id: item.task_id,
   }))
 
   return {
-    date: planData.date || params.date || new Date().toISOString().split('T')[0],
-    coach_message: planData.coach_message || 'No message available',
+    date: apiResponse.date || params.date || new Date().toISOString().split('T')[0],
+    coach_message: apiResponse.coach_message || 'No message available',
     items,
     total: items.length,
   }

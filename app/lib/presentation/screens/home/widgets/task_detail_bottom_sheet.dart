@@ -85,6 +85,37 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     if (_selectedProductId != null) {
       _fetchTopics(_selectedProductId!);
     }
+
+    // 監聽 cachedTasksStreamProvider，當同一 task 的 sub_items 有更新時同步
+    // （因為 modal sheet 是獨立 Overlay，不受父層 widget tree 重建影響，
+    //  didUpdateWidget 永遠不會被呼叫，必須自己監聽 stream）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual(cachedTasksStreamProvider, (prev, next) {
+        if (!mounted || _isSubItemEditMode) return;
+        final cacheState = next.valueOrNull;
+        if (cacheState == null) return;
+        final tasks = cacheState.data;
+        if (tasks == null) return;
+        final updatedTask = tasks.where((t) => t.id == widget.task.id).firstOrNull;
+        if (updatedTask == null) return;
+
+        final newIds = updatedTask.subItems?.map((s) => s.id).toSet() ?? {};
+        final currentIds = _subItems.map((s) => s.id).toSet();
+        if (newIds != currentIds) {
+          setState(() {
+            _subItems = (updatedTask.subItems ?? [])
+                .map((sub) => _SubItemState(
+                      id: sub.id,
+                      content: sub.content,
+                      completed: sub.completed,
+                      startDate: sub.startDate,
+                      dueDate: sub.dueDate,
+                    ))
+                .toList();
+          });
+        }
+      });
+    });
   }
 
   Future<void> _fetchTopics(String productId) async {

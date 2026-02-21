@@ -49,7 +49,7 @@ const mcpSessions = new Map<
   { transport: StreamableHTTPServerTransport; createdAt: number }
 >();
 
-const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const SESSION_TTL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days (matching access token TTL)
 const MAX_SESSIONS = 100;
 
 function cleanupStaleSessions() {
@@ -127,6 +127,19 @@ async function main() {
           // Attach auth info to req so SDK passes it to tool handlers via extra.authInfo
           attachAuthInfo(req);
           await session.transport.handleRequest(req, res);
+          return;
+        }
+
+        // Session ID provided but not found — tell client to reinitialize.
+        // DO NOT fall through to create a new transport: the new transport would reject
+        // the request (wrong session ID) and return a confusing "Server not initialized" error.
+        if (sessionId) {
+          console.log(`[mcp] Session ${sessionId} not found (expired or server restarted). Returning 404.`);
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            error: "session_not_found",
+            message: "MCP session expired or not found. Please reconnect (send a fresh initialize).",
+          }));
           return;
         }
 
@@ -209,6 +222,32 @@ async function main() {
       }
 
       // ── OAuth Discovery (for MCP clients) ─────────────
+      // RFC 8414 標準路徑（不含 -metadata 後綴）
+      if (pathname === "/.well-known/oauth-authorization-server") {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || `http://${hostname}:${port}`;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            issuer: baseUrl,
+            authorization_endpoint: `${baseUrl}/authorize`,
+            token_endpoint: `${baseUrl}/token`,
+            scopes_supported: [
+              "read:tasks",
+              "read:knowledge",
+              "read:profile",
+              "write:inbox",
+              "write:knowledge",
+              "trigger:librarian",
+            ],
+            response_types_supported: ["code"],
+            grant_types_supported: ["authorization_code", "refresh_token"],
+            code_challenge_methods_supported: ["S256"],
+            token_endpoint_auth_methods_supported: ["none"],
+          }),
+        );
+        return;
+      }
+
       if (pathname === "/.well-known/oauth-authorization-server-metadata") {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || `http://${hostname}:${port}`;
         res.writeHead(200, { "Content-Type": "application/json" });

@@ -13,7 +13,7 @@ import { ValidationException } from '@/lib/api-response'
 // ============================================================================
 
 export interface SignInRequest {
-  provider: 'google' | 'anonymous' | 'email'
+  provider: 'google' | 'anonymous' | 'email' | 'apple'
   providerId?: string | null
   email?: string | null
   name?: string | null
@@ -50,6 +50,10 @@ export class SignInUseCase {
       created = result.created
     } else if (request.provider === 'email') {
       const result = await this.handleEmailSignIn(request)
+      user = result.user
+      created = result.created
+    } else if (request.provider === 'apple') {
+      const result = await this.handleAppleSignIn(request)
       user = result.user
       created = result.created
     } else {
@@ -206,6 +210,53 @@ export class SignInUseCase {
   }
 
   /**
+   * 處理 Apple ID 登入
+   */
+  private async handleAppleSignIn(request: SignInRequest) {
+    if (!request.providerId) {
+      throw new ValidationException(
+        'Apple login requires providerId',
+        'providerId'
+      )
+    }
+
+    let user = await prisma.user.findFirst({
+      where: {
+        auth_provider: 'APPLE',
+        auth_provider_id: request.providerId,
+      },
+    })
+
+    let created = false
+
+    if (!user) {
+      // Apple Hide My Email：email 可能為 null，用 providerId 衍生 placeholder
+      const email = request.email || `${request.providerId}@privaterelay.appleid.com`
+      const name = request.name || email.split('@')[0]
+      user = await prisma.user.create({
+        data: {
+          email,
+          name,
+          auth_provider: 'APPLE',
+          auth_provider_id: request.providerId,
+        },
+      })
+      created = true
+    } else {
+      // 有新資訊才更新（Apple 只在首次登入回傳 name/email）
+      const updateData: any = { updated_at: new Date() }
+      if (request.name && !user.name) updateData.name = request.name
+      if (request.email && !user.email) updateData.email = request.email
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      })
+    }
+
+    return { user, created }
+  }
+
+  /**
    * 驗證請求資料
    */
   private validateRequest(request: SignInRequest): void {
@@ -213,7 +264,7 @@ export class SignInUseCase {
       throw new ValidationException('Provider is required', 'provider')
     }
 
-    const validProviders = ['google', 'anonymous', 'email']
+    const validProviders = ['google', 'anonymous', 'email', 'apple']
     if (!validProviders.includes(request.provider)) {
       throw new ValidationException(
         `Provider must be one of: ${validProviders.join(', ')}`,

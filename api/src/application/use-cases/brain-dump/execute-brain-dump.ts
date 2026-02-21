@@ -8,6 +8,7 @@
 import { prisma } from "@/lib/db"
 import { isValidUUID } from "@/domain/constants/validation"
 import { ValidationException } from "@/lib/api-response"
+import { ensureProductEmbedding } from "@/lib/embedding"
 import type { StructureResult, StructuredItem, Milestone, ExistingArea } from "./generate-brain-dump-structure"
 
 // ============================================================================
@@ -29,9 +30,12 @@ function calculateDueDate(
     }
   }
 
-  // 層級 2: 從里程碑推斷
-  if (item.inferred_from_milestone && isValidUUID(item.inferred_from_milestone)) {
-    const milestone = milestones.find(m => m.id === item.inferred_from_milestone)
+  // 層級 2: 從里程碑推斷（AI 回傳里程碑名稱或 UUID，兩者都支援）
+  if (item.inferred_from_milestone) {
+    const milestone = milestones.find(m =>
+      m.name === item.inferred_from_milestone ||
+      (isValidUUID(item.inferred_from_milestone) && m.id === item.inferred_from_milestone)
+    )
 
     if (milestone?.target_date) {
       let daysBeforeMilestone = item.estimated_days_needed ?? getDefaultDays(item.task_type)
@@ -81,11 +85,17 @@ function calculateDueDate(
     }
   }
 
+  // fallback: 嘗試用名稱查找 milestone ID
+  const fallbackMilestone = item.inferred_from_milestone
+    ? milestones.find(m =>
+        m.name === item.inferred_from_milestone ||
+        (isValidUUID(item.inferred_from_milestone) && m.id === item.inferred_from_milestone)
+      )
+    : null
+
   return {
     dueDate: null,
-    inferredFromMilestone: item.inferred_from_milestone && isValidUUID(item.inferred_from_milestone)
-      ? item.inferred_from_milestone
-      : null,
+    inferredFromMilestone: fallbackMilestone?.id ?? null,
     timeConfidence: null,
   }
 }
@@ -320,6 +330,10 @@ export class ExecuteBrainDumpUseCase {
           })
           productId = product.id
           productCache.set(productKey, { id: product.id })
+          // 非同步計算 embedding（不阻塞 transaction）
+          ensureProductEmbedding(product.id, product.name, null).catch(err => {
+            console.error(`❌ [embedding] Failed to compute embedding for new Product "${product.name}":`, err)
+          })
         }
 
         // 3. Topic

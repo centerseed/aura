@@ -323,6 +323,13 @@ export class CoachAIGenerator {
       sections.push('')
     }
 
+    if (input.completedTasks.length === 0 && input.calendarEvents.length === 0) {
+      sections.push('【重要】今天沒有任何完成的任務或行事曆記錄。')
+      sections.push('你的 summary 必須是：「今天是好好充電的一天，辛苦了！」')
+      sections.push('嚴禁使用任何其他句子或提及任何任務名稱。')
+      sections.push('')
+    }
+
     sections.push('---')
     sections.push('')
     sections.push('## 回應要求（嚴格遵守）')

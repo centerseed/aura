@@ -6,7 +6,7 @@
  */
 
 import type { AuthContext, OAuthScope } from "../types";
-import { verifyAccessToken, type McpTokenPayload } from "../oauth/jwt";
+import { verifyAccessToken, hashAccessToken, type McpTokenPayload } from "../oauth/jwt";
 import { prisma } from "@/lib/db";
 
 export class AuthenticationError extends Error {
@@ -55,11 +55,35 @@ export async function authenticateMcpRequest(authHeader?: string): Promise<AuthC
 
   try {
     const payload = verifyAccessToken(token);
+    // Fire-and-forget: update last_used in DB (does not block the request)
+    updateAccessTokenLastUsed(token, payload).catch(() => {});
     return payloadToAuthContext(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid token";
     throw new AuthenticationError(message);
   }
+}
+
+const ACCESS_TOKEN_TTL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+/**
+ * Fire-and-forget: update last_used timestamp in mcp_access_tokens.
+ * Runs asynchronously and errors are silently ignored.
+ */
+async function updateAccessTokenLastUsed(token: string, payload: McpTokenPayload): Promise<void> {
+  const tokenHash = hashAccessToken(token);
+  const now = new Date();
+  // Extend expires_at in DB if token has less than 24h remaining (sliding window)
+  const remainingMs = payload.exp * 1000 - Date.now();
+  const shouldExtend = remainingMs < 24 * 60 * 60 * 1000;
+
+  await prisma.mcpAccessToken.updateMany({
+    where: { token_hash: tokenHash, revoked_at: null },
+    data: {
+      last_used: now,
+      ...(shouldExtend ? { expires_at: new Date(Date.now() + ACCESS_TOKEN_TTL_MS) } : {}),
+    },
+  });
 }
 
 /**

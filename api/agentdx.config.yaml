@@ -1,0 +1,9 @@
+server:
+  entry: mcp-stdio-wrapper.ts
+  transport: stdio
+  args: []
+
+lint:
+  rules:
+    schema-required: "off"      # list_tasks/get_plan 的 optional-only 設計正確
+    name-not-ambiguous: "off"   # search 已在 zentropy-mcp-server 命名空間內

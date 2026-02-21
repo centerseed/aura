@@ -1,0 +1,87 @@
+default_platform(:ios)
+
+platform :ios do
+
+  # ──────────────────────────────────────────────
+  # beta: 上傳到 TestFlight（內部測試）
+  # ──────────────────────────────────────────────
+  desc "Build & 上傳到 TestFlight"
+  lane :beta do
+    # 1. 更新版號（從 pubspec.yaml 讀取）
+    version = get_version_from_pubspec
+
+    # 2. 更新 Xcode build number（用時間戳確保唯一）
+    build_number = Time.now.strftime("%Y%m%d%H%M")
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: "Runner.xcodeproj"
+    )
+
+    # 3. Flutter build（明確傳入 PATH 讓 flutter 找到正確的 pod）
+    flutter_path = sh("which flutter", log: false).strip
+    flutter_dir = File.dirname(flutter_path)
+    sh("export PATH=/usr/local/bin:#{flutter_dir}:$PATH && cd ../.. && flutter build ios --release --no-codesign")
+
+    # 4. 用 Xcode 打包並簽名成 ipa
+    build_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "../../build/ios/ipa",
+      output_name: "Zentropy.ipa",
+      skip_codesigning: false,
+      export_options: {
+        method: "app-store",
+        teamID: ENV["APPLE_TEAM_ID"],
+        signingStyle: "automatic"
+      }
+    )
+
+    # 5. 找到產生的 ipa 路徑
+    ipa_path = "../../build/ios/ipa/Zentropy.ipa"
+
+    # 6. 上傳到 TestFlight
+    upload_to_testflight(
+      api_key_path: ENV["ASC_API_KEY_PATH"],
+      ipa: ipa_path,
+      skip_waiting_for_build_processing: true,
+      changelog: "新版本 #{version}（Build #{build_number}）"
+    )
+
+    UI.success("✅ 已上傳到 TestFlight！版本：#{version}（#{build_number}）")
+  end
+
+  # ──────────────────────────────────────────────
+  # release: 提交 App Store 審核
+  # ──────────────────────────────────────────────
+  desc "提交 App Store 審核"
+  lane :release do
+    version = get_version_from_pubspec
+
+    UI.message("準備提交 v#{version} 到 App Store 審核...")
+
+    upload_to_app_store(
+      api_key_path: ENV["ASC_API_KEY_PATH"],
+      app_version: version,
+      submit_for_review: true,
+      automatic_release: false,   # 審核通過後手動發佈
+      force: true,
+      submission_information: {
+        add_id_info_uses_idfa: false
+      }
+    )
+
+    UI.success("✅ 已提交審核！版本：#{version}")
+  end
+
+  # ──────────────────────────────────────────────
+  # 輔助方法：從 pubspec.yaml 讀版號
+  # ──────────────────────────────────────────────
+  def get_version_from_pubspec
+    pubspec = File.read("../../pubspec.yaml")
+    match = pubspec.match(/^version:\s+(\d+\.\d+\.\d+)/)
+    match ? match[1] : "1.0.0"
+  end
+
+end

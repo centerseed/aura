@@ -1,12 +1,17 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:dartz/dartz.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+import '../../config/auth_config.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/remote/api_client.dart';
-
-import 'package:flutter/foundation.dart';
-import '../../config/auth_config.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final FirebaseAuth _firebaseAuth;
@@ -105,6 +110,78 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, User>> signInWithApple() async {
+    try {
+      // 1. 生成 nonce（防重播攻擊）
+      final rawNonce = _generateNonce();
+      final nonce = _sha256ofString(rawNonce);
+
+      // 2. 觸發 Apple 登入流程
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
+      );
+
+      // 3. 建立 Firebase OAuthCredential
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+
+      // 4. 登入 Firebase
+      final userCredential = await _firebaseAuth.signInWithCredential(
+        oauthCredential,
+      );
+
+      if (userCredential.user == null) {
+        return Left(AuthFailure('Apple sign in failed'));
+      }
+
+      // 5. Apple 只在首次登入時回傳 displayName，更新到 Firebase
+      final givenName = appleCredential.givenName;
+      final familyName = appleCredential.familyName;
+      if (givenName != null && userCredential.user!.displayName == null) {
+        final fullName = [givenName, familyName].where((s) => s != null && s.isNotEmpty).join(' ');
+        if (fullName.isNotEmpty) {
+          await userCredential.user!.updateDisplayName(fullName);
+          await userCredential.user!.reload();
+        }
+      }
+
+      // 6. 與後端同步
+      await _syncWithBackend(userCredential.user!, provider: 'apple');
+
+      return Right(userCredential.user!);
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return Left(AuthFailure('Apple sign in cancelled'));
+      }
+      return Left(AuthFailure(e.message));
+    } catch (e) {
+      return Left(AuthFailure(e.toString()));
+    }
+  }
+
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+      length,
+      (_) => charset[random.nextInt(charset.length)],
+    ).join();
+  }
+
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  @override
   Future<Either<Failure, User>> signInAnonymously() async {
     try {
       final userCredential = await _firebaseAuth.signInAnonymously();
@@ -163,11 +240,23 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
-  Future<void> _syncWithBackend(User user) async {
+  Future<void> _syncWithBackend(User user, {String? provider}) async {
     try {
-      final provider = user.isAnonymous ? 'anonymous' : 'google';
+      String resolvedProvider;
+      if (provider != null) {
+        resolvedProvider = provider;
+      } else if (user.isAnonymous) {
+        resolvedProvider = 'anonymous';
+      } else {
+        final providerData = user.providerData;
+        if (providerData.any((p) => p.providerId == 'apple.com')) {
+          resolvedProvider = 'apple';
+        } else {
+          resolvedProvider = 'google';
+        }
+      }
       final response = await _apiClient.signIn({
-        'provider': provider,
+        'provider': resolvedProvider,
         'providerId': user.uid,
         'email': user.email,
         'name': user.displayName ?? user.email?.split('@')[0] ?? '訪客',

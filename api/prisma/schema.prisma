@@ -31,6 +31,7 @@ model User {
   sub_tasks            SubTask[]
   daily_plans          DailyPlan[]
   mcp_refresh_tokens   McpRefreshToken[]
+  mcp_access_tokens    McpAccessToken[]
 
   @@index([auth_provider_id])
   @@index([auth_provider, auth_provider_id])
@@ -262,6 +263,7 @@ enum AuthProvider {
   EMAIL
   GOOGLE
   ANONYMOUS
+  APPLE
 
   @@map("authproviderenum")
 }
@@ -505,6 +507,26 @@ model McpAuthCode {
   @@index([code])
   @@index([expires_at])
   @@map("mcp_auth_codes")
+}
+
+/// Access tokens for MCP clients.
+/// Enables revocation tracking and sliding window expiry (last_used).
+model McpAccessToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  token_hash  String    @unique @db.VarChar(128)
+  user_id     String    @db.Uuid
+  client_id   String    @db.VarChar(200)
+  scope       String    @db.VarChar(500)
+  issued_at   DateTime  @db.Timestamp(6)
+  expires_at  DateTime  @db.Timestamp(6)
+  last_used   DateTime? @db.Timestamp(6)
+  revoked_at  DateTime? @db.Timestamp(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("mcp_access_tokens")
 }
 
 /// Long-lived refresh tokens for MCP clients.

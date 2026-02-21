@@ -12,10 +12,15 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     task: {
       update: vi.fn(),
+      findUnique: vi.fn(),
     },
     subTask: {
       findFirst: vi.fn(),
+      create: vi.fn(),
       update: vi.fn(),
+    },
+    dailyPlanItem: {
+      findFirst: vi.fn(),
     },
   },
 }))
@@ -132,6 +137,7 @@ describe('UpdateSubItemUseCase', () => {
     it('應該拋出錯誤當 Sub-item 不存在', async () => {
       mockFindById.mockResolvedValue({ id: 'task-123' })
       vi.mocked(prisma.subTask.findFirst).mockResolvedValue(null)
+      vi.mocked(prisma.task.findUnique).mockResolvedValue({ sub_items: null } as any)
 
       await expect(
         useCase.execute({

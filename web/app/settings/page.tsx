@@ -8,16 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, User, Mail, Shield, Loader2, ArrowLeft, Wrench, RotateCcw, Eye, Link2, Calendar, CheckCircle2, XCircle, AlertCircle, Plug, Copy, Check } from "lucide-react";
+import { LogOut, User, Loader2, ArrowLeft, Link2, Calendar, CheckCircle2, AlertCircle, Plug, Copy, Check, Pencil } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-client";
 import {
-  OAuthProvider,
   OAuthStatus,
   getOAuthStatus,
   disconnectOAuth,
-  OAUTH_PROVIDER_NAMES,
-  OAUTH_PROVIDER_DESCRIPTIONS,
-  OAUTH_PROVIDER_ICONS,
 } from "@/lib/oauth-client";
 import { OAuthConnectDialog } from "@/components/oauth-connect-dialog";
 import { BriefingScheduleSettings } from "@/components/briefing-schedule-settings";
@@ -28,7 +24,6 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isResettingOnboarding, setIsResettingOnboarding] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
   const [userData, setUserData] = useState<{
     id: string;
@@ -48,6 +43,14 @@ function SettingsContent() {
   const [userToken, setUserToken] = useState<string>('');
 
   const [mcpConfigCopied, setMcpConfigCopied] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  const mcpServerUrl =
+    process.env.NEXT_PUBLIC_MCP_SERVER_URL ||
+    (API_BASE_URL && API_BASE_URL.startsWith('http') ? API_BASE_URL : null) ||
+    'https://zentropy-api-isakqhri2a-de.a.run.app';
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
@@ -68,8 +71,8 @@ function SettingsContent() {
         if (userRes.ok) {
           const data = await userRes.json();
           setUserData({
-            ...data.user,
-            timezone: data.user.timezone || 'Asia/Taipei',
+            ...data.data.user,
+            timezone: data.data.user?.timezone || 'Asia/Taipei',
           });
         }
 
@@ -147,23 +150,16 @@ function SettingsContent() {
 
   // 複製 MCP 設定到剪貼簿
   const handleCopyMcpConfig = async () => {
-    // MCP 客戶端需要完整的 API URL（不能是相對路徑）
-    // 優先使用環境變數，否則使用 API_BASE_URL，最後 fallback 到 Cloud Run URL
-    const mcpServerUrl =
-      process.env.NEXT_PUBLIC_MCP_SERVER_URL ||
-      (API_BASE_URL && API_BASE_URL.startsWith('http') ? API_BASE_URL : null) ||
-      'https://zentropy-api-isakqhri2a-de.a.run.app';
-
     const config = {
       "mcpServers": {
         "zentropy": {
           "url": `${mcpServerUrl}/mcp`,
-          "transport": "streamableHttp",
+          "transport": "http",
           "oauth": {
             "authorizationUrl": `${mcpServerUrl}/authorize`,
             "tokenUrl": `${mcpServerUrl}/token`,
             "clientId": "claude-code",
-            "scopes": ["read:tasks", "write:inbox", "read:knowledge"]
+            "scopes": ["read:tasks", "write:inbox", "read:knowledge", "write:knowledge", "read:profile"]
           }
         }
       }
@@ -261,7 +257,7 @@ function SettingsContent() {
         });
         if (userRes.ok) {
           const data = await userRes.json();
-          setUserData(data);
+          setUserData({ ...data.data.user, timezone: data.data.user?.timezone || 'Asia/Taipei' });
         }
       }
 
@@ -280,8 +276,30 @@ function SettingsContent() {
     }
   };
 
-  const handleViewOnboarding = () => {
-    router.push("/onboarding");
+  const handleSaveName = async () => {
+    const trimmed = editingName.trim();
+    if (!trimmed) return;
+    setIsSavingName(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/api/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!response.ok) throw new Error('更新名稱失敗');
+      setUserData((prev) => prev ? { ...prev, displayName: trimmed, name: trimmed } : prev);
+      setIsEditingName(false);
+    } catch (error) {
+      console.error('儲存名稱失敗:', error);
+      alert('儲存名稱失敗，請稍後再試');
+    } finally {
+      setIsSavingName(false);
+    }
   };
 
   const handleSaveBriefingSchedule = async (schedule: BriefingSchedule) => {
@@ -321,59 +339,9 @@ function SettingsContent() {
     if (userRes.ok) {
       const data = await userRes.json();
       setUserData({
-        ...data.user,
-        timezone: data.user.timezone || 'Asia/Taipei',
+        ...data.data.user,
+        timezone: data.data.user?.timezone || 'Asia/Taipei',
       });
-    }
-  };
-
-  const handleResetOnboarding = async () => {
-    const confirmed = confirm(
-      "這將刪除所有現有的 Areas（身份地圖）並重新開始 Onboarding 流程。\n\n確定要繼續嗎？"
-    );
-
-    if (!confirmed) return;
-
-    setIsResettingOnboarding(true);
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        alert("請先登入");
-        return;
-      }
-
-      const token = await firebaseUser.getIdToken();
-
-      // 獲取所有 Areas
-      const areasRes = await fetch(`${API_BASE_URL}/api/areas`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!areasRes.ok) {
-        throw new Error("無法獲取 Areas 列表");
-      }
-
-      const areasData = await areasRes.json();
-      const areas = areasData.data?.areas || [];
-
-      // 刪除所有 Areas
-      for (const area of areas) {
-        await fetch(`${API_BASE_URL}/api/areas/${area.id}`, {
-          method: "DELETE",
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      }
-
-      // 導向 onboarding 頁面
-      router.push("/onboarding");
-    } catch (error) {
-      console.error("重置 Onboarding 失敗:", error);
-      alert(`重置失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
-      setIsResettingOnboarding(false);
     }
   };
 
@@ -417,9 +385,52 @@ function SettingsContent() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-400">名稱</span>
-                  <span className="text-white font-medium">
-                    {userData?.displayName || "未設定"}
-                  </span>
+                  {isEditingName ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        className="bg-slate-800 border border-slate-600 text-white text-sm rounded px-2 py-1 w-40 focus:outline-none focus:border-indigo-500"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveName();
+                          if (e.key === 'Escape') setIsEditingName(false);
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSaveName}
+                        disabled={isSavingName}
+                        className="h-7 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                      >
+                        {isSavingName ? <Loader2 className="w-3 h-3 animate-spin" /> : '儲存'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsEditingName(false)}
+                        className="h-7 px-2 text-slate-400 hover:text-white text-xs"
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-medium">
+                        {userData?.displayName || "未設定"}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setEditingName(userData?.name || userData?.displayName || '');
+                          setIsEditingName(true);
+                        }}
+                        className="text-slate-500 hover:text-indigo-400 transition-colors"
+                        title="編輯名稱"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-400">Email</span>
@@ -433,6 +444,7 @@ function SettingsContent() {
                     {userData?.auth_provider === "GOOGLE" && "Google"}
                     {userData?.auth_provider === "ANONYMOUS" && "訪客"}
                     {userData?.auth_provider === "EMAIL" && "Email"}
+                    {userData?.auth_provider === "APPLE" && "Apple"}
                   </Badge>
                 </div>
               </div>
@@ -478,96 +490,11 @@ function SettingsContent() {
             </Card>
           )}
 
-          {/* 帳號操作 */}
-          <Card className="bg-slate-900 border-slate-800">
-            <CardContent className="pt-6">
-              <Button
-                onClick={handleSignOut}
-                disabled={isSigningOut}
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isSigningOut ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    登出中...
-                  </>
-                ) : (
-                  <>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    登出
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
           {/* 晨報/晚報設定 */}
           <BriefingScheduleSettings
             initialSettings={userData?.settings?.briefingSchedule}
             onSave={handleSaveBriefingSchedule}
           />
-
-          {/* 開發者工具 */}
-          <Card className="bg-slate-900 border-amber-500/30">
-            <CardHeader>
-              <CardTitle className="flex items-center text-white">
-                <Wrench className="w-5 h-5 mr-2 text-amber-400" />
-                開發者工具
-              </CardTitle>
-              <CardDescription className="text-slate-400">
-                測試與開發用功能
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* 查看 Onboarding */}
-              <Button
-                onClick={handleViewOnboarding}
-                variant="outline"
-                className="w-full border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                查看 Onboarding 流程
-              </Button>
-
-              {/* 重置 Onboarding */}
-              <Button
-                onClick={handleResetOnboarding}
-                disabled={isResettingOnboarding}
-                variant="outline"
-                className="w-full border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300"
-              >
-                {isResettingOnboarding ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    重置中...
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    重置並重新開始 Onboarding
-                  </>
-                )}
-              </Button>
-
-              <p className="text-xs text-slate-500 mt-2">
-                ⚠️ 重置將刪除所有 Areas（身份地圖），請謹慎使用
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* OAuth 訊息提示 */}
-          {oauthMessage && (
-            <Alert className={oauthMessage.type === 'success' ? 'bg-emerald-950/50 border-emerald-500/30' : 'bg-red-950/50 border-red-500/30'}>
-              {oauthMessage.type === 'success' ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              ) : (
-                <AlertCircle className="h-4 w-4 text-red-400" />
-              )}
-              <AlertDescription className="text-white">
-                {oauthMessage.text}
-              </AlertDescription>
-            </Alert>
-          )}
 
           {/* MCP (Model Context Protocol) 設定 */}
           <Card className="bg-slate-900 border-slate-800">
@@ -630,32 +557,26 @@ function SettingsContent() {
               {/* 設定檔內容 */}
               <div className="relative">
                 <pre className="bg-slate-950 border border-slate-700 rounded-lg p-4 text-xs text-slate-300 overflow-x-auto">
-{(() => {
-  // 計算 MCP Server URL（與複製按鈕邏輯一致）
-  const mcpServerUrl =
-    process.env.NEXT_PUBLIC_MCP_SERVER_URL ||
-    (API_BASE_URL && API_BASE_URL.startsWith('http') ? API_BASE_URL : null) ||
-    'https://zentropy-api-isakqhri2a-de.a.run.app';
-
-  return JSON.stringify({
-    "mcpServers": {
-      "zentropy": {
-        "url": `${mcpServerUrl}/mcp`,
-        "transport": "streamableHttp",
-        "oauth": {
-          "authorizationUrl": `${mcpServerUrl}/authorize`,
-          "tokenUrl": `${mcpServerUrl}/token`,
-          "clientId": "claude-code",
-          "scopes": [
-            "read:tasks",
-            "write:inbox",
-            "read:knowledge"
-          ]
-        }
+{JSON.stringify({
+  "mcpServers": {
+    "zentropy": {
+      "url": `${mcpServerUrl}/mcp`,
+      "transport": "http",
+      "oauth": {
+        "authorizationUrl": `${mcpServerUrl}/authorize`,
+        "tokenUrl": `${mcpServerUrl}/token`,
+        "clientId": "claude-code",
+        "scopes": [
+          "read:tasks",
+          "write:inbox",
+          "read:knowledge",
+          "write:knowledge",
+          "read:profile"
+        ]
       }
     }
-  }, null, 2);
-})()}
+  }
+}, null, 2)}
                 </pre>
                 <Button
                   onClick={handleCopyMcpConfig}
@@ -776,6 +697,43 @@ function SettingsContent() {
               }}
             />
           )}
+
+          {/* OAuth 訊息提示 */}
+          {oauthMessage && (
+            <Alert className={oauthMessage.type === 'success' ? 'bg-emerald-950/50 border-emerald-500/30' : 'bg-red-950/50 border-red-500/30'}>
+              {oauthMessage.type === 'success' ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-red-400" />
+              )}
+              <AlertDescription className="text-white">
+                {oauthMessage.text}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* 帳號操作 */}
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="pt-6">
+              <Button
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isSigningOut ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    登出中...
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    登出
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

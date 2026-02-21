@@ -330,7 +330,7 @@ export class UpdateTaskUseCase {
         const todayPlan = await prisma.dailyPlan.findFirst({
           where: {
             user_id: taskData.userId,
-            plan_date: todayDate,
+            plan_date: new Date(todayDate),
           },
         })
 

@@ -17,6 +17,7 @@ import {
   issueAccessToken,
   generateRefreshToken,
   hashRefreshToken,
+  hashAccessToken,
   verifyPkce,
 } from "@/mcp/oauth/jwt";
 
@@ -127,6 +128,19 @@ async function handleAuthorizationCode(
     },
   });
 
+  // Store access token hash in DB for tracking and future revocation
+  const accessTokenHash = hashAccessToken(accessToken.token);
+  await prisma.mcpAccessToken.create({
+    data: {
+      token_hash: accessTokenHash,
+      user_id: authCode.user_id,
+      client_id: authCode.client_id,
+      scope: authCode.scope,
+      issued_at: new Date(),
+      expires_at: accessToken.expiresAt,
+    },
+  });
+
   return NextResponse.json({
     access_token: accessToken.token,
     token_type: "Bearer",
@@ -188,6 +202,19 @@ async function handleRefreshToken(
       client_id: storedToken.client_id,
       scope: storedToken.scope,
       expires_at: newRefreshToken.expiresAt,
+    },
+  });
+
+  // Store new access token hash in DB for tracking and future revocation
+  const accessTokenHash = hashAccessToken(accessToken.token);
+  await prisma.mcpAccessToken.create({
+    data: {
+      token_hash: accessTokenHash,
+      user_id: storedToken.user_id,
+      client_id: storedToken.client_id,
+      scope: storedToken.scope,
+      issued_at: new Date(),
+      expires_at: accessToken.expiresAt,
     },
   });
 

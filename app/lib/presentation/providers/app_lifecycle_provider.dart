@@ -4,6 +4,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 
 import '../../core/di/providers.dart';
 import '../../data/repositories/unified/unified_repositories.dart';
+import '../providers/coach_provider.dart';
 
 /// App 生命週期狀態
 class AppLifecycleData {
@@ -110,6 +111,9 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
         .silentRefresh();
     ((_ref.read(productRepositoryProvider) as ProductUnifiedRepository))
         .silentRefresh();
+
+    // 刷新晨報/今日計劃（若今日尚未有資料則自動生成）
+    _ref.read(coachBriefingProvider.notifier).loadLatest();
 
     state = state.copyWith(lastRefreshTime: DateTime.now());
   }

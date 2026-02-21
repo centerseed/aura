@@ -23,6 +23,8 @@ export interface UserData {
   displayName: string
   auth_provider: string
   auth_provider_id: string
+  timezone: string | null
+  settings: any | null
   areas: Array<{
     id: string
     name: string
@@ -81,6 +83,8 @@ export class GetCurrentUserUseCase {
         displayName,
         auth_provider: user.auth_provider,
         auth_provider_id: user.auth_provider_id,
+        timezone: user.timezone,
+        settings: user.settings,
         areas: user.areas,
         hasAreas: user.areas.length > 0,
       },

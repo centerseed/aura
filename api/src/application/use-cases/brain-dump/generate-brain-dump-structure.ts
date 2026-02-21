@@ -14,6 +14,7 @@ import { Prisma } from "@prisma/client"
 import { isValidUUID } from "@/domain/constants/validation"
 import { getEmbedding } from "@/lib/embedding"
 import { librarianRecall, LibrarianRule } from "@/lib/librarian-client"
+import { ValidationException } from "@/lib/api-response"
 
 // ============================================================================
 // Zod Schemas (moved from route)
@@ -49,9 +50,9 @@ const StructuredItemSchema = z.object({
   reasoning: z.string().max(100).describe("簡短說明分類理由（1 句話，最多 100 字元）"),
   due_date: z.string().datetime({ offset: true }).optional().describe("推斷的截止日期（ISO 8601 格式）- 只要能推斷出時間就必須填寫"),
   due_date_source: SourceAttributionSchema.optional().describe("時間來源歸因 - 區分 explicit/inferred"),
-  inferred_from_milestone: z.string().optional().describe("關聯的 Milestone ID（僅當任務與某里程碑相關時填寫）"),
+  inferred_from_milestone: z.string().optional().describe("關聯的里程碑名稱（如「成立公司」）—— 填入里程碑的名稱文字，不是 ID"),
   task_type: TaskTypeSchema.optional().describe("任務類型 - 用於計算需要提前多少天完成"),
-  estimated_days_needed: z.number().min(1).max(30).optional().describe("AI 估算完成此任務需要的天數（包含等待時間）"),
+  estimated_days_needed: z.number().min(0.25).max(30).optional().describe("AI 估算完成此任務需要的天數（包含等待時間），最小值為 0.25（即 2 小時）"),
   depends_on_task: z.string().max(50).optional().describe("如果此任務依賴同批次的其他任務，填入該任務的 title"),
   time_confidence: z.number().min(0).max(1).optional().describe("Confidence score for time inference (0-1)"),
   sub_items: z.array(SubItemSchema).optional().describe("如果任務包含多個可獨立勾選的步驟/項目，拆成 sub-items - 不可遺漏用戶提到的任何事項"),
@@ -59,7 +60,7 @@ const StructuredItemSchema = z.object({
 
 const AppendSubItemActionSchema = z.object({
   action: z.literal("append_sub_item"),
-  target_task_id: z.string().describe("要追加到的任務 ID"),
+  target_task_id: z.string().describe("要追加到的任務 ID —— 只能使用背景資訊「用戶的 Products 與任務」清單中格式為 '- [uuid]' 的 UUID，絕對不可使用里程碑區塊的 milestone_id"),
   sub_items: z.array(SubItemSchema).describe("要追加的待辦事項清單"),
   reasoning: z.string().max(100).describe("簡要說明為什麼判斷這是追加而非新任務（1 句話，最多 100 字元）"),
 })
@@ -450,6 +451,16 @@ export class GenerateBrainDumpStructureUseCase {
       }]
     }
 
+    // 收集 context 中所有合法的 task IDs，用於 AI 回應驗證
+    const validTaskIds = new Set<string>()
+    for (const area of existingAreas) {
+      for (const product of area.products) {
+        for (const task of product.tasks) {
+          validTaskIds.add(task.id)
+        }
+      }
+    }
+
     // timings already recorded above in db_and_recall_parallel
 
     // Step 3: 動態預算分配
@@ -544,7 +555,7 @@ export class GenerateBrainDumpStructureUseCase {
         const targetDate = new Date(milestone.target_date)
         const daysUntil = Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-        contextSummary += `🎯 **${milestone.name}** [ID: ${milestone.id}]\n`
+        contextSummary += `🎯 **${milestone.name}**\n`
         contextSummary += `   - 目標日期：${targetDate.toLocaleDateString("zh-TW")} (${daysUntil} 天後)\n`
         if (milestone.description) {
           contextSummary += `   - 描述：${milestone.description}\n`
@@ -640,6 +651,8 @@ export class GenerateBrainDumpStructureUseCase {
 
 **如果符合追加條件**：
 → 回傳 \`action: "append_sub_item"\`，指定 \`target_task_id\` 和新的 \`sub_items\`
+⚠️ \`target_task_id\` 必須填入「用戶的 Products 與任務」清單中格式為 \`- [uuid]\` 的 UUID
+🚫 **嚴禁使用里程碑區塊的 \`milestone_id\`**（兩者外觀相似，但來源不同，任何 milestone_id 都不是有效的 target_task_id）
 
 **如果是新任務**：
 → 繼續往下，按照原有規則創建新任務
@@ -752,7 +765,7 @@ ${request.explicitProductId ? `# 🚨 用戶明確指定了 Product
 
 - 用戶說「今天」「明天」「週五」「1/30」→ 填 due_date
 - 從上下文推斷出時間（如「週報通常週五發」）→ 填 due_date
-- 任務與里程碑相關 → 填 due_date + inferred_from_milestone + task_type + estimated_days_needed
+- 任務與里程碑相關 → 填 due_date + inferred_from_milestone（填里程碑名稱文字，如「成立公司」）+ task_type + estimated_days_needed
 
 due_date 格式：ISO 8601，如 2026-02-07T00:00:00+08:00
 
@@ -805,6 +818,18 @@ ${request.text}
 - 如果用戶提供了大量細節，提煉最重要的資訊`,
     })
     timings["ai_generateObject"] = Date.now() - startAI
+
+    // 驗證 append_sub_item 的 target_task_id 必須來自 context 中的真實 task
+    if (result.action === 'append_sub_item' && !validTaskIds.has(result.target_task_id)) {
+      console.warn(
+        `⚠️ [brain-dump] AI returned invalid target_task_id: ${result.target_task_id}. ` +
+        `Valid task IDs in context: [${Array.from(validTaskIds).join(', ')}]`
+      )
+      throw new ValidationException(
+        `AI 選擇的追加目標（${result.target_task_id}）不在當前任務清單中，請重新送出輸入`,
+        'target_task_id'
+      )
+    }
 
     return {
       result,

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "zentropy": {
+      "url": "https://zentropy-api-isakqhri2a-de.a.run.app/mcp",
+      "transport": "http",
+      "oauth": {
+        "authorizationUrl": "https://zentropy-api-isakqhri2a-de.a.run.app/api/oauth/mcp/authorize",
+        "tokenUrl": "https://zentropy-api-isakqhri2a-de.a.run.app/api/oauth/mcp/token",
+        "clientId": "claude-code",
+        "scopes": ["read:tasks", "write:inbox", "read:knowledge", "write:knowledge", "read:profile"]
+      }
+    }
+  }
+}

@@ -441,6 +441,7 @@ export class PrismaTaskRepository implements ITaskRepository {
 
   /**
    * 批次查詢 sub_tasks 表，替換每個 task 的 subItems
+   * 若 sub_tasks 表無資料但 JSON 欄位有資料，自動遷移（fallback）
    */
   private async enrichWithSubTasks(tasks: TaskData[]): Promise<TaskData[]> {
     if (tasks.length === 0) return tasks
@@ -458,6 +459,12 @@ export class PrismaTaskRepository implements ITaskRepository {
       grouped.set(st.task_id, list)
     }
 
+    // Fallback：找出 sub_tasks 表無資料的 task，嘗試從 JSON 欄位遷移
+    const tasksWithNoSubTasks = tasks.filter((t) => !grouped.has(t.id))
+    if (tasksWithNoSubTasks.length > 0) {
+      await this.migrateJsonSubItemsToTable(tasksWithNoSubTasks, grouped)
+    }
+
     for (const task of tasks) {
       const items = grouped.get(task.id) || []
       task.subItems = items.map((s) => ({
@@ -473,6 +480,80 @@ export class PrismaTaskRepository implements ITaskRepository {
     }
 
     return tasks
+  }
+
+  /**
+   * 從 task.sub_items JSON 欄位批次遷移到 sub_tasks 表
+   * 僅處理 sub_tasks 表中尚無資料的 tasks
+   */
+  private async migrateJsonSubItemsToTable(
+    tasks: TaskData[],
+    grouped: Map<string, { id: string; task_id: string; user_id: string; content: string; completed: boolean; created_at: Date; completed_at: Date | null; order: number; start_date: Date | null; due_date: Date | null; deleted_at: Date | null; source: string | null; original_task_id: string | null; estimated_minutes: number | null }[]>
+  ): Promise<void> {
+    try {
+      const taskIds = tasks.map((t) => t.id)
+      const rawTasks = await prisma.task.findMany({
+        where: { id: { in: taskIds } },
+        select: { id: true, user_id: true, sub_items: true, created_at: true },
+      })
+
+      for (const rawTask of rawTasks) {
+        const items = rawTask.sub_items as Array<{
+          id: string
+          content: string
+          completed: boolean
+          created_at?: string
+          completed_at?: string | null
+          order?: number
+          source?: string
+          original_task_id?: string
+          start_date?: string
+          due_date?: string
+          estimated_minutes?: number
+        }> | null
+
+        if (!items || !Array.isArray(items) || items.length === 0) continue
+
+        const migrated: typeof grouped extends Map<string, infer V> ? V : never[] = []
+        for (const item of items) {
+          try {
+            const result = await prisma.subTask.upsert({
+              where: { id: item.id },
+              update: {
+                content: item.content,
+                completed: item.completed,
+                completed_at: item.completed_at ? new Date(item.completed_at) : null,
+                order: item.order ?? 0,
+              },
+              create: {
+                id: item.id,
+                task_id: rawTask.id,
+                user_id: rawTask.user_id,
+                content: item.content,
+                completed: item.completed,
+                completed_at: item.completed_at ? new Date(item.completed_at) : null,
+                order: item.order ?? 0,
+                created_at: item.created_at ? new Date(item.created_at) : rawTask.created_at,
+                source: item.source || 'user',
+                original_task_id: item.original_task_id || null,
+                start_date: item.start_date ? new Date(item.start_date) : null,
+                due_date: item.due_date ? new Date(item.due_date) : null,
+                estimated_minutes: item.estimated_minutes ?? null,
+              },
+            })
+            migrated.push(result)
+          } catch (err) {
+            console.warn(`[enrichWithSubTasks] fallback 遷移失敗 task:${rawTask.id} item:${item.id}`, err)
+          }
+        }
+
+        if (migrated.length > 0) {
+          grouped.set(rawTask.id, migrated)
+        }
+      }
+    } catch (err) {
+      console.warn('[enrichWithSubTasks] JSON fallback 遷移整體失敗（不中斷主流程）', err)
+    }
   }
 
   /**

@@ -1,8 +1,9 @@
 # Zentropy 付費服務架構規格文件
 
-**版本**: v0.1（草稿，持續討論中）
+**版本**: v0.2（決策更新）
 **建立日期**: 2026-02-18
-**狀態**: 🟡 Draft — 等待決策確認
+**最後更新**: 2026-02-18
+**狀態**: 🟢 Active — 核心決策已確認，部分細節 TBD
 
 ---
 
@@ -28,7 +29,7 @@ Zentropy 採用 Freemium 模式，提供三個方案：Atom（免費）、Fusion
 | 限制 | 數量 |
 |------|------|
 | AI 處理（Brain Dump + Reorganize） | 50 則 / 月 |
-| Area 數量 | 1 個（固定） |
+| Area 數量 | **無限制** |
 | Coach 功能（晨晚報、衝突偵測） | ❌ 不開放 |
 | 語音 / 圖片輸入 | ❌（規劃中） |
 | MCP Server | ❌ |
@@ -40,17 +41,20 @@ Zentropy 採用 Freemium 模式，提供三個方案：Atom（免費）、Fusion
 - 向量語義搜尋（基礎）
 - Brain Dump（50 則限制）
 - AI 整理（50 則內）
+- 無限 Area 管理
 
 ---
 
-### 2.2 Fusion — $5.99 USD / 月
+### 2.2 Fusion — $5.99 USD / 月（或年付 $57.99 USD，約 8 折）
 
 **定位**: 移除所有阻力，讓 Zentropy 成為真正的第二大腦
+
+> **14 天免費試用**：首次升級 Fusion 享 14 天試用，無需信用卡（IAP 平台規則依 App Store / Google Play 為準）。試用結束後若不取消，自動轉為付費訂閱。
 
 | 功能 | 說明 |
 |------|------|
 | AI 處理 | 無限制 |
-| Area 數量 | 無限制 |
+| Area 數量 | 無限制（同 Atom，非差異功能） |
 | Coach 晨晚報 | ✅ |
 | 衝突偵測與停滯警示 | ✅ |
 | 語音輸入 | ✅（M2 推出） |
@@ -59,8 +63,7 @@ Zentropy 採用 Freemium 模式，提供三個方案：Atom（免費）、Fusion
 | API Token | ❌（Nexus 功能） |
 
 **功能清單**:
-- 包含 Atom 全部功能（無限制）
-- 多 Area 管理
+- 包含 Atom 全部功能，AI 處理無限制
 - Coach Agent（晨報 08:30 / 晚報 21:00）
 - 衝突偵測引擎
 - 停滯任務警示
@@ -83,40 +86,39 @@ Zentropy 採用 Freemium 模式，提供三個方案：Atom（免費）、Fusion
 
 ---
 
-## 3. 付款模型決策（⚠️ 待確認）
+## 3. 付款模型（✅ 已決策）
 
-### 方案 A: Access Pass（一次性付款）— 現行規劃
-> 詳見 `021_Monetization_Plan.md`
+### 3.1 付款架構（✅ 已決策：Web Only）
 
-- 用戶購買「30 天通行證」（NT$200 或 $5.99 USD）
-- 付款為一次性交易（非自動扣款）
-- 系統記錄 `subscription_end_at`，到期後回到 Atom
-- 到期前 3 天 / 1 天發送提醒通知
+| 平台 | 付款方式 | 說明 |
+|------|---------|------|
+| **Web（Next.js）** | **Stripe** 自動扣款 | 月付 $5.99 / 年付 $57.99，Webhook 驅動狀態更新 |
+| **App（iOS / Android）** | **不實作**（本期） | App 端付費延後，以 Web 為主 |
 
-**優點**:
-- 無需信用卡循環授權
-- 台灣個人戶（NewebPay）可操作
-- 技術實作簡單
+> App 端 IAP 實作另立計畫，本文件僅涵蓋 Web 端 Stripe 架構。詳見 `041_Stripe_Payment_Architecture_Plan.md`。
 
-**缺點**:
-- 用戶需手動續費（流失風險高）
-- 無法做 Annual Plan 優惠
+### 3.2 Stripe（Web）
 
-### 方案 B: Auto-renewing Subscription（自動扣款）
-- 使用 Stripe 或 Paddle
+- 自動扣款訂閱（Auto-renewing Subscription）
 - 支援月付 / 年付
-- Webhook 驅動狀態更新
+- Webhook 事件：`checkout.session.completed`、`invoice.payment_succeeded`、`customer.subscription.deleted`
+- 降級觸發：`customer.subscription.deleted` 或 `invoice.payment_failed`（重試 3 次後）
 
-**優點**:
-- 業界標準，用戶體驗佳
-- 可做 Annual Plan（降低流失）
-- 可做 Proration（按比例計費）
+### 3.3 IAP（App）
 
-**缺點**:
-- Stripe 需公司戶或 MoR（平台費用高）
-- 初期設定複雜度高
+- iOS：StoreKit 2 / RevenueCat
+- Android：Google Play Billing
+- 建議使用 **RevenueCat** 統一管理跨平台訂閱狀態，並透過 Webhook 回呼更新後端
+- 試用期：依 App Store / Google Play 的 introductory offer 機制實作 14 天試用
 
-> 🔴 **決策待定**: 初期 MVP 採用 Access Pass（方案 A），待公司設立後遷移至 Stripe 自動扣款（方案 B）。
+### 3.4 訂閱週期
+
+| 週期 | 價格（Web / Stripe） | 說明 |
+|------|-------------------|----|
+| 月付 | $5.99 USD / 月 | 隨時取消 |
+| 年付 | $57.99 USD / 年（≈ $4.83 / 月） | 約 8 折，一次扣款 |
+
+> App 定價另行設定，可能與 Web 不同。
 
 ---
 
@@ -240,8 +242,8 @@ enum Feature {
 ### 5.3 AI 用量追蹤
 
 ```typescript
-// Brain Dump 和 Reorganize 共享同一個計數器
-// Atom 上限：50 次 / 月
+// Brain Dump 和 Reorganize 共享同一個計數器（✅ 已決策：共用 50 次）
+// Atom 上限：50 次 / 月（Brain Dump + Reorganize 合計）
 // Fusion+：無限制
 
 async function checkAiUsage(userId: string): Promise<void> {
@@ -279,25 +281,22 @@ async function checkAiUsage(userId: string): Promise<void> {
    ↓
 2. 進入 /pricing 或 /upgrade 頁面
    ↓
-3. 選擇方案（月付 30 天 / 年付 365 天）
+3. 選擇方案（月付 / 年付）+ 14 天免費試用說明
    ↓
-4. POST /api/payment/create → 取得付款表單
+4. Web → Stripe Checkout / App → IAP 購買流程
    ↓
-5. 導向 NewebPay 付款頁（或 Stripe Checkout）
+5. 付款完成 → Stripe Webhook / RevenueCat Webhook
    ↓
-6. 付款完成 → Gateway 回呼 /api/payment/callback
+6. 後端驗證 → 更新 User.planType = FUSION、trialEndAt / subscriptionEndAt
    ↓
-7. 後端驗證 → 更新 User.planType = FUSION
-   ↓
-8. 導回 /success，前端即時更新方案狀態
+7. 導回 /success，前端即時更新方案狀態
 ```
 
 ### 6.2 Upsell Triggers（觸發點）
 
 | 場景 | 觸發文案 |
 |------|---------|
-| 第 51 則 Brain Dump | 「你的思緒太豐富了。升級 Fusion，釋放無限潛能。」 |
-| 嘗試新增第 2 個 Area | 「Atom 只能專注一個世界。升級 Fusion，開啟多重宇宙管理。」 |
+| 第 51 則 Brain Dump | 「你的思緒太豐富了。升級 Fusion，釋放無限 AI 處理潛能。」 |
 | 嘗試開啟 Coach 晨報 | 「Coach 是 Fusion 專屬功能。升級立即開始你的每日晨報。」 |
 | MCP 功能頁 | 「Nexus 解鎖 zentropy:// MCP，讓 AI 工具直接讀取你的任務。」 |
 
@@ -313,20 +312,22 @@ async function checkAiUsage(userId: string): Promise<void> {
 
 ### 7.1 降級時機
 
-Access Pass 模式下，「降級」= 到期不續費。系統自動在 `subscriptionEndAt` 降回 Atom。
+- **Stripe**：`customer.subscription.deleted` 事件觸發（取消後在到期日降級）
+- **IAP**：RevenueCat entitlement 到期後觸發
+- **試用結束未付款**：`trialEndAt` 時間點系統 Cron 自動降回 Atom
 
-### 7.2 資料保留政策
+### 7.2 資料保留政策（✅ 已決策：降級後只讀）
 
-降級後，資料**不刪除**，但功能受限：
+降級後，資料**不刪除**，Fusion 專屬功能停用：
 
 | 資源 | 降級後行為 |
 |------|-----------|
-| 多個 Area | **只讀**（不可新增，現有資料保留） |
-| Coach 晨晚報 | 停止生成（歷史紀錄保留） |
+| Area | 全數保留，可正常存取（Area 數量無限制，Atom / Fusion 相同） |
+| Coach 晨晚報 | 停止生成（歷史紀錄保留，可讀） |
 | 衝突偵測 | 停止（歷史紀錄保留） |
-| AI 用量 | 回歸 50 則 / 月限制 |
+| AI 用量 | 回歸 50 則 / 月限制（Brain Dump + Reorganize 共用） |
 
-> **原則**: 資料永遠是用戶的，Zentropy 不會在降級時刪除任何用戶資料。
+> **原則**: 資料永遠是用戶的，Zentropy 不會在降級時刪除任何用戶資料。只讀狀態在重新訂閱後立即解除。
 
 ### 7.3 降級通知
 
@@ -399,14 +400,16 @@ export async function POST(req: Request) {
 
 ## 10. 待決策事項（Open Questions）
 
-| # | 問題 | 選項 | 優先級 |
-|---|------|------|--------|
-| OQ-1 | 初期使用哪個金流？ | A: NewebPay（一次性）/ B: Stripe（自動扣款） | 🔴 高 |
-| OQ-2 | Fusion 定價是否有年付方案？ | A: 只有月付 / B: 月付 + 年付（8 折） | 🟡 中 |
-| OQ-3 | 降級後多個 Area 只讀，還是強制合併到 1 個？ | A: 只讀保留 / B: 強制限制（只顯示最舊的 1 個） | 🟡 中 |
-| OQ-4 | 免費試用期？ | A: 無試用 / B: 14 天 Fusion 試用 | 🟡 中 |
-| OQ-5 | Nexus 何時推出 + 定價？ | 待 M4 MCP 功能完成後決定 | 🟢 低 |
-| OQ-6 | AI 用量計數：Brain Dump 和 Reorganize 各別計算還是共用？ | A: 共用 50 次 / B: 分別 Brain Dump 30 次 + Reorg 20 次 | 🟡 中 |
+| # | 問題 | 決策 | 狀態 |
+|---|------|------|------|
+| OQ-1 | 初期使用哪個金流？ | **Web: Stripe / App: IAP（RevenueCat）** | ✅ 已決策 |
+| OQ-2 | Fusion 定價是否有年付方案？ | **有年付，$57.99 USD / 年（約 8 折）** | ✅ 已決策 |
+| OQ-3 | 降級後多個 Area 只讀，還是強制合併到 1 個？ | **只讀保留（不刪除、不合併）** | ✅ 已決策 |
+| OQ-4 | 免費試用期？ | **14 天 Fusion 試用** | ✅ 已決策 |
+| OQ-5 | Nexus 何時推出 + 定價？ | 待 M4 MCP 功能完成後決定 | 🟢 低優先 |
+| OQ-6 | AI 用量計數：Brain Dump 和 Reorganize 各別計算還是共用？ | **共用 50 次 / 月** | ✅ 已決策 |
+| OQ-7 | App 定價是否與 Web 相同？ | IAP 手續費較高，App 月付可能 $6.99（TBD） | 🟡 待定 |
+| OQ-8 | 升降級費用如何 Prorate？ | 見第 13 節討論 | 🟡 待定 |
 
 ---
 
@@ -432,6 +435,71 @@ export async function POST(req: Request) {
 - [ ] Cron：每月重置 `aiUsageCount`
 - [ ] Cron：到期自動降級 + Email 通知
 - [ ] `/settings/subscription` 頁面
+
+---
+
+## 13. 升降級費用計算（Proration）
+
+### 13.1 Web / Stripe
+
+Stripe 內建 Proration 機制，依剩餘天數自動計算差額：
+
+**月付升年付（中途升級）**
+- Stripe 計算剩餘月付價值，抵扣年付費用
+- 例：月付用了 10 天（剩 20 天），升年付時 Stripe 自動按比例折抵
+
+**年付降月付（中途降級）**
+- Stripe 預設行為：當前週期結束後才生效（不立即退款）
+- 建議設定：`proration_behavior: 'none'`，年付到期自動轉月付
+- 用戶不會拿到退款，但也不會被額外扣款
+
+**取消訂閱（Fusion → Atom）**
+- 取消後仍可使用至當前週期結束（`cancel_at_period_end: true`）
+- 到期日系統自動降級，無退款
+
+### 13.2 App / IAP
+
+IAP 的退款 / Proration 由 App Store / Google Play 全權處理，後端無法干預：
+
+- **iOS**：用戶在 App Store 管理訂閱，平台處理退款申請
+- **Android**：Google Play 有「退款視窗」（購買後 48 小時內可退）
+- RevenueCat 負責同步最新的 entitlement 狀態到後端
+
+### 13.3 跨平台切換（Web 訂閱 → 改用 App，或反之）
+
+這是個複雜問題，建議初期不支援「跨平台遷移訂閱」：
+
+- Web 訂閱（Stripe）與 App 訂閱（IAP）是獨立的
+- 用戶若同時訂閱兩個平台，**系統取最晚到期的那個**作為有效 Fusion 狀態
+- 未來可考慮：Web 訂閱用戶登入 App 時顯示「你的 Web 訂閱已涵蓋 App 使用」
+
+### 13.4 後端判斷邏輯摘要
+
+```typescript
+// User 表新增欄位
+model User {
+  // Stripe
+  stripeCustomerId    String?  @map("stripe_customer_id")
+  stripeSubEndAt      DateTime? @map("stripe_sub_end_at")
+
+  // IAP (via RevenueCat)
+  rcAppUserId         String?  @map("rc_app_user_id")
+  iapSubEndAt         DateTime? @map("iap_sub_end_at")
+
+  // Trial
+  trialStartAt        DateTime? @map("trial_start_at")
+  trialEndAt          DateTime? @map("trial_end_at")
+}
+
+// 判斷用戶是否為 Fusion
+function isFusionActive(user: User): boolean {
+  const now = new Date()
+  const stripActive = user.stripeSubEndAt && user.stripeSubEndAt > now
+  const iapActive = user.iapSubEndAt && user.iapSubEndAt > now
+  const inTrial = user.trialEndAt && user.trialEndAt > now
+  return !!(stripActive || iapActive || inTrial)
+}
+```
 
 ---
 

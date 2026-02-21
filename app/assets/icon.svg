@@ -1,12 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    <!-- Background: Deep Void / Obsidian -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#27272a"/> <!-- Zinc 800 -->
+      <stop offset="100%" stop-color="#09090b"/> <!-- Zinc 950 -->
     </linearGradient>
+
+    <!-- Zen Gradient (Top Half): Order, cooling, structured -->
+    <linearGradient id="zen-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2dd4bf" /> <!-- Teal -->
+      <stop offset="50%" stop-color="#3b82f6" /> <!-- Blue -->
+      <stop offset="100%" stop-color="#8b5cf6" /> <!-- Violet -->
+    </linearGradient>
+
+    <!-- Entropy Gradient (Bottom Half): Chaos, warming, dynamic -->
+    <linearGradient id="entropy-grad" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#f43f5e" /> <!-- Rose -->
+      <stop offset="50%" stop-color="#d946ef" /> <!-- Fuchsia -->
+      <stop offset="100%" stop-color="#f59e0b" /> <!-- Amber -->
+    </linearGradient>
+
+    <!-- Premium 3D Drop Shadow for the floating tectonic blocks -->
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+
+    <!-- Clip Path to cleanly dissect the top half of the Z -->
+    <clipPath id="clip-top">
+      <rect x="-100" y="-100" width="712" height="356" /> <!-- Exactly cuts at the horizontal center y=256 -->
+    </clipPath>
+
+    <!-- Clip Path to cleanly dissect the bottom half of the Z -->
+    <clipPath id="clip-bottom">
+      <rect x="-100" y="256" width="712" height="356" /> <!-- Starts from horizontal center y=256 -->
+    </clipPath>
+
+    <!-- The core perfect continuous Z shape -->
+    <path id="core-z" 
+          d="M 160 176 H 352 L 160 336 H 352" 
+          stroke-width="88" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none" />
   </defs>
-  <!-- 圓角方形背景 -->
-  <rect width="32" height="32" rx="7" fill="url(#grad)"/>
-  <!-- Z 字母 - 代表 Zentropy -->
-  <path d="M8 9h16v3H13.5l10.5 8v3H8v-3h10.5L8 12V9z" fill="white"/>
+
+  <!-- Base Icon Canvas -->
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+
+  <!-- 
+    The "Tectonic Z" Concept:
+    The Z is horizontally sliced perfectly in half.
+    The two halves are shifted in opposite directions, creating a dynamic 3D 
+    "broken" faultline where Zen and Entropy pull away from each other.
+    This gives the icon massive recognizability and a unique silhoutte.
+  -->
+
+  <!-- Bottom Half (Entropy) - Rendered underneath so top half casts shadow on it -->
+  <g filter="url(#shadow)">
+    <g clip-path="url(#clip-bottom)" transform="translate(-16, 16)">
+      <use href="#core-z" stroke="url(#entropy-grad)" />
+    </g>
+  </g>
+
+  <!-- Top Half (Zen) - Rendered on top, floating up and right -->
+  <g filter="url(#shadow)">
+    <g clip-path="url(#clip-top)" transform="translate(16, -16)">
+      <use href="#core-z" stroke="url(#zen-grad)" />
+    </g>
+  </g>
+
 </svg>

@@ -75,12 +75,44 @@ export class UpdateSubItemUseCase {
     }
 
     // 3. 從 sub_tasks 表查詢目標
-    const subTask = await prisma.subTask.findFirst({
+    let subTask = await prisma.subTask.findFirst({
       where: { id: request.subItemId, task_id: request.taskId, deleted_at: null },
     })
 
     if (!subTask) {
-      throw new NotFoundException('Sub-item')
+      // Fallback：嘗試從 task 的 JSON sub_items 欄位找到並自動遷移
+      const taskRecord = await prisma.task.findUnique({
+        where: { id: request.taskId },
+        select: { sub_items: true },
+      })
+      const jsonSubItems = taskRecord?.sub_items as any[] | null
+      const jsonItem = jsonSubItems?.find((item: any) => item.id === request.subItemId)
+
+      if (!jsonItem) {
+        throw new NotFoundException('Sub-item')
+      }
+
+      // 自動遷移：在 sub_tasks 建立對應記錄
+      await (prisma.subTask as any).create({
+        data: {
+          id: jsonItem.id,
+          task_id: request.taskId,
+          user_id: request.userId,
+          content: jsonItem.content,
+          completed: jsonItem.completed ?? false,
+          order: jsonItem.order ?? 0,
+          created_at: jsonItem.created_at ? new Date(jsonItem.created_at) : new Date(),
+          completed_at: jsonItem.completed_at ? new Date(jsonItem.completed_at) : null,
+        },
+      })
+
+      subTask = await prisma.subTask.findFirst({
+        where: { id: request.subItemId, task_id: request.taskId, deleted_at: null },
+      })
+
+      if (!subTask) {
+        throw new NotFoundException('Sub-item')
+      }
     }
 
     // 4. 更新 sub_task 記錄
@@ -218,7 +250,7 @@ export class UpdateSubItemUseCase {
           const todayPlan = await prisma.dailyPlan.findFirst({
             where: {
               user_id: taskRecord.user_id,
-              plan_date: todayDate,
+              plan_date: new Date(todayDate),
             },
           })
 

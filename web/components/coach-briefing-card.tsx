@@ -201,11 +201,29 @@ export function CoachAgent() {
     return () => clearInterval(interval);
   }, [userTimezone]);
 
+  const lastRefreshTimeRef = useRef<number>(0);
+
   useEffect(() => {
+    lastRefreshTimeRef.current = Date.now();
     loadBriefings();
     return () => {
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
     };
+  }, [loadBriefings]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastRefreshTimeRef.current > 30_000) {
+          lastRefreshTimeRef.current = now;
+          loadBriefings();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [loadBriefings]);
 
   const handleOpen = () => {
@@ -398,6 +416,7 @@ function CoachDrawerContent({
   };
 
   // ---- Header with tabs ----
+  const canGenerate = shouldShowGenerateButton(activeTab)
   const header = (
     <div className="border-b border-slate-200 dark:border-white/5">
       <div className="px-5 pt-5 pb-3 flex items-center gap-3">
@@ -412,9 +431,9 @@ function CoachDrawerContent({
         </div>
         <button
           onClick={() => onGenerate(activeTab)}
-          disabled={isGenerating}
+          disabled={isGenerating || !canGenerate}
           className="p-1.5 rounded-lg text-slate-400 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 transition-all disabled:opacity-50"
-          title="重新生成"
+          title={canGenerate ? "重新生成" : `目前不在${activeTab === 'MORNING' ? '晨報' : '晚報'}時間窗口`}
         >
           {isGenerating ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -576,7 +595,8 @@ function CoachDrawerContent({
             </p>
             <button
               onClick={() => onGenerate(activeTab)}
-              disabled={isGenerating}
+              disabled={isGenerating || !canGenerate}
+              title={!canGenerate ? `目前不在${activeTab === 'MORNING' ? '晨報' : '晚報'}時間窗口` : undefined}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 text-white text-xs font-medium hover:bg-amber-600 transition-colors disabled:opacity-50"
             >
               {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}

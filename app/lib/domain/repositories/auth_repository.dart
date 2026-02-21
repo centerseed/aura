@@ -24,6 +24,9 @@ abstract class AuthRepository {
   /// 使用 Google 登入
   Future<Either<Failure, User>> signInWithGoogle();
 
+  /// 使用 Apple ID 登入
+  Future<Either<Failure, User>> signInWithApple();
+
   /// 匿名登入
   Future<Either<Failure, User>> signInAnonymously();
 

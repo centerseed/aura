@@ -4,14 +4,14 @@
  * Signs and verifies stateless access tokens for MCP clients.
  * Uses HMAC-SHA256 (HS256) with a server secret.
  *
- * Access tokens are short-lived (1 hour).
+ * Access tokens are long-lived (3 days) with sliding window extension stored in DB.
  * Refresh tokens are long-lived (30 days) and stored in DB for revocation.
  */
 
 import { createHmac, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 const ALG = "HS256";
-const ACCESS_TOKEN_TTL = 3600; // 1 hour
+const ACCESS_TOKEN_TTL = 3 * 24 * 3600; // 3 days = 259200 seconds
 const REFRESH_TOKEN_TTL = 30 * 24 * 3600; // 30 days
 
 export interface McpTokenPayload {
@@ -119,6 +119,14 @@ export function generateRefreshToken(): {
 export function hashRefreshToken(raw: string): string {
   const secret = getSecret();
   return createHmac("sha256", secret).update(raw).digest("hex");
+}
+
+/**
+ * Hash an access token for DB storage/lookup (tracking and revocation).
+ */
+export function hashAccessToken(token: string): string {
+  const secret = getSecret();
+  return createHmac("sha256", secret).update(token).digest("hex");
 }
 
 /**

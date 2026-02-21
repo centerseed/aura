@@ -28,7 +28,7 @@ describe("MCP JWT Utility", () => {
       });
 
       expect(result.token).toBeDefined();
-      expect(result.expiresIn).toBe(3600);
+      expect(result.expiresIn).toBe(259200); // 3 days
       expect(result.expiresAt).toBeInstanceOf(Date);
 
       const payload = verifyAccessToken(result.token);

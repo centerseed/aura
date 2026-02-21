@@ -21,12 +21,19 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
+// Mock embedding
+const mockEnsureProductEmbedding = vi.fn()
+vi.mock('@/lib/embedding', () => ({
+  ensureProductEmbedding: (...args: any[]) => mockEnsureProductEmbedding(...args),
+}))
+
 describe('CreateProductUseCase', () => {
   let useCase: CreateProductUseCase
 
   beforeEach(() => {
     useCase = new CreateProductUseCase()
     vi.clearAllMocks()
+    mockEnsureProductEmbedding.mockResolvedValue(undefined)
   })
 
   describe('驗證邏輯', () => {
@@ -114,6 +121,52 @@ describe('CreateProductUseCase', () => {
 
       expect(result.product).toEqual(mockProduct)
       expect(result.message).toBe('Product created successfully')
+    })
+
+    it('🔴 迴歸測試：創建 Product 後必須呼叫 ensureProductEmbedding', async () => {
+      const mockArea = {
+        id: VALID_AREA_ID,
+        user_id: VALID_USER_ID,
+        name: 'Test Area',
+        scope: 'work',
+        description: null,
+        display_order: 0,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }
+
+      const mockProduct = {
+        id: VALID_PRODUCT_ID,
+        user_id: VALID_USER_ID,
+        area_id: VALID_AREA_ID,
+        name: 'Test Product',
+        description: 'Test description',
+        status: 'ACTIVE' as const,
+        lifecycle: 'FINITE' as const,
+        display_order: 0,
+        created_at: new Date(),
+        updated_at: new Date(),
+        deleted_at: null,
+        area: mockArea,
+      }
+
+      vi.mocked(prisma.area.findFirst).mockResolvedValue(mockArea)
+      vi.mocked(prisma.product.findFirst).mockResolvedValue(null)
+      vi.mocked(prisma.product.create).mockResolvedValue(mockProduct)
+
+      await useCase.execute({
+        userId: VALID_USER_ID,
+        areaId: VALID_AREA_ID,
+        name: 'Test Product',
+        description: 'Test description',
+      })
+
+      expect(mockEnsureProductEmbedding).toHaveBeenCalledTimes(1)
+      expect(mockEnsureProductEmbedding).toHaveBeenCalledWith(
+        VALID_PRODUCT_ID,
+        'Test Product',
+        'Test description'
+      )
     })
   })
 })

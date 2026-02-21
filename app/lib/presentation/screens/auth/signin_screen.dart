@@ -73,6 +73,49 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final authRepo = ref.read(authRepositoryProvider);
+    final result = await authRepo.signInWithApple();
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      result.fold(
+        (failure) {
+          if (failure.message.contains('cancelled')) return;
+          setState(() {
+            _errorMessage = failure.message;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(failure.message),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+        (user) {
+          final analytics = ref.read(analyticsServiceProvider);
+          analytics.setUserId(user.uid);
+          analytics.logLogin(method: 'apple');
+
+          _refreshAllCaches();
+
+          if (mounted) {
+            context.go('/splash');
+          }
+        },
+      );
+    }
+  }
+
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
@@ -206,6 +249,25 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                   icon: const Icon(Icons.login),
                                   label: const Text(
                                     'Sign in with Google',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: _signInWithApple,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.apple),
+                                  label: const Text(
+                                    'Sign in with Apple',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                 ),
