@@ -24,6 +24,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final taskContextMap = {for (var task in widget.proposal.tasksContext) task.id: task};
     final proposal = widget.proposal;
     final currentTopicCount = proposal.currentTopicCount ?? proposal.currentTopics.length;
@@ -78,11 +79,13 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.githubDark,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+        border: Border(top: BorderSide(color: colorScheme.onSurface.withValues(alpha: 0.1))),
       ),
-      child: Column(
+      child: SafeArea(
+        bottom: false,
+        child: Column(
         children: [
           // Handle Bar
           Padding(
@@ -91,7 +94,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: colorScheme.onSurface.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -105,14 +108,14 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 標題
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
-                      SizedBox(width: 12),
+                      const Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 12),
                       Text(
                         'AI 整理建議',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: colorScheme.onSurface,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
@@ -201,17 +204,17 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                                color: Theme.of(context).colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     c.consolidatedTitle,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -224,7 +227,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                       Expanded(
                                         child: Text(
                                           parentCtx?.title ?? c.parentTaskId,
-                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
                                         ),
                                       ),
                                     ],
@@ -240,7 +243,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                           Expanded(
                                             child: Text(
                                               subCtx?.title ?? subId,
-                                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12),
                                             ),
                                           ),
                                         ],
@@ -251,7 +254,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                     const SizedBox(height: 6),
                                     Text(
                                       c.reasoning,
-                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 11),
+                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35), fontSize: 11),
                                     ),
                                   ],
                                 ],
@@ -275,7 +278,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                top: BorderSide(color: colorScheme.onSurface.withValues(alpha: 0.1)),
               ),
             ),
             child: Row(
@@ -284,8 +287,8 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                   child: OutlinedButton(
                     onPressed: widget.isApplying ? null : () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                      foregroundColor: colorScheme.onSurface,
+                      side: BorderSide(color: colorScheme.onSurface.withValues(alpha: 0.3)),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -330,6 +333,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -383,8 +387,8 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                     const SizedBox(width: 8),
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -420,9 +424,9 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08)),
       ),
       child: op.action == 'rename'
           ? Row(
@@ -443,8 +447,8 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                 Expanded(
                   child: Text(
                     op.newName ?? '',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -464,13 +468,13 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                     children: [
                       ...(op.sourceNames ?? []).map((name) => Text(
                         name,
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13),
                       )).toList().expand((w) => [w, const Text(' + ', style: TextStyle(color: AppColors.statusArchive, fontSize: 11))]).toList()..removeLast(),
                       const Icon(Icons.arrow_forward, size: 12, color: AppColors.statusArchive),
                       Text(
                         op.targetName ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -487,12 +491,12 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
   Widget _buildClusterCard(_TopicChange change) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: change.isNew
               ? AppColors.onboardingIndigo.withValues(alpha: 0.4)
-              : Colors.white.withValues(alpha: 0.08),
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         ),
       ),
       child: Column(
@@ -504,7 +508,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
             decoration: BoxDecoration(
               color: change.isNew
                   ? AppColors.onboardingIndigo.withValues(alpha: 0.12)
-                  : const Color(0xFF334155).withValues(alpha: 0.25),
+                  : Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Row(
@@ -512,14 +516,14 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                 Icon(
                   Icons.folder_outlined,
                   size: 16,
-                  color: change.isNew ? const Color(0xFF818CF8) : Colors.white60,
+                  color: change.isNew ? const Color(0xFF818CF8) : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     change.topicName,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -545,7 +549,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                 Text(
                   '${change.totalTasks} 個任務',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -571,7 +575,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                           decoration: BoxDecoration(
                             color: showMovement
                                 ? AppColors.statusInbox
-                                : Colors.white.withValues(alpha: 0.3),
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -586,7 +590,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                               style: TextStyle(
                                 color: showMovement
                                     ? AppColors.statusInbox
-                                    : Colors.white.withValues(alpha: 0.85),
+                                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
                                 fontSize: 13,
                               ),
                             ),
@@ -596,7 +600,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                 child: Text(
                                   '從「${task.fromTopic}」移入',
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.35),
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
                                     fontSize: 11,
                                   ),
                                 ),

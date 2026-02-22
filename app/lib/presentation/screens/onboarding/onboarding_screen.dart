@@ -61,7 +61,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final canProceed = ref.watch(canProceedProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.githubDark,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       body: Stack(
         children: [
           // 背景漸層

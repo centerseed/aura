@@ -447,6 +447,32 @@ final rescheduleAllRemindersUseCaseProvider = Provider<RescheduleAllRemindersUse
   );
 });
 
+// ==================== Version Provider ====================
+
+/// App Version Provider
+final appVersionProvider = FutureProvider<String>((ref) async {
+  final dio = ref.watch(dioProvider);
+  try {
+    // 調用 /health endpoint，baseUrl 已包含 /api，所以用相對路徑
+    final response = await dio.get('/health');
+    if (response.statusCode == 200 && response.data is Map) {
+      final data = response.data as Map;
+      if (data.containsKey('version')) {
+        final version = data['version'];
+        if (version is Map && version.containsKey('api')) {
+          // version 是 { api: number, mcp: number } 格式
+          return 'v0.9.0 (API: ${version['api']})';
+        } else if (version is String) {
+          return version;
+        }
+      }
+    }
+  } catch (e) {
+    // 如果無法獲取版本，返回預設值
+  }
+  return 'v0.9.0 beta';
+});
+
 // ==================== Cached Stream Providers ====================
 // 注意: 統一 Repository 已經內建快取功能,直接使用即可
 

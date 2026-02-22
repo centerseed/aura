@@ -37,7 +37,7 @@ export function DroppableAreaHeader({
       ref={setNodeRef}
       className={`flex items-center justify-between mb-4 p-4 rounded-xl transition-all ${
         isOver
-          ? 'bg-indigo-500/10 border-2 border-indigo-500 border-dashed'
+          ? 'bg-blue-500/10 border-2 border-blue-500 border-dashed'
           : 'border-2 border-transparent'
       }`}
     >

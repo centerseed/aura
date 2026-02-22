@@ -153,11 +153,11 @@ function SettingsContent() {
     const config = {
       "mcpServers": {
         "zentropy": {
+          "type": "sse",
           "url": `${mcpServerUrl}/mcp`,
-          "transport": "http",
           "oauth": {
-            "authorizationUrl": `${mcpServerUrl}/authorize`,
-            "tokenUrl": `${mcpServerUrl}/token`,
+            "authorizationUrl": `${mcpServerUrl}/api/oauth/mcp/authorize`,
+            "tokenUrl": `${mcpServerUrl}/api/oauth/mcp/token`,
             "clientId": "claude-code",
             "scopes": ["read:tasks", "write:inbox", "read:knowledge", "write:knowledge", "read:profile"]
           }
@@ -540,7 +540,7 @@ function SettingsContent() {
                   <li className="flex items-start gap-2">
                     <span className="text-purple-400 font-bold">1.</span>
                     <div>
-                      打開 Claude Code 設定檔（<code className="bg-slate-800 px-1 py-0.5 rounded text-xs">~/.claude/config.json</code>）
+                      在專案根目錄建立（或開啟）<code className="bg-slate-800 px-1 py-0.5 rounded text-xs">.mcp.json</code>
                     </div>
                   </li>
                   <li className="flex items-start gap-2">
@@ -560,11 +560,11 @@ function SettingsContent() {
 {JSON.stringify({
   "mcpServers": {
     "zentropy": {
+      "type": "sse",
       "url": `${mcpServerUrl}/mcp`,
-      "transport": "http",
       "oauth": {
-        "authorizationUrl": `${mcpServerUrl}/authorize`,
-        "tokenUrl": `${mcpServerUrl}/token`,
+        "authorizationUrl": `${mcpServerUrl}/api/oauth/mcp/authorize`,
+        "tokenUrl": `${mcpServerUrl}/api/oauth/mcp/token`,
         "clientId": "claude-code",
         "scopes": [
           "read:tasks",

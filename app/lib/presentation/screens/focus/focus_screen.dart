@@ -230,7 +230,6 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.darkBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -453,7 +452,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
 
   Widget _buildSetupScreen(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.deepBlack, // Deep Black
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -476,7 +475,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: AppColors.darkBackground,
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: Colors.white.withOpacity(0.08),

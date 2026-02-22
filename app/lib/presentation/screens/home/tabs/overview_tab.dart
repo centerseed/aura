@@ -39,6 +39,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     // 使用 Dashboard API 統一載入 Areas + Products（單一 HTTP 請求）
     final areasAsync = ref.watch(dashboardAreasProvider);
     final productsAsync = ref.watch(dashboardProductsProvider);
@@ -50,7 +51,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           ref.invalidate(dashboardProvider);
         },
         color: AppColors.primary,
-        backgroundColor: AppColors.githubDarkLight,
+        backgroundColor: colorScheme.surfaceContainer,
         child: CustomScrollView(
           slivers: [
             // Header
@@ -104,7 +105,28 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   }
 
   Widget _buildHeader() {
-    return Padding(
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: isDark
+          ? null
+          : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [
+                  AppColors.brandBlue.withValues(alpha: 0.07),
+                  AppColors.primaryDeep.withValues(alpha: 0.04),
+                  colorScheme.surface.withValues(alpha: 0.0),
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+            ),
+      child: Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,8 +135,11 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.brandTeal, AppColors.brandBlue],
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => LinearGradient(
+                  colors: isDark
+                      ? [AppColors.brandTeal, AppColors.brandBlue]
+                      : [AppColors.primaryDeep, AppColors.brandBlue],
                 ).createShader(bounds),
                 child: const Text(
                   '全視圖',
@@ -127,14 +152,14 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
+                  color: colorScheme.onSurface.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: colorScheme.onSurface.withValues(alpha: 0.1),
                   ),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.person_outline, color: Colors.white70),
+                  icon: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant),
                   onPressed: () => context.push('/profile'),
                 ),
               ),
@@ -144,11 +169,12 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           Text(
             'Area → Product 結構',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
               fontSize: 14,
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -187,6 +213,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   }
 
   Widget _buildAreaHeader(Area area) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Row(
@@ -210,8 +237,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
               children: [
                 Text(
                   area.name,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -222,7 +249,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                     child: Text(
                       area.description!,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: colorScheme.onSurface.withValues(alpha: 0.4),
                         fontSize: 12,
                       ),
                     ),
@@ -236,6 +263,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
   }
 
   Widget _buildProductCard(Product product) {
+    final colorScheme = Theme.of(context).colorScheme;
     // 優先使用完整任務列表，回退到最近任務
     final displayTasks = product.tasks ?? product.recentTasks ?? [];
     final hasReferences = product.referenceCount > 0;
@@ -250,7 +278,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             end: Alignment.bottomRight,
             colors: [
               AppColors.statusActive.withValues(alpha: 0.08),
-              Colors.white.withValues(alpha: 0.03),
+              colorScheme.onSurface.withValues(alpha: 0.03),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
@@ -303,12 +331,12 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.06),
+                              color: colorScheme.onSurface.withValues(alpha: 0.06),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               isExpanded ? Icons.expand_less : Icons.expand_more,
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: colorScheme.onSurface.withValues(alpha: 0.5),
                               size: 20,
                             ),
                           ),
@@ -330,8 +358,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                               children: [
                                 Text(
                                   product.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: colorScheme.onSurface,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -342,7 +370,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                                     child: Text(
                                       product.description!,
                                       style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.45),
+                                        color: colorScheme.onSurface.withValues(alpha: 0.45),
                                         fontSize: 13,
                                       ),
                                       maxLines: 2,
@@ -381,7 +409,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.white.withValues(alpha: 0.1),
+                              colorScheme.onSurface.withValues(alpha: 0.1),
                               Colors.transparent,
                             ],
                           ),
@@ -409,7 +437,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.white.withValues(alpha: 0.1),
+                              colorScheme.onSurface.withValues(alpha: 0.1),
                               Colors.transparent,
                             ],
                           ),
@@ -447,7 +475,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                             child: Text(
                               '無任務',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
+                                color: colorScheme.onSurface.withValues(alpha: 0.4),
                                 fontSize: 14,
                               ),
                             ),
@@ -466,6 +494,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
 
   /// 展開模式中的任務卡片
   Widget _buildExpandedTaskCard(Task task) {
+    final colorScheme = Theme.of(context).colorScheme;
     final accentColor = task.isOverdue
         ? AppColors.error
         : task.isToday
@@ -517,8 +546,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                   Expanded(
                     child: Text(
                       task.content,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -560,7 +589,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                   decoration: BoxDecoration(
                     border: Border(
                       left: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
@@ -583,7 +612,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                                 border: Border.all(
                                   color: subItem.completed
                                       ? AppColors.accentEmerald
-                                      : Colors.white.withValues(alpha: 0.2),
+                                      : colorScheme.onSurface.withValues(alpha: 0.2),
                                   width: 1.5,
                                 ),
                               ),
@@ -601,13 +630,13 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                                 subItem.content,
                                 style: TextStyle(
                                   color: subItem.completed
-                                      ? Colors.white.withValues(alpha: 0.35)
-                                      : Colors.white.withValues(alpha: 0.7),
+                                      ? colorScheme.onSurface.withValues(alpha: 0.35)
+                                      : colorScheme.onSurface.withValues(alpha: 0.7),
                                   fontSize: 13,
                                   decoration: subItem.completed
                                       ? TextDecoration.lineThrough
                                       : null,
-                                  decorationColor: Colors.white.withValues(alpha: 0.3),
+                                  decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -701,8 +730,8 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
               Expanded(
                 child: Text(
                   task.content,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                   ),
                   maxLines: 1,
@@ -879,7 +908,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             Text(
               'AI 分析中...',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
             ),
           ],
@@ -915,6 +944,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
+            useSafeArea: true,
             backgroundColor: Colors.transparent,
             builder: (context) => ReorganizeBottomSheet(
               proposal: proposal,
@@ -1023,7 +1053,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             Text(
               '尚未建立任何專案',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 16,
               ),
             ),
@@ -1031,7 +1061,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             Text(
               '開始記錄你的第一個想法吧',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                 fontSize: 14,
               ),
             ),
@@ -1055,7 +1085,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             const SizedBox(height: 16),
             Text(
               message,
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),

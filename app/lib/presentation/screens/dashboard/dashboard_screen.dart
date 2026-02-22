@@ -23,11 +23,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final taskState = ref.watch(activeTasksProvider);
     final dailyProgress = ref.watch(dailyProgressProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.deepBlack,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => refreshTasks(ref),
@@ -39,11 +39,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
               // Task List - 使用 TaskDataState
               if (taskState.showLoading)
-                const SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Center(
                     child: Padding(
-                      padding: EdgeInsets.all(48.0),
-                      child: CircularProgressIndicator(color: Colors.white),
+                      padding: const EdgeInsets.all(48.0),
+                      child: CircularProgressIndicator(color: colorScheme.onSurface),
                     ),
                   ),
                 )
@@ -66,6 +66,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildHeader(DailyProgress progress, {bool isRefreshing = false}) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
@@ -76,29 +77,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               Row(
                 children: [
-                  const Text(
+                  Text(
                     'Zentropy',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: colorScheme.onSurface,
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   if (isRefreshing) ...[
                     const SizedBox(width: 12),
-                    const SizedBox(
+                    SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white54,
+                        color: colorScheme.onSurface.withOpacity(0.54),
                       ),
                     ),
                   ],
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.person_outline, color: Colors.white70),
+                icon: Icon(Icons.person_outline, color: colorScheme.onSurface.withOpacity(0.7)),
                 onPressed: () => context.push('/profile'),
               ),
             ],
@@ -127,18 +128,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         '今日進度',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: colorScheme.onSurface.withOpacity(0.7),
                           fontSize: 14,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         '${progress.completed} / ${progress.total}',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
                         ),
@@ -156,7 +157,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ? progress.completed / progress.total
                             : 0,
                         strokeWidth: 6,
-                        backgroundColor: Colors.white.withValues(alpha: 0.1),
+                        backgroundColor: colorScheme.onSurface.withOpacity(0.1),
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           AppColors.success,
                         ),
@@ -166,8 +167,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           progress.total > 0
                               ? '${((progress.completed / progress.total) * 100).round()}%'
                               : '0%',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colorScheme.onSurface,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -180,10 +181,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             '待辦事項',
             style: TextStyle(
-              color: Colors.white,
+              color: colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
@@ -207,13 +208,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Icon(
                   Icons.check_circle_outline,
                   size: 64,
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   '太棒了！沒有待辦事項',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                     fontSize: 16,
                   ),
                 ),
@@ -283,6 +284,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildTaskCard(Task task) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Material(
@@ -293,9 +295,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.darkBackground,
+              color: colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(color: colorScheme.onSurface.withOpacity(0.08)),
             ),
             child: Row(
               children: [
@@ -328,8 +330,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     children: [
                       Text(
                         task.content,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
                           fontSize: 16,
                         ),
                         maxLines: 2,
@@ -343,7 +345,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 .whereType<String>()
                                 .join(' > '),
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
+                              color: colorScheme.onSurface.withOpacity(0.4),
                               fontSize: 12,
                             ),
                           ),
@@ -355,7 +357,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 IconButton(
                   icon: Icon(
                     Icons.play_circle_outline,
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: colorScheme.onSurface.withOpacity(0.5),
                   ),
                   onPressed: () =>
                       context.push('/focus/${task.id}', extra: task),
@@ -382,7 +384,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SizedBox(height: 16),
             Text(
               message,
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -415,24 +417,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Text(
+        title: Text(
           '完成任務',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600),
         ),
         content: Text(
           '確定要完成「${task.content}」嗎？',
-          style: const TextStyle(color: Colors.white70, fontSize: 15),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 15),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
+            child: Text(
               '取消',
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54)),
             ),
           ),
           TextButton(
@@ -600,13 +602,14 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.darkBackground,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -617,7 +620,7 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: colorScheme.onSurface.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -625,16 +628,16 @@ class _QuickCaptureSheetState extends ConsumerState<_QuickCaptureSheet> {
             TextField(
               controller: _textController,
               autofocus: true,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+              style: TextStyle(color: colorScheme.onSurface, fontSize: 16),
               decoration: InputDecoration(
                 hintText: '輸入新任務...',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.3)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
+                fillColor: colorScheme.onSurface.withOpacity(0.05),
               ),
               onSubmitted: (_) => _submit(),
             ),

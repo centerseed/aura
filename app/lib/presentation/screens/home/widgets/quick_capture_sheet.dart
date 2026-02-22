@@ -298,19 +298,18 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-      backgroundColor: AppColors.githubDark,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: AppColors.githubDarkLight,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           '新增事項',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -347,10 +346,10 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.githubDarkLight,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
             width: 1,
           ),
         ),
@@ -361,7 +360,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
             child: Text(
               '可繼續新增，或點完成返回',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 13,
               ),
             ),
@@ -397,7 +396,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           Text(
             '身份地圖',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -452,13 +451,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               Icon(
                 Icons.subdirectory_arrow_right,
                 size: 16,
-                color: Colors.white.withValues(alpha: 0.4),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
               const SizedBox(width: 4),
               Text(
                 '選擇專案',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
@@ -481,7 +480,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     child: Text(
                       '此領域尚無專案',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                         fontSize: 14,
                       ),
                     ),
@@ -524,6 +523,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   }
 
   Widget _buildAreaChip(Area area, bool isSelected) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -542,19 +542,19 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primary.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.05),
+              : colorScheme.onSurface.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? AppColors.primary
-                : Colors.white.withValues(alpha: 0.15),
+                : colorScheme.onSurface.withValues(alpha: 0.15),
             width: 1,
           ),
         ),
         child: Text(
           area.name,
           style: TextStyle(
-            color: isSelected ? AppColors.primary : Colors.white,
+            color: isSelected ? AppColors.primary : colorScheme.onSurface,
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -564,6 +564,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   }
 
   Widget _buildProductChip(Product product, bool isSelected) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -576,12 +577,12 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.accentEmerald.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.05),
+              : colorScheme.onSurface.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? AppColors.accentEmerald
-                : Colors.white.withValues(alpha: 0.15),
+                : colorScheme.onSurface.withValues(alpha: 0.15),
             width: 1,
           ),
         ),
@@ -593,13 +594,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               size: 14,
               color: isSelected
                   ? AppColors.accentEmerald
-                  : Colors.white.withValues(alpha: 0.6),
+                  : colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 6),
             Text(
               product.name,
               style: TextStyle(
-                color: isSelected ? AppColors.accentEmerald : Colors.white,
+                color: isSelected ? AppColors.accentEmerald : colorScheme.onSurface,
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -612,6 +613,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
 
   Widget _buildInstructions() {
     if (_messages.isNotEmpty) return const SizedBox.shrink();
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -620,13 +622,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           Icon(
             Icons.auto_awesome,
             size: 32,
-            color: Colors.white.withValues(alpha: 0.3),
+            color: colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 12),
           Text(
             '直接輸入即可，AI 會自動歸類',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: colorScheme.onSurfaceVariant,
               fontSize: 16,
             ),
           ),
@@ -634,7 +636,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           Text(
             '或選擇 Area 後指定專案',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
+              color: colorScheme.onSurface.withValues(alpha: 0.4),
               fontSize: 14,
             ),
           ),
@@ -697,7 +699,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   decoration: BoxDecoration(
                     color: isUser
                         ? AppColors.primary
-                        : Colors.white.withValues(alpha: 0.08),
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -708,7 +710,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   child: Text(
                     message.content,
                     style: TextStyle(
-                      color: isUser ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                      color: isUser ? Colors.white : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9),
                       fontSize: 15,
                       height: 1.4,
                     ),
@@ -721,13 +723,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.person,
                     size: 16,
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -854,7 +856,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
@@ -887,7 +889,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.3 + (value * 0.3)),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3 + (value * 0.3)),
             shape: BoxShape.circle,
           ),
         );
@@ -899,13 +901,14 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     // 顯示當前選擇的 Area/Product
     final hasSelection = _selectedAreaId != null || _selectedProductId != null;
 
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       decoration: BoxDecoration(
-        color: AppColors.githubDark,
+        color: colorScheme.surfaceContainerLow,
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: colorScheme.onSurface.withValues(alpha: 0.08),
             width: 1,
           ),
         ),
@@ -951,10 +954,10 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   child: TextField(
                     controller: _textController,
                     autofocus: false,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(color: colorScheme.onSurface, fontSize: 16),
                     decoration: InputDecoration(
                       hintText: '輸入新事項...',
-                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3)),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
@@ -962,7 +965,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.05),
+                      fillColor: colorScheme.onSurface.withValues(alpha: 0.05),
                     ),
                     onSubmitted: (_) => _submit(),
                     textInputAction: TextInputAction.send,
@@ -1020,7 +1023,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               _lastWords.isNotEmpty ? _lastWords : (isListening ? '正在聆聽...' : '點擊麥克風開始'),
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: _lastWords.isNotEmpty ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                color: _lastWords.isNotEmpty ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
@@ -1044,12 +1047,12 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.close,
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     size: 24,
                   ),
                 ),
@@ -1100,14 +1103,14 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   decoration: BoxDecoration(
                     color: _lastWords.isNotEmpty
                         ? AppColors.accentEmerald
-                        : Colors.white.withValues(alpha: 0.1),
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.check,
                     color: _lastWords.isNotEmpty
                         ? Colors.white
-                        : Colors.white.withValues(alpha: 0.3),
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                     size: 24,
                   ),
                 ),

@@ -244,6 +244,7 @@ class TutorialOverlay extends ConsumerWidget {
     required VoidCallback onNext,
     bool showSkip = false,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: Container(
@@ -277,8 +278,8 @@ class TutorialOverlay extends ConsumerWidget {
           // 標題
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: colorScheme.onSurface,
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -291,7 +292,7 @@ class TutorialOverlay extends ConsumerWidget {
           Text(
             message,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: colorScheme.onSurface.withValues(alpha: 0.9),
               fontSize: 16,
               height: 1.5,
             ),
@@ -315,7 +316,7 @@ class TutorialOverlay extends ConsumerWidget {
                   child: Text(
                     '跳過',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 16,
                     ),
                   ),

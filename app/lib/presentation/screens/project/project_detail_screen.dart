@@ -77,7 +77,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             padding: const EdgeInsets.only(right: 8.0),
             child: PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: Colors.white70),
-              color: AppColors.darkCard,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               enabled: !_isDeleting,
               onSelected: (value) {
                 if (value == 'delete') {
@@ -401,16 +401,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('刪除專案', style: TextStyle(color: Colors.white)),
+        title: Text('刪除專案', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               '確定要刪除「${widget.product.name}」嗎？',
-              style: const TextStyle(color: Colors.white70, fontSize: 15),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 15),
             ),
             const SizedBox(height: 12),
             Container(
@@ -443,7 +443,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+            child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -474,15 +474,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            backgroundColor: AppColors.darkCard,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)
             ),
-            title: const Text('無法刪除',
-              style: TextStyle(color: Colors.white)),
+            title: Text('無法刪除',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             content: Text(
               failure.message,
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
             ),
             actions: [
               TextButton(
@@ -656,7 +656,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
       child: Container(
         height: 600,
         decoration: BoxDecoration(
-          color: AppColors.darkBackground.withOpacity(0.9),
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
@@ -984,7 +984,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.darkBackground.withOpacity(0.5),
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),

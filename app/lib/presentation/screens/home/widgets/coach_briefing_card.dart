@@ -84,6 +84,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
   }
 
   Widget _buildContentCard(CoachBriefingState state, BriefingType type) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isMorning = type == BriefingType.morning;
     final briefing = state.briefing;
     final plan = state.plan;
@@ -147,7 +148,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
                 ),
               Icon(
                 Icons.chevron_right,
-                color: Colors.white.withValues(alpha: 0.3),
+                color: colorScheme.onSurface.withValues(alpha: 0.3),
                 size: 20,
               ),
             ],
@@ -158,7 +159,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
             Text(
               briefing.summary,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -214,13 +215,14 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
   }
 
   Widget _buildSkeletonCard() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       key: const ValueKey('skeleton'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: colorScheme.onSurface.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,7 +254,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
             builder: (_, __) => Text(
               _loadingTexts[_loadingTextIndex],
               style: TextStyle(
-                color: Colors.white.withValues(
+                color: colorScheme.onSurface.withValues(
                   alpha: 0.3 + (_shimmerController.value * 0.2),
                 ),
                 fontSize: 12,
@@ -271,7 +273,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
         width: width == double.infinity ? null : width,
         height: height,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(
+          color: Theme.of(context).colorScheme.onSurface.withValues(
             alpha: 0.04 + (_shimmerController.value * 0.04),
           ),
           borderRadius:
@@ -301,7 +303,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
             child: Text(
               '簡報載入失敗',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 13,
               ),
             ),
@@ -346,7 +348,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
             child: Text(
               isMorning ? '尚未生成今日晨報' : '尚未生成今日晚報',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 13,
               ),
             ),

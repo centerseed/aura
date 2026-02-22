@@ -9,6 +9,7 @@ import 'core/di/providers.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'presentation/providers/app_lifecycle_provider.dart';
+import 'presentation/providers/theme_provider.dart';
 import 'presentation/routes/app_router.dart';
 
 void main() async {
@@ -65,13 +66,14 @@ class ZentropyApp extends ConsumerWidget {
     ref.watch(appLifecycleProvider);
 
     final router = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Zentropy',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       locale: const Locale('zh', 'TW'),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

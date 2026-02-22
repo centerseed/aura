@@ -38,6 +38,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final taskState = ref.watch(activeTasksProvider);
     final completedTodayAsync = ref.watch(completedTodayTasksProvider);
     final dailyProgress = ref.watch(dailyProgressProvider);
@@ -50,7 +51,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           ref.read(coachBriefingProvider.notifier).loadLatest();
         },
         color: AppColors.primary,
-        backgroundColor: AppColors.githubDarkLight,
+        backgroundColor: colorScheme.surfaceContainer,
         child: CustomScrollView(
           slivers: [
             // Header with refresh indicator
@@ -74,7 +75,28 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildHeader(DailyProgress progress, {bool isRefreshing = false}) {
-    return Padding(
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: isDark
+          ? null
+          : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.brandTeal.withValues(alpha: 0.07),
+                  AppColors.brandBlue.withValues(alpha: 0.04),
+                  colorScheme.surface.withValues(alpha: 0.0),
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+            ),
+      child: Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,8 +107,11 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               Row(
                 children: [
                   ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [AppColors.brandTeal, AppColors.brandBlue],
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: isDark
+                          ? [AppColors.brandTeal, AppColors.brandBlue]
+                          : [AppColors.primaryDeep, AppColors.brandBlue],
                     ).createShader(bounds),
                     child: const Text(
                       'Zentropy',
@@ -99,12 +124,12 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   ),
                   if (isRefreshing) ...[
                     const SizedBox(width: 12),
-                    const SizedBox(
+                    SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white54,
+                        color: colorScheme.onSurface.withValues(alpha: 0.54),
                       ),
                     ),
                   ],
@@ -112,14 +137,14 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
+                  color: colorScheme.onSurface.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: colorScheme.onSurface.withValues(alpha: 0.1),
                   ),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.person_outline, color: Colors.white70),
+                  icon: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant),
                   onPressed: () => context.push('/profile'),
                 ),
               ),
@@ -130,10 +155,12 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
           _buildProgressCard(progress),
         ],
       ),
+      ),
     );
   }
 
   Widget _buildProgressCard(DailyProgress progress) {
+    final colorScheme = Theme.of(context).colorScheme;
     final percentage = progress.total > 0
         ? (progress.completed / progress.total * 100).round()
         : 0;
@@ -190,7 +217,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     Text(
                       '今日進度',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -213,7 +240,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   child: LinearProgressIndicator(
                     value: progressValue,
                     minHeight: 8,
-                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    backgroundColor: colorScheme.onSurface.withValues(alpha: 0.08),
                     valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                   ),
                 ),
@@ -234,15 +261,15 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     value: progressValue,
                     strokeWidth: 5,
                     strokeCap: StrokeCap.round,
-                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    backgroundColor: colorScheme.onSurface.withValues(alpha: 0.08),
                     valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                   ),
                 ),
                 Center(
                   child: Text(
                     '$percentage%',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -260,6 +287,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     TaskDataState taskState,
     AsyncValue<TaskDataState> completedTodayAsync,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     final coachState = ref.watch(coachBriefingProvider);
     final plan = coachState.plan;
 
@@ -307,10 +335,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
+                  Text(
                     '最近任務',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: colorScheme.onSurface,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
@@ -331,7 +359,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 child: Text(
                   '💡 生成今日計畫以獲得 AI 排序建議',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -367,6 +395,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     DailyPlan plan,
     AsyncValue<TaskDataState> completedTodayAsync,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     final todayItems = plan.items
         .where((i) => i.status == 'today' && !i.completed && !i.deferred)
         .toList();
@@ -401,10 +430,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
+                  Text(
                     '今日計畫',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: colorScheme.onSurface,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
@@ -414,7 +443,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     Text(
                       '${todayItems.length}項 · $todayMinutes分鐘',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: colorScheme.onSurface.withValues(alpha: 0.4),
                         fontSize: 12,
                       ),
                     ),
@@ -461,7 +490,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
             child: Text(
               '今日計畫已全數完成！',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: colorScheme.onSurface.withValues(alpha: 0.4),
                 fontSize: 14,
               ),
               textAlign: TextAlign.center,
@@ -478,7 +507,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 Expanded(
                   child: Container(
                     height: 1,
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: colorScheme.onSurface.withValues(alpha: 0.08),
                   ),
                 ),
                 Padding(
@@ -486,7 +515,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   child: Text(
                     '明後天代辦',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: colorScheme.onSurface.withValues(alpha: 0.35),
                       fontSize: 12,
                     ),
                   ),
@@ -494,7 +523,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 Expanded(
                   child: Container(
                     height: 1,
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: colorScheme.onSurface.withValues(alpha: 0.08),
                   ),
                 ),
               ],
@@ -560,6 +589,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildPlanItemCard(DailyPlanItem item) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isOverflow = item.status == 'overflow';
     final accentColor =
         isOverflow ? AppColors.statusArchive : AppColors.onboardingIndigo;
@@ -619,7 +649,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           Text(
                             '↳ ',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.35),
+                              color: colorScheme.onSurface.withValues(alpha: 0.35),
                               fontSize: 14,
                             ),
                           ),
@@ -629,8 +659,8 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                             item.content,
                             style: TextStyle(
                               color: item.itemType == 'subtask'
-                                  ? Colors.white.withValues(alpha: 0.65)
-                                  : Colors.white.withValues(alpha: 0.85),
+                                  ? colorScheme.onSurface.withValues(alpha: 0.65)
+                                  : colorScheme.onSurface.withValues(alpha: 0.85),
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
                             ),
@@ -649,7 +679,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                               item.taskName,
                           ].whereType<String>().join(' > '),
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
+                            color: colorScheme.onSurface.withValues(alpha: 0.3),
                             fontSize: 11,
                           ),
                         ),
@@ -663,7 +693,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               Text(
                 '${item.estimatedMinutes}分',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.35),
+                  color: colorScheme.onSurface.withValues(alpha: 0.35),
                   fontSize: 11,
                 ),
               ),
@@ -683,7 +713,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 size: 18,
                 color: isOverflow
                     ? AppColors.statusActive
-                    : Colors.white.withValues(alpha: 0.35),
+                    : colorScheme.onSurface.withValues(alpha: 0.35),
               ),
             ),
           ],
@@ -693,6 +723,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildCompletedPlanItemCard(DailyPlanItem item) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       child: Container(
@@ -718,7 +749,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           Text(
                             '↳ ',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: colorScheme.onSurface.withValues(alpha: 0.2),
                               fontSize: 14,
                             ),
                           ),
@@ -726,10 +757,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           child: Text(
                             item.content,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
+                              color: colorScheme.onSurface.withValues(alpha: 0.4),
                               fontSize: 14,
                               decoration: TextDecoration.lineThrough,
-                              decorationColor: Colors.white.withValues(alpha: 0.3),
+                              decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -743,7 +774,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                         child: Text(
                           [item.areaName, item.productName, item.taskName].whereType<String>().join(' > '),
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: colorScheme.onSurface.withValues(alpha: 0.2),
                             fontSize: 11,
                           ),
                           maxLines: 1,
@@ -798,6 +829,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildPlanSkeleton() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(
@@ -810,7 +842,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 width: 4,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: colorScheme.onSurface.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -819,7 +851,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 width: 80,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: colorScheme.onSurface.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(9),
                 ),
               ),
@@ -832,10 +864,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               margin: const EdgeInsets.only(bottom: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
+                color: colorScheme.onSurface.withValues(alpha: 0.03),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: colorScheme.onSurface.withValues(alpha: 0.06),
                 ),
               ),
               child: Row(
@@ -847,7 +879,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: colorScheme.onSurface.withValues(alpha: 0.08),
                         width: 1.5,
                       ),
                     ),
@@ -863,7 +895,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           height: 14,
                           margin: EdgeInsets.only(right: (i * 30.0 + 20) % 100),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
+                            color: colorScheme.onSurface.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(7),
                           ),
                         ),
@@ -872,7 +904,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           width: 80,
                           height: 11,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.04),
+                            color: colorScheme.onSurface.withValues(alpha: 0.04),
                             borderRadius: BorderRadius.circular(5),
                           ),
                         ),
@@ -884,7 +916,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     width: 30,
                     height: 11,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
+                      color: colorScheme.onSurface.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(5),
                     ),
                   ),
@@ -910,7 +942,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 Text(
                   '正在生成今日計畫...',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: colorScheme.onSurface.withValues(alpha: 0.4),
                     fontSize: 13,
                   ),
                 ),
@@ -952,6 +984,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildTaskCard(Task task, {bool expanded = false}) {
+    final colorScheme = Theme.of(context).colorScheme;
     final accentColor = task.isOverdue
         ? AppColors.error
         : task.isToday
@@ -972,7 +1005,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 end: Alignment.bottomRight,
                 colors: [
                   accentColor.withValues(alpha: 0.08),
-                  Colors.white.withValues(alpha: 0.03),
+                  colorScheme.onSurface.withValues(alpha: 0.03),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
@@ -1045,8 +1078,8 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                 children: [
                                   Text(
                                     task.content,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1061,7 +1094,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                           Icon(
                                             Icons.folder_outlined,
                                             size: 12,
-                                            color: Colors.white.withValues(alpha: 0.35),
+                                            color: colorScheme.onSurface.withValues(alpha: 0.35),
                                           ),
                                           const SizedBox(width: 4),
                                           Expanded(
@@ -1070,7 +1103,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                                   .whereType<String>()
                                                   .join(' > '),
                                               style: TextStyle(
-                                                color: Colors.white.withValues(alpha: 0.4),
+                                                color: colorScheme.onSurface.withValues(alpha: 0.4),
                                                 fontSize: 12,
                                               ),
                                               maxLines: 1,
@@ -1112,16 +1145,16 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.06),
+                                    color: colorScheme.onSurface.withValues(alpha: 0.06),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.1),
+                                      color: colorScheme.onSurface.withValues(alpha: 0.1),
                                     ),
                                   ),
                                   child: Text(
                                     '未排程',
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.35),
+                                      color: colorScheme.onSurface.withValues(alpha: 0.35),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1147,6 +1180,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildSubItems(Task task) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 12, left: 34),
       child: Container(
@@ -1154,7 +1188,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -1189,7 +1223,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                             border: Border.all(
                               color: isCompleted
                                   ? AppColors.accentEmerald
-                                  : Colors.white.withValues(alpha: 0.2),
+                                  : colorScheme.onSurface.withValues(alpha: 0.2),
                               width: 1.5,
                             ),
                           ),
@@ -1212,12 +1246,12 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
                         color: isCompleted
-                            ? Colors.white.withValues(alpha: 0.35)
-                            : Colors.white.withValues(alpha: 0.8),
+                            ? colorScheme.onSurface.withValues(alpha: 0.35)
+                            : colorScheme.onSurface.withValues(alpha: 0.8),
                         fontSize: 14,
                         decoration:
                             isCompleted ? TextDecoration.lineThrough : null,
-                        decorationColor: Colors.white.withValues(alpha: 0.3),
+                        decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
                       ),
                       child: Text(subItem.content),
                     ),
@@ -1268,6 +1302,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildCompletedTaskCard(Task task) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Container(
@@ -1288,10 +1323,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               child: Text(
                 task.content,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: colorScheme.onSurface.withValues(alpha: 0.4),
                   fontSize: 14,
                   decoration: TextDecoration.lineThrough,
-                  decorationColor: Colors.white.withValues(alpha: 0.3),
+                  decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1304,6 +1339,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
   }
 
   Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(48.0),
@@ -1331,7 +1367,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
             Text(
               '太棒了！沒有待辦事項',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 16,
               ),
             ),
@@ -1355,7 +1391,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
             const SizedBox(height: 16),
             Text(
               message,
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -1383,9 +1419,9 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2530),
-        title: const Text('完成項目', style: TextStyle(color: Colors.white)),
-        content: Text(item.content, style: const TextStyle(color: Colors.white70)),
+        backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+        title: Text('完成項目', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface)),
+        content: Text(item.content, style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1437,24 +1473,24 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Text(
+        title: Text(
           '完成任務',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600),
         ),
         content: Text(
           '確定要完成「${task.content}」嗎？',
-          style: const TextStyle(color: Colors.white70, fontSize: 15),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 15),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
+            child: Text(
               '取消',
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54)),
             ),
           ),
           TextButton(
@@ -1573,16 +1609,16 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         title: Text(
           newCompleted ? '完成子任務' : '取消完成',
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
-        content: Text(confirmMessage, style: const TextStyle(color: Colors.white70)),
+        content: Text(confirmMessage, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+            child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54))),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),

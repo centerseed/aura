@@ -395,7 +395,7 @@ export function DashboardModals({
           {/* Modal */}
           <Card className="relative w-full max-w-lg mx-4 bg-slate-900 border-white/10 shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-indigo-900/30 to-indigo-900/30">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-blue-900/30 to-blue-900/30">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-cta flex items-center justify-center">
                   <Target className="w-5 h-5 text-white" />
@@ -430,8 +430,8 @@ export function DashboardModals({
 
               {/* 箭頭 */}
               <div className="flex justify-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                  <ChevronDown className="w-5 h-5 text-indigo-400" />
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <ChevronDown className="w-5 h-5 text-blue-400" />
                 </div>
               </div>
 
@@ -444,7 +444,7 @@ export function DashboardModals({
                     {pendingMerge.targetTask.tag.area} → {pendingMerge.targetTask.tag.product}
                   </p>
                   {pendingMerge.targetTask.sub_items && pendingMerge.targetTask.sub_items.length > 0 && (
-                    <p className="text-xs text-indigo-400 mt-2">
+                    <p className="text-xs text-blue-400 mt-2">
                       目前有 {pendingMerge.targetTask.sub_items.length} 個待辦事項
                     </p>
                   )}

@@ -8,22 +8,52 @@ import 'app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get light => ThemeData(
-    colorScheme: ColorScheme.fromSeed(
+  static ThemeData get light {
+    final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       brightness: Brightness.light,
-    ),
-    useMaterial3: true,
-  );
+    );
+    return ThemeData(
+      colorScheme: colorScheme,
+      useMaterial3: true,
+      scaffoldBackgroundColor: colorScheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: colorScheme.surfaceContainer,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
 
-  static ThemeData get dark => ThemeData(
-    colorScheme: ColorScheme.fromSeed(
+  static ThemeData get dark {
+    final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       brightness: Brightness.dark,
     ).copyWith(
       surface: AppColors.darkBackground,
       surfaceContainerHighest: AppColors.darkCard,
-    ),
-    useMaterial3: true,
-  );
+      surfaceContainer: AppColors.githubDarkLight,
+      surfaceContainerLow: AppColors.githubDark,
+    );
+    return ThemeData(
+      colorScheme: colorScheme,
+      useMaterial3: true,
+      scaffoldBackgroundColor: AppColors.githubDark,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: AppColors.githubDarkLight,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: Colors.white.withValues(alpha: 0.5),
+      ),
+    );
+  }
 }

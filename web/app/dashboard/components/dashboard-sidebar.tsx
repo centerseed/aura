@@ -84,7 +84,7 @@ export function DashboardSidebar({
             onClick={() => onSelectArea(null)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
               selectedArea === null
-                ? 'bg-indigo-500/20 text-indigo-300'
+                ? 'bg-blue-500/20 text-blue-300'
                 : 'hover:bg-white/10 text-white/60'
             }`}
           >
@@ -115,7 +115,7 @@ export function DashboardSidebar({
                     }}
                     className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                       selectedArea === area.name
-                        ? 'bg-indigo-500/20 text-indigo-300'
+                        ? 'bg-blue-500/20 text-blue-300'
                         : 'hover:bg-white/10 text-white/60'
                     }`}
                   >

@@ -21,7 +21,8 @@ class StatisticsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayColor = color ?? Colors.white.withOpacity(0.7);
+    final colorScheme = Theme.of(context).colorScheme;
+    final displayColor = color ?? colorScheme.onSurfaceVariant;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
@@ -50,7 +51,7 @@ class StatisticsCard extends StatelessWidget {
               Text(
                 '$value',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: colorScheme.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -60,7 +61,7 @@ class StatisticsCard extends StatelessWidget {
                 Text(
                   suffix!,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: colorScheme.onSurface.withOpacity(0.6),
                     fontSize: 10,
                   ),
                 ),
@@ -76,7 +77,7 @@ class StatisticsCard extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: colorScheme.onSurface.withOpacity(0.7),
               fontSize: 10,
             ),
             maxLines: 1,

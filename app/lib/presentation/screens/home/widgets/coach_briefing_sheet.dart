@@ -13,17 +13,19 @@ class CoachBriefingSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final state = ref.watch(coachBriefingProvider);
     final briefingType = ref.watch(currentBriefingTypeProvider);
     final isMorning = briefingType == BriefingType.morning;
+    final onSurface = colorScheme.onSurface;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.purpleTinted,
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -34,7 +36,7 @@ class CoachBriefingSheet extends ConsumerWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -51,25 +53,25 @@ class CoachBriefingSheet extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       isMorning ? '今日晨報' : '今日晚報',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: onSurface,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   if (state.isGenerating)
-                    const SizedBox(
+                    SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white54,
+                        color: onSurface.withValues(alpha: 0.5),
                       ),
                     )
                   else
                     IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.white54),
+                      icon: Icon(Icons.refresh, color: onSurface.withValues(alpha: 0.5)),
                       onPressed: () {
                         ref
                             .read(coachBriefingProvider.notifier)
@@ -83,7 +85,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                 ],
               ),
             ),
-            const Divider(color: Colors.white12, height: 1),
+            Divider(color: onSurface.withValues(alpha: 0.12), height: 1),
             // Content
             Expanded(
               child: ListView(
@@ -91,52 +93,50 @@ class CoachBriefingSheet extends ConsumerWidget {
                 padding: const EdgeInsets.all(20),
                 children: [
                   if (state.briefing != null) ...[
-                    _buildSummarySection(state.briefing!),
+                    _buildSummarySection(onSurface, state.briefing!),
                     const SizedBox(height: 20),
                   ],
                   if (isMorning) ...[
-                    // 晨報：完整計畫 + 詳情
                     if (state.plan != null) ...[
-                      _buildPlanSection(context, ref, state.plan!),
+                      _buildPlanSection(context, ref, state.plan!, onSurface),
                       const SizedBox(height: 20),
                     ],
                     if (state.briefing != null) ...[
                       if (state.briefing!.calendarEvents.isNotEmpty) ...[
-                        _buildCalendarSection(state.briefing!),
+                        _buildCalendarSection(onSurface, state.briefing!),
                         const SizedBox(height: 20),
                       ],
                       if (state.briefing!.overdueTasks.isNotEmpty) ...[
-                        _buildOverdueSection(state.briefing!),
+                        _buildOverdueSection(onSurface, state.briefing!),
                         const SizedBox(height: 20),
                       ],
                       if (state.briefing!.conflicts.isNotEmpty) ...[
-                        _buildConflictSection(state.briefing!),
+                        _buildConflictSection(onSurface, state.briefing!),
                         const SizedBox(height: 20),
                       ],
                       if (state.briefing!.recommendations.isNotEmpty) ...[
-                        _buildRecommendationsSection(state.briefing!),
+                        _buildRecommendationsSection(onSurface, state.briefing!),
                         const SizedBox(height: 20),
                       ],
                     ],
                   ] else ...[
-                    // 晚報：只顯示已完成 + 延後建議
                     if (state.plan != null) ...[
-                      _buildEveningCompletedPlanSection(state.plan!),
+                      _buildEveningCompletedPlanSection(onSurface, state.plan!),
                       const SizedBox(height: 20),
                     ],
                     if (state.briefing != null &&
                         state.briefing!.completedTasks.isNotEmpty) ...[
-                      _buildCompletedSection(state.briefing!),
+                      _buildCompletedSection(onSurface, state.briefing!),
                       const SizedBox(height: 20),
                     ],
                     if (state.briefing != null &&
                         state.briefing!.deferSuggestions.isNotEmpty) ...[
-                      _buildDeferSection(ref, state.briefing!),
+                      _buildDeferSection(onSurface, ref, state.briefing!),
                       const SizedBox(height: 20),
                     ],
                   ],
                   if (!state.hasData && !state.isLoading)
-                    _buildGeneratePrompt(ref, isMorning),
+                    _buildGeneratePrompt(onSurface, ref, isMorning),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -164,7 +164,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummarySection(CoachBriefing briefing) {
+  Widget _buildSummarySection(Color onSurface, CoachBriefing briefing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -182,7 +182,7 @@ class CoachBriefingSheet extends ConsumerWidget {
           child: Text(
             briefing.summary,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
+              color: onSurface.withValues(alpha: 0.8),
               fontSize: 14,
               height: 1.5,
             ),
@@ -196,6 +196,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     DailyPlan plan,
+    Color onSurface,
   ) {
     final todayItems = plan.items
         .where((i) => i.status == 'today' && !i.completed && !i.deferred)
@@ -217,7 +218,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                 child: Text(
                   plan.coachMessage!,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: onSurface.withValues(alpha: 0.4),
                     fontSize: 11,
                   ),
                   maxLines: 1,
@@ -251,7 +252,7 @@ class CoachBriefingSheet extends ConsumerWidget {
         ],
         const SizedBox(height: 12),
         // Today 項目
-        ...todayItems.map((item) => _buildPlanItem(ref, item)),
+        ...todayItems.map((item) => _buildPlanItem(ref, item, onSurface)),
         // Overflow 項目（分隔顯示）
         if (overflowItems.isNotEmpty) ...[
           Padding(
@@ -264,7 +265,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.1),
+                          color: onSurface.withValues(alpha: 0.1),
                           width: 1,
                           style: BorderStyle.solid,
                         ),
@@ -277,7 +278,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                   child: Text(
                     '明後天代辦',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: onSurface.withValues(alpha: 0.35),
                       fontSize: 12,
                     ),
                   ),
@@ -285,13 +286,13 @@ class CoachBriefingSheet extends ConsumerWidget {
                 Expanded(
                   child: Container(
                     height: 1,
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: onSurface.withValues(alpha: 0.1),
                   ),
                 ),
               ],
             ),
           ),
-          ...overflowItems.map((item) => _buildPlanItem(ref, item)),
+          ...overflowItems.map((item) => _buildPlanItem(ref, item, onSurface)),
         ],
         // 已完成項目
         if (completedItems.isNotEmpty) ...[
@@ -300,12 +301,12 @@ class CoachBriefingSheet extends ConsumerWidget {
             child: Text(
               '已完成 (${completedItems.length})',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.35),
+                color: onSurface.withValues(alpha: 0.35),
                 fontSize: 12,
               ),
             ),
           ),
-          ...completedItems.map((item) => _buildPlanItem(ref, item)),
+          ...completedItems.map((item) => _buildPlanItem(ref, item, onSurface)),
         ],
       ],
     );
@@ -325,7 +326,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildPlanItem(WidgetRef ref, DailyPlanItem item) {
+  Widget _buildPlanItem(WidgetRef ref, DailyPlanItem item, Color onSurface) {
     final isCompleted = item.completed;
     final isDeferred = item.deferred;
     final accentColor = isCompleted
@@ -364,7 +365,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                   border: Border.all(
                     color: isCompleted
                         ? AppColors.accentEmerald
-                        : Colors.white.withValues(alpha: 0.2),
+                        : onSurface.withValues(alpha: 0.2),
                     width: 1.5,
                   ),
                 ),
@@ -383,11 +384,11 @@ class CoachBriefingSheet extends ConsumerWidget {
                     item.content,
                     style: TextStyle(
                       color: isCompleted
-                          ? Colors.white.withValues(alpha: 0.35)
-                          : Colors.white.withValues(alpha: 0.85),
+                          ? onSurface.withValues(alpha: 0.35)
+                          : onSurface.withValues(alpha: 0.85),
                       fontSize: 14,
                       decoration: isCompleted ? TextDecoration.lineThrough : null,
-                      decorationColor: Colors.white.withValues(alpha: 0.3),
+                      decorationColor: onSurface.withValues(alpha: 0.3),
                     ),
                   ),
                   if (item.areaName != null || item.productName != null)
@@ -398,7 +399,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                             .whereType<String>()
                             .join(' > '),
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: onSurface.withValues(alpha: 0.3),
                           fontSize: 11,
                         ),
                       ),
@@ -411,7 +412,7 @@ class CoachBriefingSheet extends ConsumerWidget {
               Text(
                 '${item.estimatedMinutes}分',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.35),
+                  color: onSurface.withValues(alpha: 0.35),
                   fontSize: 11,
                 ),
               ),
@@ -431,7 +432,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                   size: 16,
                   color: item.pinned
                       ? AppColors.statusInbox
-                      : Colors.white.withValues(alpha: 0.2),
+                      : onSurface.withValues(alpha: 0.2),
                 ),
               ),
             ],
@@ -441,7 +442,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildEveningCompletedPlanSection(DailyPlan plan) {
+  Widget _buildEveningCompletedPlanSection(Color onSurface, DailyPlan plan) {
     final completedItems =
         plan.items.where((i) => i.completed && i.status == 'today').toList();
 
@@ -482,10 +483,10 @@ class CoachBriefingSheet extends ConsumerWidget {
                       child: Text(
                         item.content,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: onSurface.withValues(alpha: 0.6),
                           fontSize: 13,
                           decoration: TextDecoration.lineThrough,
-                          decorationColor: Colors.white.withValues(alpha: 0.3),
+                          decorationColor: onSurface.withValues(alpha: 0.3),
                         ),
                       ),
                     ),
@@ -493,7 +494,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                       Text(
                         '${item.estimatedMinutes}分',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: onSurface.withValues(alpha: 0.3),
                           fontSize: 11,
                         ),
                       ),
@@ -505,7 +506,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildCalendarSection(CoachBriefing briefing) {
+  Widget _buildCalendarSection(Color onSurface, CoachBriefing briefing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -538,14 +539,14 @@ class CoachBriefingSheet extends ConsumerWidget {
                           Text(
                             event.summary,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
+                              color: onSurface.withValues(alpha: 0.8),
                               fontSize: 13,
                             ),
                           ),
                           Text(
                             _formatEventTime(event),
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
+                              color: onSurface.withValues(alpha: 0.4),
                               fontSize: 11,
                             ),
                           ),
@@ -577,7 +578,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     }
   }
 
-  Widget _buildOverdueSection(CoachBriefing briefing) {
+  Widget _buildOverdueSection(Color onSurface, CoachBriefing briefing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -586,13 +587,14 @@ class CoachBriefingSheet extends ConsumerWidget {
         ...briefing.overdueTasks.map((task) => _buildTaskSummaryTile(
               task,
               AppColors.error,
+              onSurface: onSurface,
               suffix: task.daysOverdue != null ? '逾期 ${task.daysOverdue} 天' : null,
             )),
       ],
     );
   }
 
-  Widget _buildConflictSection(CoachBriefing briefing) {
+  Widget _buildConflictSection(Color onSurface, CoachBriefing briefing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -613,7 +615,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                 child: Text(
                   conflict.description,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: onSurface.withValues(alpha: 0.7),
                     fontSize: 13,
                   ),
                 ),
@@ -623,7 +625,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecommendationsSection(CoachBriefing briefing) {
+  Widget _buildRecommendationsSection(Color onSurface, CoachBriefing briefing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -647,7 +649,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     Text(
                       rec.action,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: onSurface.withValues(alpha: 0.85),
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -657,7 +659,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                       Text(
                         rec.reasoning,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.45),
+                          color: onSurface.withValues(alpha: 0.45),
                           fontSize: 12,
                         ),
                       ),
@@ -670,7 +672,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildCompletedSection(CoachBriefing briefing) {
+  Widget _buildCompletedSection(Color onSurface, CoachBriefing briefing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -680,13 +682,14 @@ class CoachBriefingSheet extends ConsumerWidget {
         ...briefing.completedTasks.map((task) => _buildTaskSummaryTile(
               task,
               AppColors.success,
+              onSurface: onSurface,
               isCompleted: true,
             )),
       ],
     );
   }
 
-  Widget _buildDeferSection(WidgetRef ref, CoachBriefing briefing) {
+  Widget _buildDeferSection(Color onSurface, WidgetRef ref, CoachBriefing briefing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -710,7 +713,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     Text(
                       suggestion.taskContent,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: onSurface.withValues(alpha: 0.7),
                         fontSize: 13,
                       ),
                     ),
@@ -718,7 +721,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     Text(
                       suggestion.reasoning,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: onSurface.withValues(alpha: 0.4),
                         fontSize: 12,
                       ),
                     ),
@@ -733,6 +736,7 @@ class CoachBriefingSheet extends ConsumerWidget {
   Widget _buildTaskSummaryTile(
     TaskSummary task,
     Color color, {
+    required Color onSurface,
     String? suffix,
     bool isCompleted = false,
   }) {
@@ -758,8 +762,8 @@ class CoachBriefingSheet extends ConsumerWidget {
                     task.content,
                     style: TextStyle(
                       color: isCompleted
-                          ? Colors.white.withValues(alpha: 0.4)
-                          : Colors.white.withValues(alpha: 0.8),
+                          ? onSurface.withValues(alpha: 0.4)
+                          : onSurface.withValues(alpha: 0.8),
                       fontSize: 13,
                       decoration:
                           isCompleted ? TextDecoration.lineThrough : null,
@@ -771,7 +775,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                           .whereType<String>()
                           .join(' > '),
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: onSurface.withValues(alpha: 0.3),
                         fontSize: 11,
                       ),
                     ),
@@ -789,7 +793,7 @@ class CoachBriefingSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildGeneratePrompt(WidgetRef ref, bool isMorning) {
+  Widget _buildGeneratePrompt(Color onSurface, WidgetRef ref, bool isMorning) {
     final accentColor =
         isMorning ? AppColors.statusInbox : AppColors.statusMaintain;
 
@@ -805,7 +809,7 @@ class CoachBriefingSheet extends ConsumerWidget {
           Text(
             isMorning ? '尚未生成今日晨報' : '尚未生成今日晚報',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: onSurface.withValues(alpha: 0.5),
               fontSize: 16,
             ),
           ),

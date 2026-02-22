@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, Loader2, LogIn, Zap, RefreshCw, BookOpen, Sparkles, Check, ListTodo, Wand2, Sun, Moon } from "lucide-react";
+import { ArrowRight, Loader2, LogIn, Zap, RefreshCw, BookOpen, Sparkles, Check, ListTodo, Wand2, Sun, Moon, Calendar } from "lucide-react";
 import { auth, googleProvider, appleProvider, signInWithPopup, signInAnonymously } from "@/lib/firebase";
 
 export default function HomeDemo() {
@@ -162,6 +162,22 @@ export default function HomeDemo() {
           { title: "產品 A-UI", tasks: 5 }
         ],
         mergedCard: { title: "產品 A", tasks: 13, subtitle: "Product" }
+      }
+    },
+    {
+      id: 3,
+      name: "Coach 晨報",
+      icon: Calendar,
+      scenario: {
+        input: "早上 8:30，Zentropy 自動發送今日簡報",
+        category: "Briefing",
+        icon: Calendar,
+        color: "emerald",
+        briefingItems: [
+          { type: "conflict", text: "⚠️ 下午 2 點有衝突：投資人會議 vs. 產品 Demo" },
+          { type: "stagnant", text: "🔴 「財務規劃」已停滯 5 天，需關注" },
+          { type: "priority", text: "✅ 今日 Top 3：準備簡報、回覆 Alice、更新 roadmap" }
+        ]
       }
     }
   ];
@@ -478,7 +494,7 @@ export default function HomeDemo() {
                   {/* AI 處理結果 */}
                   <div className="space-y-4">
                     <div className={`text-xs uppercase tracking-wider ${theme.textMutedDarker} font-semibold mb-3 text-center`}>
-                      ⚡ {activeDemoTab === 0 ? "AI 瞬間分類" : activeDemoTab === 1 ? "AI 智能拆解" : "AI 重組建議"}
+                      ⚡ {activeDemoTab === 0 ? "AI 瞬間分類" : activeDemoTab === 1 ? "AI 智能拆解" : activeDemoTab === 2 ? "AI 重組建議" : "Coach 今日簡報"}
                     </div>
                     {(() => {
                       const scenario = currentScenario;
@@ -532,7 +548,8 @@ export default function HomeDemo() {
                         Maintain: "🔄 維護 Maintain",
                         Reference: "📚 參考 Reference",
                         TodoList: "✅ 待辦清單",
-                        Reorganize: "🔄 智能重組"
+                        Reorganize: "🔄 智能重組",
+                        Briefing: "📅 Coach 晨報"
                       };
 
                       // Tab 0: 自動分類 - 顯示分類卡片
@@ -768,6 +785,33 @@ export default function HomeDemo() {
                         }
                       }
 
+                      // Tab 3: Coach 晨報 - 顯示晨報項目
+                      if (activeDemoTab === 3 && 'briefingItems' in scenario) {
+                        const items = (scenario as any).briefingItems;
+                        return (
+                          <div className={`space-y-3 p-6 rounded-2xl border-2 ${colors.border} bg-gradient-to-br ${colors.bg} to-transparent shadow-xl ${colors.shadow}`}>
+                            <div className={`flex items-center gap-2 mb-4`}>
+                              <ActiveIcon className={`w-5 h-5 ${colors.iconText}`} />
+                              <span className={`text-sm font-bold ${colors.text}`}>今日晨報 · 08:30</span>
+                            </div>
+                            {items.map((item: any, i: number) => (
+                              <div
+                                key={i}
+                                className={`p-3 rounded-lg border ${
+                                  item.type === "conflict"
+                                    ? isDark ? "bg-amber-500/10 border-amber-500/30" : "bg-amber-50 border-amber-300"
+                                    : item.type === "stagnant"
+                                      ? isDark ? "bg-red-500/10 border-red-500/30" : "bg-red-50 border-red-300"
+                                      : isDark ? "bg-emerald-500/10 border-emerald-500/30" : "bg-emerald-50 border-emerald-300"
+                                }`}
+                              >
+                                <div className={`text-sm ${theme.text}`}>{item.text}</div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+
                       return null;
                     })()}
                   </div>
@@ -785,6 +829,9 @@ export default function HomeDemo() {
                     {activeDemoTab === 2 && (
                       <>🔄 <strong>發現重複標籤、合併相似專案、優化分類邏輯</strong> — 讓系統越用越聰明</>
                     )}
+                    {activeDemoTab === 3 && (
+                      <>📅 <strong>每日 8:30 自動分析全局、偵測衝突、標記停滯</strong> — 不是你管系統，是系統幫你管全局</>
+                    )}
                   </p>
                 </div>
               </div>
@@ -797,7 +844,7 @@ export default function HomeDemo() {
               { icon: "🎯", text: "不再遺漏", desc: "全追蹤" },
               { icon: "⚡", text: "省 80% 時間", desc: "自動分類" },
               { icon: "🔍", text: "優先級清晰", desc: "一目瞭然" },
-              { icon: "🧠", text: "決策有依據", desc: "智能關聯" }
+              { icon: "📅", text: "主動提醒", desc: "每日晨報" }
             ].map((item, i) => (
               <div
                 key={i}
@@ -948,6 +995,69 @@ export default function HomeDemo() {
             {/* 分隔線 */}
             <div className={`h-px bg-gradient-to-r from-transparent ${isDark ? "via-emerald-500/20" : "via-emerald-400/30"} to-transparent`} />
 
+            {/* AI 主動治理 Section */}
+            <div className="space-y-12">
+              <div className="text-center space-y-4">
+                <div className={`text-xs uppercase tracking-widest ${isDark ? "text-emerald-400" : "text-emerald-600"} font-semibold`}>AI 主動治理</div>
+                <h2 className={`text-4xl md:text-5xl font-bold ${theme.text} leading-tight`}>不是你管 Zentropy</h2>
+                <p className={`${theme.textMuted} max-w-2xl mx-auto text-lg`}>
+                  是 Zentropy 幫你管全局 — 主動偵測、主動預警、主動提醒
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                {[
+                  {
+                    icon: "🌅",
+                    title: "每日晨報",
+                    subtitle: "08:30 自動啟動",
+                    desc: "每天早上自動分析全局，給出今日優先事項、逾期任務、行程摘要，讓你清醒就掌握全局。",
+                    color: isDark ? "border-emerald-500/40" : "border-emerald-400",
+                    bgGradient: isDark ? "from-emerald-500/10 to-transparent" : "from-emerald-50 to-white",
+                    textColor: isDark ? "text-emerald-400" : "text-emerald-700"
+                  },
+                  {
+                    icon: "⚡",
+                    title: "衝突偵測",
+                    subtitle: "跨 Area 預警",
+                    desc: "自動掃描跨領域的時間衝突和資源競爭，在問題發生前提前預警，避免手忙腳亂。",
+                    color: isDark ? "border-amber-500/40" : "border-amber-400",
+                    bgGradient: isDark ? "from-amber-500/10 to-transparent" : "from-amber-50 to-white",
+                    textColor: isDark ? "text-amber-400" : "text-amber-700"
+                  },
+                  {
+                    icon: "🔍",
+                    title: "停滯警示",
+                    subtitle: "不讓任何事掉落",
+                    desc: "追蹤哪些專案超過 N 天沒有進展，在晨報中主動提醒，確保重要事項不在忙碌中被遺忘。",
+                    color: isDark ? "border-red-500/40" : "border-red-400",
+                    bgGradient: isDark ? "from-red-500/10 to-transparent" : "from-red-50 to-white",
+                    textColor: isDark ? "text-red-400" : "text-red-700"
+                  }
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className={`group relative p-8 rounded-2xl transition-all hover:scale-105 hover:shadow-2xl ${isDark ? `border-2 ${item.color} bg-gradient-to-br ${item.bgGradient}` : ""}`}
+                    style={isDark ? {} : {
+                      background: "#fff",
+                      border: `2px solid ${i === 0 ? "#34d399" : i === 1 ? "#fbbf24" : "#f87171"}`,
+                      boxShadow: "0 8px 30px -8px rgba(0,0,0,0.06)"
+                    }}
+                  >
+                    <div className="text-4xl mb-5 group-hover:scale-110 transition-transform">{item.icon}</div>
+                    <div className="space-y-2 mb-4">
+                      <h3 className={`text-xl font-bold ${theme.text}`}>{item.title}</h3>
+                      <p className={`text-sm font-medium ${item.textColor}`}>{item.subtitle}</p>
+                    </div>
+                    <p className={`text-sm ${theme.textMuted} leading-relaxed`}>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 第二條分隔線 */}
+            <div className={`h-px bg-gradient-to-r from-transparent ${isDark ? "via-emerald-500/20" : "via-emerald-400/30"} to-transparent`} />
+
             {/* 定價與計畫 */}
             <div className="space-y-12">
               <div className="text-center space-y-4">
@@ -982,7 +1092,7 @@ export default function HomeDemo() {
                       "多 Area 管理",
                       "Coach 晨晚報",
                       "衝突偵測與停滯警示",
-                      "語音/圖片輸入（M2，即將推出）"
+                      "語音/圖片輸入"
                     ],
                     cta: "限時免費"
                   },

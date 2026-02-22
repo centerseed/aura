@@ -71,6 +71,8 @@ export interface CreateSubItemDTO {
 export interface UpdateSubItemDTO {
   content?: string
   completed?: boolean
+  due_date?: string | null
+  start_date?: string | null
 }
 
 /**

@@ -8,6 +8,8 @@
 
 import { useCallback } from 'react'
 import { API } from '@/lib/api-client'
+import { toDateOnlyISOString } from '@/lib/date-utils'
+import type { UpdateSubItemDTO } from '@/infrastructure/api/tasks.api'
 import type { DrawerStatus, TaskCard } from '@/types'
 import type { ApiArea } from '../context/types'
 
@@ -184,9 +186,15 @@ export function useTaskOperations({
    * 編輯子項目
    */
   const handleSubItemEdit = useCallback(
-    async (taskId: string, subItemId: string, content: string) => {
+    async (
+      taskId: string,
+      subItemId: string,
+      updates: string | { content?: string; start_date?: string | null; due_date?: string | null }
+    ) => {
       try {
-        await API.tasks.subItems.update(taskId, subItemId, { content })
+        const data: UpdateSubItemDTO =
+          typeof updates === 'string' ? { content: updates } : updates
+        await API.tasks.subItems.update(taskId, subItemId, data)
 
         setAreas((prev) =>
           prev.map((area) => ({
@@ -198,7 +206,27 @@ export function useTaskOperations({
                   ? {
                       ...task,
                       sub_items: task.sub_items?.map((item) =>
-                        item.id === subItemId ? { ...item, content } : item
+                        item.id === subItemId
+                          ? {
+                              ...item,
+                              content:
+                                typeof updates === 'string'
+                                  ? updates
+                                  : (updates.content ?? item.content),
+                              due_date:
+                                typeof updates !== 'string'
+                                  ? updates.due_date !== undefined
+                                    ? updates.due_date
+                                    : item.due_date
+                                  : item.due_date,
+                              start_date:
+                                typeof updates !== 'string'
+                                  ? updates.start_date !== undefined
+                                    ? updates.start_date
+                                    : item.start_date
+                                  : item.start_date,
+                            }
+                          : item
                       ),
                     }
                   : task
@@ -298,10 +326,10 @@ export function useTaskOperations({
       try {
         const body: Record<string, string | null> = {}
         if (dueDate !== undefined) {
-          body.due_date = dueDate ? dueDate.toISOString() : null
+          body.due_date = dueDate ? toDateOnlyISOString(dueDate) : null
         }
         if (startDate !== undefined) {
-          body.start_date = startDate ? startDate.toISOString() : null
+          body.start_date = startDate ? toDateOnlyISOString(startDate) : null
         }
 
         await API.tasks.update(taskId, body)
@@ -315,8 +343,8 @@ export function useTaskOperations({
                 task.id === taskId
                   ? {
                       ...task,
-                      due_date: dueDate ? dueDate.toISOString() : null,
-                      start_date: startDate !== undefined ? (startDate ? startDate.toISOString() : null) : task.start_date,
+                      due_date: dueDate ? toDateOnlyISOString(dueDate) : null,
+                      start_date: startDate !== undefined ? (startDate ? toDateOnlyISOString(startDate) : null) : task.start_date,
                     }
                   : task
               ),

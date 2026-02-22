@@ -130,7 +130,7 @@ export function DroppableProduct({
         rounded-xl border-2 transition-all duration-200
         ${isDragging ? 'opacity-50 scale-105' : ''}
         ${isOver
-          ? 'border-indigo-500 bg-indigo-500/20 ring-2 ring-indigo-500/50 scale-[1.02]'
+          ? 'border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/50 scale-[1.02]'
           : 'border-white/10 bg-white/5 backdrop-blur-sm'
         }
       `}
@@ -152,7 +152,7 @@ export function DroppableProduct({
                   name: productName,
                 })
               }}
-              className="font-medium text-white flex-1 truncate text-left hover:text-indigo-300 transition-colors"
+              className="font-medium text-white flex-1 truncate text-left hover:text-blue-300 transition-colors"
               title="點擊查看專案任務"
             >
               {productName}
@@ -188,15 +188,15 @@ export function DroppableProduct({
                 disabled={isReorganizing}
                 className={`p-1.5 rounded-md border transition-all ${
                   isReorganizing
-                    ? 'bg-indigo-500/30 border-indigo-400/50 cursor-wait'
-                    : 'bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20 hover:border-indigo-400/50'
+                    ? 'bg-blue-500/30 border-blue-400/50 cursor-wait'
+                    : 'bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 hover:border-blue-400/50'
                 }`}
                 title={isReorganizing ? 'AI 分析中...' : 'AI 自動整理 Topics 與時間'}
               >
                 {isReorganizing ? (
-                  <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                 )}
               </button>
             )}
@@ -217,10 +217,10 @@ export function DroppableProduct({
                 <button
                   key={milestone.id}
                   onClick={() => onEditMilestone(milestone)}
-                  className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors"
+                  className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
                   title={`點擊編輯「${milestone.name}」`}
                 >
-                  <Target className="w-3 h-3 text-indigo-400 shrink-0" />
+                  <Target className="w-3 h-3 text-blue-400 shrink-0" />
                   <span className="text-xs text-white/70 max-w-[120px] truncate">
                     {milestone.name}
                   </span>
@@ -230,7 +230,7 @@ export function DroppableProduct({
                         ? 'text-red-400'
                         : isUrgent
                         ? 'text-orange-400'
-                        : 'text-indigo-300'
+                        : 'text-blue-300'
                     }`}
                   >
                     {isOverdue
@@ -244,11 +244,11 @@ export function DroppableProduct({
             {/* 新增里程碑按鈕 */}
             <button
               onClick={() => onEditMilestone({ entity_type: 'PRODUCT', entity_id: productId })}
-              className="flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/10 transition-colors group"
+              className="flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-blue-400/50 hover:bg-blue-500/10 transition-colors group"
               title="新增里程碑"
             >
-              <Plus className="w-3 h-3 text-white/40 group-hover:text-indigo-400 transition-colors" />
-              <span className="text-xs text-white/40 group-hover:text-indigo-300 transition-colors">新增</span>
+              <Plus className="w-3 h-3 text-white/40 group-hover:text-blue-400 transition-colors" />
+              <span className="text-xs text-white/40 group-hover:text-blue-300 transition-colors">新增</span>
             </button>
           </div>
         )}
@@ -258,11 +258,11 @@ export function DroppableProduct({
           <div className="px-4 pb-2">
             <button
               onClick={() => onEditMilestone({ entity_type: 'PRODUCT', entity_id: productId })}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/10 transition-colors w-full justify-center group"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-blue-400/50 hover:bg-blue-500/10 transition-colors w-full justify-center group"
               title="設定第一個里程碑"
             >
-              <Target className="w-3 h-3 text-white/30 group-hover:text-indigo-400 transition-colors" />
-              <span className="text-xs text-white/40 group-hover:text-indigo-300 transition-colors">設定里程碑</span>
+              <Target className="w-3 h-3 text-white/30 group-hover:text-blue-400 transition-colors" />
+              <span className="text-xs text-white/40 group-hover:text-blue-300 transition-colors">設定里程碑</span>
             </button>
           </div>
         )}

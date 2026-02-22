@@ -232,9 +232,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppColors.primary,
-              surface: AppColors.darkBackground,
+              surface: Theme.of(context).colorScheme.surface,
             ),
           ),
           child: child!,
@@ -258,9 +258,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFFFFB020),
-              surface: AppColors.darkBackground,
+            colorScheme: ColorScheme.dark(
+              primary: const Color(0xFFFFB020),
+              surface: Theme.of(context).colorScheme.surface,
             ),
           ),
           child: child!,
@@ -277,9 +277,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         builder: (context, child) {
           return Theme(
             data: ThemeData.dark().copyWith(
-              colorScheme: const ColorScheme.dark(
-                primary: Color(0xFFFFB020),
-                surface: AppColors.darkBackground,
+              colorScheme: ColorScheme.dark(
+                primary: const Color(0xFFFFB020),
+                surface: Theme.of(context).colorScheme.surface,
               ),
             ),
             child: child!,
@@ -317,24 +317,27 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final confirmMessage = newCompleted ? '確定要標記為完成？' : '確定要取消完成？';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+        backgroundColor: cs.surfaceContainerHighest,
         title: Text(
           newCompleted ? '完成子任務' : '取消完成',
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: cs.onSurface),
         ),
-        content: Text(confirmMessage, style: const TextStyle(color: Colors.white70)),
+        content: Text(confirmMessage, style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7))),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+            child: Text('取消', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.54))),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('確定', style: TextStyle(color: AppColors.primary)),
           ),
         ],
-      ),
+      );
+      },
     );
     if (confirmed != true) return;
 
@@ -481,10 +484,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   Future<void> _handlePromoteSubItem(String subItemId) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
-        title: const Text('升級為獨立任務', style: TextStyle(color: Colors.white)),
-        content: const Text('確定要將此待辦項目升級為獨立任務嗎？', style: TextStyle(color: Colors.white70)),
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+        backgroundColor: cs.surfaceContainerHighest,
+        title: Text('升級為獨立任務', style: TextStyle(color: cs.onSurface)),
+        content: Text('確定要將此待辦項目升級為獨立任務嗎？', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7))),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
           TextButton(
@@ -492,7 +497,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             child: const Text('確定', style: TextStyle(color: AppColors.primary)),
           ),
         ],
-      ),
+      );
+      },
     );
     if (confirmed != true) return;
 
@@ -748,18 +754,20 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   Future<void> _handleDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+        backgroundColor: cs.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('刪除任務', style: TextStyle(color: Colors.white)),
+        title: Text('刪除任務', style: TextStyle(color: cs.onSurface)),
         content: Text(
           '確定要刪除「${widget.task.content}」嗎？\n此操作無法復原。',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+            child: Text('取消', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.54))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -767,7 +775,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             child: const Text('刪除'),
           ),
         ],
-      ),
+      );
+      },
     );
     if (confirmed != true) return;
 
@@ -806,24 +815,27 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   Future<void> _showAreaSelector(List<Area> areas) async {
     final selected = await showModalBottomSheet<Area>(
       context: context,
-      backgroundColor: AppColors.darkCard,
-      builder: (context) => Container(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("選擇領域", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("選擇領域", style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ...areas.map((area) => ListTile(
               leading: const Icon(Icons.category, color: AppColors.primary),
-              title: Text(area.name, style: const TextStyle(color: Colors.white)),
+              title: Text(area.name, style: TextStyle(color: cs.onSurface)),
               selected: area.id == _selectedAreaId,
               selectedTileColor: AppColors.primary.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, area),
             )),
           ],
         ),
-      ),
+      );
+      },
     );
     if (selected != null) {
       setState(() {
@@ -837,24 +849,27 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   Future<void> _showProductSelector(List<Product> products) async {
     final selected = await showModalBottomSheet<Product>(
       context: context,
-      backgroundColor: AppColors.darkCard,
-      builder: (context) => Container(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("選擇專案", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("選擇專案", style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ...products.map((product) => ListTile(
               leading: const Icon(Icons.work_outline, color: Colors.green),
-              title: Text(product.name, style: const TextStyle(color: Colors.white)),
+              title: Text(product.name, style: TextStyle(color: cs.onSurface)),
               selected: product.id == _selectedProductId,
               selectedTileColor: Colors.green.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, product),
             )),
           ],
         ),
-      ),
+      );
+      },
     );
     if (selected != null) {
       setState(() {
@@ -870,31 +885,34 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final topics = _availableTopics;
     final selected = await showModalBottomSheet<Map<String, dynamic>?>(
       context: context,
-      backgroundColor: AppColors.darkCard,
-      builder: (context) => Container(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("選擇主題", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("選擇主題", style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.label_off_outlined, color: Colors.grey),
-              title: const Text('未分類', style: TextStyle(color: Colors.white)),
+              title: Text('未分類', style: TextStyle(color: cs.onSurface)),
               selected: _selectedTopicId == null,
               selectedTileColor: Colors.purple.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, <String, dynamic>{'id': null, 'name': '未分類'}),
             ),
             ...topics.map((topic) => ListTile(
               leading: const Icon(Icons.label_outline, color: Colors.purple),
-              title: Text(topic['name'] as String, style: const TextStyle(color: Colors.white)),
+              title: Text(topic['name'] as String, style: TextStyle(color: cs.onSurface)),
               selected: topic['id'] == _selectedTopicId,
               selectedTileColor: Colors.purple.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, topic),
             )),
           ],
         ),
-      ),
+      );
+      },
     );
     if (selected != null) {
       setState(() {
@@ -907,12 +925,13 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: AppColors.darkBackground.withValues(alpha: 0.95),
+        color: colorScheme.surface.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.1)),
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -964,22 +983,24 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   }
 
   Widget _buildHandle() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(top: 12, bottom: 4),
       width: 40,
       height: 4,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.3),
+        color: colorScheme.onSurface.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(2),
       ),
     );
   }
 
   Widget _buildDivider() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Divider(
       height: 1,
       thickness: 0.5,
-      color: Colors.white.withValues(alpha: 0.1),
+      color: colorScheme.onSurface.withValues(alpha: 0.1),
       indent: 20,
       endIndent: 20,
     );
@@ -1016,6 +1037,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
 
   /// 標題：大字直接編輯 + 關閉按鈕
   Widget _buildTitleRow() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
@@ -1026,15 +1048,15 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               controller: _contentController,
               maxLines: null,
               minLines: 1,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: colorScheme.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
               decoration: InputDecoration.collapsed(
                 hintText: '輸入任務內容...',
                 hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: colorScheme.onSurface.withValues(alpha: 0.3),
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1047,10 +1069,10 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: colorScheme.onSurface.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.6), size: 20),
+              child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
             ),
           ),
         ],
@@ -1060,6 +1082,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
 
   /// 狀態選擇行
   Widget _buildStatusRow() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
@@ -1067,9 +1090,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         children: [
           Row(
             children: [
-              Icon(Icons.swap_horiz, size: 18, color: Colors.white.withValues(alpha: 0.6)),
+              Icon(Icons.swap_horiz, size: 18, color: colorScheme.onSurfaceVariant),
               const SizedBox(width: 6),
-              Text('狀態', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+              Text('狀態', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
             ],
           ),
           const SizedBox(height: 8),
@@ -1091,12 +1114,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? status.color.withValues(alpha: 0.2)
-                            : Colors.white.withValues(alpha: 0.05),
+                            : colorScheme.onSurface.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: isSelected
                               ? status.color.withValues(alpha: 0.6)
-                              : Colors.white.withValues(alpha: 0.1),
+                              : colorScheme.onSurface.withValues(alpha: 0.1),
                         ),
                       ),
                       child: Row(
@@ -1105,7 +1128,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                           Icon(
                             status.icon,
                             size: 14,
-                            color: isSelected ? status.color : Colors.white.withValues(alpha: 0.4),
+                            color: isSelected ? status.color : colorScheme.onSurface.withValues(alpha: 0.4),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1113,7 +1136,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                              color: isSelected ? status.color : Colors.white.withValues(alpha: 0.5),
+                              color: isSelected ? status.color : colorScheme.onSurface.withValues(alpha: 0.5),
                             ),
                           ),
                         ],
@@ -1131,6 +1154,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
 
   /// 日期並排一行
   Widget _buildDatesRow() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
@@ -1153,7 +1177,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           ),
           Container(
             height: 24, width: 0.5,
-            color: Colors.white.withValues(alpha: 0.15),
+            color: colorScheme.onSurface.withValues(alpha: 0.15),
             margin: const EdgeInsets.symmetric(horizontal: 12),
           ),
           Expanded(
@@ -1198,12 +1222,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           children: [
             Icon(icon, size: 18, color: iconColor),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14)),
             const Spacer(),
             Text(
               date != null ? DateFormat('MM/dd').format(date) : '未設定',
               style: TextStyle(
-                color: date != null ? dateColor : Colors.white.withValues(alpha: 0.3),
+                color: date != null ? dateColor : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                 fontSize: 14,
                 fontWeight: date != null ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -1216,6 +1240,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
 
   /// 提醒行
   Widget _buildReminderRow() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Row(
@@ -1223,10 +1248,10 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           Icon(
             Icons.notifications_outlined,
             size: 18,
-            color: _reminderEnabled ? const Color(0xFFFFB020) : Colors.white.withValues(alpha: 0.6),
+            color: _reminderEnabled ? const Color(0xFFFFB020) : colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
-          Text('提醒', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+          Text('提醒', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
           const Spacer(),
           if (_reminderEnabled && _selectedRemindAt != null)
             GestureDetector(
@@ -1244,7 +1269,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               onTap: _showReminderTimePicker,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text('設定時間', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 13)),
+                child: Text('設定時間', style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3), fontSize: 13)),
               ),
             ),
           SizedBox(
@@ -1306,7 +1331,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text('分類', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+            child: Text('分類', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1404,6 +1429,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
 
   /// Sub-items
   Widget _buildSubItemsSection() {
+    final colorScheme = Theme.of(context).colorScheme;
     final completedCount = _subItems.where((s) => s.completed).length;
     final total = _subItems.length;
 
@@ -1417,7 +1443,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               const Icon(Icons.checklist, size: 18, color: AppColors.primary),
               const SizedBox(width: 6),
               Text('待辦 $completedCount/$total',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
               const Spacer(),
               if (_subItems.isNotEmpty)
                 GestureDetector(
@@ -1456,17 +1482,17 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                   margin: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      Icon(Icons.drag_handle, size: 20, color: Colors.white.withValues(alpha: 0.5)),
+                      Icon(Icons.drag_handle, size: 20, color: colorScheme.onSurface.withValues(alpha: 0.5)),
                       const SizedBox(width: 8),
                       Icon(
                         sub.completed ? Icons.check_circle : Icons.circle_outlined,
                         size: 18,
-                        color: sub.completed ? Colors.green : Colors.white.withValues(alpha: 0.4),
+                        color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(sub.content, style: TextStyle(
-                          color: sub.completed ? Colors.white.withValues(alpha: 0.5) : Colors.white,
+                          color: sub.completed ? colorScheme.onSurface.withValues(alpha: 0.5) : colorScheme.onSurface,
                           fontSize: 14,
                           decoration: sub.completed ? TextDecoration.lineThrough : null,
                         )),
@@ -1482,7 +1508,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                         onTap: () => _handleDeleteSubItem(sub.id),
                         child: Padding(
                           padding: const EdgeInsets.all(6),
-                          child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 16),
+                          child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.3), size: 16),
                         ),
                       ),
                     ],
@@ -1516,7 +1542,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                                 sub.completed ? Icons.check_circle : Icons.circle_outlined,
                                 key: ValueKey(sub.completed),
                                 size: 18,
-                                color: sub.completed ? Colors.green : Colors.white.withValues(alpha: 0.4),
+                                color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.4),
                               ),
                             ),
                           ),
@@ -1529,7 +1555,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                           AnimatedDefaultTextStyle(
                             duration: const Duration(milliseconds: 200),
                             style: TextStyle(
-                              color: sub.completed ? Colors.white.withValues(alpha: 0.5) : Colors.white,
+                              color: sub.completed ? colorScheme.onSurface.withValues(alpha: 0.5) : colorScheme.onSurface,
                               fontSize: 14,
                               decoration: sub.completed ? TextDecoration.lineThrough : null,
                             ),
@@ -1561,7 +1587,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       onTap: () => _handleDeleteSubItem(sub.id),
                       child: Padding(
                         padding: const EdgeInsets.all(6),
-                        child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.3), size: 16),
+                        child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.3), size: 16),
                       ),
                     ),
                   ],
@@ -1575,6 +1601,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
 
   /// 專注模式行
   Widget _buildFocusModeRow() {
+    final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: _isLoading ? null : _handleStartFocus,
       child: Padding(
@@ -1583,12 +1610,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           children: [
             const Icon(Icons.center_focus_strong_rounded, size: 18, color: AppColors.primary),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               '專注模式',
-              style: TextStyle(color: Colors.white, fontSize: 15),
+              style: TextStyle(color: colorScheme.onSurface, fontSize: 15),
             ),
             const Spacer(),
-            Icon(Icons.chevron_right, size: 20, color: Colors.white.withValues(alpha: 0.3)),
+            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurface.withValues(alpha: 0.3)),
           ],
         ),
       ),
@@ -1610,7 +1637,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               style: TextStyle(color: AppColors.success, fontSize: 15),
             ),
             const Spacer(),
-            Icon(Icons.chevron_right, size: 20, color: Colors.white.withValues(alpha: 0.3)),
+            Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
           ],
         ),
       ),

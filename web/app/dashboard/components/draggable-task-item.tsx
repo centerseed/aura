@@ -157,7 +157,7 @@ export function DraggableTaskItem({
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 autoFocus
-                className="flex-1 bg-white/10 border border-white/30 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-indigo-400"
+                className="flex-1 bg-white/10 border border-white/30 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-blue-400"
                 onKeyDown={(e) => {
                   e.stopPropagation()
                   if (e.key === 'Escape') {
@@ -200,9 +200,9 @@ export function DraggableTaskItem({
             <h4
               ref={setDropRef}
               className={`
-                font-medium text-white text-sm leading-snug cursor-pointer hover:text-indigo-300 transition-colors
+                font-medium text-white text-sm leading-snug cursor-pointer hover:text-blue-300 transition-colors
                 rounded px-2 py-1 -mx-2
-                ${isOver ? 'bg-indigo-500/30 ring-2 ring-indigo-500' : ''}
+                ${isOver ? 'bg-blue-500/30 ring-2 ring-blue-500' : ''}
               `}
               onClick={(e) => {
                 e.stopPropagation()
@@ -310,7 +310,7 @@ export function DraggableTaskItem({
                           value={editSubItemContent}
                           onChange={(e) => setEditSubItemContent(e.target.value)}
                           autoFocus
-                          className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-indigo-400"
+                          className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-blue-400"
                           onKeyDown={(e) => {
                             e.stopPropagation()
                             if (e.key === 'Escape') {
@@ -474,7 +474,7 @@ export function DraggableTaskItem({
                     onChange={(e) => setNewSubItemContent(e.target.value)}
                     placeholder="新增待辦事項..."
                     autoFocus
-                    className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-indigo-400"
+                    className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-blue-400"
                     onKeyDown={(e) => {
                       e.stopPropagation()
                       if (e.key === 'Escape') {
@@ -613,7 +613,7 @@ export function DragOverlayTask({ task }: { task: TaskCard }) {
   const drawerConfig = DRAWER_CONFIG[task.drawer] || DRAWER_CONFIG.INBOX
 
   return (
-    <div className="bg-slate-800 rounded-lg border-2 border-indigo-500 p-3 shadow-xl shadow-indigo-500/25 rotate-3 scale-105">
+    <div className="bg-slate-800 rounded-lg border-2 border-blue-500 p-3 shadow-xl shadow-blue-500/25 rotate-3 scale-105">
       <div className="flex items-start gap-3">
         <div className={`mt-1.5 w-2 h-2 rounded-full ${drawerConfig.dotColor} shrink-0`} />
         <div className="flex-1 min-w-0">
@@ -633,9 +633,9 @@ export function DragOverlayTask({ task }: { task: TaskCard }) {
  */
 export function DragOverlayProduct({ productName }: { productName: string }) {
   return (
-    <div className="bg-slate-800 rounded-xl border-2 border-indigo-500 p-4 shadow-xl shadow-indigo-500/25 rotate-3 scale-105 min-w-[200px]">
+    <div className="bg-slate-800 rounded-xl border-2 border-blue-500 p-4 shadow-xl shadow-blue-500/25 rotate-3 scale-105 min-w-[200px]">
       <div className="flex items-center gap-2">
-        <Package className="w-4 h-4 text-indigo-400" />
+        <Package className="w-4 h-4 text-blue-400" />
         <span className="font-medium text-white">{productName}</span>
       </div>
     </div>

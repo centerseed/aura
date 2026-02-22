@@ -133,7 +133,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: AppColors.darkBackground.withValues(alpha: 0.95),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
@@ -516,7 +516,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.darkBackground,
+        color: Theme.of(context).colorScheme.surface,
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),

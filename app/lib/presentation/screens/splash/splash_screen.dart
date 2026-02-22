@@ -34,7 +34,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.githubDark,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

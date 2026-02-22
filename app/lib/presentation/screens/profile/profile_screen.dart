@@ -3,9 +3,10 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timezone/timezone.dart' as tz;
-import '../../../core/di/providers.dart' show analyticsServiceProvider;
+import '../../../core/di/providers.dart' show analyticsServiceProvider, appVersionProvider;
 import '../../providers/app_lifecycle_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../providers/user_provider.dart';
 import 'widgets/statistics_card.dart';
 import '../../providers/first_time_tutorial_provider.dart';
@@ -19,20 +20,19 @@ class ProfileScreen extends ConsumerWidget {
     final statisticsAsync = ref.watch(userStatisticsProvider);
     final authRepo = ref.watch(authRepositoryProvider);
     final isAnonymous = authRepo.isAnonymous;
+    final colorScheme = Theme.of(context).colorScheme;
+    final versionAsync = ref.watch(appVersionProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.deepBlack,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios_new, color: colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           '個人檔案',
           style: TextStyle(
-            color: Colors.white,
+            color: colorScheme.onSurface,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
@@ -43,16 +43,14 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             const SizedBox(height: 24),
 
-            // ========== 優化後的 Avatar Section ==========
-            _buildAvatarSection(user, isAnonymous),
+            _buildAvatarSection(context, user, isAnonymous),
 
             const SizedBox(height: 32),
 
-            // ========== 統計卡片區塊 (新增) ==========
             statisticsAsync.when(
               data: (stats) => Column(
                 children: [
-                  _buildStatisticsSection(stats),
+                  _buildStatisticsSection(context, stats),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -67,7 +65,7 @@ class ProfileScreen extends ConsumerWidget {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.darkBackground,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -81,7 +79,7 @@ class ProfileScreen extends ConsumerWidget {
                       Text(
                         '統計數據載入失敗',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                          color: colorScheme.onSurface.withOpacity(0.7),
                           fontSize: 14,
                         ),
                       ),
@@ -89,7 +87,7 @@ class ProfileScreen extends ConsumerWidget {
                       Text(
                         '請檢查網路連接或稍後再試',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
+                          color: colorScheme.onSurface.withOpacity(0.4),
                           fontSize: 12,
                         ),
                       ),
@@ -99,13 +97,11 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
 
-            // ========== 匿名用戶綁定提示 ==========
             if (isAnonymous) ...[
               _buildAnonymousBindingCard(context, ref),
               const SizedBox(height: 16),
             ],
 
-            // ========== 設定項目 ==========
             _buildSection(context, '帳戶', [
               _buildTile(
                 context,
@@ -125,13 +121,35 @@ class ProfileScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
+            _buildSection(context, '外觀', [
+              _buildThemeSelector(context, ref),
+            ]),
+
+            const SizedBox(height: 24),
+
             _buildSection(context, '關於', [
-              _buildTile(
-                context,
-                icon: Icons.info_outline_rounded,
-                title: '關於 Zentropy',
-                subtitle: 'v0.9.0 beta',
-                onTap: () => _showAboutDialog(context),
+              versionAsync.when(
+                data: (version) => _buildTile(
+                  context,
+                  icon: Icons.info_outline_rounded,
+                  title: '關於 Zentropy',
+                  subtitle: version,
+                  onTap: () => _showAboutDialog(context, version),
+                ),
+                loading: () => _buildTile(
+                  context,
+                  icon: Icons.info_outline_rounded,
+                  title: '關於 Zentropy',
+                  subtitle: '載入中...',
+                  onTap: () => _showAboutDialog(context, '載入中...'),
+                ),
+                error: (error, stack) => _buildTile(
+                  context,
+                  icon: Icons.info_outline_rounded,
+                  title: '關於 Zentropy',
+                  subtitle: 'v0.9.0 beta',
+                  onTap: () => _showAboutDialog(context, 'v0.9.0 beta'),
+                ),
               ),
             ]),
 
@@ -152,7 +170,6 @@ class ProfileScreen extends ConsumerWidget {
                 titleColor: const Color(0xFFFF453A),
                 iconColor: const Color(0xFFFF453A),
                 onTap: () async {
-                  // 記錄登出事件
                   final analytics = ref.read(analyticsServiceProvider);
                   await analytics.logLogout();
 
@@ -171,8 +188,50 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  // ========== 匿名用戶綁定 Google 帳號卡片 ==========
+  Widget _buildThemeSelector(BuildContext context, WidgetRef ref) {
+    final currentMode = ref.watch(themeModeProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        children: [
+          Icon(Icons.palette_outlined, color: colorScheme.onSurfaceVariant, size: 22),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              '主題模式',
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          SegmentedButton<ThemeMode>(
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              textStyle: WidgetStatePropertyAll(
+                const TextStyle(fontSize: 12),
+              ),
+            ),
+            segments: const [
+              ButtonSegment(value: ThemeMode.system, label: Text('系統')),
+              ButtonSegment(value: ThemeMode.light, label: Text('淺色')),
+              ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
+            ],
+            selected: {currentMode},
+            onSelectionChanged: (selection) {
+              ref.read(themeModeProvider.notifier).setThemeMode(selection.first);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAnonymousBindingCard(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -197,10 +256,10 @@ class ProfileScreen extends ConsumerWidget {
               size: 32,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               '您目前使用訪客模式',
               style: TextStyle(
-                color: Colors.white,
+                color: colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -210,7 +269,7 @@ class ProfileScreen extends ConsumerWidget {
               '綁定 Google 帳號以同步資料到網頁端，並避免遺失資料',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: colorScheme.onSurface.withOpacity(0.6),
                 fontSize: 13,
               ),
             ),
@@ -267,15 +326,14 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  // ========== 優化後的 Avatar Section ==========
-  Widget _buildAvatarSection(user, bool isAnonymous) {
+  Widget _buildAvatarSection(BuildContext context, user, bool isAnonymous) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         children: [
           Stack(
             alignment: Alignment.center,
             children: [
-              // 發光效果（優化）
               Container(
                 width: 80,
                 height: 80,
@@ -290,25 +348,24 @@ class ProfileScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              // 漸變邊框 + Avatar
               Container(
                 padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     colors: [AppColors.primary, Color(0xFF8F8AFF)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
                 child: CircleAvatar(
-                  radius: 36, // 從 50 減至 36
+                  radius: 36,
                   backgroundImage: user?.photoURL != null
                       ? NetworkImage(user!.photoURL!)
                       : null,
-                  backgroundColor: AppColors.darkBackground,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
                   child: user?.photoURL == null
-                      ? const Icon(Icons.person, size: 36, color: Colors.white24)
+                      ? Icon(Icons.person, size: 36, color: colorScheme.onSurfaceVariant)
                       : null,
                 ),
               ),
@@ -317,8 +374,8 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Text(
             isAnonymous ? '訪客' : (user?.displayName ?? '未設定名稱'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
@@ -327,13 +384,13 @@ class ProfileScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: colorScheme.onSurface.withOpacity(0.05),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               isAnonymous ? '訪客模式' : (user?.email ?? '無電子郵件'),
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: colorScheme.onSurface.withOpacity(0.5),
                 fontSize: 13,
               ),
             ),
@@ -343,8 +400,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  // ========== 統計卡片區塊 (新增) ==========
-  Widget _buildStatisticsSection(stats) {
+  Widget _buildStatisticsSection(BuildContext context, stats) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -353,7 +410,7 @@ class ProfileScreen extends ConsumerWidget {
           Text(
             '數據統計',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: colorScheme.onSurface.withOpacity(0.5),
               fontSize: 12,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
@@ -362,7 +419,6 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Column(
               children: [
-                // 第一行
                 Row(
                   children: [
                     Expanded(
@@ -370,7 +426,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.totalTasks,
                         label: '總任務',
                         icon: Icons.task_alt,
-                        color: const Color(0xFF5E9FFF), // 藍色
+                        color: const Color(0xFF5E9FFF),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -379,7 +435,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.totalProducts,
                         label: '專案',
                         icon: Icons.folder_outlined,
-                        color: const Color(0xFFFF9F0A), // 橙色
+                        color: const Color(0xFFFF9F0A),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -388,7 +444,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.totalAreas,
                         label: '領域',
                         icon: Icons.category_outlined,
-                        color: const Color(0xFFFF375F), // 粉紅色
+                        color: const Color(0xFFFF375F),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -398,13 +454,12 @@ class ProfileScreen extends ConsumerWidget {
                         label: '使用天數',
                         icon: Icons.calendar_today,
                         suffix: '天',
-                        color: const Color(0xFF32D7C9), // 青色
+                        color: const Color(0xFF32D7C9),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                // 第二行
                 Row(
                   children: [
                     Expanded(
@@ -412,7 +467,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.activeTasks,
                         label: '進行中',
                         icon: Icons.play_circle_outline,
-                        color: AppColors.primary, // 紫色
+                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -421,7 +476,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.archivedTasks,
                         label: '已歸檔',
                         icon: Icons.archive_outlined,
-                        color: const Color(0xFF98A2B3), // 灰藍色
+                        color: const Color(0xFF98A2B3),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -430,7 +485,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.completedToday,
                         label: '今日完成',
                         icon: Icons.check_circle_outline,
-                        color: const Color(0xFF30D158), // 綠色
+                        color: const Color(0xFF30D158),
                         showSparkle: stats.completedToday > 0,
                       ),
                     ),
@@ -448,6 +503,7 @@ class ProfileScreen extends ConsumerWidget {
     String title,
     List<Widget> children,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -456,7 +512,7 @@ class ProfileScreen extends ConsumerWidget {
           child: Text(
             title,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.3),
+              color: colorScheme.onSurface.withOpacity(0.3),
               fontSize: 12,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
@@ -466,9 +522,9 @@ class ProfileScreen extends ConsumerWidget {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: AppColors.darkBackground,
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.2)),
           ),
           child: Column(children: children),
         ),
@@ -481,10 +537,11 @@ class ProfileScreen extends ConsumerWidget {
     final currentTimezone = tz.local.name;
     final now = DateTime.now();
     final utcNow = now.toUtc();
+    final colorScheme = Theme.of(context).colorScheme;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -508,10 +565,10 @@ class ProfileScreen extends ConsumerWidget {
                   child: const Icon(Icons.public, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 16),
-                const Text(
+                Text(
                   '時區設定',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colorScheme.onSurface,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -519,19 +576,22 @@ class ProfileScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 24),
-            _buildTimezoneInfoRow('當前時區', currentTimezone, Icons.location_on),
+            _buildTimezoneInfoRow(context, '當前時區', currentTimezone, Icons.location_on),
             _buildTimezoneInfoRow(
+              context,
               '上次已知',
               lifecycleData.lastKnownTimezone ?? '未設定',
               Icons.history,
             ),
-            const Divider(height: 32, color: AppColors.darkCard),
+            Divider(height: 32, color: colorScheme.outlineVariant),
             _buildTimezoneInfoRow(
+              context,
               '本地時間',
               _formatDetailedDateTime(now),
               Icons.access_time,
             ),
             _buildTimezoneInfoRow(
+              context,
               'UTC 時間',
               _formatDetailedDateTime(utcNow),
               Icons.public,
@@ -558,7 +618,7 @@ class ProfileScreen extends ConsumerWidget {
                     child: Text(
                       '時區會自動偵測並同步到所有提醒',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: colorScheme.onSurface.withOpacity(0.8),
                         fontSize: 13,
                       ),
                     ),
@@ -574,10 +634,11 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showAboutDialog(BuildContext context) {
+  void _showAboutDialog(BuildContext context, String version) {
+    final colorScheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -598,10 +659,10 @@ class ProfileScreen extends ConsumerWidget {
               child: const Icon(Icons.auto_awesome, color: Colors.white, size: 40),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Zentropy',
               style: TextStyle(
-                color: Colors.white,
+                color: colorScheme.onSurface,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -610,15 +671,15 @@ class ProfileScreen extends ConsumerWidget {
             Text(
               '讓一切井然有序',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: colorScheme.onSurface.withOpacity(0.6),
                 fontSize: 14,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'v0.9.0 beta',
+              version,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: colorScheme.onSurface.withOpacity(0.4),
                 fontSize: 12,
               ),
             ),
@@ -626,7 +687,7 @@ class ProfileScreen extends ConsumerWidget {
             Text(
               '你的 AI 營運長——讓一切井然有序',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: colorScheme.onSurface.withOpacity(0.5),
                 fontSize: 13,
               ),
               textAlign: TextAlign.center,
@@ -638,7 +699,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTimezoneInfoRow(String label, String value, IconData icon) {
+  Widget _buildTimezoneInfoRow(BuildContext context, String label, String value, IconData icon) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
@@ -656,15 +718,15 @@ class ProfileScreen extends ConsumerWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: colorScheme.onSurface.withOpacity(0.6),
                     fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -697,18 +759,19 @@ class ProfileScreen extends ConsumerWidget {
     Color? titleColor,
     Color? iconColor,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: Icon(
         icon,
-        color: iconColor ?? Colors.white.withOpacity(0.7),
+        color: iconColor ?? colorScheme.onSurfaceVariant,
         size: 22,
       ),
       title: Text(
         title,
         style: TextStyle(
-          color: titleColor ?? Colors.white,
+          color: titleColor ?? colorScheme.onSurface,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
@@ -717,14 +780,14 @@ class ProfileScreen extends ConsumerWidget {
           ? Text(
               subtitle,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: colorScheme.onSurface.withOpacity(0.5),
                 fontSize: 12,
               ),
             )
           : null,
       trailing: Icon(
         Icons.chevron_right_rounded,
-        color: Colors.white.withOpacity(0.2),
+        color: colorScheme.onSurface.withOpacity(0.2),
         size: 20,
       ),
     );

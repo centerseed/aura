@@ -36,7 +36,6 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.deepBlack,
       body: SafeArea(
         child: Column(
           children: [
@@ -153,7 +152,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
           Center(
             child: Text(
               "尚未建立身份地圖",
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             ),
           ),
         ],
@@ -189,8 +188,8 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                   const SizedBox(width: 12),
                   Text(
                     area.name,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
@@ -200,7 +199,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                   Text(
                     '${areaProducts.length} 專案',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -217,7 +216,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                 child: Text(
                   "尚無專案",
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                     fontSize: 14,
                     fontStyle: FontStyle.italic,
                   ),
@@ -255,12 +254,13 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
     Product product,
     List<Task> projectTasks,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: 260,
       decoration: BoxDecoration(
-        color: AppColors.darkBackground,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: colorScheme.onSurface.withOpacity(0.08)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -285,7 +285,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                     Icon(
                       Icons.folder_open_rounded,
                       size: 18,
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: colorScheme.onSurface.withOpacity(0.5),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -293,8 +293,8 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                         product.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
@@ -311,7 +311,7 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                       child: Text(
                         "暫無待辦",
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: colorScheme.onSurface.withOpacity(0.3),
                           fontSize: 12,
                         ),
                       ),
@@ -331,8 +331,8 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                                       width: 4,
                                       height: 4,
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.5,
+                                        color: colorScheme.onSurface.withOpacity(
+                                          0.5,
                                         ),
                                         shape: BoxShape.circle,
                                       ),
@@ -344,8 +344,8 @@ class _InboxReviewScreenState extends ConsumerState<InboxReviewScreen>
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.7,
+                                          color: colorScheme.onSurface.withOpacity(
+                                            0.7,
                                           ),
                                           fontSize: 13,
                                         ),

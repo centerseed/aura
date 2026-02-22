@@ -126,8 +126,9 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Dialog(
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -142,10 +143,10 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   '編輯待辦項目',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colorScheme.onSurface,
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
                   ),
@@ -197,12 +198,12 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
             // 內容編輯
             TextField(
               controller: _contentController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: colorScheme.onSurface),
               decoration: InputDecoration(
                 labelText: '內容',
-                labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                labelStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                  borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.3)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -254,7 +255,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                 child: Text(
                   '任務截止日：${_formatDate(widget.taskDueDate!)}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: colorScheme.onSurface.withOpacity(0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -299,7 +300,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                       onPressed: () => Navigator.pop(context),
                       child: Text(
                         '取消',
-                        style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -334,12 +335,13 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
     required VoidCallback onTap,
     required VoidCallback onClear,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white.withOpacity(0.3)),
+          border: Border.all(color: colorScheme.onSurface.withOpacity(0.3)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -350,15 +352,15 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                 Icon(
                   Icons.calendar_today,
                   size: 16,
-                  color: Colors.white.withOpacity(0.7),
+                  color: colorScheme.onSurface.withOpacity(0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   date == null ? label : _formatDate(date),
                   style: TextStyle(
                     color: date == null
-                        ? Colors.white.withOpacity(0.5)
-                        : Colors.white,
+                        ? colorScheme.onSurface.withOpacity(0.5)
+                        : colorScheme.onSurface,
                     fontSize: 14,
                   ),
                 ),
@@ -370,7 +372,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                 child: Icon(
                   Icons.close,
                   size: 18,
-                  color: Colors.white.withOpacity(0.5),
+                  color: colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
           ],

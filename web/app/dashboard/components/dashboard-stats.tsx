@@ -27,7 +27,7 @@ const STAT_ITEMS: {
   { key: 'active', icon: Rocket, label: '進行中', color: 'text-blue-500' },
   { key: 'archived', icon: Archive, label: '已歸檔', color: 'text-slate-400' },
   { key: 'areas', icon: FolderOpen, label: '領域', color: 'text-green-500' },
-  { key: 'products', icon: Package, label: '項目', color: 'text-indigo-500' },
+  { key: 'products', icon: Package, label: '項目', color: 'text-blue-500' },
 ]
 
 export function DashboardStats({ stats }: DashboardStatsProps) {

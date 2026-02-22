@@ -2,7 +2,7 @@
   "mcpServers": {
     "zentropy": {
       "url": "https://zentropy-api-isakqhri2a-de.a.run.app/mcp",
-      "transport": "http",
+      "type": "sse",
       "oauth": {
         "authorizationUrl": "https://zentropy-api-isakqhri2a-de.a.run.app/api/oauth/mcp/authorize",
         "tokenUrl": "https://zentropy-api-isakqhri2a-de.a.run.app/api/oauth/mcp/token",

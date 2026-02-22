@@ -27,7 +27,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
       child: RefreshIndicator(
         onRefresh: () => refreshTasks(ref),
         color: AppColors.primary,
-        backgroundColor: AppColors.githubDarkLight,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
         child: CustomScrollView(
           slivers: [
             // Header with refresh indicator
@@ -57,7 +57,28 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
   }
 
   Widget _buildHeader({bool isRefreshing = false}) {
-    return Padding(
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: isDark
+          ? null
+          : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.brandPurple.withValues(alpha: 0.06),
+                  AppColors.primary.withValues(alpha: 0.04),
+                  colorScheme.surface.withValues(alpha: 0.0),
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+            ),
+      child: Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,8 +89,11 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
               Row(
                 children: [
                   ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [AppColors.onboardingIndigo, AppColors.statusInbox],
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: isDark
+                          ? [AppColors.onboardingIndigo, AppColors.statusInbox]
+                          : [AppColors.brandPurple, AppColors.primary],
                     ).createShader(bounds),
                     child: const Text(
                       '負載視圖',
@@ -82,19 +106,19 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                   ),
                   if (isRefreshing) ...[
                     const SizedBox(width: 12),
-                    const SizedBox(
+                    SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white54,
+                        color: colorScheme.onSurface.withValues(alpha: 0.54),
                       ),
                     ),
                   ],
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.person_outline, color: Colors.white70),
+                icon: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant),
                 onPressed: () => context.push('/profile'),
               ),
             ],
@@ -103,11 +127,12 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
           Text(
             '每週工作量分析',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -136,6 +161,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
         weeklyLoads.where((w) => w.taskCount >= _LoadThresholds.warning).length;
     final maxLoad = weeklyLoads.map((w) => w.taskCount).reduce((a, b) => a > b ? a : b);
 
+    final colorScheme = Theme.of(context).colorScheme;
     return SliverList(
       delegate: SliverChildListDelegate([
         // 緊湊的統計摘要
@@ -146,7 +172,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
               Text(
                 '共 ${weeklyLoads.length} 週',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
                   fontSize: 13,
                 ),
               ),
@@ -154,7 +180,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
               Text(
                 '•',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: colorScheme.onSurface.withValues(alpha: 0.3),
                   fontSize: 13,
                 ),
               ),
@@ -162,7 +188,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
               Text(
                 '平均 ${avgLoad.toStringAsFixed(1)}',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
                   fontSize: 13,
                 ),
               ),
@@ -171,7 +197,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 Text(
                   '•',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
+                    color: colorScheme.onSurface.withValues(alpha: 0.3),
                     fontSize: 13,
                   ),
                 ),
@@ -227,6 +253,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
   }
 
   Widget _buildWeekCard(_WeekLoad week) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isExpanded = _expandedWeeks.contains(week.key);
     final isCurrent = _isCurrentWeek(week.weekStart);
     final loadColor = _getLoadColor(week.taskCount);
@@ -235,7 +262,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.githubDarkLight,
+          color: colorScheme.surfaceContainer,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isCurrent
@@ -267,15 +294,15 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                       isExpanded
                           ? Icons.keyboard_arrow_down
                           : Icons.keyboard_arrow_right,
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: colorScheme.onSurface.withValues(alpha: 0.4),
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     // 週標籤
                     Text(
                       '${week.weekStart.month}/${week.weekStart.day} 週',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -344,7 +371,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                   child: LinearProgressIndicator(
                     value: (week.taskCount / 10).clamp(0.0, 1.0),
                     minHeight: 6,
-                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    backgroundColor: colorScheme.onSurface.withValues(alpha: 0.08),
                     valueColor: AlwaysStoppedAnimation<Color>(loadColor),
                   ),
                 ),
@@ -355,7 +382,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 decoration: BoxDecoration(
                   border: Border(
                     top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                     ),
                   ),
                 ),
@@ -367,7 +394,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                     Text(
                       '${_formatDate(week.weekStart)} ~ ${_formatDate(week.weekEnd)}',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: colorScheme.onSurface.withValues(alpha: 0.4),
                         fontSize: 11,
                       ),
                     ),
@@ -384,6 +411,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
   }
 
   Widget _buildTaskItem(Task task) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: InkWell(
@@ -398,7 +426,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 width: 4,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: colorScheme.onSurface.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -407,8 +435,8 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
               Expanded(
                 child: Text(
                   task.content,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
                     fontSize: 13,
                   ),
                   maxLines: 1,
@@ -421,7 +449,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 Text(
                   '${task.dueDate!.month}/${task.dueDate!.day}',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: colorScheme.onSurface.withValues(alpha: 0.4),
                     fontSize: 12,
                   ),
                 ),
@@ -465,7 +493,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             fontSize: 12,
           ),
         ),
@@ -482,13 +510,13 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
             Icon(
               Icons.calendar_today_outlined,
               size: 64,
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 16),
             Text(
               '沒有排定日期的任務',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 16,
               ),
             ),
@@ -512,7 +540,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
             const SizedBox(height: 16),
             Text(
               message,
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),

@@ -98,7 +98,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     final items = result.items;
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -335,7 +335,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   void _showAppendSubItemResult(AppendSubItemInfo info) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -556,6 +556,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () {
         // 點擊空白區域關閉鍵盤
@@ -563,13 +564,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       },
       child: Container(
         // Premium gradient background (matching web quality)
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.githubDark, // Deep dark blue (GitHub dark)
-              AppColors.githubDarkLight, // Slightly lighter
+              colorScheme.surfaceContainerLow,
+              colorScheme.surfaceContainer,
               AppColors.purpleTinted, // With purple tint
             ],
           ),

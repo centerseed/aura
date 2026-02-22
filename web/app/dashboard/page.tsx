@@ -209,7 +209,7 @@ function DraggableTaskItem({
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
   onPromoteSubItem?: (taskId: string, subItemId: string) => void;
   onEditTitle?: (taskId: string, newTitle: string) => void;
-  onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
+  onEditSubItem?: (taskId: string, subItemId: string, updates: string | { content?: string; start_date?: string | null; due_date?: string | null }) => void;
   onAddSubItem?: (taskId: string, content: string) => void;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onOpenDetail?: () => void;
@@ -297,7 +297,7 @@ function DraggableTaskItem({
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 autoFocus
-                className="flex-1 bg-white/10 border border-white/30 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-indigo-400"
+                className="flex-1 bg-white/10 border border-white/30 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-blue-400"
                 onKeyDown={(e) => {
                   e.stopPropagation();
                   if (e.key === "Escape") {
@@ -341,9 +341,9 @@ function DraggableTaskItem({
             <h4
               ref={setDropRef}
               className={`
-                font-medium text-white text-sm leading-snug cursor-pointer hover:text-indigo-300 transition-colors
+                font-medium text-white text-sm leading-snug cursor-pointer hover:text-blue-300 transition-colors
                 rounded px-2 py-1 -mx-2
-                ${isOver ? "bg-indigo-500/30 ring-2 ring-indigo-500" : ""}
+                ${isOver ? "bg-blue-500/30 ring-2 ring-blue-500" : ""}
               `}
               onClick={(e) => {
                 e.stopPropagation();
@@ -452,7 +452,7 @@ function DraggableTaskItem({
                           value={editSubItemContent}
                           onChange={(e) => setEditSubItemContent(e.target.value)}
                           autoFocus
-                          className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-indigo-400"
+                          className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-blue-400"
                           onKeyDown={(e) => {
                             e.stopPropagation();
                             if (e.key === "Escape") {
@@ -598,7 +598,7 @@ function DraggableTaskItem({
                     onChange={(e) => setNewSubItemContent(e.target.value)}
                     placeholder="新增待辦事項..."
                     autoFocus
-                    className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-indigo-400"
+                    className="flex-1 bg-white/10 border border-white/30 rounded px-1.5 py-0.5 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-blue-400"
                     onKeyDown={(e) => {
                       e.stopPropagation();
                       if (e.key === "Escape") {
@@ -737,7 +737,7 @@ function DragOverlayTask({ task }: { task: TaskCard }) {
   const drawerConfig = DRAWER_CONFIG[task.drawer] || DRAWER_CONFIG.INBOX;
 
   return (
-    <div className="bg-slate-800 rounded-lg border-2 border-indigo-500 p-3 shadow-xl shadow-indigo-500/25 rotate-3 scale-105">
+    <div className="bg-slate-800 rounded-lg border-2 border-blue-500 p-3 shadow-xl shadow-blue-500/25 rotate-3 scale-105">
       <div className="flex items-start gap-3">
         <div className={`mt-1.5 w-2 h-2 rounded-full ${drawerConfig.dotColor} shrink-0`} />
         <div className="flex-1 min-w-0">
@@ -755,9 +755,9 @@ function DragOverlayTask({ task }: { task: TaskCard }) {
 // 拖曳預覽 - Product
 function DragOverlayProduct({ productName }: { productName: string }) {
   return (
-    <div className="bg-slate-800 rounded-xl border-2 border-indigo-500 p-4 shadow-xl shadow-indigo-500/25 rotate-3 scale-105 min-w-[200px]">
+    <div className="bg-slate-800 rounded-xl border-2 border-blue-500 p-4 shadow-xl shadow-blue-500/25 rotate-3 scale-105 min-w-[200px]">
       <div className="flex items-center gap-2">
-        <Package className="w-4 h-4 text-indigo-400" />
+        <Package className="w-4 h-4 text-blue-400" />
         <span className="font-medium text-white">{productName}</span>
       </div>
     </div>
@@ -811,7 +811,7 @@ function DroppableProduct({
   onToggleSubItem?: (taskId: string, subItemId: string, completed: boolean) => void;
   onDeleteSubItem?: (taskId: string, subItemId: string) => void;
   onPromoteSubItem?: (taskId: string, subItemId: string) => void;
-  onEditSubItem?: (taskId: string, subItemId: string, newContent: string) => void;
+  onEditSubItem?: (taskId: string, subItemId: string, updates: string | { content?: string; start_date?: string | null; due_date?: string | null }) => void;
   onAddSubItem?: (taskId: string, content: string) => void;
   onDeleteReference?: (taskId: string, referenceId: string) => void;
   onOpenTaskDetail?: (task: TaskCard) => void;
@@ -873,7 +873,7 @@ function DroppableProduct({
         rounded-xl border-2 transition-all duration-200
         ${isDragging ? "opacity-50 scale-105" : ""}
         ${isOver
-          ? "border-indigo-500 bg-indigo-500/20 ring-2 ring-indigo-500/50 scale-[1.02]"
+          ? "border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/50 scale-[1.02]"
           : "border-white/10 bg-white/5 backdrop-blur-sm"
         }
       `}
@@ -898,7 +898,7 @@ function DroppableProduct({
                   status: productStatus,
                 });
               }}
-              className="font-medium text-white flex-1 truncate text-left hover:text-indigo-300 transition-colors"
+              className="font-medium text-white flex-1 truncate text-left hover:text-blue-300 transition-colors"
               title="點擊查看專案詳情"
             >
               {productName}
@@ -934,15 +934,15 @@ function DroppableProduct({
                 disabled={isReorganizing}
                 className={`p-1.5 rounded-md border transition-all ${
                   isReorganizing
-                    ? "bg-indigo-500/30 border-indigo-400/50 cursor-wait"
-                    : "bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20 hover:border-indigo-400/50"
+                    ? "bg-blue-500/30 border-blue-400/50 cursor-wait"
+                    : "bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 hover:border-blue-400/50"
                 }`}
                 title={isReorganizing ? "AI 分析中..." : "AI 自動整理 Topics 與時間"}
               >
                 {isReorganizing ? (
-                  <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                 )}
               </button>
             )}
@@ -963,10 +963,10 @@ function DroppableProduct({
                 <button
                   key={milestone.id}
                   onClick={() => onEditMilestone(milestone)}
-                  className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors"
+                  className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
                   title={`點擊編輯「${milestone.name}」`}
                 >
-                  <Target className="w-3 h-3 text-indigo-400 shrink-0" />
+                  <Target className="w-3 h-3 text-blue-400 shrink-0" />
                   <span className="text-xs text-white/70 max-w-[120px] truncate">
                     {milestone.name}
                   </span>
@@ -976,7 +976,7 @@ function DroppableProduct({
                         ? "text-red-400"
                         : isUrgent
                         ? "text-orange-400"
-                        : "text-indigo-300"
+                        : "text-blue-300"
                     }`}
                   >
                     {isOverdue
@@ -990,11 +990,11 @@ function DroppableProduct({
             {/* 新增里程碑按鈕 */}
             <button
               onClick={() => onEditMilestone({ entity_type: "PRODUCT", entity_id: productId })}
-              className="flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/10 transition-colors group"
+              className="flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-blue-400/50 hover:bg-blue-500/10 transition-colors group"
               title="新增里程碑"
             >
-              <Plus className="w-3 h-3 text-white/40 group-hover:text-indigo-400 transition-colors" />
-              <span className="text-xs text-white/40 group-hover:text-indigo-300 transition-colors">新增</span>
+              <Plus className="w-3 h-3 text-white/40 group-hover:text-blue-400 transition-colors" />
+              <span className="text-xs text-white/40 group-hover:text-blue-300 transition-colors">新增</span>
             </button>
           </div>
         )}
@@ -1004,11 +1004,11 @@ function DroppableProduct({
           <div className="px-4 pb-2">
             <button
               onClick={() => onEditMilestone({ entity_type: "PRODUCT", entity_id: productId })}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/10 transition-colors w-full justify-center group"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-white/20 hover:border-blue-400/50 hover:bg-blue-500/10 transition-colors w-full justify-center group"
               title="設定第一個里程碑"
             >
-              <Target className="w-3 h-3 text-white/30 group-hover:text-indigo-400 transition-colors" />
-              <span className="text-xs text-white/40 group-hover:text-indigo-300 transition-colors">設定里程碑</span>
+              <Target className="w-3 h-3 text-white/30 group-hover:text-blue-400 transition-colors" />
+              <span className="text-xs text-white/40 group-hover:text-blue-300 transition-colors">設定里程碑</span>
             </button>
           </div>
         )}
@@ -1062,7 +1062,7 @@ function DroppableAreaHeader({
       ref={setNodeRef}
       className={`flex items-center justify-between mb-4 p-4 rounded-xl transition-all ${
         isOver
-          ? "bg-indigo-500/10 border-2 border-indigo-500 border-dashed"
+          ? "bg-blue-500/10 border-2 border-blue-500 border-dashed"
           : "border-2 border-transparent"
       }`}
     >
@@ -3121,7 +3121,7 @@ function DashboardContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
           <p className="text-white/50">載入資料中...</p>
         </div>
       </div>
@@ -3336,7 +3336,7 @@ function DashboardContent() {
                   onClick={() => setViewMode("structure")}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
                     viewMode === "structure"
-                      ? "bg-indigo-500/30 text-indigo-300"
+                      ? "bg-blue-500/30 text-blue-300"
                       : "text-white/60 hover:text-white hover:bg-white/10"
                   }`}
                 >
@@ -3409,7 +3409,7 @@ function DashboardContent() {
                     onClick={() => setSelectedArea(null)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                       selectedArea === null
-                        ? "bg-indigo-500/20 text-indigo-300"
+                        ? "bg-blue-500/20 text-blue-300"
                         : "hover:bg-white/10 text-white/60"
                     }`}
                   >
@@ -3440,7 +3440,7 @@ function DashboardContent() {
                             }}
                             className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                               selectedArea === area.name
-                                ? "bg-indigo-500/20 text-indigo-300"
+                                ? "bg-blue-500/20 text-blue-300"
                                 : "hover:bg-white/10 text-white/60"
                             }`}
                           >
@@ -4132,8 +4132,8 @@ function DashboardContent() {
 
                 {/* 箭頭 */}
                 <div className="flex justify-center">
-                  <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                    <ChevronDown className="w-5 h-5 text-indigo-400" />
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <ChevronDown className="w-5 h-5 text-blue-400" />
                   </div>
                 </div>
 
@@ -4146,7 +4146,7 @@ function DashboardContent() {
                       {pendingMerge.targetTask.tag.area} → {pendingMerge.targetTask.tag.product}
                     </p>
                     {pendingMerge.targetTask.sub_items && pendingMerge.targetTask.sub_items.length > 0 && (
-                      <p className="text-xs text-indigo-400 mt-2">
+                      <p className="text-xs text-blue-400 mt-2">
                         目前有 {pendingMerge.targetTask.sub_items.length} 個待辦事項
                       </p>
                     )}
@@ -4232,7 +4232,7 @@ export default function DashboardPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
         </div>
       }
     >
