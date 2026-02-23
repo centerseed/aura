@@ -46,14 +46,14 @@
     /* Drawer 狀態背景色 */
     --drawer-inbox-bg:     45 100% 94%;
     --drawer-active-bg:    207 89% 94%;
-    --drawer-maintain-bg:  293 50% 93%;
+    --drawer-maintain-bg:  220 60% 94%;
     --drawer-reference-bg: 125 39% 93%;
     --drawer-archive-bg:   204 14% 94%;
 
     /* Drawer 狀態前景色 */
     --drawer-inbox-fg:     37 91% 55%;
     --drawer-active-fg:    217 91% 60%;
-    --drawer-maintain-fg:  239 84% 67%;
+    --drawer-maintain-fg:  220 80% 55%;
     --drawer-reference-fg: 142 71% 45%;
     --drawer-archive-fg:   215 16% 66%;
 
@@ -118,14 +118,14 @@
     /* Drawer 狀態背景色（暗色模式） */
     --drawer-inbox-bg:     45 80% 12%;
     --drawer-active-bg:    213 80% 12%;
-    --drawer-maintain-bg:  239 60% 15%;
+    --drawer-maintain-bg:  220 60% 15%;
     --drawer-reference-bg: 142 60% 12%;
     --drawer-archive-bg:   217 20% 16%;
 
     /* Drawer 狀態前景色（暗色模式） */
     --drawer-inbox-fg:     45 96% 56%;
     --drawer-active-fg:    213 93% 68%;
-    --drawer-maintain-fg:  234 89% 74%;
+    --drawer-maintain-fg:  220 85% 72%;
     --drawer-reference-fg: 142 71% 58%;
     --drawer-archive-fg:   215 16% 66%;
 
@@ -230,9 +230,9 @@
   .text-white\/80 { color: rgba(26, 31, 54, 0.85); }
   .text-white\/70 { color: rgba(26, 31, 54, 0.7); }
   .text-white\/60 { color: #64748b; }
-  .text-white\/50 { color: #94a3b8; }
-  .text-white\/40 { color: #a0aec0; }
-  .text-white\/30 { color: #b8c4d0; }
+  .text-white\/50 { color: #64748b; }
+  .text-white\/40 { color: #718096; }
+  .text-white\/30 { color: #94a3b8; }
   .placeholder\:text-white\/30::placeholder { color: #b8c4d0; }
 
   /* === 半透明表面 → 懸浮卡片質感 === */
@@ -287,7 +287,7 @@
   .text-indigo-300 { color: #4f46e5; }
   .text-indigo-400 { color: #6366f1; }
   .text-blue-300   { color: #2563eb; }
-  .text-purple-300 { color: #7c3aed; }
+  .text-purple-300 { color: #2563eb; }
   .text-amber-400  { color: #d4a04a; }
   .text-green-400  { color: #16a34a; }
   .text-red-400    { color: #e07070; }
@@ -297,7 +297,7 @@
   .bg-indigo-500\/20 { background-color: rgba(99, 102, 241, 0.08); }
   .bg-indigo-500\/10 { background-color: rgba(99, 102, 241, 0.06); }
   .bg-blue-500\/30   { background-color: rgba(59, 130, 246, 0.12); }
-  .bg-purple-500\/30 { background-color: rgba(124, 58, 237, 0.12); }
+  .bg-purple-500\/30 { background-color: rgba(59, 130, 246, 0.12); }
   .bg-green-500\/10  { background-color: rgba(22, 163, 74, 0.08); }
   .bg-yellow-500\/10 { background-color: rgba(234, 179, 8, 0.08); }
   .bg-amber-500\/10  { background-color: rgba(245, 158, 11, 0.08); }

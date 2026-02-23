@@ -103,7 +103,7 @@ export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate
           <div className="flex items-center gap-2 mb-3">
             <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-fuchsia-500 transition-all"
+                className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
                 style={{ width: `${(task.sub_items_meta?.completed || 0) / (task.sub_items_meta?.total || 1) * 100}%` }}
               />
             </div>

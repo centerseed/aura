@@ -912,7 +912,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
               ref={dropdownRef}
               className="relative w-full max-w-md mx-4 bg-slate-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden"
             >
-              <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+              <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-blue-900/30 to-slate-900/30">
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4 text-indigo-400" />
                   <span className="text-sm font-medium text-white">選擇專案</span>
@@ -956,7 +956,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         <div className="w-full max-w-xl mx-auto">
           <div className="bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl shadow-indigo-500/20 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-gradient-to-r from-blue-900/30 to-slate-900/30">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-indigo-400" />
                 <span className="text-base font-medium text-white">快速記錄</span>
@@ -976,7 +976,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
 
             {/* 處理中動畫 */}
             {isProcessing && (
-              <div className="p-5 border-b border-white/10 bg-gradient-to-r from-purple-900/20 to-indigo-900/20">
+              <div className="p-5 border-b border-white/10 bg-gradient-to-r from-blue-900/20 to-slate-900/20">
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
@@ -1168,7 +1168,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             className="relative w-full max-w-md mx-4 bg-slate-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden"
           >
             {/* 標題 */}
-            <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+            <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-blue-900/30 to-slate-900/30">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-indigo-400" />
                 <span className="text-sm font-medium text-white">選擇專案</span>
@@ -1571,7 +1571,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         {/* 主面板 */}
         <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-indigo-500/20 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/30 to-indigo-900/30">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gradient-to-r from-blue-900/30 to-slate-900/30">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-400" />
             <span className="text-sm font-medium text-white">快速記錄</span>
@@ -1692,7 +1692,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
 
           {/* 處理中動畫 - 快速記錄 */}
           {isProcessing && (
-            <div className="p-4 border-b border-white/10 bg-gradient-to-r from-purple-900/20 to-indigo-900/20">
+            <div className="p-4 border-b border-white/10 bg-gradient-to-r from-blue-900/20 to-slate-900/20">
             <div className="flex items-center gap-3">
               <div className="relative">
                 <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />

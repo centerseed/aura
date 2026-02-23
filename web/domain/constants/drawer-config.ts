@@ -54,7 +54,7 @@ export const DRAWER_CONFIG: Record<DrawerStatus, DrawerConfigItem> = {
     badgeBorder: 'border-indigo-500/30',
     badgeText: 'text-indigo-400',
     columnGradient: 'from-indigo-500/10 to-emerald-500/5',
-    columnBorder: 'border-indigo-200 dark:border-purple-800',
+    columnBorder: 'border-indigo-200 dark:border-blue-800',
   },
   REFERENCE: {
     label: '參考資料',

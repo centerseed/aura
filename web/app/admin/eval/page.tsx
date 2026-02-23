@@ -323,8 +323,8 @@ export default function EvaluationDashboard() {
                 {selectedLog.metadata && (
                   <div>
                     <h3 className="text-sm font-medium text-white/70 mb-2">額外資訊</h3>
-                    <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 max-h-64 overflow-y-auto">
-                      <pre className="text-xs text-purple-200 whitespace-pre-wrap break-words">
+                    <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 max-h-64 overflow-y-auto">
+                      <pre className="text-xs text-blue-200 whitespace-pre-wrap break-words">
                         {JSON.stringify(selectedLog.metadata, null, 2)}
                       </pre>
                     </div>

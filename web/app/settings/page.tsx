@@ -500,7 +500,7 @@ function SettingsContent() {
           <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
               <CardTitle className="flex items-center text-white">
-                <Plug className="w-5 h-5 mr-2 text-purple-400" />
+                <Plug className="w-5 h-5 mr-2 text-blue-400" />
                 MCP Integration
               </CardTitle>
               <CardDescription className="text-slate-400">
@@ -515,19 +515,19 @@ function SettingsContent() {
                 </p>
                 <ul className="space-y-2 text-sm text-slate-400">
                   <li className="flex items-start">
-                    <span className="text-purple-400 mr-2">✓</span>
+                    <span className="text-blue-400 mr-2">✓</span>
                     查看你的任務清單和今日計畫
                   </li>
                   <li className="flex items-start">
-                    <span className="text-purple-400 mr-2">✓</span>
+                    <span className="text-blue-400 mr-2">✓</span>
                     新增任務到 Inbox
                   </li>
                   <li className="flex items-start">
-                    <span className="text-purple-400 mr-2">✓</span>
+                    <span className="text-blue-400 mr-2">✓</span>
                     搜尋知識庫內容
                   </li>
                   <li className="flex items-start">
-                    <span className="text-purple-400 mr-2">✓</span>
+                    <span className="text-blue-400 mr-2">✓</span>
                     查看專案結構（Areas/Products/Topics）
                   </li>
                 </ul>
@@ -538,17 +538,17 @@ function SettingsContent() {
                 <p className="text-sm font-medium text-white">設定步驟：</p>
                 <ol className="space-y-3 text-sm text-slate-300">
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-400 font-bold">1.</span>
+                    <span className="text-blue-400 font-bold">1.</span>
                     <div>
                       在專案根目錄建立（或開啟）<code className="bg-slate-800 px-1 py-0.5 rounded text-xs">.mcp.json</code>
                     </div>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-400 font-bold">2.</span>
+                    <span className="text-blue-400 font-bold">2.</span>
                     <div>複製下方設定並貼到 <code className="bg-slate-800 px-1 py-0.5 rounded text-xs">mcpServers</code> 區塊</div>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-400 font-bold">3.</span>
+                    <span className="text-blue-400 font-bold">3.</span>
                     <div>重新啟動 Claude Code，首次使用時會自動進行 OAuth 授權</div>
                   </li>
                 </ol>
@@ -582,7 +582,7 @@ function SettingsContent() {
                   onClick={handleCopyMcpConfig}
                   size="sm"
                   variant="outline"
-                  className="absolute top-2 right-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                  className="absolute top-2 right-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                 >
                   {mcpConfigCopied ? (
                     <>

@@ -15,7 +15,7 @@ export function TourScene3() {
     <div className="space-y-12 max-w-3xl mx-auto">
       {/* 標題區域 - 統一風格 */}
       <div className="text-center space-y-3 animate-in fade-in duration-500">
-        <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-[0_2px_20px_rgba(168,85,247,0.4)]">
+        <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-[0_2px_20px_rgba(59,130,246,0.4)]">
           AI 會自動整理並安排時間
         </h1>
         <p className="text-lg text-white/90 max-w-xl mx-auto font-medium">
@@ -97,7 +97,7 @@ export function TourScene3() {
 
       {/* 核心說明 - 簡化版 */}
       <div
-        className={`p-6 rounded-2xl bg-gradient-to-r from-indigo-600/30 to-violet-600/30 border-2 border-indigo-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
+        className={`p-6 rounded-2xl bg-gradient-to-r from-indigo-600/30 to-blue-600/30 border-2 border-indigo-400/40 backdrop-blur-xl shadow-2xl transition-all duration-500 ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         }`}
         style={{ transitionDelay: "300ms" }}

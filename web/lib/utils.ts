@@ -23,7 +23,7 @@ export const DRAWER_CONFIG = {
     label: "維護中",
     icon: "RefreshCw",
     bg: "bg-drawer-maintain",
-    border: "border-purple-500",
+    border: "border-blue-500",
   },
   "30_reference": {
     label: "參考",

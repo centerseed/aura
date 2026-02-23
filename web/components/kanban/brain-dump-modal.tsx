@@ -62,7 +62,7 @@ export function BrainDumpModal({ isOpen, onClose, onSubmit, isLoading }: BrainDu
           />
 
           {/* Tips */}
-          <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-indigo-500/20">
+          <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-slate-900/30 border border-indigo-500/20">
             <p className="text-sm text-indigo-300">
               <strong>提示：</strong>可以混合多個主題，使用任何語言。AI 會：
             </p>

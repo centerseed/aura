@@ -140,7 +140,7 @@ export default function HomeDemo() {
         input: "明天要打電話給客戶\n記得準備簡報\n下午3點開會",
         category: "TodoList",
         icon: ListTodo,
-        color: "purple",
+        color: "blue",
         outputItems: [
           { text: "打電話給客戶", time: "明天", priority: "高" },
           { text: "準備簡報", time: "明天", priority: "中" },
@@ -522,14 +522,6 @@ export default function HomeDemo() {
                           iconText: isDark ? "text-emerald-400" : "text-emerald-700",
                           text: isDark ? "text-emerald-400" : "text-emerald-700",
                           shadow: isDark ? "shadow-emerald-500/20" : "shadow-emerald-300/20"
-                        },
-                        purple: {
-                          border: isDark ? "border-purple-500/50" : "border-purple-400",
-                          bg: isDark ? "from-purple-500/20" : "from-purple-50",
-                          iconBg: isDark ? "bg-purple-500/30" : "bg-purple-200",
-                          iconText: isDark ? "text-purple-400" : "text-purple-700",
-                          text: isDark ? "text-purple-400" : "text-purple-700",
-                          shadow: isDark ? "shadow-purple-500/20" : "shadow-purple-300/20"
                         },
                         indigo: {
                           border: isDark ? "border-indigo-500/50" : "border-indigo-400",

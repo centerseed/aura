@@ -102,21 +102,21 @@ export default function HomeDemo() {
           input: "明天要打電話給客戶\n記得準備簡報\n下午3點開會",
           category: "TodoList",
           icon: ListTodo,
-          color: "purple",
+          color: "blue",
           result: "自動拆分成 3 個待辦事項，加上時間標記和優先級"
         },
         {
           input: "產品改版：修 bug、優化 UI、寫文檔",
           category: "TodoList",
           icon: ListTodo,
-          color: "purple",
+          color: "blue",
           result: "智能拆解成子任務清單，建議執行順序"
         },
         {
           input: "週一發文、週三客服、週五覆盤",
           category: "TodoList",
           icon: ListTodo,
-          color: "purple",
+          color: "blue",
           result: "自動轉換為結構化的週計畫"
         }
       ]
@@ -412,14 +412,6 @@ export default function HomeDemo() {
                           text: isDark ? "text-emerald-400" : "text-emerald-700",
                           shadow: isDark ? "shadow-emerald-500/20" : "shadow-emerald-300/20"
                         },
-                        purple: {
-                          border: isDark ? "border-purple-500/50" : "border-purple-400",
-                          bg: isDark ? "from-purple-500/20" : "from-purple-50",
-                          iconBg: isDark ? "bg-purple-500/30" : "bg-purple-200",
-                          iconText: isDark ? "text-purple-400" : "text-purple-700",
-                          text: isDark ? "text-purple-400" : "text-purple-700",
-                          shadow: isDark ? "shadow-purple-500/20" : "shadow-purple-300/20"
-                        },
                         indigo: {
                           border: isDark ? "border-indigo-500/50" : "border-indigo-400",
                           bg: isDark ? "from-indigo-500/20" : "from-indigo-50",
@@ -483,10 +475,6 @@ export default function HomeDemo() {
                           emerald: {
                             bg: isDark ? "bg-emerald-500/20" : "bg-emerald-100",
                             text: isDark ? "text-emerald-400" : "text-emerald-600"
-                          },
-                          purple: {
-                            bg: isDark ? "bg-purple-500/20" : "bg-purple-100",
-                            text: isDark ? "text-purple-400" : "text-purple-600"
                           },
                           indigo: {
                             bg: isDark ? "bg-indigo-500/20" : "bg-indigo-100",

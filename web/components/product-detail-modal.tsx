@@ -1254,7 +1254,7 @@ export function ProductDetailModal({
               ) : (
                 <div className="relative">
                   {/* Timeline connector line */}
-                  <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-gradient-to-b from-blue-500/50 via-indigo-500/50 to-purple-500/50" />
+                  <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-gradient-to-b from-blue-500/50 via-blue-400/50 to-cyan-500/50" />
 
                   {/* Milestone items */}
                   <div className="space-y-4">

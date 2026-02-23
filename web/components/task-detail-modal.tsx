@@ -723,7 +723,7 @@ export function TaskDetailModal({
                   </div>
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-fuchsia-500 transition-all duration-300"
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-300"
                       style={{ width: `${(task.sub_items_meta.completion_rate || 0) * 100}%` }}
                     />
                   </div>

@@ -19,7 +19,7 @@ export function TourScene1({ userAreas }: Props) {
     <div className="space-y-8 max-w-3xl mx-auto">
       {/* 標題區域 - 緊湊版 */}
       <div className="text-center space-y-2 animate-in fade-in duration-500">
-        <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-[0_2px_20px_rgba(168,85,247,0.4)]">
+        <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-[0_2px_20px_rgba(59,130,246,0.4)]">
           剛剛你定義了「身份地圖」
         </h1>
         <p className="text-base text-white/90 max-w-xl mx-auto font-medium">

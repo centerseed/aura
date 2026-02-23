@@ -365,26 +365,26 @@ export function ReorganizeModal({
 
           {/* ========== Section 3: 任務整合 ========== */}
           {hasConsolidations && (
-            <div className={`rounded-xl border ${applyConsolidations ? 'border-violet-200 dark:border-violet-500/20 bg-violet-50/30 dark:bg-violet-950/10' : 'border-slate-200 dark:border-white/10 opacity-50'} overflow-hidden transition-all`}>
+            <div className={`rounded-xl border ${applyConsolidations ? 'border-blue-200 dark:border-blue-500/20 bg-blue-50/30 dark:bg-blue-950/10' : 'border-slate-200 dark:border-white/10 opacity-50'} overflow-hidden transition-all`}>
               {/* Section Header = Checkbox */}
-              <label className="flex items-center gap-3 px-4 py-3 cursor-pointer bg-violet-50 dark:bg-violet-500/10 border-b border-violet-200 dark:border-violet-500/20">
+              <label className="flex items-center gap-3 px-4 py-3 cursor-pointer bg-blue-50 dark:bg-blue-500/10 border-b border-blue-200 dark:border-blue-500/20">
                 <input
                   type="checkbox"
                   checked={applyConsolidations}
                   onChange={(e) => setApplyConsolidations(e.target.checked)}
-                  className="w-4 h-4 rounded border-violet-400 dark:border-violet-500 text-violet-600 focus:ring-violet-500"
+                  className="w-4 h-4 rounded border-blue-400 dark:border-blue-500 text-blue-600 focus:ring-blue-500"
                 />
-                <Layers className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                <span className="font-semibold text-violet-900 dark:text-violet-200">
+                <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="font-semibold text-blue-900 dark:text-blue-200">
                   任務整合
                 </span>
-                <span className="text-sm text-violet-600 dark:text-violet-300/70">
+                <span className="text-sm text-blue-600 dark:text-blue-300/70">
                   {proposal.task_consolidations!.length} 組細碎任務合併
                 </span>
               </label>
 
               {/* Consolidation Items */}
-              <div className="divide-y divide-violet-100 dark:divide-violet-500/10">
+              <div className="divide-y divide-blue-100 dark:divide-blue-500/10">
                 {proposal.task_consolidations!.map((consolidation, idx) => {
                   const parentTask = taskContextMap.get(consolidation.parent_task_id);
                   const subTasks = consolidation.sub_task_ids.map(id => taskContextMap.get(id)).filter(Boolean);
@@ -393,18 +393,18 @@ export function ReorganizeModal({
                     <div key={idx} className="px-4 py-3 space-y-2">
                       {/* 整合結果標題 */}
                       <div className="flex items-start gap-2">
-                        <div className="font-medium text-sm text-violet-900 dark:text-violet-100">
+                        <div className="font-medium text-sm text-blue-900 dark:text-blue-100">
                           {consolidation.consolidated_title}
                         </div>
-                        <span className="text-xs text-violet-500 dark:text-violet-300/60 flex-shrink-0 mt-0.5">
+                        <span className="text-xs text-blue-500 dark:text-blue-300/60 flex-shrink-0 mt-0.5">
                           {consolidation.reasoning}
                         </span>
                       </div>
 
                       {/* 被整合的任務列表 */}
-                      <div className="ml-2 space-y-1 border-l-2 border-violet-200 dark:border-violet-500/20 pl-3">
+                      <div className="ml-2 space-y-1 border-l-2 border-blue-200 dark:border-blue-500/20 pl-3">
                         <div className="text-xs text-slate-600 dark:text-white/70 flex items-center gap-1.5">
-                          <span className="text-[10px] px-1 py-0.5 rounded bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300">主</span>
+                          <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">主</span>
                           {parentTask?.title || consolidation.parent_task_id}
                         </div>
                         {subTasks.map((task, subIdx) => (

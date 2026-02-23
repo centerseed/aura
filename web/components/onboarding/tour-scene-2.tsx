@@ -15,7 +15,7 @@ export function TourScene2() {
     <div className="space-y-12 max-w-3xl mx-auto">
       {/* 標題區域 */}
       <div className="text-center space-y-3 animate-in fade-in duration-500">
-        <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-[0_2px_20px_rgba(168,85,247,0.4)]">
+        <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-[0_2px_20px_rgba(59,130,246,0.4)]">
           什麼是里程碑？
         </h1>
         <p className="text-lg text-white/90 max-w-xl mx-auto font-medium">
@@ -45,12 +45,12 @@ export function TourScene2() {
 
         {/* 重點 2 */}
         <div className="flex gap-4 items-start">
-          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-violet-500/20 border-2 border-violet-400/40 flex items-center justify-center">
-            <span className="text-violet-400 text-xl font-bold">2</span>
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-500/20 border-2 border-blue-400/40 flex items-center justify-center">
+            <span className="text-blue-400 text-xl font-bold">2</span>
           </div>
           <div className="flex-1 pt-2">
             <div className="flex items-center gap-2 mb-2">
-              <Anchor className="w-5 h-5 text-violet-400" />
+              <Anchor className="w-5 h-5 text-blue-400" />
               <h3 className="text-white text-xl font-semibold">里程碑是時間錨點</h3>
             </div>
             <p className="text-white/70 text-base">讓系統知道什麼時候必須完成</p>

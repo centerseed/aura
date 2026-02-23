@@ -421,10 +421,10 @@ function MilestoneLoadViewComponent({ areas, milestones }: MilestoneLoadViewProp
                         {day.milestones.map((m) => (
                           <div
                             key={m.id}
-                            className="flex items-start gap-2 bg-purple-50 dark:bg-purple-500/20 rounded px-2 py-1.5 text-sm border border-purple-200 dark:border-purple-500/30"
+                            className="flex items-start gap-2 bg-blue-50 dark:bg-blue-500/20 rounded px-2 py-1.5 text-sm border border-blue-200 dark:border-blue-500/30"
                           >
-                            <Flag className="h-4 w-4 text-purple-500 dark:text-purple-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-purple-700 dark:text-purple-300">{m.name}</span>
+                            <Flag className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                            <span className="text-blue-700 dark:text-blue-300">{m.name}</span>
                           </div>
                         ))}
                       </div>

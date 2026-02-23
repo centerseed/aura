@@ -18,7 +18,7 @@ const mockDrawerConfig = {
   INBOX: { label: '規劃中', dotColor: '#888' },
   ACTIVE: { label: '進行中', dotColor: '#3b82f6' },
   MAINTAIN: { label: '維護中', dotColor: '#22c55e' },
-  REFERENCE: { label: '參考', dotColor: '#a855f7' },
+  REFERENCE: { label: '參考', dotColor: '#3b82f6' },
   ARCHIVE: { label: '已歸檔', dotColor: '#6b7280' },
 } as any
 

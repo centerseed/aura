@@ -933,7 +933,7 @@ function TodaySheetContent({
                               ds.suggested_action === "archive"
                                 ? "bg-slate-500/20 text-slate-300"
                                 : ds.suggested_action === "delegate"
-                                ? "bg-purple-500/20 text-purple-300"
+                                ? "bg-blue-500/20 text-blue-300"
                                 : "bg-blue-500/20 text-blue-300"
                             }`}
                           >
