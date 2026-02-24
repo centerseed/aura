@@ -7,7 +7,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const MCP_URL = 'https://zentropy-api-894512935237.asia-east1.run.app/mcp';
+const MCP_URL = 'https://api.zentropy.cc/mcp';
 
 async function testMcpServer() {
   console.log('==========================================');

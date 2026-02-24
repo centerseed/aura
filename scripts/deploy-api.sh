@@ -243,10 +243,12 @@ DEPLOY_ARGS=(
     --update-secrets GOOGLE_OAUTH_CLIENT_SECRET=google-oauth-client-secret:latest
     --update-secrets OAUTH_ENCRYPTION_KEY=oauth-encryption-key:latest
     --update-secrets ZENTROPY_MCP_JWT_SECRET=ZENTROPY_MCP_JWT_SECRET:latest
+    --update-secrets CALENDAR_WEBHOOK_SECRET=calendar-webhook-secret:latest
 
     # Node.js 環境變數
     # NEXT_PUBLIC_API_URL 必須指向 API Backend，用於 OAuth Discovery metadata
-    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://zentropy-api-isakqhri2a-de.a.run.app,NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAJYyZ1wfUHyxaCpI11Z2c3SH44Qi7lg-E,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5"
+    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://api.zentropy.cc,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5"
+    --update-secrets NEXT_PUBLIC_FIREBASE_API_KEY=firebase-web-api-key:latest
 )
 
 if [ "$ENVIRONMENT" = "staging" ]; then

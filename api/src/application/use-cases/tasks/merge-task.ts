@@ -2,7 +2,7 @@
  * MergeTaskUseCase - 合併任務
  *
  * Application Layer Use Case
- * 將來源任務合併為目標任務的 sub_task + 雙寫 JSON（過渡期相容）
+ * 將來源任務合併為目標任務的 sub_task
  */
 
 import type {
@@ -13,7 +13,7 @@ import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
 import { mergeReferences } from '@/application/use-cases/merge-references'
 import type { Reference } from '@/domain/entities/task.entity'
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -125,9 +125,7 @@ export class MergeTaskUseCase {
     const targetReferences = (targetTask.references || []) as unknown as Reference[]
     const mergedReferences = mergeReferences(targetReferences, sourceReferences)
 
-    // 8. 雙寫 JSON + 更新 target task + 軟刪除 source task
-    await syncSubTasksToJson(request.targetTaskId)
-
+    // 8. 更新 target task + 軟刪除 source task
     await prisma.$transaction([
       prisma.task.update({
         where: { id: request.targetTaskId },

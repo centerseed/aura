@@ -7,7 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Loader2, LogIn, Zap, RefreshCw, BookOpen, Sparkles, Check, ListTodo, Wand2, Sun, Moon, Calendar } from "lucide-react";
-import { auth, googleProvider, appleProvider, signInWithPopup, signInAnonymously } from "@/lib/firebase";
+import { auth, googleProvider, appleProvider, signInWithPopup } from "@/lib/firebase";
 
 export default function HomeDemo() {
   const router = useRouter();
@@ -249,35 +249,6 @@ export default function HomeDemo() {
     }
   };
 
-  const handleAnonymousSignIn = async () => {
-    setIsEntering(true);
-    isSigningInRef.current = true;
-    try {
-      const result = await signInAnonymously(auth);
-      const user = result.user;
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: "anonymous",
-          providerId: user.uid,
-          email: null,
-          name: "訪客",
-        }),
-      });
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`登入 API 失敗: ${response.status} - ${error}`);
-      }
-      const userData = await response.json();
-      await redirectUser(userData);
-    } catch (error) {
-      console.error("匿名登入失敗:", error);
-      setIsEntering(false);
-      isSigningInRef.current = false;
-      alert(`登入失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
-    }
-  };
 
   const handleNameSignIn = async () => {
     if (!name.trim()) return;
@@ -1235,23 +1206,6 @@ export default function HomeDemo() {
                   )}
                 </Button>
 
-                <Button
-                  onClick={handleAnonymousSignIn}
-                  disabled={isEntering}
-                  className="w-full h-12 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-medium"
-                >
-                  {isEntering ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>訪客模式</>
-                  )}
-                </Button>
-
-                <div className="relative flex items-center py-2">
-                  <div className={`flex-1 border-t ${isDark ? "border-white/10" : "border-slate-200"}`}></div>
-                  <span className={`px-3 text-sm ${isDark ? "text-white/40" : "text-slate-400"}`}>或</span>
-                  <div className={`flex-1 border-t ${isDark ? "border-white/10" : "border-slate-200"}`}></div>
-                </div>
 
                 <Button
                   onClick={() => setAuthMethod("name")}

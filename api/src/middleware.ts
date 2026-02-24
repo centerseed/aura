@@ -7,7 +7,34 @@ import type { NextRequest } from 'next/server'
  * 在開發環境中允許來自 localhost:3001 (Web) 的請求
  * 在生產環境中可以設定特定的域名
  */
+// 已知的爬蟲 User-Agent 關鍵字
+const BOT_PATTERNS = [
+  'Googlebot', 'bingbot', 'Baiduspider', 'YandexBot',
+  'DuckDuckBot', 'Slurp', 'facebookexternalhit', 'Twitterbot',
+  'rogerbot', 'linkedinbot', 'embedly', 'showyoubot',
+  'outbrain', 'pinterest', 'applebot', 'SemrushBot',
+  'AhrefsBot', 'MJ12bot', 'DotBot', 'PetalBot',
+]
+
+function isBot(userAgent: string | null): boolean {
+  if (!userAgent) return false
+  const ua = userAgent.toLowerCase()
+  return BOT_PATTERNS.some(bot => ua.includes(bot.toLowerCase()))
+}
+
 export function middleware(request: NextRequest) {
+  // 🛡️ Bot 防護：無認證的爬蟲請求直接拒絕
+  // 跳過條件：有 Authorization header、或公開端點（health check 等）
+  const pathname = request.nextUrl.pathname
+  const isPublicEndpoint = pathname === '/api/health'
+  const hasAuth = request.headers.has('authorization')
+  if (!hasAuth && !isPublicEndpoint && isBot(request.headers.get('user-agent'))) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403 }
+    )
+  }
+
   // 允許的來源 (origins)
   const allowedOrigins = [
     'http://localhost:3001', // 本地開發 Web

@@ -2,7 +2,7 @@
  * DeleteSubItemUseCase - 刪除任務子項目
  *
  * Application Layer Use Case
- * 操作 sub_tasks 表（soft delete）+ 雙寫 JSON（過渡期相容）
+ * 操作 sub_tasks 表（soft delete）
  */
 
 import type {
@@ -11,7 +11,7 @@ import type {
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -90,10 +90,7 @@ export class DeleteSubItemUseCase {
       )
     }
 
-    // 6. 雙寫：同步到 JSON
-    await syncSubTasksToJson(request.taskId)
-
-    // 7. 清理對應的 plan item
+    // 6. 清理對應的 plan item
     try {
       await prisma.dailyPlanItem.deleteMany({
         where: {
@@ -105,7 +102,7 @@ export class DeleteSubItemUseCase {
       console.error('[DeleteSubItemUseCase] Failed to cleanup plan item:', error)
     }
 
-    // 8. 計算統計資訊
+    // 7. 計算統計資訊
     const meta = await getSubTasksMeta(request.taskId)
 
     return {

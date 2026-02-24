@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
-import { syncSubTasksToJson } from "@/infrastructure/repositories/sub-task-sync";
+import { UnauthorizedException } from "@/lib/api-response";
 
 // POST /api/products/[id]/restore-recent-tasks - 恢復最近被刪除的 Tasks
 export async function POST(
@@ -78,11 +78,6 @@ export async function POST(
         data: { deleted_at: new Date() },
       });
 
-      // 雙寫：sync 受影響的 parent tasks 的 JSON
-      const affectedParentIds = [...new Set(affectedSubTasks.map(s => s.task_id))];
-      for (const parentId of affectedParentIds) {
-        await syncSubTasksToJson(parentId);
-      }
     }
 
     return NextResponse.json({
@@ -96,12 +91,12 @@ export async function POST(
       })),
     });
   } catch (error) {
+    if (error instanceof UnauthorizedException) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Restore tasks failed:", error);
     return NextResponse.json(
-      {
-        error: "Failed to restore tasks",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to restore tasks" },
       { status: 500 }
     );
   }
@@ -144,15 +139,12 @@ export async function GET(
       })),
     });
   } catch (error) {
-    console.error("Get deleted tasks failed:", error);
-    if (error instanceof Error && error.message.includes("token")) {
+    if (error instanceof UnauthorizedException) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    console.error("Get deleted tasks failed:", error);
     return NextResponse.json(
-      {
-        error: "Failed to get deleted tasks",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to get deleted tasks" },
       { status: 500 }
     );
   }

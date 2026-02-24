@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server'
 import { authenticateRequest } from '@/lib/auth-middleware'
 import { prisma } from '@/lib/db'
 import { ApiResponseBuilder, catchDomainException } from '@/lib/api-response'
+import { checkAiRateLimit, incrementAiUsage } from '@/lib/ai-rate-limit'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { GetPlanUseCase } from '@/application/use-cases/coach/get-plan'
 import { formatPlan } from '@/app/api/coach/plan/_shared'
@@ -31,12 +32,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma)
+    await checkAiRateLimit(userId)
 
     const body = await request.json() as any
     const { date, timezone } = body || {}
 
     const useCase = new GeneratePlanUseCase()
     const result = await useCase.execute({ userId, date, timezone })
+    await incrementAiUsage(userId)
 
     return ApiResponseBuilder.success({
       plan: formatPlan(result.plan),

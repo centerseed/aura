@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInAnonymously } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -24,4 +24,4 @@ export const isMobileDevice = () => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
-export { auth, googleProvider, appleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInAnonymously };
+export { auth, googleProvider, appleProvider, signInWithPopup, signInWithRedirect, getRedirectResult };

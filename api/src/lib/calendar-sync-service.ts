@@ -65,6 +65,7 @@ export class CalendarSyncService {
           id: channelId,
           type: 'web_hook',
           address: webhookUrl,
+          token: process.env.CALENDAR_WEBHOOK_SECRET || '',
           params: {
             ttl: '604800', // 7 days in seconds
           },

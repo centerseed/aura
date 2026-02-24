@@ -18,7 +18,7 @@
     "test:components": "vitest run tests/components",
     "test:e2e": "vitest run tests/e2e",
     "test:e2e:local": "NEXT_PUBLIC_API_URL=http://localhost:3002 vitest run tests/e2e",
-    "test:e2e:prod": "NEXT_PUBLIC_API_URL=https://zentropy-api-894512935237.asia-east1.run.app vitest run tests/e2e",
+    "test:e2e:prod": "NEXT_PUBLIC_API_URL=https://api.zentropy.cc vitest run tests/e2e",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",

@@ -2,9 +2,9 @@
   "mcpServers": {
     "zentropy": {
       "type": "http",
-      "url": "https://zentropy-api-isakqhri2a-de.a.run.app/mcp",
+      "url": "https://api.zentropy.cc/mcp",
       "oauth": {
-        "discoveryUrl": "https://zentropy-api-isakqhri2a-de.a.run.app/.well-known/oauth-authorization-server-metadata",
+        "discoveryUrl": "https://api.zentropy.cc/.well-known/oauth-authorization-server-metadata",
         "clientId": "claude-code",
         "scopes": [
           "read:tasks",

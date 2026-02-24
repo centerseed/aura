@@ -20,13 +20,12 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-// Mock sub-task-sync
-vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
-  syncSubTasksToJson: vi.fn(),
+// Mock sub-task-utils
+vi.mock('@/infrastructure/repositories/sub-task-utils', () => ({
   getSubTasksMeta: vi.fn(),
 }))
 
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -133,7 +132,6 @@ describe('AddSubItemUseCase', () => {
       expect(result.meta.completionRate).toBe(0)
       expect(result.message).toBe('Sub-item added successfully')
       expect(prisma.subTask.create).toHaveBeenCalled()
-      expect(syncSubTasksToJson).toHaveBeenCalledWith('task-123')
     })
 
     it('應該將新 sub-item 附加到現有列表', async () => {

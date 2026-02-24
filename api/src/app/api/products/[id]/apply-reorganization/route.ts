@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { UnauthorizedException } from "@/lib/api-response";
 import { isValidUUID } from "@/domain/constants/validation";
 import type { Reference } from "@/domain/entities/task.entity";
 import { mergeReferences } from "@/application/use-cases/merge-references";
-import { syncSubTasksToJson } from "@/infrastructure/repositories/sub-task-sync";
 import { cleanupZombieTopics } from "@/application/use-cases/topics/cleanup-zombie-topics";
 
 type TopicOperation =
@@ -341,7 +341,7 @@ export async function POST(
             ? new Date(Math.max(...allDueDates.map(d => d.getTime())))
             : null;
 
-          // 更新 parent task（不直接寫 sub_items，由 syncSubTasksToJson 處理）
+          // 更新 parent task
           const parentAnalysis = (parentTask.ai_analysis as Record<string, unknown>) || {};
           await tx.task.update({
             where: { id: consolidation.parent_task_id },
@@ -383,16 +383,10 @@ export async function POST(
         }
       }
 
-      // 收集需要 sync 的 parent task IDs
-      const parentTaskIds = (proposal.task_consolidations || [])
-        .map(c => c.parent_task_id)
-        .filter(id => isValidUUID(id));
-
       return {
         updated_topics: applyTopicOps ? proposal.proposed_clusters.length : 0,
         updated_tasks: updatedTasksCount,
         consolidated_tasks: consolidatedCount,
-        parentTaskIds,
         operatedTopicIds: Array.from(operatedTopicIds),
       };
     }, {
@@ -403,11 +397,6 @@ export async function POST(
     console.log(`[APPLY-REORGANIZATION] Transaction 完成:`);
     console.log(`  updated_topics: ${result.updated_topics}, updated_tasks: ${result.updated_tasks}, consolidated: ${result.consolidated_tasks}`);
     console.log(`  operatedTopicIds: ${result.operatedTopicIds.join(', ')}`);
-
-    // 雙寫：同步 sub_tasks → JSON（在 transaction 外執行）
-    for (const taskId of result.parentTaskIds) {
-      await syncSubTasksToJson(taskId);
-    }
 
     // 清理 zombie topics
     await cleanupZombieTopics(prisma, {
@@ -441,12 +430,12 @@ export async function POST(
       }`,
     });
   } catch (error) {
+    if (error instanceof UnauthorizedException) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Apply reorganization failed:", error);
     return NextResponse.json(
-      {
-        error: "Failed to apply reorganization",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to apply reorganization" },
       { status: 500 }
     );
   }

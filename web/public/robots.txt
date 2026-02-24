@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /dashboard
+Disallow: /api
+Disallow: /admin
+Disallow: /settings
+Disallow: /onboarding
+
+Sitemap: https://zentropy.cc/sitemap.xml

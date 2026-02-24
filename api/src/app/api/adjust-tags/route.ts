@@ -8,6 +8,7 @@ import { NextRequest } from "next/server"
 import { prisma } from "@/lib/db"
 import { authenticateRequest } from "@/lib/auth-middleware"
 import { ApiResponseBuilder, ValidationException, catchDomainException } from "@/lib/api-response"
+import { checkAiRateLimit, incrementAiUsage } from "@/lib/ai-rate-limit"
 import { sanitizeText } from "@/domain/constants/validation"
 import { AnalyzeAdjustmentIntentUseCase } from "@/application/use-cases/adjust-tags/analyze-adjustment-intent"
 import { ExecuteAdjustmentUseCase, type ExecuteAdjustmentRequest } from "@/application/use-cases/adjust-tags/execute-adjustment"
@@ -17,6 +18,7 @@ export async function POST(request: NextRequest) {
   return catchDomainException<any>(async () => {
     const startTotal = Date.now()
     const userId = await authenticateRequest(request, prisma)
+    await checkAiRateLimit(userId)
     const body = await request.json() as any
     const { preview = false, confirmed = false, logId = null } = body
 
@@ -39,6 +41,8 @@ export async function POST(request: NextRequest) {
       preview: preview || !confirmed,
     })
 
+    // Note: preview 模式也消耗 AI quota，因為 AnalyzeAdjustmentIntent 每次都呼叫 LLM
+    await incrementAiUsage(userId)
     const { intent, taskMap, structuredOperations, previewLog, timings } = analysis
 
     // 如果不是調整指令

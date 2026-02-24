@@ -105,9 +105,9 @@ gcloud run deploy "$SERVICE_NAME" \
   --concurrency 80 \
   --timeout 300 \
   --set-env-vars "NODE_ENV=production" \
-  --set-env-vars "DATABASE_URL=$DATABASE_URL" \
-  --set-env-vars "GOOGLE_GENERATIVE_AI_API_KEY=$GOOGLE_GENERATIVE_AI_API_KEY" \
-  --set-env-vars "LIBRARIAN_API_KEY=$LIBRARIAN_API_KEY"
+  --update-secrets "DATABASE_URL=librarian-database-url:latest" \
+  --update-secrets "GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest" \
+  --update-secrets "LIBRARIAN_API_KEY=librarian-api-key:latest"
 
 # ============================================================================
 # 5. 取得 URL 並執行冒煙測試

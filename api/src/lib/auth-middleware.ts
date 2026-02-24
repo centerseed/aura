@@ -49,11 +49,18 @@ export async function getOrCreateUser(
     const email = decodedToken.email || null;
     const name = decodedToken.name || decodedToken.email?.split("@")[0] || "User";
 
+    const signInProvider = decodedToken.firebase?.sign_in_provider ?? "";
+    const authProvider = signInProvider.startsWith("apple")
+      ? "APPLE"
+      : signInProvider === "password" || signInProvider === "emailLink"
+        ? "EMAIL"
+        : "GOOGLE";
+
     user = await prisma.user.create({
       data: {
         email,
         name,
-        auth_provider: "GOOGLE", // 從 Firebase token 推斷
+        auth_provider: authProvider,
         auth_provider_id: firebaseUid,
       },
     });
@@ -90,15 +97,12 @@ export async function authenticateRequest(
       console.warn("[auth] MCP internal auth HMAC mismatch, falling through");
     }
 
-    // 測試模式：允許使用 X-Test-User-Id header（本地環境或 MCP dev bypass 模式）
+    // 測試模式：僅在本地資料庫或測試環境允許 X-Test-User-Id header
     const isLocalDb = process.env.DATABASE_URL?.includes('localhost') ||
                       process.env.DATABASE_URL?.includes('127.0.0.1');
     const isTest = process.env.NODE_ENV === 'test';
-    // 當 ZENTROPY_MCP_JWT_SECRET 未設定時，MCP server 處於 dev bypass 模式，
-    // 後端同樣允許 X-Test-User-Id，確保兩端 dev bypass 邏輯一致。
-    const isMcpDevMode = !process.env.ZENTROPY_MCP_JWT_SECRET;
 
-    if ((isLocalDb || isTest || isMcpDevMode)) {
+    if (isLocalDb || isTest) {
       const testUserId = request.headers.get("x-test-user-id");
       if (testUserId) {
         // 若已是 UUID（MCP auth layer 已解析過），直接回傳，避免雙重解析
@@ -128,7 +132,13 @@ export async function authenticateRequest(
 
     return userId;
   } catch (error) {
-    console.error("Authentication failed:", error);
-    throw error;
+    // 已經是 UnauthorizedException 就直接丟出
+    if (error instanceof UnauthorizedException) {
+      throw error;
+    }
+    // Firebase auth 錯誤統一包裝為 UnauthorizedException
+    const message = error instanceof Error ? error.message : "Authentication failed";
+    console.error("Authentication failed:", message);
+    throw new UnauthorizedException("Invalid or expired token");
   }
 }

@@ -216,7 +216,7 @@ enum EntityType {
 enum AuthProvider {
   EMAIL
   GOOGLE
-  ANONYMOUS
+  APPLE
 
   @@map("authproviderenum")
 }

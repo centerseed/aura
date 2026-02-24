@@ -1,7 +1,7 @@
 #!/bin/bash
 # Zentropy MCP Server 遠端測試腳本
 
-MCP_URL="https://zentropy-api-894512935237.asia-east1.run.app/mcp"
+MCP_URL="https://api.zentropy.cc/mcp"
 
 echo "=========================================="
 echo "Zentropy MCP Server 測試"
@@ -11,7 +11,7 @@ echo ""
 # 1. Health Check
 echo "1️⃣  Health Check"
 echo "---"
-curl -s https://zentropy-api-894512935237.asia-east1.run.app/health | jq '.'
+curl -s https://api.zentropy.cc/health | jq '.'
 echo ""
 echo ""
 

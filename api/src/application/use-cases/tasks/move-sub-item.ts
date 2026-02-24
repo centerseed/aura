@@ -2,7 +2,7 @@
  * MoveSubItemUseCase - 移動子項目到另一個 Task
  *
  * Application Layer Use Case
- * 將 sub_task 從一個 task 移動到另一個 task，並同步兩邊 JSON
+ * 將 sub_task 從一個 task 移動到另一個 task
  */
 
 import type {
@@ -11,7 +11,7 @@ import type {
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 import { librarianObserve } from '@/lib/librarian-client'
 
 // ============================================================================
@@ -129,11 +129,7 @@ export class MoveSubItemUseCase {
       )
     }
 
-    // 9. 雙寫：同步兩邊的 JSON
-    await syncSubTasksToJson(request.sourceTaskId)
-    await syncSubTasksToJson(request.targetTaskId)
-
-    // 10. 計算統計資訊
+    // 9. 計算統計資訊
     const sourceTaskMeta = await getSubTasksMeta(request.sourceTaskId)
     const targetTaskMeta = await getSubTasksMeta(request.targetTaskId)
 

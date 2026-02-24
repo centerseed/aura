@@ -54,6 +54,8 @@ export enum ErrorCode {
   CONFLICT = 'CONFLICT',
   BUSINESS_LOGIC_ERROR = 'BUSINESS_LOGIC_ERROR',
 
+  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
+
   // 500 系列 - Server 錯誤
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   DATABASE_ERROR = 'DATABASE_ERROR',
@@ -71,6 +73,7 @@ const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   [ErrorCode.FORBIDDEN]: 403,
   [ErrorCode.NOT_FOUND]: 404,
   [ErrorCode.CONFLICT]: 409,
+  [ErrorCode.RATE_LIMIT_EXCEEDED]: 429,
   [ErrorCode.BUSINESS_LOGIC_ERROR]: 422,
   [ErrorCode.INTERNAL_ERROR]: 500,
   [ErrorCode.DATABASE_ERROR]: 500,
@@ -285,6 +288,13 @@ export class ConflictException extends DomainException {
   }
 }
 
+export class RateLimitException extends DomainException {
+  constructor(message: string = 'Daily AI usage limit exceeded') {
+    super(message, ErrorCode.RATE_LIMIT_EXCEEDED)
+    this.name = 'RateLimitException'
+  }
+}
+
 // ============================================================================
 // Helper: Catch Domain Exceptions
 // ============================================================================
@@ -324,6 +334,9 @@ export async function catchDomainException<T = any>(
     }
     if (error instanceof ConflictException) {
       return ApiResponseBuilder.conflict(error.message)
+    }
+    if (error instanceof RateLimitException) {
+      return ApiResponseBuilder.error(error, ErrorCode.RATE_LIMIT_EXCEEDED, error.message)
     }
     if (error instanceof DomainException) {
       return ApiResponseBuilder.businessLogicError(error.message)

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Loader2, LogIn, Zap, RefreshCw, BookOpen, Sparkles, Check, ListTodo, Wand2 } from "lucide-react";
-import { auth, googleProvider, signInWithPopup, signInAnonymously } from "@/lib/firebase";
+import { auth, googleProvider, signInWithPopup } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
 
 // Helper function to get auth headers
@@ -175,31 +175,6 @@ export default function HomeDemo() {
       console.error("Google 登入失敗:", error);
       setIsEntering(false);
       alert("登入失敗，請稍後再試");
-    }
-  };
-
-  const handleAnonymousSignIn = async () => {
-    setIsEntering(true);
-    try {
-      const result = await signInAnonymously(auth);
-      const user = result.user;
-      const response = await fetch(`${API_BASE_URL}/api/auth/signin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: "anonymous",
-          providerId: user.uid,
-          email: null,
-          name: "訪客",
-        }),
-      });
-      if (!response.ok) throw new Error("登入失敗");
-      const userData = await response.json();
-      await redirectUser(userData);
-    } catch (error) {
-      console.error("匿名登入失敗:", error);
-      setIsEntering(false);
-      alert("登入失敗,請稍後再試");
     }
   };
 
@@ -836,23 +811,6 @@ export default function HomeDemo() {
                   )}
                 </Button>
 
-                <Button
-                  onClick={handleAnonymousSignIn}
-                  disabled={isEntering}
-                  className="w-full h-12 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-medium"
-                >
-                  {isEntering ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>訪客模式</>
-                  )}
-                </Button>
-
-                <div className="relative flex items-center py-2">
-                  <div className="flex-1 border-t border-white/10"></div>
-                  <span className="px-3 text-sm text-white/40">或</span>
-                  <div className="flex-1 border-t border-white/10"></div>
-                </div>
 
                 <Button
                   onClick={() => setAuthMethod("name")}

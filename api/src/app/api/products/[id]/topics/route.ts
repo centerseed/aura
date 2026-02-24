@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { UnauthorizedException } from "@/lib/api-response";
 
 // GET /api/products/[id]/topics
 export async function GET(
@@ -30,6 +31,9 @@ export async function GET(
       data: { topics },
     });
   } catch (error) {
+    if (error instanceof UnauthorizedException) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Get product topics failed:", error);
     return NextResponse.json(
       { error: "Failed to get topics" },

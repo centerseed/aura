@@ -18,8 +18,6 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final statisticsAsync = ref.watch(userStatisticsProvider);
-    final authRepo = ref.watch(authRepositoryProvider);
-    final isAnonymous = authRepo.isAnonymous;
     final colorScheme = Theme.of(context).colorScheme;
     final versionAsync = ref.watch(appVersionProvider);
 
@@ -43,7 +41,7 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             const SizedBox(height: 24),
 
-            _buildAvatarSection(context, user, isAnonymous),
+            _buildAvatarSection(context, user),
 
             const SizedBox(height: 32),
 
@@ -96,11 +94,6 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
             ),
-
-            if (isAnonymous) ...[
-              _buildAnonymousBindingCard(context, ref),
-              const SizedBox(height: 16),
-            ],
 
             _buildSection(context, '帳戶', [
               _buildTile(
@@ -230,103 +223,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAnonymousBindingCard(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.primary.withOpacity(0.15),
-              const Color(0xFF5E9FFF).withOpacity(0.10),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: AppColors.primary.withOpacity(0.3),
-          ),
-        ),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.link_rounded,
-              color: AppColors.primary,
-              size: 32,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '您目前使用訪客模式',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '綁定 Google 帳號以同步資料到網頁端，並避免遺失資料',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colorScheme.onSurface.withOpacity(0.6),
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _linkWithGoogle(context, ref),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                icon: const Icon(Icons.account_circle_outlined, size: 20),
-                label: const Text(
-                  '綁定 Google 帳號',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _linkWithGoogle(BuildContext context, WidgetRef ref) async {
-    final authRepo = ref.read(authRepositoryProvider);
-    final result = await authRepo.linkWithGoogle();
-
-    if (!context.mounted) return;
-
-    result.fold(
-      (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(failure.message),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-      (user) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google 帳號綁定成功！'),
-            backgroundColor: Color(0xFF30D158),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAvatarSection(BuildContext context, user, bool isAnonymous) {
+  Widget _buildAvatarSection(BuildContext context, user) {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
@@ -373,7 +270,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            isAnonymous ? '訪客' : (user?.displayName ?? '未設定名稱'),
+            user?.displayName ?? '未設定名稱',
             style: TextStyle(
               color: colorScheme.onSurface,
               fontSize: 20,
@@ -388,7 +285,7 @@ class ProfileScreen extends ConsumerWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              isAnonymous ? '訪客模式' : (user?.email ?? '無電子郵件'),
+              user?.email ?? '無電子郵件',
               style: TextStyle(
                 color: colorScheme.onSurface.withOpacity(0.5),
                 fontSize: 13,

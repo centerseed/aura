@@ -26,13 +26,12 @@ vi.mock('@/application/use-cases/merge-references', () => ({
   mergeReferences: vi.fn((target, source) => [...target, ...source]),
 }))
 
-// Mock sub-task-sync
-vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
-  syncSubTasksToJson: vi.fn(),
+// Mock sub-task-utils
+vi.mock('@/infrastructure/repositories/sub-task-utils', () => ({
   getSubTasksMeta: vi.fn(),
 }))
 
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -168,7 +167,6 @@ describe('MergeTaskUseCase', () => {
       expect(result.meta.completed).toBe(0)
       expect(result.meta.completionRate).toBe(0)
       expect(prisma.subTask.create).toHaveBeenCalled()
-      expect(syncSubTasksToJson).toHaveBeenCalledWith('target-123')
       expect(prisma.$transaction).toHaveBeenCalled()
     })
 

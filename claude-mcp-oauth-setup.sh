@@ -30,7 +30,7 @@ echo ""
 case $choice in
   A|a)
     echo "執行命令："
-    echo "claude mcp add --transport http --oauth https://zentropy.cc/.well-known/oauth-authorization-server-metadata zentropy https://zentropy-api-894512935237.asia-east1.run.app/mcp"
+    echo "claude mcp add --transport http --oauth https://zentropy.cc/.well-known/oauth-authorization-server-metadata zentropy https://api.zentropy.cc/mcp"
     echo ""
     echo "請手動執行上述命令（需要互動）"
     ;;
@@ -43,7 +43,7 @@ case $choice in
     echo ""
     cat << 'EOF'
     "zentropy": {
-      "url": "https://zentropy-api-894512935237.asia-east1.run.app/mcp",
+      "url": "https://api.zentropy.cc/mcp",
       "transport": "http",
       "oauth": {
         "authorizationEndpoint": "https://zentropy.cc/api/oauth/mcp/authorize",
@@ -61,7 +61,7 @@ EOF
     echo ""
     cat << 'EOF'
     "zentropy": {
-      "url": "https://zentropy-api-894512935237.asia-east1.run.app/mcp",
+      "url": "https://api.zentropy.cc/mcp",
       "transport": "http"
     }
 EOF

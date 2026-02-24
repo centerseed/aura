@@ -2,7 +2,7 @@
  * AddSubItemUseCase - 新增任務子項目
  *
  * Application Layer Use Case
- * 寫入 sub_tasks 表 + 雙寫 JSON（過渡期相容）
+ * 寫入 sub_tasks 表
  */
 
 import type {
@@ -11,7 +11,7 @@ import type {
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -90,10 +90,7 @@ export class AddSubItemUseCase {
       },
     })
 
-    // 5. 雙寫：同步到 JSON
-    await syncSubTasksToJson(request.taskId)
-
-    // 6. 計算統計資訊
+    // 5. 計算統計資訊
     const meta = await getSubTasksMeta(request.taskId)
 
     const newSubItem: SubItemData = {
@@ -124,6 +121,13 @@ export class AddSubItemUseCase {
     if (request.content.trim().length === 0) {
       throw new ValidationException(
         'Content cannot be empty',
+        'content'
+      )
+    }
+
+    if (request.content.trim().length > 500) {
+      throw new ValidationException(
+        'Content must be 500 characters or less',
         'content'
       )
     }

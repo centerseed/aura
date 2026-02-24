@@ -20,9 +20,8 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-// Mock sub-task-sync
-vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
-  syncSubTasksToJson: vi.fn(),
+// Mock sub-task-utils
+vi.mock('@/infrastructure/repositories/sub-task-utils', () => ({
   getSubTasksMeta: vi.fn(),
 }))
 
@@ -31,7 +30,7 @@ vi.mock('@/lib/librarian-client', () => ({
   librarianObserve: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -230,8 +229,6 @@ describe('MoveSubItemUseCase', () => {
         userId: 'user-123',
       })
 
-      expect(syncSubTasksToJson).toHaveBeenCalledWith('task-source')
-      expect(syncSubTasksToJson).toHaveBeenCalledWith('task-target')
     })
 
     it('應該回傳兩邊的 meta', async () => {

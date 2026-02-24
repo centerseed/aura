@@ -38,7 +38,6 @@ interface RawProductRow {
   task_time_confidence: number | null
   task_inferred_from_milestone: string | null
   task_ai_analysis: unknown
-  task_sub_items: unknown
   task_references: unknown
   task_created_at: Date | null
   task_updated_at: Date | null
@@ -159,7 +158,6 @@ export class GetProductsUseCase {
         t.time_confidence as task_time_confidence,
         t.inferred_from_milestone as task_inferred_from_milestone,
         t.ai_analysis as task_ai_analysis,
-        t.sub_items as task_sub_items,
         t.references as task_references,
         t.created_at as task_created_at,
         t.updated_at as task_updated_at,
@@ -174,8 +172,33 @@ export class GetProductsUseCase {
       ORDER BY p.display_order ASC, p.created_at DESC, t.created_at DESC
     `
 
-    // 3. 將扁平結果轉換為巢狀結構
-    const products = this.transformToProductStructure(rawRows)
+    // 3. 批次查詢 sub_tasks
+    const taskIds = rawRows.map(r => r.task_id).filter((id): id is string => id !== null)
+    const uniqueTaskIds = [...new Set(taskIds)]
+    const subTasksByTaskId = new Map<string, Array<{ id: string; content: string; completed: boolean; created_at: string; completed_at: string | null; order: number }>>()
+
+    if (uniqueTaskIds.length > 0) {
+      const allSubTasks = await prisma.subTask.findMany({
+        where: { task_id: { in: uniqueTaskIds }, deleted_at: null },
+        orderBy: { order: 'asc' },
+        select: { id: true, task_id: true, content: true, completed: true, created_at: true, completed_at: true, order: true },
+      })
+      for (const st of allSubTasks) {
+        const list = subTasksByTaskId.get(st.task_id) || []
+        list.push({
+          id: st.id,
+          content: st.content,
+          completed: st.completed,
+          created_at: st.created_at.toISOString(),
+          completed_at: st.completed_at?.toISOString() ?? null,
+          order: st.order,
+        })
+        subTasksByTaskId.set(st.task_id, list)
+      }
+    }
+
+    // 4. 將扁平結果轉換為巢狀結構
+    const products = this.transformToProductStructure(rawRows, subTasksByTaskId)
 
     return {
       products,
@@ -185,7 +208,7 @@ export class GetProductsUseCase {
   /**
    * 將扁平的 SQL 結果轉換為 Product → Task 結構
    */
-  private transformToProductStructure(rows: RawProductRow[]): ProductData[] {
+  private transformToProductStructure(rows: RawProductRow[], subTasksByTaskId: Map<string, Array<{ id: string; content: string; completed: boolean; created_at: string; completed_at: string | null; order: number }>>): ProductData[] {
     const productsMap = new Map<string, ProductData>()
     const taskIdsAdded = new Set<string>()
 
@@ -227,7 +250,7 @@ export class GetProductsUseCase {
       if (row.task_id && !taskIdsAdded.has(row.task_id)) {
         taskIdsAdded.add(row.task_id)
         const product = productsMap.get(row.product_id)!
-        const taskData = this.transformTask(row, product)
+        const taskData = this.transformTask(row, product, subTasksByTaskId.get(row.task_id!) || [])
         product.tasks.push(taskData)
 
         // 累加 task references 到 total_reference_count
@@ -241,17 +264,7 @@ export class GetProductsUseCase {
   /**
    * 轉換單一 Task 資料
    */
-  private transformTask(row: RawProductRow, product: ProductData): ProductData['tasks'][0] {
-    // 提取 sub_items
-    const subItems = (row.task_sub_items as Array<{
-      id: string
-      content: string
-      completed: boolean
-      created_at: string
-      completed_at: string | null
-      order: number
-    }>) || []
-
+  private transformTask(row: RawProductRow, product: ProductData, subItems: Array<{ id: string; content: string; completed: boolean; created_at: string; completed_at: string | null; order: number }>): ProductData['tasks'][0] {
     // 提取 task 層級的 references
     const taskReferences = (row.task_references as Array<{
       id: string

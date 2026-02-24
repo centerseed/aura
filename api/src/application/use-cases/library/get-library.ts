@@ -111,7 +111,6 @@ interface RawLibraryRow {
   task_content: string | null
   task_status: string | null
   task_ai_analysis: unknown
-  task_sub_items: unknown
   task_references: unknown
   task_start_date: Date | null
   task_due_date: Date | null
@@ -145,7 +144,6 @@ export class GetLibraryUseCase {
         t.content as task_content,
         t.status::text as task_status,
         t.ai_analysis as task_ai_analysis,
-        t.sub_items as task_sub_items,
         t.references as task_references,
         t.start_date as task_start_date,
         t.due_date as task_due_date,
@@ -163,10 +161,28 @@ export class GetLibraryUseCase {
       ORDER BY a.name, p.display_order, p.name, t.created_at DESC
     `
 
-    // 3. 將扁平結果轉換為巢狀結構
-    const formattedAreas = this.transformToNestedStructure(rawRows)
+    // 3. 批次查詢 sub_tasks（從 sub_tasks 表讀取，不再依賴 JSON）
+    const taskIds = rawRows.map(r => r.task_id).filter((id): id is string => id !== null)
+    const uniqueTaskIds = [...new Set(taskIds)]
+    let subTasksByTaskId = new Map<string, Array<{ id: string; content: string; completed: boolean; created_at: Date; completed_at: Date | null; order: number; start_date: Date | null; due_date: Date | null }>>()
 
-    // 4. 查詢所有 topics 並掛到對應 product
+    if (uniqueTaskIds.length > 0) {
+      const allSubTasks = await prisma.subTask.findMany({
+        where: { task_id: { in: uniqueTaskIds }, deleted_at: null },
+        orderBy: { order: 'asc' },
+        select: { id: true, task_id: true, content: true, completed: true, created_at: true, completed_at: true, order: true, start_date: true, due_date: true },
+      })
+      for (const st of allSubTasks) {
+        const list = subTasksByTaskId.get(st.task_id) || []
+        list.push(st)
+        subTasksByTaskId.set(st.task_id, list)
+      }
+    }
+
+    // 4. 將扁平結果轉換為巢狀結構
+    const formattedAreas = this.transformToNestedStructure(rawRows, subTasksByTaskId)
+
+    // 5. 查詢所有 topics 並掛到對應 product
     const allProductIds = formattedAreas.flatMap(a => a.products.map(p => p.id))
     if (allProductIds.length > 0) {
       const topics = await prisma.topic.findMany({
@@ -200,7 +216,7 @@ export class GetLibraryUseCase {
   /**
    * 將扁平的 SQL 結果轉換為巢狀的 Area → Product → Task 結構
    */
-  private transformToNestedStructure(rows: RawLibraryRow[]): AreaData[] {
+  private transformToNestedStructure(rows: RawLibraryRow[], subTasksByTaskId: Map<string, Array<{ id: string; content: string; completed: boolean; created_at: Date; completed_at: Date | null; order: number; start_date: Date | null; due_date: Date | null }>>): AreaData[] {
     const areasMap = new Map<string, AreaData>()
     const productsMap = new Map<string, ProductData>()
     const taskIdsAdded = new Set<string>()
@@ -239,7 +255,7 @@ export class GetLibraryUseCase {
       if (row.task_id && row.product_id && !taskIdsAdded.has(row.task_id)) {
         taskIdsAdded.add(row.task_id)
         const product = productsMap.get(row.product_id)!
-        const taskData = this.transformTask(row)
+        const taskData = this.transformTask(row, subTasksByTaskId.get(row.task_id!) || [])
         product.tasks.push(taskData)
 
         // 累加 task references 到 product 的 referenceCount
@@ -253,23 +269,20 @@ export class GetLibraryUseCase {
   /**
    * 轉換單一 Task 資料
    */
-  private transformTask(row: RawLibraryRow): TaskData {
+  private transformTask(row: RawLibraryRow, subTaskRows: Array<{ id: string; content: string; completed: boolean; created_at: Date; completed_at: Date | null; order: number; start_date: Date | null; due_date: Date | null }>): TaskData {
     const analysis = row.task_ai_analysis as Record<string, unknown> | null
 
-    // 提取並清理 sub_items
-    const rawSubItems = (row.task_sub_items as Array<any>) || []
-    const subItems = rawSubItems
-      .filter((item) => item != null && item.id && item.content)
-      .map((item) => ({
-        id: item.id,
-        content: item.content,
-        completed: Boolean(item.completed),
-        created_at: item.created_at || new Date().toISOString(),
-        completed_at: item.completed_at || null,
-        order: Number(item.order) || 0,
-        start_date: item.start_date || null,
-        due_date: item.due_date || null,
-      }))
+    // 從 sub_tasks 表讀取
+    const subItems = subTaskRows.map((st) => ({
+      id: st.id,
+      content: st.content,
+      completed: st.completed,
+      created_at: st.created_at.toISOString(),
+      completed_at: st.completed_at?.toISOString() ?? null,
+      order: st.order,
+      start_date: st.start_date?.toISOString() ?? null,
+      due_date: st.due_date?.toISOString() ?? null,
+    }))
 
     const subItemsMeta =
       subItems.length > 0

@@ -1,25 +1,37 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 
 /// 透過 Firebase Auth REST API 取得 ID Token
 /// 不依賴 Flutter Firebase SDK，可在純 Dart VM (flutter test) 中使用
 class FirebaseTestAuth {
-  static const _apiKey = 'AIzaSyAJYyZ1wfUHyxaCpI11Z2c3SH44Qi7lg-E';
-  static const testEmail = 'test@zentropy.cc';
-  static const testPassword = '123456';
+  static String get _apiKey {
+    final key = Platform.environment['FIREBASE_API_KEY'];
+    if (key == null || key.isEmpty) {
+      throw StateError(
+        'FIREBASE_API_KEY environment variable is required for integration tests',
+      );
+    }
+    return key;
+  }
+
+  static String get testEmail =>
+      Platform.environment['TEST_EMAIL'] ?? 'test@zentropy.cc';
+  static String get testPassword =>
+      Platform.environment['TEST_PASSWORD'] ?? '123456';
   static const testFirebaseUid = 'b1MHYIFidPaJKisUmUk25CXG6c33';
 
   /// 用 email/password 登入，回傳 ID Token
   static Future<String> signIn({
-    String email = testEmail,
-    String password = testPassword,
+    String? email,
+    String? password,
   }) async {
     final dio = Dio();
     final response = await dio.post(
       'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$_apiKey',
       data: {
-        'email': email,
-        'password': password,
+        'email': email ?? testEmail,
+        'password': password ?? testPassword,
         'returnSecureToken': true,
       },
     );

@@ -22,13 +22,12 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-// Mock sub-task-sync
-vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
-  syncSubTasksToJson: vi.fn(),
+// Mock sub-task-utils
+vi.mock('@/infrastructure/repositories/sub-task-utils', () => ({
   getSubTasksMeta: vi.fn(),
 }))
 
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -134,7 +133,6 @@ describe('DeleteSubItemUseCase', () => {
         where: { id: 'sub-1' },
         data: { deleted_at: expect.any(Date) },
       })
-      expect(syncSubTasksToJson).toHaveBeenCalledWith('task-123')
     })
 
     it('應該重新排序剩餘 sub_tasks', async () => {

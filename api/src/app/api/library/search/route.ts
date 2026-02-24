@@ -13,6 +13,7 @@ import {
   ValidationException,
   catchDomainException,
 } from "@/lib/api-response";
+import { checkAiRateLimit, incrementAiUsage } from "@/lib/ai-rate-limit";
 import { getEmbedding } from "@/lib/embedding";
 
 interface SearchRequestBody {
@@ -41,6 +42,7 @@ interface SearchResultItem {
 export async function POST(request: NextRequest) {
   return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma);
+    await checkAiRateLimit(userId);
     const body = (await request.json()) as SearchRequestBody;
 
     if (!body.query || typeof body.query !== "string" || body.query.trim().length === 0) {
@@ -49,8 +51,9 @@ export async function POST(request: NextRequest) {
 
     const limit = Math.min(body.limit ?? 20, 50);
 
-    // 計算 query embedding
+    // 計算 query embedding（消耗 AI quota）
     const queryEmbedding = await getEmbedding(body.query.trim());
+    await incrementAiUsage(userId);
     const vectorStr = `[${queryEmbedding.join(",")}]`;
 
     // 搜尋 tasks（有 embedding 的）

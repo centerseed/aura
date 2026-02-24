@@ -13,7 +13,7 @@
 # 環境配置:
 #   - Web: http://localhost:3001
 #   - API (local): http://localhost:3002
-#   - API (remote): https://zentropy-api-894512935237.asia-east1.run.app
+#   - API (remote): https://api.zentropy.cc
 #
 # ==============================================================================
 
@@ -27,7 +27,7 @@ WEB_PORT=3001
 
 # API URL 配置
 LOCAL_API_URL="http://localhost:3002"
-REMOTE_API_URL="https://zentropy-api-894512935237.asia-east1.run.app"
+REMOTE_API_URL="https://api.zentropy.cc"
 
 # 顏色輸出
 GREEN='\033[0;32m'

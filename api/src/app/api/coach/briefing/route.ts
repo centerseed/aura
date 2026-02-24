@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { authenticateRequest } from '@/lib/auth-middleware'
 import { prisma } from '@/lib/db'
 import { ApiResponseBuilder, catchDomainException, ValidationException } from '@/lib/api-response'
+import { checkAiRateLimit, incrementAiUsage } from '@/lib/ai-rate-limit'
 import { GenerateBriefingUseCase } from '@/application/use-cases/coach/generate-briefing'
 import { formatBriefing } from '@/app/api/coach/briefing/_shared'
 
@@ -38,6 +39,7 @@ const BriefingRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma)
+    await checkAiRateLimit(userId)
 
     const body = await request.json()
     const parsed = BriefingRequestSchema.safeParse(body)
@@ -56,6 +58,7 @@ export async function POST(request: NextRequest) {
       date,
       timezone,
     })
+    await incrementAiUsage(userId)
 
     return ApiResponseBuilder.success({
       briefing: formatBriefing(result.briefing),

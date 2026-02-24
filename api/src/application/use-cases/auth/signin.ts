@@ -13,7 +13,7 @@ import { ValidationException } from '@/lib/api-response'
 // ============================================================================
 
 export interface SignInRequest {
-  provider: 'google' | 'anonymous' | 'email' | 'apple'
+  provider: 'google' | 'email' | 'apple'
   providerId?: string | null
   email?: string | null
   name?: string | null
@@ -42,10 +42,6 @@ export class SignInUseCase {
     // 2. 根據不同的認證方式處理
     if (request.provider === 'google') {
       const result = await this.handleGoogleSignIn(request)
-      user = result.user
-      created = result.created
-    } else if (request.provider === 'anonymous') {
-      const result = await this.handleAnonymousSignIn(request)
       user = result.user
       created = result.created
     } else if (request.provider === 'email') {
@@ -111,43 +107,6 @@ export class SignInUseCase {
           updated_at: new Date(),
         },
       })
-    }
-
-    return { user, created }
-  }
-
-  /**
-   * 處理匿名登入
-   */
-  private async handleAnonymousSignIn(request: SignInRequest) {
-    if (!request.providerId) {
-      throw new ValidationException(
-        'Anonymous login requires providerId',
-        'providerId'
-      )
-    }
-
-    // 檢查是否已存在該匿名用戶
-    let user = await prisma.user.findFirst({
-      where: {
-        auth_provider: 'ANONYMOUS',
-        auth_provider_id: request.providerId,
-      },
-    })
-
-    let created = false
-
-    if (!user) {
-      // 創建新匿名用戶
-      user = await prisma.user.create({
-        data: {
-          email: null,
-          name: request.name || '訪客',
-          auth_provider: 'ANONYMOUS',
-          auth_provider_id: request.providerId,
-        },
-      })
-      created = true
     }
 
     return { user, created }
@@ -264,7 +223,7 @@ export class SignInUseCase {
       throw new ValidationException('Provider is required', 'provider')
     }
 
-    const validProviders = ['google', 'anonymous', 'email', 'apple']
+    const validProviders = ['google', 'email', 'apple']
     if (!validProviders.includes(request.provider)) {
       throw new ValidationException(
         `Provider must be one of: ${validProviders.join(', ')}`,

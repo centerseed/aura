@@ -4,6 +4,8 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { checkAiRateLimit, incrementAiUsage } from "@/lib/ai-rate-limit";
+import { UnauthorizedException, RateLimitException } from "@/lib/api-response";
 import { buildReorganizePrompt } from "@/lib/reorganize-prompt";
 
 // Zod Schema for AI structured output (極簡版 - 減少 74% 輸出量)
@@ -57,6 +59,7 @@ export async function POST(
     const startTotal = Date.now();
 
     const userId = await authenticateRequest(request, prisma);
+    await checkAiRateLimit(userId);
     const { id: productId } = await params;
 
     // 1. 查詢 Product 資訊並驗證屬於當前用戶
@@ -187,6 +190,7 @@ export async function POST(
       prompt,
     });
     timings["ai_generateObject"] = Date.now() - startAI;
+    await incrementAiUsage(userId);
 
     // 過濾無效的 merge 操作（source_names 少於 2 個不算真正的合併）
     if (result.topic_operations) {
@@ -299,14 +303,22 @@ export async function POST(
       logId: evaluationLog.id,
     });
   } catch (error) {
+    // Auth 錯誤返回 401，不要返回 500
+    if (error instanceof UnauthorizedException) {
+      return NextResponse.json(
+        { error: "Unauthorized", message: error.message },
+        { status: 401 }
+      );
+    }
+    if (error instanceof RateLimitException) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded", message: error.message },
+        { status: 429 }
+      );
+    }
     console.error("Reorganize topics failed:", error);
-    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
     return NextResponse.json(
-      {
-        error: "Reorganization failed",
-        details: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      },
+      { error: "Reorganization failed" },
       { status: 500 }
     );
   }

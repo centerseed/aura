@@ -42,6 +42,8 @@ const mockPlanItem = (overrides = {}) => ({
   completed_at: null,
   pinned: false,
   deferred: false,
+  status: 'today',
+  user_adjusted: false,
   ...overrides,
 })
 

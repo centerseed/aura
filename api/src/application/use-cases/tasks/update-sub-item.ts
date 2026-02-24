@@ -2,7 +2,7 @@
  * UpdateSubItemUseCase - 更新任務子項目
  *
  * Application Layer Use Case
- * 操作 sub_tasks 表 + 雙寫 JSON（過渡期相容）
+ * 操作 sub_tasks 表
  */
 
 import type {
@@ -11,7 +11,7 @@ import type {
 import { PrismaTaskRepository } from '@/infrastructure/repositories/prisma-task-repository'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -80,39 +80,7 @@ export class UpdateSubItemUseCase {
     })
 
     if (!subTask) {
-      // Fallback：嘗試從 task 的 JSON sub_items 欄位找到並自動遷移
-      const taskRecord = await prisma.task.findUnique({
-        where: { id: request.taskId },
-        select: { sub_items: true },
-      })
-      const jsonSubItems = taskRecord?.sub_items as any[] | null
-      const jsonItem = jsonSubItems?.find((item: any) => item.id === request.subItemId)
-
-      if (!jsonItem) {
-        throw new NotFoundException('Sub-item')
-      }
-
-      // 自動遷移：在 sub_tasks 建立對應記錄
-      await (prisma.subTask as any).create({
-        data: {
-          id: jsonItem.id,
-          task_id: request.taskId,
-          user_id: request.userId,
-          content: jsonItem.content,
-          completed: jsonItem.completed ?? false,
-          order: jsonItem.order ?? 0,
-          created_at: jsonItem.created_at ? new Date(jsonItem.created_at) : new Date(),
-          completed_at: jsonItem.completed_at ? new Date(jsonItem.completed_at) : null,
-        },
-      })
-
-      subTask = await prisma.subTask.findFirst({
-        where: { id: request.subItemId, task_id: request.taskId, deleted_at: null },
-      })
-
-      if (!subTask) {
-        throw new NotFoundException('Sub-item')
-      }
+      throw new NotFoundException('Sub-item')
     }
 
     // 4. 更新 sub_task 記錄
@@ -157,10 +125,7 @@ export class UpdateSubItemUseCase {
       data: updateData,
     })
 
-    // 5. 雙寫：同步到 JSON
-    await syncSubTasksToJson(request.taskId)
-
-    // 5.1 子任務完成時 touch 母任務 updated_at（避免停滯警告誤報）
+    // 5. 子任務完成時 touch 母任務 updated_at（避免停滯警告誤報）
     if (request.completed) {
       await prisma.task.update({
         where: { id: request.taskId },
@@ -310,6 +275,13 @@ export class UpdateSubItemUseCase {
     if (request.content !== undefined && request.content.trim().length === 0) {
       throw new ValidationException(
         'Content cannot be empty',
+        'content'
+      )
+    }
+
+    if (request.content !== undefined && request.content.trim().length > 500) {
+      throw new ValidationException(
+        'Content must be 500 characters or less',
         'content'
       )
     }

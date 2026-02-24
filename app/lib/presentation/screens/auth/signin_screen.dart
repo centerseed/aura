@@ -38,41 +38,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     productRepo.refresh();
   }
 
-  Future<void> _signInAnonymously() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    final authRepo = ref.read(authRepositoryProvider);
-    final result = await authRepo.signInAnonymously();
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      result.fold(
-        (failure) {
-          setState(() {
-            _errorMessage = failure.message;
-          });
-        },
-        (user) {
-          final analytics = ref.read(analyticsServiceProvider);
-          analytics.setUserId(user.uid);
-          analytics.logLogin(method: 'anonymous');
-
-          _refreshAllCaches();
-
-          if (mounted) {
-            context.go('/splash');
-          }
-        },
-      );
-    }
-  }
-
   Future<void> _signInWithApple() async {
     setState(() {
       _isLoading = true;
@@ -269,17 +234,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                   label: const Text(
                                     'Sign in with Apple',
                                     style: TextStyle(fontSize: 16),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                TextButton(
-                                  onPressed: _signInAnonymously,
-                                  child: Text(
-                                    '稍後再說，先逛逛',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
                                   ),
                                 ),
                               ],

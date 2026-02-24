@@ -192,10 +192,6 @@ export class ExecuteBrainDumpUseCase {
         })
       }
 
-      // 雙寫：同步到 JSON
-      const { syncSubTasksToJson } = await import('@/infrastructure/repositories/sub-task-sync')
-      await syncSubTasksToJson(result.target_task_id)
-
       await prisma.systemEvaluationLog.create({
         data: {
           user_id: request.userId,
@@ -392,7 +388,7 @@ export class ExecuteBrainDumpUseCase {
           result.items
         )
 
-        // 建立 Task（sub_items JSON 暫時為空，稍後由 syncSubTasksToJson 填入）
+        // 建立 Task
         const task = await tx.task.create({
           data: {
             user_id: request.userId,
@@ -420,26 +416,6 @@ export class ExecuteBrainDumpUseCase {
               order: subItem.order,
               source: 'user',
             },
-          })
-        }
-
-        // 雙寫：同步 sub_tasks → JSON
-        if (pendingSubItems.length > 0) {
-          const subTaskRows = await tx.subTask.findMany({
-            where: { task_id: task.id, deleted_at: null },
-            orderBy: { order: 'asc' },
-          })
-          const jsonSubItems = subTaskRows.map((st) => ({
-            id: st.id,
-            content: st.content,
-            completed: st.completed,
-            created_at: st.created_at.toISOString(),
-            completed_at: st.completed_at?.toISOString() ?? null,
-            order: st.order,
-          }))
-          await tx.task.update({
-            where: { id: task.id },
-            data: { sub_items: jsonSubItems as any },
           })
         }
 

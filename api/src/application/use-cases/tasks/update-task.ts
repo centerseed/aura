@@ -20,7 +20,6 @@ import {
 } from '@/lib/api-response'
 import { librarianObserve } from '@/lib/librarian-client'
 import { prisma } from '@/lib/db'
-import { syncSubTasksToJson } from '@/infrastructure/repositories/sub-task-sync'
 import { PrismaCoachBriefingRepository } from '@/infrastructure/repositories/prisma-coach-briefing-repository'
 
 // ============================================================================
@@ -386,9 +385,6 @@ export class UpdateTaskUseCase {
       })
 
       if (count > 0) {
-        // 同步 JSON
-        await syncSubTasksToJson(taskId)
-
         // 同步對應的 DailyPlanItem 完成狀態
         await prisma.dailyPlanItem.updateMany({
           where: {

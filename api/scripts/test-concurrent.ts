@@ -26,11 +26,14 @@ initializeApp({
 // 切換測試目標
 const API_BASE = process.argv[2] === 'local'
   ? 'http://localhost:3002'
-  : 'https://zentropy-api-894512935237.asia-east1.run.app';
+  : 'https://api.zentropy.cc';
 
 console.log(`Testing: ${API_BASE}\n`);
 const UID = 'e9adcccc-e4ad-46d6-b92e-6018f5dc4b11';
-const FIREBASE_API_KEY = 'AIzaSyAJYyZ1wfUHyxaCpI11Z2c3SH44Qi7lg-E';
+const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+if (!FIREBASE_API_KEY) {
+  throw new Error('NEXT_PUBLIC_FIREBASE_API_KEY environment variable is required');
+}
 
 async function testConcurrency() {
   // 生成 custom token 並交換為 ID token

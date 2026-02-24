@@ -2,12 +2,12 @@
  * ReorderSubItemsUseCase - 重新排序任務子項目
  *
  * Application Layer Use Case
- * 操作 sub_tasks 表 + 雙寫 JSON（過渡期相容）
+ * 操作 sub_tasks 表
  */
 
 import { prisma } from '@/lib/db'
 import { ValidationException, NotFoundException } from '@/lib/api-response'
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -71,10 +71,7 @@ export class ReorderSubItemsUseCase {
       )
     )
 
-    // 4. 雙寫：同步到 JSON
-    await syncSubTasksToJson(request.taskId)
-
-    // 5. 讀取更新後的 sub_tasks
+    // 4. 讀取更新後的 sub_tasks
     const subTasks = await prisma.subTask.findMany({
       where: { task_id: request.taskId, deleted_at: null },
       orderBy: { order: 'asc' },

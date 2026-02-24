@@ -3,7 +3,7 @@
 
 set -e
 
-API_URL="https://zentropy-api-isakqhri2a-de.a.run.app"
+API_URL="https://api.zentropy.cc"
 
 echo "=== MCP Search Tool 除錯 ==="
 echo ""

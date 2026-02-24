@@ -25,13 +25,12 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-// Mock sub-task-sync
-vi.mock('@/infrastructure/repositories/sub-task-sync', () => ({
-  syncSubTasksToJson: vi.fn(),
+// Mock sub-task-utils
+vi.mock('@/infrastructure/repositories/sub-task-utils', () => ({
   getSubTasksMeta: vi.fn(),
 }))
 
-import { syncSubTasksToJson, getSubTasksMeta } from '@/infrastructure/repositories/sub-task-sync'
+import { getSubTasksMeta } from '@/infrastructure/repositories/sub-task-utils'
 
 // Mock Repository
 const mockFindById = vi.fn()
@@ -186,7 +185,6 @@ describe('UpdateSubItemUseCase', () => {
       expect(result.meta.completionRate).toBe(1)
       expect(result.taskCompleted).toBe(true)
       expect(result.message).toBe('Sub-item updated successfully')
-      expect(syncSubTasksToJson).toHaveBeenCalledWith('task-123')
     })
 
     it('應該成功更新 sub-item 的 content', async () => {

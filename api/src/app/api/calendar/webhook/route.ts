@@ -8,14 +8,29 @@
  * - X-Goog-Channel-ID: The channel ID we set when registering
  * - X-Goog-Resource-ID: The resource being watched
  * - X-Goog-Resource-State: "sync" (initial) or "exists" (change)
+ * - X-Goog-Channel-Token: The token we set when registering the watch
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { CalendarSyncService } from '@/lib/calendar-sync-service'
 import { prisma } from '@/lib/db'
+import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate webhook token to prevent forged notifications
+    const webhookSecret = process.env.CALENDAR_WEBHOOK_SECRET
+    if (webhookSecret) {
+      const channelToken = request.headers.get('x-goog-channel-token')
+      if (!channelToken || !crypto.timingSafeEqual(
+        Buffer.from(channelToken),
+        Buffer.from(webhookSecret),
+      )) {
+        console.warn('Calendar webhook: invalid or missing channel token')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
+
     const channelId = request.headers.get('x-goog-channel-id')
     const resourceId = request.headers.get('x-goog-resource-id')
     const resourceState = request.headers.get('x-goog-resource-state')
