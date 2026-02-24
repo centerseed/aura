@@ -238,12 +238,12 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                       padding: const EdgeInsets.only(top: 4),
                                       child: Row(
                                         children: [
-                                          _buildTag('子', AppColors.statusMaintain.withValues(alpha: 0.5)),
+                                          _buildTag('子', AppColors.statusMaintain.withValues(alpha: 0.7)),
                                           const SizedBox(width: 6),
                                           Expanded(
                                             child: Text(
                                               subCtx?.title ?? subId,
-                                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12),
+                                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
                                             ),
                                           ),
                                         ],
@@ -254,7 +254,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                     const SizedBox(height: 6),
                                     Text(
                                       c.reasoning,
-                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35), fontSize: 11),
+                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 11),
                                     ),
                                   ],
                                 ],
@@ -541,7 +541,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                       '新',
                       style: TextStyle(
                         color: Color(0xFF818CF8),
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -575,7 +575,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                           decoration: BoxDecoration(
                             color: showMovement
                                 ? AppColors.statusInbox
-                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -600,7 +600,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                                 child: Text(
                                   '從「${task.fromTopic}」移入',
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                     fontSize: 11,
                                   ),
                                 ),
@@ -631,7 +631,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
         text,
         style: TextStyle(
           color: color,
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
         ),
       ),

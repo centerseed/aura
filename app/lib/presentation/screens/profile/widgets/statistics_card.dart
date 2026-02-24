@@ -62,7 +62,7 @@ class StatisticsCard extends StatelessWidget {
                   suffix!,
                   style: TextStyle(
                     color: colorScheme.onSurface.withOpacity(0.6),
-                    fontSize: 10,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -78,7 +78,7 @@ class StatisticsCard extends StatelessWidget {
             label,
             style: TextStyle(
               color: colorScheme.onSurface.withOpacity(0.7),
-              fontSize: 10,
+              fontSize: 11,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

@@ -7,14 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
 import { getOAuthStatus } from "@/lib/oauth-client";
-
-// Helper function to get auth headers
-async function getAuthHeaders() {
-  const user = auth.currentUser;
-  if (!user) throw new Error("No authenticated user");
-  const token = await user.getIdToken();
-  return { 'Authorization': `Bearer ${token}` };
-}
 import {
   DndContext,
   DragOverlay,
@@ -81,6 +73,14 @@ import { ReorganizeModal } from "@/components/reorganize-modal";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DRAWER_CONFIG } from "@/domain/constants/drawer-config";
+
+// Helper function to get auth headers
+async function getAuthHeaders() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No authenticated user");
+  const token = await user.getIdToken();
+  return { 'Authorization': `Bearer ${token}` };
+}
 
 // 視圖類型
 type ViewMode = "structure" | "timeline" | "load";
@@ -1153,6 +1153,8 @@ function DashboardContent() {
 
   // 歡迎模式（新用戶空白狀態）- 初始為 false，避免載入時閃爍
   const [isWelcomeMode, setIsWelcomeMode] = useState(false);
+  // 防止資料更新時（例如歸檔任務）意外將用戶彈回歡迎模式
+  const hasInitializedWelcomeModeRef = useRef(false);
   const [showQuickInputGuide, setShowQuickInputGuide] = useState(false);
   const [showAIButtonTip, setShowAIButtonTip] = useState(false);
 
@@ -1164,11 +1166,13 @@ function DashboardContent() {
   const [recentArchivedTasks, setRecentArchivedTasks] = useState<TaskCard[]>([]);
   const [isLoadingArchived, setIsLoadingArchived] = useState(false);
   const [archivedLoaded, setArchivedLoaded] = useState(false);
+  const isLoadingArchivedRef = useRef(false); // 同步鎖，防止並發重複請求
 
   // 載入今日完成的任務
   // 載入最近兩週的已歸檔任務
   const loadRecentArchived = useCallback(async () => {
-    if (archivedLoaded || isLoadingArchived) return;
+    if (archivedLoaded || isLoadingArchivedRef.current) return;
+    isLoadingArchivedRef.current = true;
     setIsLoadingArchived(true);
     try {
       const twoWeeksAgo = new Date();
@@ -1188,8 +1192,9 @@ function DashboardContent() {
       console.error("Failed to load recent archived tasks:", err);
     } finally {
       setIsLoadingArchived(false);
+      isLoadingArchivedRef.current = false;
     }
-  }, [archivedLoaded, isLoadingArchived]);
+  }, [archivedLoaded]);
 
   // ✅ 已移至初始載入並行處理，不再需要單獨的 useEffect
 
@@ -1282,26 +1287,30 @@ function DashboardContent() {
   );
 
   useEffect(() => {
-    if (!isLoading && userId) {
+    if (!isLoading && userId && !hasInitializedWelcomeModeRef.current) {
+      // 只在初次載入時設定歡迎模式，避免後續歸檔任務時意外彈回歡迎模式
       setIsWelcomeMode(!hasTasks);
+      hasInitializedWelcomeModeRef.current = true;
     }
   }, [isLoading, userId, hasTasks]);
 
   // 檢查 Google Calendar 連線狀態
   useEffect(() => {
     if (!userId) return;
+    let isMounted = true;
     const checkCalendar = async () => {
       try {
         const user = auth.currentUser;
-        if (!user) return;
+        if (!user || !isMounted) return;
         const token = await user.getIdToken();
         const status = await getOAuthStatus('google_calendar', token);
-        setCalendarConnected(status.authorized);
+        if (isMounted) setCalendarConnected(status.authorized);
       } catch {
         // 忽略錯誤，預設未連線
       }
     };
     checkCalendar();
+    return () => { isMounted = false; };
   }, [userId]);
 
   // 獲取今天的日期範圍
@@ -1402,18 +1411,23 @@ function DashboardContent() {
 
       if (oldIndex === -1 || newIndex === -1) return;
 
-      // 重新排列 products
+      // 重新排列 products（用於 API call）
       const reorderedProducts = [...targetArea.products];
       const [movedProduct] = reorderedProducts.splice(oldIndex, 1);
       reorderedProducts.splice(newIndex, 0, movedProduct);
 
-      // 更新 UI
+      // 更新 UI — 在 prevAreas 內重新計算以避免 stale closure
       setAreas(prevAreas =>
-        prevAreas.map(area =>
-          area.id === activeAreaId
-            ? { ...area, products: reorderedProducts }
-            : area
-        )
+        prevAreas.map(area => {
+          if (area.id !== activeAreaId) return area;
+          const prevOldIndex = area.products.findIndex(p => p.id === activeId);
+          const prevNewIndex = area.products.findIndex(p => p.id === overId);
+          if (prevOldIndex === -1 || prevNewIndex === -1) return area;
+          const prevReordered = [...area.products];
+          const [prevMoved] = prevReordered.splice(prevOldIndex, 1);
+          prevReordered.splice(prevNewIndex, 0, prevMoved);
+          return { ...area, products: prevReordered };
+        })
       );
 
       // 調用 API 更新順序
@@ -1762,12 +1776,11 @@ function DashboardContent() {
       }
 
       const createData = await createRes.json();
+      const createdProduct = createData.data?.product || createData.product;
 
-      if (!createData.success || !createData.product) {
+      if (!createData.success || !createdProduct) {
         throw new Error("創建專案失敗：回傳格式錯誤");
       }
-
-      const createdProduct = createData.product;
 
       // 2. 移動任務到新專案
       const moveRes = await fetch(`${API_BASE_URL}/api/tasks`, {
@@ -1834,7 +1847,7 @@ function DashboardContent() {
       if (!res.ok) throw new Error("狀態更新失敗");
 
       const responseData = await res.json();
-      const { task: updatedTask } = responseData.data;
+      const updatedTask = responseData.data?.task;
 
       if (updatedTask) {
         setAreas(prevAreas => updateAreasState(prevAreas, (areas) =>
@@ -1869,7 +1882,7 @@ function DashboardContent() {
       if (!res.ok) throw new Error("主題更新失敗");
 
       const responseData = await res.json();
-      const { task: updatedTask } = responseData.data;
+      const updatedTask = responseData.data?.task;
 
       if (updatedTask) {
         setAreas(prevAreas => updateAreasState(prevAreas, (areas) =>
@@ -1982,6 +1995,17 @@ function DashboardContent() {
         throw new Error("API 回應格式錯誤");
       }
 
+      // 清洗 API 回傳的 task 資料，確保 sub_items/references 不含 null
+      const cleanedTask: TaskCard = {
+        ...updatedTask,
+        sub_items: Array.isArray(updatedTask.sub_items)
+          ? updatedTask.sub_items.filter((s: any) => s != null && s.id)
+          : [],
+        references: Array.isArray(updatedTask.references)
+          ? updatedTask.references.filter((r: any) => r != null && r.id)
+          : [],
+      };
+
       // 直接使用返回的完整任務資料更新 state（不重新查詢所有卡片）
       setAreas(prevAreas => updateAreasState(prevAreas, (areas) => {
         const taskExistsInAreas = areas.some(area =>
@@ -1995,7 +2019,7 @@ function DashboardContent() {
             products: area.products.map(product => ({
               ...product,
               tasks: product.tasks.map(task =>
-                task.id === taskId ? updatedTask : task
+                task.id === taskId ? cleanedTask : task
               ),
             })),
           }));
@@ -2004,10 +2028,10 @@ function DashboardContent() {
           return areas.map(area => ({
             ...area,
             products: area.products.map(product => {
-              if (product.id === updatedTask.product_id) {
+              if (product.id === cleanedTask.product_id) {
                 return {
                   ...product,
-                  tasks: [...product.tasks, updatedTask],
+                  tasks: [...product.tasks, cleanedTask],
                 };
               }
               return product;
@@ -2019,9 +2043,9 @@ function DashboardContent() {
 
       // 更新 completedTodayTasks
       if (isCompleting) {
-        setCompletedTodayTasks(prev => [...prev, updatedTask]);
-        const newCount = completedTodayTasks.length + 1;
-        setCompletionFeedback(`完成！今天已完成 ${newCount} 項`);
+        const newCompletedCount = completedTodayTasks.length + 1;
+        setCompletedTodayTasks(prev => [...prev, cleanedTask]);
+        setCompletionFeedback(`完成！今天已完成 ${newCompletedCount} 項`);
         setTimeout(() => setCompletionFeedback(null), 3000);
       } else {
         setCompletedTodayTasks(prev => prev.filter(t => t.id !== taskId));
@@ -2030,7 +2054,7 @@ function DashboardContent() {
       // 更新 recentArchivedTasks
       if (isCompleting) {
         // 完成任務時，加入已歸檔列表
-        setRecentArchivedTasks(prev => [...prev, updatedTask]);
+        setRecentArchivedTasks(prev => [...prev, cleanedTask]);
       } else {
         // 取消完成時，從已歸檔列表移除
         setRecentArchivedTasks(prev => prev.filter(t => t.id !== taskId));
@@ -2076,11 +2100,15 @@ function DashboardContent() {
     } catch (err) {
       console.error("Failed to delete task:", err);
       alert("刪除任務失敗，請稍後再試");
-      // 錯誤時重新載入數據
-      const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
-      if (libraryRes.ok) {
-        const libraryData = await libraryRes.json();
-        setAreas(cleanLibraryData(libraryData.data?.areas || []));
+      // 錯誤時重新載入數據（獨立 try/catch 防止 rollback 自身失敗導致 task 永久消失）
+      try {
+        const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
+        }
+      } catch (rollbackErr) {
+        console.error("Failed to rollback after delete error:", rollbackErr);
       }
     }
   };
@@ -2129,10 +2157,10 @@ function DashboardContent() {
       const startTime = options?.startTime || "09:00";
 
       const dateStr = task.due_date || task.start_date;
-      const date = dateStr ? new Date(dateStr) : new Date();
+      const datePart = dateStr ? dateStr.split('T')[0] : new Date().toISOString().split('T')[0];
       const [hours, minutes] = startTime.split(':').map(Number);
-      const start = new Date(date);
-      start.setHours(hours, minutes, 0, 0);
+      const [year, month, day] = datePart.split('-').map(Number);
+      const start = new Date(year, month - 1, day, hours, minutes, 0, 0);
       const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
 
       const startDateTime = start.toISOString();
@@ -2671,6 +2699,9 @@ function DashboardContent() {
 
       const result = await res.json();
       const newSubItem = result.data?.subItem || result.sub_item;
+      if (!newSubItem) {
+        throw new Error("新增子項目失敗：API 未回傳子項目資料");
+      }
 
       // 更新 UI
       setAreas(prevAreas => {
@@ -2738,6 +2769,7 @@ function DashboardContent() {
       }
 
       const result = await res.json();
+      const reorderedSubItems = result.data?.sub_items ?? result.sub_items;
 
       // 更新 UI
       setAreas(prevAreas => {
@@ -2749,8 +2781,8 @@ function DashboardContent() {
               if (task.id === taskId) {
                 const updatedTask = {
                   ...task,
-                  sub_items: result.sub_items,
-                  sub_items_meta: result.sub_items_meta,
+                  sub_items: Array.isArray(reorderedSubItems) ? reorderedSubItems : task.sub_items,
+                  sub_items_meta: result.data?.sub_items_meta ?? result.sub_items_meta,
                 };
 
                 // 同時更新 selectedTask
@@ -2959,6 +2991,9 @@ function DashboardContent() {
       });
 
       if (!res.ok) {
+        if (res.status === 429) {
+          throw new Error("今日 AI 額度已用完，明天午夜後將自動重置。")
+        }
         const errorText = await res.text();
         throw new Error(`重組分析失敗 (HTTP ${res.status}): ${errorText}`);
       }
@@ -2969,7 +3004,7 @@ function DashboardContent() {
       console.log('🔍 [Web] task_consolidations:', proposal.task_consolidations);
       console.log('🔍 [Web] task_consolidations length:', proposal.task_consolidations?.length || 0);
 
-      const fullProposal = { ...proposal, productId, productName };
+      const fullProposal = { ...proposal, productId, product_id: proposal.product_id ?? productId, productName };
 
       // ✅ 快取 proposal（只在成功時快取）
       proposalCacheRef.current.set(productId, fullProposal);
@@ -3047,7 +3082,7 @@ function DashboardContent() {
     try {
       const authHeaders = await getAuthHeaders();
       const res = await fetch(
-        `/api/products/${lastReorganizedProductId}/restore-recent-tasks`,
+        `${API_BASE_URL}/api/products/${lastReorganizedProductId}/restore-recent-tasks`,
         {
           method: "POST",
           headers: {
@@ -3108,9 +3143,12 @@ function DashboardContent() {
       products: (Array.isArray(area.products) ? area.products : []).map(product => {
         const archivedTasks = archivedByProduct.get(product.id) || [];
         if (archivedTasks.length === 0) return product;
+        const existingIds = new Set((Array.isArray(product.tasks) ? product.tasks : []).map((t) => t.id));
+        const newArchived = archivedTasks.filter((t) => !existingIds.has(t.id));
+        if (newArchived.length === 0) return product;
         return {
           ...product,
-          tasks: [...(Array.isArray(product.tasks) ? product.tasks : []), ...archivedTasks],
+          tasks: [...(Array.isArray(product.tasks) ? product.tasks : []), ...newArchived],
         };
       }),
     }));
@@ -3854,12 +3892,12 @@ function DashboardContent() {
                 const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
                 if (libraryRes.ok) {
                   const libraryData = await libraryRes.json();
-                  const areas = libraryData.data?.areas || [];
-                  setAreas(areas);
+                  const cleanedAreas = cleanLibraryData(libraryData.data?.areas || []);
+                  setAreas(cleanedAreas);
 
                   // 同步更新 selectedTask（如果打開了詳情 modal）
                   if (selectedTask) {
-                    const updatedTask = (Array.isArray(areas) ? areas : [])
+                    const updatedTask = cleanedAreas
                       .flatMap((a: ApiArea) => (Array.isArray(a.products) ? a.products : []).flatMap((p: ApiProduct) => Array.isArray(p.tasks) ? p.tasks : []))
                       .filter((t: TaskCard) => t != null)
                       .find((t: TaskCard) => t.id === selectedTask.id);

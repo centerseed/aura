@@ -1056,7 +1056,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               decoration: InputDecoration.collapsed(
                 hintText: '輸入任務內容...',
                 hintStyle: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.3),
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1128,7 +1128,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                           Icon(
                             status.icon,
                             size: 14,
-                            color: isSelected ? status.color : colorScheme.onSurface.withValues(alpha: 0.4),
+                            color: isSelected ? status.color : colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1227,7 +1227,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             Text(
               date != null ? DateFormat('MM/dd').format(date) : '未設定',
               style: TextStyle(
-                color: date != null ? dateColor : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                color: date != null ? dateColor : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 14,
                 fontWeight: date != null ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -1269,7 +1269,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               onTap: _showReminderTimePicker,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text('設定時間', style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3), fontSize: 13)),
+                child: Text('設定時間', style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 13)),
               ),
             ),
           SizedBox(
@@ -1487,7 +1487,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       Icon(
                         sub.completed ? Icons.check_circle : Icons.circle_outlined,
                         size: 18,
-                        color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -1508,7 +1508,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                         onTap: () => _handleDeleteSubItem(sub.id),
                         child: Padding(
                           padding: const EdgeInsets.all(6),
-                          child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.3), size: 16),
+                          child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.5), size: 16),
                         ),
                       ),
                     ],
@@ -1542,7 +1542,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                                 sub.completed ? Icons.check_circle : Icons.circle_outlined,
                                 key: ValueKey(sub.completed),
                                 size: 18,
-                                color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.4),
+                                color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -1587,7 +1587,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       onTap: () => _handleDeleteSubItem(sub.id),
                       child: Padding(
                         padding: const EdgeInsets.all(6),
-                        child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.3), size: 16),
+                        child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.5), size: 16),
                       ),
                     ),
                   ],
@@ -1615,7 +1615,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               style: TextStyle(color: colorScheme.onSurface, fontSize: 15),
             ),
             const Spacer(),
-            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurface.withValues(alpha: 0.3)),
+            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurface.withValues(alpha: 0.5)),
           ],
         ),
       ),
@@ -1637,7 +1637,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               style: TextStyle(color: AppColors.success, fontSize: 15),
             ),
             const Spacer(),
-            Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+            Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
           ],
         ),
       ),

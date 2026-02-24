@@ -668,7 +668,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withOpacity(0.55),
             fontSize: 12,
             letterSpacing: 1.5,
             fontWeight: FontWeight.bold,
@@ -688,7 +688,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.remove, color: Colors.white.withOpacity(0.2)),
+                child: Icon(Icons.remove, color: Colors.white.withOpacity(0.5)),
               ),
             ),
             SizedBox(
@@ -714,14 +714,14 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.add, color: Colors.white.withOpacity(0.2)),
+                child: Icon(Icons.add, color: Colors.white.withOpacity(0.5)),
               ),
             ),
           ],
         ),
         Text(
           "分鐘",
-          style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12),
+          style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12),
         ),
       ],
     );

@@ -920,7 +920,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
           const SizedBox(height: 16),
 
           // 整合卡片
-          ...proposal.taskConsolidations.map((c) => _buildGroupingCard(c, taskContextMap)),
+          ...proposal.taskConsolidations.map((c) => _buildGroupingCard(context, c, taskContextMap)),
 
           const SizedBox(height: 30),
 
@@ -1068,7 +1068,8 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
     );
   }
 
-  Widget _buildGroupingCard(TaskConsolidation c, Map<String, TaskContext> taskContextMap) {
+  Widget _buildGroupingCard(BuildContext context, TaskConsolidation c, Map<String, TaskContext> taskContextMap) {
+    final colorScheme = Theme.of(context).colorScheme;
     // 取得主任務和子任務的標題
     final parentTask = taskContextMap[c.parentTaskId];
     final subTasks = c.subTaskIds
@@ -1081,7 +1082,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161621),
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.primary.withOpacity(0.2)),
       ),
@@ -1096,8 +1097,8 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
               Expanded(
                 child: Text(
                   c.consolidatedTitle,
-                  style: const TextStyle(
-                    color: Color(0xFF9D97FF),
+                  style: TextStyle(
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -1110,7 +1111,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
             child: Text(
               "${c.subTaskIds.length + 1} 個任務整合為待辦清單",
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 11,
               ),
             ),
@@ -1140,8 +1141,8 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                     Expanded(
                       child: Text(
                         parentTask?.title ?? c.parentTaskId,
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withValues(alpha: 0.7),
                           fontSize: 12,
                         ),
                       ),
@@ -1153,9 +1154,9 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                         color: AppColors.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(3),
                       ),
-                      child: const Text(
+                      child: Text(
                         "主任務",
-                        style: TextStyle(fontSize: 9, color: Color(0xFF8F8AFF)),
+                        style: TextStyle(fontSize: 12, color: AppColors.primary),
                       ),
                     ),
                   ],
@@ -1172,7 +1173,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                         width: 4,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.3),
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -1181,7 +1182,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                         child: Text(
                           task.title,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
                             fontSize: 11,
                           ),
                         ),
@@ -1190,8 +1191,8 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                       Text(
                         "子項目",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.3),
-                          fontSize: 9,
+                          color: colorScheme.onSurface.withValues(alpha: 0.55),
+                          fontSize: 12,
                         ),
                       ),
                     ],

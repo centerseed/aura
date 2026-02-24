@@ -11,8 +11,10 @@ import '../../../../core/errors/failures.dart';
 import '../../../../domain/entities/task.dart';
 import '../../../../domain/entities/area.dart';
 import '../../../../domain/entities/product.dart';
+import '../../../providers/ai_consent_provider.dart';
 import '../../../providers/task_provider.dart';
 import '../../../providers/area_provider.dart';
+import '../../../widgets/ai_consent_dialog.dart';
 import '../../../providers/product_provider.dart';
 import 'task_detail_bottom_sheet.dart';
 
@@ -136,6 +138,14 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   Future<void> _submit() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
+
+    // AI consent check
+    final hasConsent = ref.read(aiConsentProvider);
+    if (!hasConsent) {
+      final granted = await AiConsentDialog.show(context);
+      if (!granted) return;
+      ref.read(aiConsentProvider.notifier).grant();
+    }
 
     // 構建完整訊息(包含 @ mention)
     final fullMessage = _buildUserMessage(text);
@@ -451,7 +461,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               Icon(
                 Icons.subdirectory_arrow_right,
                 size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               const SizedBox(width: 4),
               Text(
@@ -480,7 +490,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     child: Text(
                       '此領域尚無專案',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         fontSize: 14,
                       ),
                     ),
@@ -622,7 +632,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           Icon(
             Icons.auto_awesome,
             size: 32,
-            color: colorScheme.onSurface.withValues(alpha: 0.3),
+            color: colorScheme.onSurface.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 12),
           Text(
@@ -636,7 +646,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           Text(
             '或選擇 Area 後指定專案',
             style: TextStyle(
-              color: colorScheme.onSurface.withValues(alpha: 0.4),
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
               fontSize: 14,
             ),
           ),
@@ -957,7 +967,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     style: TextStyle(color: colorScheme.onSurface, fontSize: 16),
                     decoration: InputDecoration(
                       hintText: '輸入新事項...',
-                      hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3)),
+                      hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5)),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
@@ -1110,7 +1120,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     Icons.check,
                     color: _lastWords.isNotEmpty
                         ? Colors.white
-                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     size: 24,
                   ),
                 ),

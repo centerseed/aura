@@ -15,7 +15,7 @@ export default function TermsPage() {
             服務條款
           </h1>
           <p className="text-slate-400">
-            最後更新日期：2026 年 2 月 7 日
+            最後更新日期：2026 年 2 月 24 日
           </p>
         </div>
 
@@ -64,7 +64,22 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">5. 智慧財產權</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">5. AI 功能使用條款</h2>
+            <p className="mb-4">
+              Zentropy 提供 AI 驅動的功能（包括 Brain Dump 智慧捕捉、Coach Briefing 教練簡報、Topic Reorganization 主題重組）。
+              使用這些功能時，您同意：
+            </p>
+            <ul className="list-disc list-inside space-y-2 ml-4">
+              <li>AI 功能需要您的<strong>明確同意</strong>才會啟用，首次使用時會顯示同意對話框</li>
+              <li>您的文字輸入、任務名稱、專案名稱及里程碑資訊將傳送至 Google Gemini API 進行處理</li>
+              <li>AI 產生的建議（包括任務分類、每日計畫、組織結構建議）<strong>僅供參考</strong>，最終決策權屬於您</li>
+              <li>您可以隨時在 App 的個人檔案設定中<strong>關閉 AI 功能</strong>，撤回同意後 AI 功能將停止資料傳輸</li>
+              <li>我們不保證 AI 建議的準確性或適用性</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-4">6. 智慧財產權</h2>
             <ul className="list-disc list-inside space-y-2 ml-4">
               <li><strong>您的內容</strong>：您保留對上傳內容的所有權</li>
               <li><strong>Zentropy 平台</strong>：所有介面、程式碼、設計為 Zentropy 所有</li>
@@ -73,7 +88,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">6. 免責聲明</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">7. 免責聲明</h2>
             <p className="mb-4">
               Zentropy 服務按「現況」提供，我們不保證：
             </p>
@@ -88,7 +103,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">7. 服務變更與終止</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">8. 服務變更與終止</h2>
             <ul className="list-disc list-inside space-y-2 ml-4">
               <li>我們保留隨時修改或終止服務的權利</li>
               <li>重大變更會提前通知用戶</li>
@@ -98,7 +113,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">8. 資料備份</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">9. 資料備份</h2>
             <p>
               我們建議您定期備份重要資料。雖然我們會盡力保護資料安全，
               但不對資料遺失承擔責任。
@@ -106,15 +121,15 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">9. 第三方服務</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">10. 第三方服務</h2>
             <p>
-              Zentropy 整合了 Google Calendar 等第三方服務。
+              Zentropy 整合了 Google Calendar 及 Google Gemini AI 等第三方服務。
               這些服務受其各自的服務條款約束，我們不對第三方服務負責。
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">10. 適用法律</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">11. 適用法律</h2>
             <p>
               本服務條款受中華民國法律管轄。
               如有爭議，雙方同意以台灣台北地方法院為第一審管轄法院。
@@ -122,7 +137,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">11. 條款更新</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">12. 條款更新</h2>
             <p>
               我們可能會不定期更新服務條款。重大變更時，我們會通過 Email 或服務通知您。
               繼續使用服務即表示您同意更新後的條款。
@@ -130,7 +145,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">12. 聯絡我們</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">13. 聯絡我們</h2>
             <p>
               如果您對服務條款有任何疑問，請聯絡：
               <br />

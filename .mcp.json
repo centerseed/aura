@@ -2,7 +2,7 @@
   "mcpServers": {
     "zentropy": {
       "url": "https://api.zentropy.cc/mcp",
-      "type": "sse",
+      "type": "http",
       "oauth": {
         "authorizationUrl": "https://api.zentropy.cc/api/oauth/mcp/authorize",
         "tokenUrl": "https://api.zentropy.cc/api/oauth/mcp/token",

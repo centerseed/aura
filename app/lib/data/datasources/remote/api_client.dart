@@ -348,6 +348,12 @@ class ApiClient {
     return response.data;
   }
 
+  /// 刪除帳號（soft-delete 所有使用者資料）
+  /// DELETE /api/me
+  Future<void> deleteAccount() async {
+    await _dio.delete('/me');
+  }
+
   // ==================== Milestones ====================
 
   /// 取得所有里程碑

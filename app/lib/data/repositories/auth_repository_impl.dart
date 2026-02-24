@@ -235,6 +235,35 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, void>> deleteAccount() async {
+    try {
+      // 1. Soft-delete all user data on backend
+      await _apiClient.deleteAccount();
+
+      // 2. Delete Firebase account
+      try {
+        await _firebaseAuth.currentUser?.delete();
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'requires-recent-login') {
+          // Backend data is already soft-deleted, but Firebase account remains
+          // User needs to re-authenticate to complete deletion
+          return Left(AuthFailure('requires-recent-login'));
+        }
+        rethrow;
+      }
+
+      // 3. Clear local auth state
+      await _googleSignIn.signOut();
+
+      return const Right(null);
+    } on FirebaseAuthException catch (e) {
+      return Left(AuthFailure(e.message ?? 'Failed to delete account'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> ensureBackendSync() async {
     try {
       final user = _firebaseAuth.currentUser;

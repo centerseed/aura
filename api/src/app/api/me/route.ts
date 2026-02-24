@@ -11,6 +11,7 @@ import {
   ValidationException,
 } from '@/lib/api-response'
 import { GetCurrentUserUseCase } from '@/application/use-cases/users/get-current-user'
+import { DeleteAccountUseCase } from '@/application/use-cases/users/delete-account'
 import { prisma } from '@/lib/db'
 
 // ============================================================================
@@ -178,5 +179,35 @@ export async function PATCH(request: NextRequest) {
       },
       {}
     )
+  })
+}
+
+// ============================================================================
+// DELETE /api/me - 刪除帳號（soft-delete 所有使用者資料）
+// ============================================================================
+
+export async function DELETE(request: NextRequest) {
+  return catchDomainException(async () => {
+    // 驗證 Firebase ID Token
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Missing or invalid authorization header')
+    }
+
+    const token = authHeader.substring(7)
+    const auth = getAuth()
+    let decodedToken
+    try {
+      decodedToken = await auth.verifyIdToken(token)
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired token')
+    }
+    const firebaseUid = decodedToken.uid
+
+    // 執行 Use Case
+    const useCase = new DeleteAccountUseCase()
+    const result = await useCase.execute({ firebaseUid })
+
+    return ApiResponseBuilder.success(result, {})
   })
 }

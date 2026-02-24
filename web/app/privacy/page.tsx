@@ -15,7 +15,7 @@ export default function PrivacyPage() {
             隱私政策
           </h1>
           <p className="text-slate-400">
-            最後更新日期：2026 年 2 月 7 日
+            最後更新日期：2026 年 2 月 24 日
           </p>
         </div>
 
@@ -71,15 +71,43 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">5. 資料分享</h2>
-            <p>
-              我們<strong>不會</strong>出售、交易或轉讓您的個人資訊給第三方。
-              除非法律要求或獲得您的明確同意。
+            <h2 className="text-2xl font-semibold text-white mb-4">5. AI 功能與資料處理</h2>
+            <p className="mb-4">
+              Zentropy 使用人工智慧技術提供以下功能：
+            </p>
+            <ul className="list-disc list-inside space-y-2 ml-4">
+              <li><strong>Brain Dump（智慧捕捉）</strong>：自動分析您的文字輸入，將其分類為任務並歸入適當的專案</li>
+              <li><strong>Coach Briefing（教練簡報）</strong>：根據您的任務和專案狀態，產生每日行動建議</li>
+              <li><strong>Topic Reorganization（主題重組）</strong>：分析專案中的任務分布，提供組織結構優化建議</li>
+            </ul>
+            <p className="mt-4 mb-4">
+              為提供上述 AI 功能，我們會將以下資料傳送至 <strong>Google Gemini API</strong> 進行處理：
+            </p>
+            <ul className="list-disc list-inside space-y-2 ml-4">
+              <li>您輸入的文字內容</li>
+              <li>任務名稱與描述</li>
+              <li>專案名稱與主題名稱</li>
+              <li>里程碑資訊</li>
+            </ul>
+            <p className="mt-4">
+              <strong>重要說明</strong>：根據 Google 的 API 資料使用政策，透過 API 傳送的資料<strong>不會</strong>被用於訓練 Google 的 AI 模型。
+              AI 功能需要您的明確同意才會啟用，您可以隨時在 App 設定中關閉 AI 功能。
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">6. 您的權利</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">6. 資料分享</h2>
+            <p className="mb-4">
+              我們<strong>不會</strong>出售、交易或轉讓您的個人資訊給第三方，除非法律要求或獲得您的明確同意。
+            </p>
+            <p>
+              上述 AI 功能所需的資料傳輸（至 Google Gemini API）屬於提供服務所必要的處理，
+              僅限於您同意使用 AI 功能時進行，且不構成資訊出售或轉讓。
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-4">7. 您的權利</h2>
             <p className="mb-4">您有權利：</p>
             <ul className="list-disc list-inside space-y-2 ml-4">
               <li>隨時刪除您的帳號和所有資料</li>
@@ -90,7 +118,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">7. Cookie 使用</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">8. Cookie 使用</h2>
             <p>
               Zentropy 使用 Cookie 來維持您的登入狀態和改善使用體驗。
               您可以通過瀏覽器設定管理 Cookie。
@@ -98,14 +126,14 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">8. 政策更新</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">9. 政策更新</h2>
             <p>
               我們可能會不定期更新此隱私政策。重大變更時，我們會通過 Email 或服務通知您。
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">9. 聯絡我們</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">10. 聯絡我們</h2>
             <p>
               如果您對此隱私政策有任何疑問，請聯絡：
               <br />

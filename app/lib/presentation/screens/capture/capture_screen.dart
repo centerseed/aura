@@ -7,9 +7,11 @@ import 'package:app/domain/entities/brain_dump_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import '../../../core/di/providers.dart';
+import '../../providers/ai_consent_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/area_provider.dart';
+import '../../widgets/ai_consent_dialog.dart';
 import '../home/widgets/task_detail_bottom_sheet.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
@@ -38,6 +40,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   Future<void> _submit() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
+
+    // AI consent check
+    final hasConsent = ref.read(aiConsentProvider);
+    if (!hasConsent) {
+      final granted = await AiConsentDialog.show(context);
+      if (!granted) return;
+      ref.read(aiConsentProvider.notifier).grant();
+    }
 
     setState(() {
       _isProcessing = true;
@@ -607,14 +617,17 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                               ),
                             );
                           },
-                          child: Container(
+                          child: Builder(
+                            builder: (context) {
+                              final cs = Theme.of(context).colorScheme;
+                              return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.05),
+                              color: cs.onSurface.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
+                                color: cs.onSurface.withValues(alpha: 0.1),
                               ),
                             ),
                             child: Row(
@@ -625,8 +638,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                     children: [
                                       Text(
                                         task.content,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: cs.onSurface,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -641,8 +654,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: Colors.grey.withOpacity(
-                                                0.2,
+                                              color: cs.onSurfaceVariant.withValues(
+                                                alpha: 0.15,
                                               ),
                                               borderRadius:
                                                   BorderRadius.circular(4),
@@ -650,8 +663,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                             child: Text(
                                               task.areaName!,
                                               style: TextStyle(
-                                                color: Colors.grey[300],
-                                                fontSize: 10,
+                                                color: cs.onSurfaceVariant,
+                                                fontSize: 11,
                                               ),
                                             ),
                                           ),
@@ -664,8 +677,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: Colors.blue.withOpacity(
-                                                0.2,
+                                              color: cs.primary.withValues(
+                                                alpha: 0.15,
                                               ),
                                               borderRadius:
                                                   BorderRadius.circular(4),
@@ -673,8 +686,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                             child: Text(
                                               task.productName!,
                                               style: TextStyle(
-                                                color: Colors.blue[200],
-                                                fontSize: 10,
+                                                color: cs.primary,
+                                                fontSize: 11,
                                               ),
                                             ),
                                           ),
@@ -704,6 +717,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                 ),
                               ],
                             ),
+                          );
+                            },
                           ),
                         );
                       }

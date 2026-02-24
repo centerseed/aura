@@ -249,7 +249,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                     child: Text(
                       area.description!,
                       style: TextStyle(
-                        color: colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: colorScheme.onSurface.withValues(alpha: 0.5),
                         fontSize: 12,
                       ),
                     ),
@@ -370,7 +370,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                                     child: Text(
                                       product.description!,
                                       style: TextStyle(
-                                        color: colorScheme.onSurface.withValues(alpha: 0.45),
+                                        color: colorScheme.onSurface.withValues(alpha: 0.5),
                                         fontSize: 13,
                                       ),
                                       maxLines: 2,
@@ -475,7 +475,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                             child: Text(
                               '無任務',
                               style: TextStyle(
-                                color: colorScheme.onSurface.withValues(alpha: 0.4),
+                                color: colorScheme.onSurface.withValues(alpha: 0.5),
                                 fontSize: 14,
                               ),
                             ),
@@ -612,7 +612,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                                 border: Border.all(
                                   color: subItem.completed
                                       ? AppColors.accentEmerald
-                                      : colorScheme.onSurface.withValues(alpha: 0.2),
+                                      : colorScheme.onSurface.withValues(alpha: 0.5),
                                   width: 1.5,
                                 ),
                               ),
@@ -630,13 +630,13 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                                 subItem.content,
                                 style: TextStyle(
                                   color: subItem.completed
-                                      ? colorScheme.onSurface.withValues(alpha: 0.35)
-                                      : colorScheme.onSurface.withValues(alpha: 0.7),
+                                      ? colorScheme.onSurface.withValues(alpha: 0.5)
+                                      : colorScheme.onSurface.withValues(alpha: 0.8),
                                   fontSize: 13,
                                   decoration: subItem.completed
                                       ? TextDecoration.lineThrough
                                       : null,
-                                  decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
+                                  decorationColor: colorScheme.onSurface.withValues(alpha: 0.5),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -752,7 +752,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                     _formatDueDate(task.dueDate!),
                     style: TextStyle(
                       color: dotColor,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1061,7 +1061,7 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
             Text(
               '開始記錄你的第一個想法吧',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 14,
               ),
             ),

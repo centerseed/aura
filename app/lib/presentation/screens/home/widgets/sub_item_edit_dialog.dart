@@ -201,9 +201,9 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
               style: TextStyle(color: colorScheme.onSurface),
               decoration: InputDecoration(
                 labelText: '內容',
-                labelStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+                labelStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.7)),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.3)),
+                  borderSide: BorderSide(color: colorScheme.onSurface.withValues(alpha: 0.4)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -255,7 +255,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                 child: Text(
                   '任務截止日：${_formatDate(widget.taskDueDate!)}',
                   style: TextStyle(
-                    color: colorScheme.onSurface.withOpacity(0.5),
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -341,7 +341,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
-          border: Border.all(color: colorScheme.onSurface.withOpacity(0.3)),
+          border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.4)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -352,14 +352,14 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                 Icon(
                   Icons.calendar_today,
                   size: 16,
-                  color: colorScheme.onSurface.withOpacity(0.7),
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   date == null ? label : _formatDate(date),
                   style: TextStyle(
                     color: date == null
-                        ? colorScheme.onSurface.withOpacity(0.5)
+                        ? colorScheme.onSurface.withValues(alpha: 0.6)
                         : colorScheme.onSurface,
                     fontSize: 14,
                   ),
@@ -372,7 +372,7 @@ class _SubItemEditDialogState extends State<SubItemEditDialog> {
                 child: Icon(
                   Icons.close,
                   size: 18,
-                  color: colorScheme.onSurface.withOpacity(0.5),
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
           ],

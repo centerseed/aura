@@ -218,7 +218,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                 child: Text(
                   plan.coachMessage!,
                   style: TextStyle(
-                    color: onSurface.withValues(alpha: 0.4),
+                    color: onSurface.withValues(alpha: 0.5),
                     fontSize: 11,
                   ),
                   maxLines: 1,
@@ -278,7 +278,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                   child: Text(
                     '明後天代辦',
                     style: TextStyle(
-                      color: onSurface.withValues(alpha: 0.35),
+                      color: onSurface.withValues(alpha: 0.5),
                       fontSize: 12,
                     ),
                   ),
@@ -301,7 +301,7 @@ class CoachBriefingSheet extends ConsumerWidget {
             child: Text(
               '已完成 (${completedItems.length})',
               style: TextStyle(
-                color: onSurface.withValues(alpha: 0.35),
+                color: onSurface.withValues(alpha: 0.5),
                 fontSize: 12,
               ),
             ),
@@ -365,7 +365,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                   border: Border.all(
                     color: isCompleted
                         ? AppColors.accentEmerald
-                        : onSurface.withValues(alpha: 0.2),
+                        : onSurface.withValues(alpha: 0.5),
                     width: 1.5,
                   ),
                 ),
@@ -384,11 +384,11 @@ class CoachBriefingSheet extends ConsumerWidget {
                     item.content,
                     style: TextStyle(
                       color: isCompleted
-                          ? onSurface.withValues(alpha: 0.35)
+                          ? onSurface.withValues(alpha: 0.5)
                           : onSurface.withValues(alpha: 0.85),
                       fontSize: 14,
                       decoration: isCompleted ? TextDecoration.lineThrough : null,
-                      decorationColor: onSurface.withValues(alpha: 0.3),
+                      decorationColor: onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                   if (item.areaName != null || item.productName != null)
@@ -399,7 +399,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                             .whereType<String>()
                             .join(' > '),
                         style: TextStyle(
-                          color: onSurface.withValues(alpha: 0.3),
+                          color: onSurface.withValues(alpha: 0.5),
                           fontSize: 11,
                         ),
                       ),
@@ -412,7 +412,7 @@ class CoachBriefingSheet extends ConsumerWidget {
               Text(
                 '${item.estimatedMinutes}分',
                 style: TextStyle(
-                  color: onSurface.withValues(alpha: 0.35),
+                  color: onSurface.withValues(alpha: 0.5),
                   fontSize: 11,
                 ),
               ),
@@ -432,7 +432,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                   size: 16,
                   color: item.pinned
                       ? AppColors.statusInbox
-                      : onSurface.withValues(alpha: 0.2),
+                      : onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -486,7 +486,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                           color: onSurface.withValues(alpha: 0.6),
                           fontSize: 13,
                           decoration: TextDecoration.lineThrough,
-                          decorationColor: onSurface.withValues(alpha: 0.3),
+                          decorationColor: onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ),
@@ -494,7 +494,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                       Text(
                         '${item.estimatedMinutes}分',
                         style: TextStyle(
-                          color: onSurface.withValues(alpha: 0.3),
+                          color: onSurface.withValues(alpha: 0.5),
                           fontSize: 11,
                         ),
                       ),
@@ -546,7 +546,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                           Text(
                             _formatEventTime(event),
                             style: TextStyle(
-                              color: onSurface.withValues(alpha: 0.4),
+                              color: onSurface.withValues(alpha: 0.5),
                               fontSize: 11,
                             ),
                           ),
@@ -659,7 +659,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                       Text(
                         rec.reasoning,
                         style: TextStyle(
-                          color: onSurface.withValues(alpha: 0.45),
+                          color: onSurface.withValues(alpha: 0.5),
                           fontSize: 12,
                         ),
                       ),
@@ -721,7 +721,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     Text(
                       suggestion.reasoning,
                       style: TextStyle(
-                        color: onSurface.withValues(alpha: 0.4),
+                        color: onSurface.withValues(alpha: 0.5),
                         fontSize: 12,
                       ),
                     ),
@@ -762,7 +762,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                     task.content,
                     style: TextStyle(
                       color: isCompleted
-                          ? onSurface.withValues(alpha: 0.4)
+                          ? onSurface.withValues(alpha: 0.5)
                           : onSurface.withValues(alpha: 0.8),
                       fontSize: 13,
                       decoration:
@@ -775,7 +775,7 @@ class CoachBriefingSheet extends ConsumerWidget {
                           .whereType<String>()
                           .join(' > '),
                       style: TextStyle(
-                        color: onSurface.withValues(alpha: 0.3),
+                        color: onSurface.withValues(alpha: 0.5),
                         fontSize: 11,
                       ),
                     ),

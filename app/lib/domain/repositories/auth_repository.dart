@@ -30,4 +30,7 @@ abstract class AuthRepository {
   /// 確保當前用戶已與後端同步
   /// 在 app 啟動時如果發現有 Firebase 會話，應該調用此方法確保資料庫中有用戶記錄
   Future<Either<Failure, void>> ensureBackendSync();
+
+  /// 刪除帳號（後端 soft-delete + Firebase 帳號刪除）
+  Future<Either<Failure, void>> deleteAccount();
 }

@@ -103,16 +103,21 @@ interface BriefingData {
 // LocalStorage helpers
 // ============================================================================
 
-const STORAGE_KEY = "coach_last_seen_briefing_id";
+const STORAGE_KEY_MORNING = "coach_last_seen_morning_id";
+const STORAGE_KEY_EVENING = "coach_last_seen_evening_id";
 
-function getLastSeenId(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(STORAGE_KEY);
+function getLastSeenIds() {
+  if (typeof window === "undefined") return { morning: null as string | null, evening: null as string | null };
+  return {
+    morning: localStorage.getItem(STORAGE_KEY_MORNING),
+    evening: localStorage.getItem(STORAGE_KEY_EVENING),
+  };
 }
 
-function setLastSeenId(id: string) {
+function setLastSeenId(type: "MORNING" | "EVENING", id: string) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, id);
+  const key = type === "MORNING" ? STORAGE_KEY_MORNING : STORAGE_KEY_EVENING;
+  localStorage.setItem(key, id);
 }
 
 // ============================================================================
@@ -139,6 +144,11 @@ export function CoachAgent() {
   const [currentLocalHour, setCurrentLocalHour] = useState<number>(new Date().getHours());
 
   const briefing = activeTab === "MORNING" ? morningBriefing : eveningBriefing;
+  // 防止 unmount 後 setState（visibility change 觸發後 unmount 仍 setState）
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   const loadBriefings = useCallback(async () => {
     try {
@@ -150,24 +160,29 @@ export function CoachAgent() {
         API.coach.getLatestBriefing({ type: "EVENING" }),
       ]);
 
+      if (!isMountedRef.current) return;
+
       const m = morningRes.status === "fulfilled" ? morningRes.value?.briefing || null : null;
       const e = eveningRes.status === "fulfilled" ? eveningRes.value?.briefing || null : null;
       setMorningBriefing(m);
       setEveningBriefing(e);
 
-      // Check unread: either one is new
-      const lastSeen = getLastSeenId();
-      const newestId = e?.id || m?.id;
-      if (newestId && lastSeen !== newestId) {
+      // Check unread: either morning or evening is new
+      const lastSeen = getLastSeenIds();
+      const morningIsNew = m?.id && lastSeen.morning !== m.id;
+      const eveningIsNew = e?.id && lastSeen.evening !== e.id;
+      if (morningIsNew || eveningIsNew) {
         setHasUnread(true);
         setShowBubble(true);
+        if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
         bubbleTimerRef.current = setTimeout(() => setShowBubble(false), 6000);
       }
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       console.error("[Coach] Failed to load briefings:", err);
       setError(err?.message || "Failed to load briefings");
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) setIsLoading(false);
     }
   }, []);
 
@@ -179,14 +194,18 @@ export function CoachAgent() {
         const settings = response.user?.settings?.briefingSchedule;
         const timezone = response.user?.timezone || 'Asia/Taipei';
 
+        const localHour = getCurrentLocalHour(timezone);
         setUserSettings(settings);
         setUserTimezone(timezone);
-        setCurrentLocalHour(getCurrentLocalHour(timezone));
+        setCurrentLocalHour(localHour);
+        setActiveTab(localHour < 14 ? "MORNING" : "EVENING");
       } catch (err) {
         console.error('[Coach] Failed to load user settings:', err);
         // 使用預設值
+        const fallbackHour = new Date().getHours();
         setUserTimezone('Asia/Taipei');
-        setCurrentLocalHour(new Date().getHours());
+        setCurrentLocalHour(fallbackHour);
+        setActiveTab(fallbackHour < 14 ? "MORNING" : "EVENING");
       }
     }
     loadUserSettings();
@@ -230,8 +249,8 @@ export function CoachAgent() {
     setIsOpen(true);
     setHasUnread(false);
     setShowBubble(false);
-    const newestId = eveningBriefing?.id || morningBriefing?.id;
-    if (newestId) setLastSeenId(newestId);
+    if (morningBriefing?.id) setLastSeenId("MORNING", morningBriefing.id);
+    if (eveningBriefing?.id) setLastSeenId("EVENING", eveningBriefing.id);
   };
 
   const handleGenerate = async (type: "MORNING" | "EVENING") => {
@@ -242,11 +261,15 @@ export function CoachAgent() {
       const b = result?.briefing || null;
       if (type === "MORNING") setMorningBriefing(b);
       else setEveningBriefing(b);
-      if (b) setLastSeenId(b.id);
+      if (b) setLastSeenId(type, b.id);
       setHasUnread(false);
     } catch (err: any) {
       console.error("[Coach] Failed to generate briefing:", err);
-      setError(err?.message || "Failed to generate briefing");
+      if (err?.status === 429 || err?.code === 'RATE_LIMIT_EXCEEDED') {
+        setError("今日 AI 額度已用完，明天午夜後將自動重置。");
+      } else {
+        setError(err?.message || "Failed to generate briefing");
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -263,8 +286,7 @@ export function CoachAgent() {
       const existingBriefing = type === "MORNING" ? morningBriefing : eveningBriefing;
       if (!existingBriefing) return true;
 
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(new Date());
       const briefingDate = existingBriefing.briefing_date.split("T")[0];
 
       // 如果已有今天的簡報，不顯示生成按鈕
@@ -272,21 +294,19 @@ export function CoachAgent() {
 
       return true;
     },
-    [userSettings, currentLocalHour, morningBriefing, eveningBriefing]
+    [userSettings, currentLocalHour, userTimezone, morningBriefing, eveningBriefing]
   );
 
-  const isMorning = new Date().getHours() < 14;
+  const isMorning = currentLocalHour < 14;
   const newestBriefing = eveningBriefing || morningBriefing;
   const briefingLabel = newestBriefing
     ? newestBriefing.type === "MORNING" ? "晨報" : "晚報"
     : isMorning ? "晨報" : "晚報";
 
-  // Count alerts across both briefings
-  const alertCount = (morningBriefing
-    ? morningBriefing.overdue_tasks.length + morningBriefing.conflicts.length
-    : 0) + (eveningBriefing
-    ? eveningBriefing.overdue_tasks.length + eveningBriefing.conflicts.length
-    : 0);
+  // Count alerts from the latest briefing only (avoid double-counting same tasks)
+  const alertCount = newestBriefing
+    ? newestBriefing.overdue_tasks.length + newestBriefing.conflicts.length
+    : 0;
 
   return (
     <>
@@ -349,6 +369,7 @@ export function CoachAgent() {
             onGenerate={handleGenerate}
             onRefresh={loadBriefings}
             shouldShowGenerateButton={shouldShowGenerateButton}
+            userTimezone={userTimezone}
           />
         </SheetContent>
       </Sheet>
@@ -376,6 +397,7 @@ function CoachDrawerContent({
   onGenerate,
   onRefresh,
   shouldShowGenerateButton,
+  userTimezone,
 }: {
   briefing: BriefingData | null;
   morningBriefing: BriefingData | null;
@@ -389,6 +411,7 @@ function CoachDrawerContent({
   onGenerate: (type: "MORNING" | "EVENING") => void;
   onRefresh: () => void;
   shouldShowGenerateButton: (type: "MORNING" | "EVENING") => boolean;
+  userTimezone: string;
 }) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
@@ -568,8 +591,7 @@ function CoachDrawerContent({
 
   // ---- Briefing Content ----
   const isOutdated = (() => {
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(new Date());
     const briefingDate = briefing.briefing_date.split("T")[0];
     return briefingDate !== today;
   })();
@@ -804,7 +826,7 @@ function CoachDrawerContent({
                             ? "bg-slate-500/20 text-slate-300"
                             : ds.suggested_action === "delegate"
                             ? "bg-blue-500/20 text-blue-300"
-                            : "bg-blue-500/20 text-blue-300"
+                            : "bg-purple-500/20 text-purple-300"
                         }`}
                       >
                         {ds.suggested_action === "defer"

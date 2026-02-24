@@ -70,6 +70,16 @@ export class ServerError extends ApiError {
 }
 
 /**
+ * 速率限制錯誤（429）
+ */
+export class RateLimitError extends ApiError {
+  constructor(message: string = '今日 AI 額度已用完，明天午夜後將自動重置。') {
+    super(message, 429, 'RATE_LIMIT_EXCEEDED')
+    this.name = 'RateLimitError'
+  }
+}
+
+/**
  * 根據 HTTP 狀態碼拋出對應的錯誤
  */
 export function throwApiError(status: number, message: string): never {
@@ -82,6 +92,8 @@ export function throwApiError(status: number, message: string): never {
       throw new NotFoundError(message)
     case 400:
       throw new ValidationError(message)
+    case 429:
+      throw new RateLimitError(message)
     case 500:
     case 503:
       throw new ServerError(message)
@@ -93,34 +105,20 @@ export function throwApiError(status: number, message: string): never {
 /**
  * 處理通用錯誤並轉換為 ApiError
  *
- * 統一錯誤處理邏輯，包含：
- * - 認證錯誤檢測（原本在 17 個檔案中重複）
- * - 錯誤訊息標準化
+ * HTTP 狀態碼分類由 throwApiError(response.status, ...) 負責。
+ * 此函式僅兜底處理未分類的非 HTTP 錯誤。
  */
 export function handleError(error: unknown): ApiError {
-  // 已經是 ApiError，直接返回
   if (error instanceof ApiError) {
     return error
   }
-
-  // 轉換為字串訊息
   const errorMessage = error instanceof Error ? error.message : String(error)
-
-  // 檢測認證錯誤（原本重複的邏輯）
-  if (errorMessage.includes('token') || errorMessage.includes('Unauthorized')) {
-    return new AuthenticationError('認證失敗，請重新登入')
+  // Preserve HTTP status from duck-typed errors (e.g., ApiError instances from other modules)
+  if (error !== null && typeof error === 'object' && 'status' in error) {
+    const status = (error as any).status
+    if (typeof status === 'number') {
+      return new ApiError(errorMessage, status)
+    }
   }
-
-  // 檢測授權錯誤
-  if (errorMessage.includes('permission') || errorMessage.includes('Forbidden')) {
-    return new AuthorizationError('沒有權限執行此操作')
-  }
-
-  // 檢測未找到錯誤
-  if (errorMessage.includes('not found') || errorMessage.includes('Not Found')) {
-    return new NotFoundError(errorMessage)
-  }
-
-  // 其他錯誤
   return new ServerError(errorMessage)
 }

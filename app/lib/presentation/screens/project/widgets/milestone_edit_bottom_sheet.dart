@@ -519,22 +519,22 @@ class _MilestoneEditBottomSheetState
             Text(
               '低',
               style: TextStyle(
-                fontSize: 10,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
               ),
             ),
             Text(
               '中',
               style: TextStyle(
-                fontSize: 10,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
               ),
             ),
             Text(
               '高',
               style: TextStyle(
-                fontSize: 10,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
               ),
             ),
           ],

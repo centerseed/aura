@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/user_provider.dart';
 import 'widgets/statistics_card.dart';
+import '../../providers/ai_consent_provider.dart';
 import '../../providers/first_time_tutorial_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -96,6 +97,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
 
             _buildSection(context, '帳戶', [
+              _buildAiConsentTile(context, ref),
               _buildTile(
                 context,
                 icon: Icons.tour_outlined,
@@ -155,6 +157,14 @@ class ProfileScreen extends ConsumerWidget {
                 title: '時區設定',
                 subtitle: tz.local.name,
                 onTap: () => _showTimezoneSettings(context, ref),
+              ),
+              _buildTile(
+                context,
+                icon: Icons.delete_forever_rounded,
+                title: '刪除帳號',
+                titleColor: const Color(0xFFFF453A),
+                iconColor: const Color(0xFFFF453A),
+                onTap: () => _showDeleteAccountDialog(context, ref),
               ),
               _buildTile(
                 context,
@@ -646,6 +656,178 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   String _pad(int value) => value.toString().padLeft(2, '0');
+
+  Widget _buildAiConsentTile(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final aiConsent = ref.watch(aiConsentProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome, color: colorScheme.onSurfaceVariant, size: 22),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI 資料分享',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  '允許傳送資料至 AI 服務進行智慧分類',
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withOpacity(0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: aiConsent,
+            onChanged: (value) {
+              if (value) {
+                ref.read(aiConsentProvider.notifier).grant();
+              } else {
+                ref.read(aiConsentProvider.notifier).revoke();
+              }
+            },
+            activeColor: const Color(0xFF818CF8),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_rounded, color: const Color(0xFFFF453A), size: 24),
+            const SizedBox(width: 8),
+            Text(
+              '刪除帳號',
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '此操作無法復原。以下資料將被永久刪除：',
+              style: TextStyle(
+                color: colorScheme.onSurface.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...[
+              '所有任務與子任務',
+              '所有專案與主題',
+              '所有領域',
+              '所有里程碑',
+              '行事曆事件與提醒',
+              'AI 教練簡報與每日計畫',
+            ].map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.remove, color: const Color(0xFFFF453A), size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    item,
+                    style: TextStyle(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              '取消',
+              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6)),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _executeDeleteAccount(context, ref);
+            },
+            child: const Text(
+              '確認刪除',
+              style: TextStyle(
+                color: Color(0xFFFF453A),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executeDeleteAccount(BuildContext context, WidgetRef ref) async {
+    // Show loading indicator
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    final authRepo = ref.read(authRepositoryProvider);
+    final result = await authRepo.deleteAccount();
+
+    if (!context.mounted) return;
+    Navigator.pop(context); // dismiss loading
+
+    result.fold(
+      (failure) {
+        if (!context.mounted) return;
+        String message;
+        if (failure.message == 'requires-recent-login') {
+          message = '基於安全考量，請重新登入後再嘗試刪除帳號';
+        } else {
+          message = '刪除帳號失敗：${failure.message}';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: const Color(0xFFFF453A),
+          ),
+        );
+      },
+      (_) {
+        if (!context.mounted) return;
+        context.go('/auth/signin');
+      },
+    );
+  }
 
   Widget _buildTile(
     BuildContext context, {

@@ -28,7 +28,7 @@ import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { auth } from "@/lib/firebase";
 import { API_BASE_URL } from "@/lib/api-client";
 import type { TaskCard } from "@/types";
-import type { DrawerStatus } from "@/types";
+import type { DrawerStatus, LifecycleStatus } from "@/types";
 
 interface ProcessedItem {
   id: string;
@@ -208,6 +208,14 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   // 語音辨識狀態（Web Speech API）
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  // fetch abort controller — 組件 unmount 時取消進行中的請求
+  const submitAbortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      submitAbortControllerRef.current?.abort();
+    };
+  }, []);
 
   // 將 ProcessedItem 轉換為 TaskCard（供 TaskDetailModal 使用）
   const processedItemToTaskCard = (item: ProcessedItem): TaskCard => ({
@@ -215,7 +223,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     title: item.title,
     narrative: item.narrative || null,
     drawer: (item.drawer || "INBOX") as DrawerStatus,
-    lifecycle: "FINITE" as any,
+    lifecycle: "active" as LifecycleStatus,
     tag: item.tag,
     strategy_used: item.strategy_used,
     reasoning: item.reasoning,
@@ -337,6 +345,14 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         p.areaName.toLowerCase().includes(mentionQuery.toLowerCase())
       )
     : allProducts;
+
+  // 元件 unmount 時停止語音辨識，防止記憶體洩漏
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+    };
+  }, []);
 
   // 自動聚焦
   useEffect(() => {
@@ -694,11 +710,17 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
     };
 
     recognition.onerror = () => {
-      setIsListening(false);
+      // 只更新當前 session 的狀態，避免舊 session 的 onerror 影響新 session
+      if (recognitionRef.current === recognition) {
+        setIsListening(false);
+      }
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      // 只更新當前 session 的狀態，避免舊 session 的 onend 影響新 session
+      if (recognitionRef.current === recognition) {
+        setIsListening(false);
+      }
     };
 
     recognitionRef.current = recognition;
@@ -738,6 +760,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }
       const token = await user.getIdToken();
 
+      // 建立 AbortController，組件 unmount 時可取消請求
+      submitAbortControllerRef.current?.abort();
+      const controller = new AbortController();
+      submitAbortControllerRef.current = controller;
+
       let res: Response;
 
       if (imageToSend) {
@@ -753,6 +780,7 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             "Authorization": `Bearer ${token}`,
           },
           body: formData,
+          signal: controller.signal,
         });
       } else {
         // 文字模式：使用 JSON
@@ -763,10 +791,14 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             "Authorization": `Bearer ${token}`,
           },
           body: JSON.stringify({ text: userInput, userId }),
+          signal: controller.signal,
         });
       }
 
       if (!res.ok) {
+        if (res.status === 429) {
+          throw new Error("今日 AI 額度已用完，明天午夜後將自動重置。")
+        }
         const errorBody = await res.json().catch(() => null);
         const errorMsg = errorBody?.error?.message || "AI 處理失敗";
         throw new Error(errorMsg);
@@ -782,7 +814,9 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         timestamp: new Date(),
         content: data.action === 'create_new_tasks'
           ? `已為你整理 ${data.items?.length || 0} 個任務`
-          : `已追加 ${data.appended_sub_items?.length || 0} 個待辦事項${data.target_task?.content ? `到「${data.target_task.content}」` : ''}`,
+          : data.action === 'append_sub_item'
+            ? `已追加 ${data.appended_sub_items?.length || 0} 個待辦事項${data.target_task?.content ? `到「${data.target_task.content}」` : ''}`
+            : `處理完成`,
         data: {
           action: data.action,
           ...(data.action === 'create_new_tasks' && { items: data.items }),
@@ -841,19 +875,26 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
       }
       const token = await user.getIdToken();
 
-      if (pendingOperation.type === "adjust") {
-        // 執行調整操作
+      if (pendingOperation.type === "adjust" || pendingOperation.type === "reorganize") {
+        // adjust 和 reorganize 都透過 /api/adjust-tags 執行
+        const bodyPayload: Record<string, unknown> = {
+          text: pendingOperation.originalInput,
+          userId,
+          confirmed: true,
+        };
+
+        // reorganize 允許用戶選擇要執行的操作
+        if (pendingOperation.type === "reorganize" && selectedOperationIds.size > 0) {
+          bodyPayload.operation_ids = Array.from(selectedOperationIds);
+        }
+
         const res = await fetch(`${API_BASE_URL}/api/adjust-tags`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            text: pendingOperation.originalInput,
-            userId,
-            confirmed: true,
-          }),
+          body: JSON.stringify(bodyPayload),
         });
 
         if (res.ok) {
@@ -867,6 +908,11 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
             setShowResults(false);
             setAdjustmentResult(null);
           }, 6000);
+        } else {
+          if (res.status === 429) {
+            throw new Error("今日 AI 額度已用完，明天午夜後將自動重置。");
+          }
+          throw new Error(`操作失敗 (HTTP ${res.status})`);
         }
       }
     } catch (err) {
@@ -881,7 +927,6 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
   const handleCancelOperation = () => {
     setShowConfirmDialog(false);
     setPendingOperation(null);
-    setProcessingCount(prev => prev - 1);
     setSelectedOperationIds(new Set());
   };
 

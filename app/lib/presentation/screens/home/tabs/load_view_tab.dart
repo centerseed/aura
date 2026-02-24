@@ -180,7 +180,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
               Text(
                 '•',
                 style: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.3),
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
                   fontSize: 13,
                 ),
               ),
@@ -197,7 +197,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 Text(
                   '•',
                   style: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.3),
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 13,
                   ),
                 ),
@@ -294,7 +294,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                       isExpanded
                           ? Icons.keyboard_arrow_down
                           : Icons.keyboard_arrow_right,
-                      color: colorScheme.onSurface.withValues(alpha: 0.4),
+                      color: colorScheme.onSurface.withValues(alpha: 0.5),
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -322,7 +322,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                           '本週',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -394,7 +394,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                     Text(
                       '${_formatDate(week.weekStart)} ~ ${_formatDate(week.weekEnd)}',
                       style: TextStyle(
-                        color: colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: colorScheme.onSurface.withValues(alpha: 0.5),
                         fontSize: 11,
                       ),
                     ),
@@ -426,7 +426,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 width: 4,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: colorScheme.onSurface.withValues(alpha: 0.3),
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -449,7 +449,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                 Text(
                   '${task.dueDate!.month}/${task.dueDate!.day}',
                   style: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.4),
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -510,7 +510,7 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
             Icon(
               Icons.calendar_today_outlined,
               size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(

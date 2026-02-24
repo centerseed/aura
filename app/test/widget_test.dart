@@ -38,6 +38,16 @@ class MockAuthRepository implements AuthRepository {
   Future<Either<Failure, void>> ensureBackendSync() async {
     return const Right(null);
   }
+
+  @override
+  Future<Either<Failure, User>> signInWithApple() async {
+    return Left(AuthFailure('Mock Apple sign in fail'));
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteAccount() async {
+    return const Right(null);
+  }
 }
 
 void main() {

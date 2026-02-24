@@ -55,8 +55,8 @@ class AppColors {
   // ==================== 功能色 ====================
 
   /// 成功 / 完成 - 綠色
-  static const Color success = Color(0xFF4ADE80);
-  static const Color successDark = Color(0xFF22C55E);
+  static const Color success = Color(0xFF16A34A);
+  static const Color successDark = Color(0xFF15803D);
 
   /// 錯誤 / 危險 - 紅色
   static const Color error = Color(0xFFEF4444);
@@ -125,14 +125,14 @@ class AppColors {
     return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
   }
 
-  /// 提示文字色 (40% 透明度)
+  /// 提示文字色 (50% 透明度)
   static Color textHint(BuildContext context) {
-    return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4);
+    return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
   }
 
-  /// 禁用文字色 (30% 透明度)
+  /// 禁用文字色 (45% 透明度)
   static Color textDisabled(BuildContext context) {
-    return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3);
+    return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45);
   }
 
   // ==================== 卡片樣式顏色 ====================

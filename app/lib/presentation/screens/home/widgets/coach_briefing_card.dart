@@ -148,7 +148,7 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
                 ),
               Icon(
                 Icons.chevron_right,
-                color: colorScheme.onSurface.withValues(alpha: 0.3),
+                color: colorScheme.onSurface.withValues(alpha: 0.5),
                 size: 20,
               ),
             ],

@@ -443,7 +443,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                     Text(
                       '${todayItems.length}項 · $todayMinutes分鐘',
                       style: TextStyle(
-                        color: colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: colorScheme.onSurface.withValues(alpha: 0.5),
                         fontSize: 12,
                       ),
                     ),
@@ -490,7 +490,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
             child: Text(
               '今日計畫已全數完成！',
               style: TextStyle(
-                color: colorScheme.onSurface.withValues(alpha: 0.4),
+                color: colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 14,
               ),
               textAlign: TextAlign.center,
@@ -515,7 +515,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                   child: Text(
                     '明後天代辦',
                     style: TextStyle(
-                      color: colorScheme.onSurface.withValues(alpha: 0.35),
+                      color: colorScheme.onSurface.withValues(alpha: 0.5),
                       fontSize: 12,
                     ),
                   ),
@@ -628,7 +628,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: accentColor.withValues(alpha: 0.4),
+                          color: accentColor.withValues(alpha: 0.6),
                           width: 1.5,
                         ),
                       ),
@@ -649,7 +649,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           Text(
                             '↳ ',
                             style: TextStyle(
-                              color: colorScheme.onSurface.withValues(alpha: 0.35),
+                              color: colorScheme.onSurface.withValues(alpha: 0.5),
                               fontSize: 14,
                             ),
                           ),
@@ -679,7 +679,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                               item.taskName,
                           ].whereType<String>().join(' > '),
                           style: TextStyle(
-                            color: colorScheme.onSurface.withValues(alpha: 0.3),
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
                             fontSize: 11,
                           ),
                         ),
@@ -693,7 +693,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               Text(
                 '${item.estimatedMinutes}分',
                 style: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.35),
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
                   fontSize: 11,
                 ),
               ),
@@ -713,7 +713,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 size: 18,
                 color: isOverflow
                     ? AppColors.statusActive
-                    : colorScheme.onSurface.withValues(alpha: 0.35),
+                    : colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -749,7 +749,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           Text(
                             '↳ ',
                             style: TextStyle(
-                              color: colorScheme.onSurface.withValues(alpha: 0.2),
+                              color: colorScheme.onSurface.withValues(alpha: 0.5),
                               fontSize: 14,
                             ),
                           ),
@@ -757,10 +757,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                           child: Text(
                             item.content,
                             style: TextStyle(
-                              color: colorScheme.onSurface.withValues(alpha: 0.4),
+                              color: colorScheme.onSurface.withValues(alpha: 0.5),
                               fontSize: 14,
                               decoration: TextDecoration.lineThrough,
-                              decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
+                              decorationColor: colorScheme.onSurface.withValues(alpha: 0.5),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -942,7 +942,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 Text(
                   '正在生成今日計畫...',
                   style: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.4),
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 13,
                   ),
                 ),
@@ -1054,7 +1054,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: accentColor.withValues(alpha: 0.5),
+                                    color: accentColor.withValues(alpha: 0.7),
                                     width: 2,
                                   ),
                                 ),
@@ -1064,7 +1064,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                     height: 8,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: accentColor.withValues(alpha: 0.3),
+                                      color: accentColor.withValues(alpha: 0.5),
                                     ),
                                   ),
                                 ),
@@ -1094,7 +1094,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                           Icon(
                                             Icons.folder_outlined,
                                             size: 12,
-                                            color: colorScheme.onSurface.withValues(alpha: 0.35),
+                                            color: colorScheme.onSurface.withValues(alpha: 0.5),
                                           ),
                                           const SizedBox(width: 4),
                                           Expanded(
@@ -1103,7 +1103,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                                   .whereType<String>()
                                                   .join(' > '),
                                               style: TextStyle(
-                                                color: colorScheme.onSurface.withValues(alpha: 0.4),
+                                                color: colorScheme.onSurface.withValues(alpha: 0.5),
                                                 fontSize: 12,
                                               ),
                                               maxLines: 1,
@@ -1154,7 +1154,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                   child: Text(
                                     '未排程',
                                     style: TextStyle(
-                                      color: colorScheme.onSurface.withValues(alpha: 0.35),
+                                      color: colorScheme.onSurface.withValues(alpha: 0.5),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1188,7 +1188,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
               width: 1,
             ),
           ),
@@ -1223,7 +1223,7 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                             border: Border.all(
                               color: isCompleted
                                   ? AppColors.accentEmerald
-                                  : colorScheme.onSurface.withValues(alpha: 0.2),
+                                  : colorScheme.onSurface.withValues(alpha: 0.5),
                               width: 1.5,
                             ),
                           ),
@@ -1246,12 +1246,12 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
                         color: isCompleted
-                            ? colorScheme.onSurface.withValues(alpha: 0.35)
-                            : colorScheme.onSurface.withValues(alpha: 0.8),
+                            ? colorScheme.onSurface.withValues(alpha: 0.5)
+                            : colorScheme.onSurface.withValues(alpha: 0.85),
                         fontSize: 14,
                         decoration:
                             isCompleted ? TextDecoration.lineThrough : null,
-                        decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
+                        decorationColor: colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                       child: Text(subItem.content),
                     ),
@@ -1323,10 +1323,10 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
               child: Text(
                 task.content,
                 style: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.4),
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
                   fontSize: 14,
                   decoration: TextDecoration.lineThrough,
-                  decorationColor: colorScheme.onSurface.withValues(alpha: 0.3),
+                  decorationColor: colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
