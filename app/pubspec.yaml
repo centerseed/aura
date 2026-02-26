@@ -93,6 +93,7 @@ dependencies:
   flutter_dual_cache:
     path: ../packages/flutter_dual_cache
   url_launcher: ^6.3.2
+  marionette_flutter: ^0.3.0
 
 
 dev_dependencies:
@@ -115,6 +116,7 @@ dev_dependencies:
   mockito: ^5.4.4
   mocktail: ^1.0.4
   flutter_launcher_icons: ^0.14.4
+  marionette_mcp: ^0.3.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

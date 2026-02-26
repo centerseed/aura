@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/debug/debug_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/di/providers.dart' show areaRepositoryProvider;
 
@@ -17,6 +18,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Debug bypass: 直接跳 dashboard，不等 Firebase auth
+    if (kDebugAuthBypass) {
+      Future.microtask(() {
+        if (!context.mounted) return;
+        context.go('/dashboard');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final authState = ref.watch(authStateProvider);
 
     // 當認證狀態載入完成且有用戶時，先同步後端再跳轉

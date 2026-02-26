@@ -5,7 +5,9 @@ class AppConfig {
   /// Production: Cloud Run URL
   /// Debug: localhost for development
   static String get apiBaseUrl {
-    // Cloud Run
+    if (kDebugMode) {
+      return 'http://localhost:3002/api';
+    }
     return 'https://zentropy-api-894512935237.asia-east1.run.app/api';
   }
 

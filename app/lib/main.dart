@@ -2,6 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Add implicit import for Persistence/FirebaseAuth
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:marionette_flutter/marionette_flutter.dart';
+import 'core/config/app_config.dart';
+import 'core/debug/debug_config.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,8 +18,12 @@ import 'presentation/routes/app_router.dart';
 
 void main() async {
   try {
-    // 確保 Flutter 綁定初始化
-    WidgetsFlutterBinding.ensureInitialized();
+    // 確保 Flutter 綁定初始化（debug 模式啟用 Marionette MCP 控制）
+    if (kDebugMode) {
+      MarionetteBinding.ensureInitialized();
+    } else {
+      WidgetsFlutterBinding.ensureInitialized();
+    }
 
     // 初始化 Firebase
     await Firebase.initializeApp(
@@ -25,6 +33,11 @@ void main() async {
     // 只有 Web 需要設定持久化，Mobile 預設就是本地持久化且調用此 API 可能出錯
     if (kIsWeb) {
       await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    }
+
+    // Debug mode: 用 custom token 登入測試用戶，讓 API 呼叫有真實 auth token
+    if (kDebugAuthBypass) {
+      await _debugSignIn();
     }
 
     // 初始化依賴注入 (Hive boxes)
@@ -54,6 +67,25 @@ void main() async {
         ),
       ),
     );
+  }
+}
+
+/// Debug 模式專用：從後端取得 custom token 並登入 Firebase
+Future<void> _debugSignIn() async {
+  try {
+    final dio = Dio();
+    final response = await dio.get<Map<String, dynamic>>(
+      '${AppConfig.apiBaseUrl}/debug/token',
+    );
+    final token = response.data?['token'] as String?;
+    if (token != null) {
+      await FirebaseAuth.instance.signInWithCustomToken(token);
+      debugPrint('✅ Debug sign-in successful (uid: $kDebugUserId)');
+    } else {
+      debugPrint('⚠️ Debug token endpoint returned no token — 確認 DEBUG_TOKEN_ALLOWED=true');
+    }
+  } catch (e) {
+    debugPrint('⚠️ Debug sign-in failed: $e');
   }
 }
 

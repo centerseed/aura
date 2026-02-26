@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/debug/debug_config.dart';
 import '../../core/di/providers.dart' show analyticsServiceProvider;
 import '../providers/auth_provider.dart';
 import '../screens/auth/signin_screen.dart';
@@ -22,6 +23,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     observers: [analyticsService.observer],
     refreshListenable: GoRouterRefreshStream(authRepository.authStateChanges),
     redirect: (context, state) {
+      // Debug bypass: 直接跳到 dashboard，跳過所有認證流程
+      if (kDebugAuthBypass) {
+        if (state.matchedLocation == '/splash' ||
+            state.matchedLocation.startsWith('/auth')) {
+          return '/dashboard';
+        }
+        return null;
+      }
+
       final authState = ref.read(authStateProvider);
 
       // 0. 如果正在初始加載中，強制留在 Splash 頁面等待
