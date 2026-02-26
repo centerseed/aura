@@ -33,8 +33,15 @@ vi.mock('@/lib/db', () => ({
 }))
 
 const mockEnsureProductEmbedding = vi.fn()
+const mockEnsureTaskEmbedding = vi.fn()
 vi.mock('@/lib/embedding', () => ({
   ensureProductEmbedding: (...args: any[]) => mockEnsureProductEmbedding(...args),
+  ensureTaskEmbedding: (...args: any[]) => mockEnsureTaskEmbedding(...args),
+}))
+
+const mockMaybeRefreshBlueprint = vi.fn()
+vi.mock('@/lib/product-blueprint', () => ({
+  maybeRefreshBlueprint: (...args: any[]) => mockMaybeRefreshBlueprint(...args),
 }))
 
 import { prisma } from '@/lib/db'
@@ -126,6 +133,8 @@ describe('ExecuteBrainDumpUseCase', () => {
     mockTx.task.create.mockResolvedValue(buildMockTask())
     mockTx.systemEvaluationLog.create.mockResolvedValue({})
     mockEnsureProductEmbedding.mockResolvedValue(undefined)
+    mockEnsureTaskEmbedding.mockResolvedValue(undefined)
+    mockMaybeRefreshBlueprint.mockResolvedValue(undefined)
   })
 
   describe('🔴 迴歸測試：Brain Dump 自動建立 Product 必須呼叫 ensureProductEmbedding', () => {

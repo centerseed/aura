@@ -161,8 +161,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
 
-        // 首次使用引導 Overlay
-        const TutorialOverlay(),
+        // 首次使用引導 Overlay（Positioned.fill 確保覆蓋全畫面）
+        const Positioned.fill(child: TutorialOverlay()),
       ],
     );
   }

@@ -194,6 +194,35 @@ class AppColors {
 
   // ==================== 漸變色 ====================
 
+  // ==================== Destructive / System Red ====================
+  /// iOS 系統紅（用於刪除、退出等破壞性操作）
+  static const Color destructiveRed = Color(0xFFFF453A);
+
+  // ==================== Reminder / Due Date ====================
+  /// 提醒/到期日的琥珀橙色
+  static const Color reminderAmber = Color(0xFFFFB020);
+
+  // ==================== Milestone ====================
+  /// 里程碑完成的金黃色
+  static const Color milestoneGold = Color(0xFFFFD700);
+
+  // ==================== AI Accent ====================
+  /// AI 功能強調色 — 靛紫色
+  static const Color aiAccent = Color(0xFF818CF8);
+
+  // ==================== Gradient Secondary ====================
+  /// 漸層次要色 — 紫藍色
+  static const Color gradientSecondary = Color(0xFF8F8AFF);
+
+  // ==================== Stats Card Colors ====================
+  /// 統計卡片系列顏色（Profile Screen 使用）
+  static const Color statsBlue   = Color(0xFF5E9FFF);
+  static const Color statsOrange = Color(0xFFFF9F0A);
+  static const Color statsPink   = Color(0xFFFF375F);
+  static const Color statsTeal   = Color(0xFF32D7C9);
+  static const Color statsSlate  = Color(0xFF98A2B3);
+  static const Color statsGreen  = Color(0xFF30D158);
+
   /// 主要漸變（Logo：Blue → Magenta）
   static const Gradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,

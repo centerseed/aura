@@ -2,20 +2,25 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 
+import 'package:flutter/material.dart' show DateUtils;
+
 import '../../core/di/providers.dart';
 import '../../data/repositories/unified/unified_repositories.dart';
 import '../providers/coach_provider.dart';
+import '../providers/task_provider.dart';
 
 /// App 生命週期狀態
 class AppLifecycleData {
   final DateTime? lastResumeTime;
   final DateTime? lastRefreshTime;
   final String? lastKnownTimezone;
+  final DateTime? lastActiveDate;
 
   const AppLifecycleData({
     this.lastResumeTime,
     this.lastRefreshTime,
     this.lastKnownTimezone,
+    this.lastActiveDate,
   });
 
   /// 是否應該刷新 (節流檢查 - 30秒)
@@ -29,11 +34,13 @@ class AppLifecycleData {
     DateTime? lastResumeTime,
     DateTime? lastRefreshTime,
     String? lastKnownTimezone,
+    DateTime? lastActiveDate,
   }) {
     return AppLifecycleData(
       lastResumeTime: lastResumeTime ?? this.lastResumeTime,
       lastRefreshTime: lastRefreshTime ?? this.lastRefreshTime,
       lastKnownTimezone: lastKnownTimezone ?? this.lastKnownTimezone,
+      lastActiveDate: lastActiveDate ?? this.lastActiveDate,
     );
   }
 }
@@ -66,9 +73,23 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
     // 檢查時區變更
     _checkTimezoneChange();
 
-    if (state.shouldRefresh) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final isNewDay = state.lastActiveDate == null || state.lastActiveDate != today;
+
+    if (isNewDay) {
+      debugPrint('[AppLifecycle] 🌅 New day detected, full refresh');
+      _onDayChanged();
+      state = state.copyWith(lastActiveDate: today);
+    } else if (state.shouldRefresh) {
       _triggerSilentRefresh();
     }
+  }
+
+  /// 跨日偵測後的全面刷新
+  void _onDayChanged() {
+    _triggerSilentRefresh();
+    // invalidate 跨日失效的 providers
+    _ref.invalidate(completedTodayTasksProvider);
   }
 
   /// 檢查時區是否變更,若變更則重新排程所有提醒
@@ -114,6 +135,9 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
 
     // 刷新晨報/今日計劃（若今日尚未有資料則自動生成）
     _ref.read(coachBriefingProvider.notifier).loadLatest();
+
+    // 確保 completedToday 也重新查詢
+    _ref.invalidate(completedTodayTasksProvider);
 
     state = state.copyWith(lastRefreshTime: DateTime.now());
   }

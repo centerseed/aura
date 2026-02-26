@@ -273,6 +273,25 @@ export async function findRelevantProducts(
 // ============================================================================
 
 /**
+ * 計算並存儲 Task 的 embedding 向量（fire-and-forget）
+ */
+export async function ensureTaskEmbedding(
+  taskId: string,
+  content: string
+): Promise<void> {
+  const embedding = await getEmbedding(content);
+  const vectorStr = `[${embedding.join(",")}]`;
+
+  await prisma.$executeRaw`
+    UPDATE tasks
+    SET embedding = ${vectorStr}::vector
+    WHERE id = ${taskId}::uuid
+  `;
+
+  console.log(`✅ [embedding] Stored embedding for Task: "${content.slice(0, 30)}..."`);
+}
+
+/**
  * 計算並存儲 Product 的 embedding 向量
  */
 export async function ensureProductEmbedding(

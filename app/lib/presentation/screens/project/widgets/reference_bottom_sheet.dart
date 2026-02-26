@@ -129,13 +129,14 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   Widget build(BuildContext context) {
     // 監聽 reference provider
     final referencesAsync = ref.watch(productReferencesUnwrappedProvider(widget.productId));
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+        color: colorScheme.surface.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -189,7 +190,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                   child: Center(
                     child: Text(
                       '載入失敗: $error',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                     ),
                   ),
                 ),
@@ -202,11 +203,12 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   }
 
   Widget _buildHeader(int referenceCount) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          bottom: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
       ),
       child: Column(
@@ -219,7 +221,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: colorScheme.onSurface.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -233,8 +235,8 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                   children: [
                     Text(
                       widget.productName,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -243,7 +245,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     Text(
                       '相關資料 ($referenceCount)',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 14,
                       ),
                     ),
@@ -251,7 +253,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.white70),
+                icon: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.7)),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -280,6 +282,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   }
 
   Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(40),
       child: Column(
@@ -287,13 +290,13 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
           Icon(
             Icons.folder_open_outlined,
             size: 64,
-            color: Colors.white.withValues(alpha: 0.3),
+            color: colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
             '尚無相關資料',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
               fontSize: 16,
             ),
           ),
@@ -303,6 +306,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   }
 
   Widget _buildReferenceItem(Reference reference) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isUrl = reference.type == ReferenceType.url;
     final isExpanded = _expandedReferenceIds.contains(reference.id);
     final isLongContent = reference.content.length > 150 || reference.content.split('\n').length > 3;
@@ -310,9 +314,9 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,8 +342,8 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                       if (reference.title != null) ...[
                         Text(
                           reference.title!,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colorScheme.onSurface,
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
@@ -348,7 +352,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                         Text(
                           isUrl ? '連結' : '備註',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
+                            color: colorScheme.onSurface.withValues(alpha: 0.6),
                             fontSize: 13,
                             fontWeight: FontWeight.w400,
                           ),
@@ -365,7 +369,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     IconButton(
                       icon: Icon(
                         Icons.edit_outlined,
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: colorScheme.onSurface.withValues(alpha: 0.3),
                         size: 18,
                       ),
                       padding: EdgeInsets.zero,
@@ -377,7 +381,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                     IconButton(
                       icon: Icon(
                         Icons.delete_outline,
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: colorScheme.onSurface.withValues(alpha: 0.3),
                         size: 18,
                       ),
                       padding: EdgeInsets.zero,
@@ -420,42 +424,42 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
                       selectable: true,
                       styleSheet: MarkdownStyleSheet(
                         p: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: colorScheme.onSurface.withValues(alpha: 0.8),
                           fontSize: 13,
                           height: 1.5,
                         ),
-                        h1: const TextStyle(
-                          color: Colors.white,
+                        h1: TextStyle(
+                          color: colorScheme.onSurface,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
-                        h2: const TextStyle(
-                          color: Colors.white,
+                        h2: TextStyle(
+                          color: colorScheme.onSurface,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                         h3: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: colorScheme.onSurface.withValues(alpha: 0.9),
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                         code: TextStyle(
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          backgroundColor: colorScheme.outlineVariant.withValues(alpha: 0.5),
                           color: AppColors.success,
                           fontFamily: 'monospace',
                           fontSize: 12,
                         ),
                         codeblockDecoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                          border: Border.all(color: colorScheme.outlineVariant),
                         ),
                         listBullet: const TextStyle(
                           color: AppColors.success,
                           fontSize: 13,
                         ),
                         blockquote: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
                           fontSize: 13,
                         ),
                         blockquoteDecoration: BoxDecoration(
@@ -513,12 +517,13 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   }
 
   Widget _buildAddReferenceForm() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: colorScheme.surface,
         border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
       ),
       child: Column(
@@ -534,8 +539,8 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
               const SizedBox(width: 8),
               Text(
                 _editingReferenceId != null ? "編輯資料" : "新增資料",
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -566,19 +571,19 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
           // Title (Optional)
           TextField(
             controller: _titleController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: '標題（選填）',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+              hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4)),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
+              fillColor: colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -591,20 +596,20 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
           // Content
           TextField(
             controller: _contentController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: colorScheme.onSurface),
             maxLines: 3,
             decoration: InputDecoration(
               hintText: _selectedType == ReferenceType.url ? 'https://...' : '輸入備註內容',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+              hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4)),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
+              fillColor: colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -645,6 +650,7 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
   }
 
   Widget _buildTypeChip(ReferenceType type, IconData icon, String label) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isSelected = _selectedType == type;
 
     return GestureDetector(
@@ -654,12 +660,12 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primary
-              : Colors.white.withValues(alpha: 0.05),
+              : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? AppColors.primary
-                : Colors.white.withValues(alpha: 0.2),
+                : colorScheme.outlineVariant,
           ),
         ),
         child: Row(
@@ -668,13 +674,13 @@ class _ReferenceBottomSheetState extends ConsumerState<ReferenceBottomSheet> {
             Icon(
               icon,
               size: 16,
-              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
+              color: isSelected ? Colors.white : colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                color: isSelected ? Colors.white : colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
               ),

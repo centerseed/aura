@@ -230,6 +230,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
     }
 
     return Scaffold(
+      backgroundColor: AppColors.darkBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -430,9 +431,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                       icon: const Icon(Icons.check),
                       label: const Text('COMPLETE'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(
-                          0xFF4ADE80,
-                        ), // Keep Green for Success
+                        backgroundColor: AppColors.success, // Keep Green for Success
                         foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -451,13 +450,14 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
   }
 
   Widget _buildSetupScreen(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white70, size: 28),
+          icon: Icon(Icons.close, color: colorScheme.onSurface, size: 28),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -475,10 +475,10 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
+                        color: colorScheme.surfaceContainer,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.08),
+                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                         ),
                       ),
                       child: Column(
@@ -492,13 +492,13 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                               ),
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.08),
+                                color: colorScheme.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 widget.task.areaName!,
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                   letterSpacing: 0.5,
@@ -507,8 +507,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                             ),
                           Text(
                             widget.task.content,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: colorScheme.onSurface,
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                               height: 1.3,
@@ -517,7 +517,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                           if (_task.subItems != null &&
                               _task.subItems!.isNotEmpty) ...[
                             const SizedBox(height: 20),
-                            const Divider(color: Colors.white10),
+                            Divider(color: colorScheme.outlineVariant),
                             const SizedBox(height: 12),
                             ..._task.subItems!.map(
                               (item) => InkWell(
@@ -567,8 +567,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                                               : Icons.circle_outlined,
                                           size: 16,
                                           color: item.completed
-                                              ? Colors.greenAccent
-                                              : Colors.white.withOpacity(0.3),
+                                              ? AppColors.success
+                                              : colorScheme.onSurface.withValues(alpha: 0.35),
                                         ),
                                       ),
                                       Expanded(
@@ -576,8 +576,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                                           item.content,
                                           style: TextStyle(
                                             color: item.completed
-                                                ? Colors.white.withOpacity(0.3)
-                                                : Colors.white.withOpacity(0.7),
+                                                ? colorScheme.onSurface.withValues(alpha: 0.35)
+                                                : colorScheme.onSurface.withValues(alpha: 0.75),
                                             fontSize: 14,
                                             height: 1.4,
                                             decoration: item.completed
@@ -604,6 +604,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                       children: [
                         Expanded(
                           child: _buildLargeTimePicker(
+                            context: context,
                             label: '專注時間',
                             value: _focusMinutes,
                             color: AppColors.pomodoroFocus,
@@ -611,9 +612,10 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                                 setState(() => _focusMinutes = val),
                           ),
                         ),
-                        Container(width: 1, height: 60, color: Colors.white10),
+                        Container(width: 1, height: 60, color: colorScheme.outlineVariant),
                         Expanded(
                           child: _buildLargeTimePicker(
+                            context: context,
                             label: '休息時間',
                             value: _shortBreakMinutes,
                             color: AppColors.pomodoroShortBreak,
@@ -658,17 +660,19 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
   }
 
   Widget _buildLargeTimePicker({
+    required BuildContext context,
     required String label,
     required int value,
     required Color color,
     required ValueChanged<int> onChanged,
   }) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Column(
       children: [
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.55),
+            color: onSurface.withValues(alpha: 0.55),
             fontSize: 12,
             letterSpacing: 1.5,
             fontWeight: FontWeight.bold,
@@ -688,7 +692,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.remove, color: Colors.white.withOpacity(0.5)),
+                child: Icon(Icons.remove, color: onSurface.withValues(alpha: 0.5)),
               ),
             ),
             SizedBox(
@@ -700,7 +704,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                   color: color,
                   fontSize: 48,
                   fontWeight: FontWeight.w300,
-                  fontFamily: 'Monospace', // Or user preferred font
+                  fontFamily: 'Monospace',
                 ),
               ),
             ),
@@ -714,14 +718,14 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.add, color: Colors.white.withOpacity(0.5)),
+                child: Icon(Icons.add, color: onSurface.withValues(alpha: 0.5)),
               ),
             ),
           ],
         ),
         Text(
           "分鐘",
-          style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12),
+          style: TextStyle(color: onSurface.withValues(alpha: 0.55), fontSize: 12),
         ),
       ],
     );

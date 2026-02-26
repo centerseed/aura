@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,7 +65,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 ),
                 child: const Icon(
                   Icons.auto_awesome,
-                  color: Color(0xFF8F8AFF),
+                  color: AppColors.gradientSecondary,
                   size: 20,
                 ),
               ),
@@ -76,7 +75,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.white70),
+              icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               enabled: !_isDeleting,
               onSelected: (value) {
@@ -90,10 +89,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   child: Row(
                     children: [
                       Icon(Icons.delete_outline, size: 18,
-                        color: Colors.red.withOpacity(0.6)),
+                        color: AppColors.error.withValues(alpha: 0.6)),
                       const SizedBox(width: 8),
                       Text('刪除專案',
-                        style: TextStyle(color: Colors.red.withOpacity(0.6))),
+                        style: TextStyle(color: AppColors.error.withValues(alpha: 0.6))),
                     ],
                   ),
                 ),
@@ -447,7 +446,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('刪除'),
           ),
         ],
@@ -648,17 +647,17 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
     final isLoading = state is AsyncLoading;
 
     // Determine state
-    final isAnalyzing = proposal == null && isLoading;
+    // proposal == null && !error 表示「尚未分析完成」，不論 loading 狀態都顯示 analyzing view
+    // 避免初始 AsyncData(null) 狀態因 isLoading=false 而落入空白的 else 分支
+    final isAnalyzing = proposal == null && !state.hasError;
     final isApplying = proposal != null && isLoading;
 
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-      child: Container(
+    return Container(
         height: 600,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -669,7 +668,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -681,24 +680,21 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                   child: Text(
                     "分析失敗\n${state.error}",
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.redAccent),
+                    style: const TextStyle(color: AppColors.error),
                   ),
                 ),
               )
             else if (isAnalyzing)
               _buildAnalyzingView()
             else if (proposal != null)
-              _buildSuggestionView(proposal, isApplying)
-            else
-              // Fallback or empty state
-              const Expanded(child: Center(child: Text("Ready"))),
+              _buildSuggestionView(proposal, isApplying),
           ],
         ),
-      ),
     );
   }
 
   Widget _buildAnalyzingView() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -719,10 +715,10 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             "AI 正在分析專案結構...",
             style: TextStyle(
-              color: Colors.white,
+              color: colorScheme.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -731,7 +727,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
           Text(
             "尋找可優化的任務與屬性",
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
               fontSize: 14,
             ),
           ),
@@ -741,6 +737,87 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
   }
 
   Widget _buildSuggestionView(ReorganizeProposal proposal, bool isApplying) {
+    // 沒有任何進行中的任務 → 顯示空狀態
+    if (proposal.tasksContext.isEmpty && proposal.proposedClusters.isEmpty) {
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Column(
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        "AI 重組建議",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Icon(
+                Icons.check_circle_outline,
+                size: 48,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "此專案目前沒有進行中的任務",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "所有任務皆已封存或刪除，無需重組",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                  fontSize: 13,
+                ),
+              ),
+              const Spacer(flex: 2),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(
+                    "關閉",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      );
+    }
+
     // 計算流向資料
     final flowData = _calculateFlowData(proposal);
     final totalTasks = proposal.tasksContext.length;
@@ -750,6 +827,87 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
     final unchangedCount = flowData['unchangedCount'] as int;
     final flows = flowData['flows'] as List<TopicFlow>;
     final changedFlows = flows.where((f) => !f.isSame).toList();
+
+    // 無任何變動建議 → 友善提示，不顯示令人困惑的空 ListView + Apply 按鈕
+    if (changedFlows.isEmpty && proposal.taskConsolidations.isEmpty) {
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        "AI 重組建議",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Icon(
+                Icons.auto_awesome,
+                size: 48,
+                color: AppColors.primary.withValues(alpha: 0.4),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "專案結構已很完整",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "AI 分析後認為目前的分類已是最佳狀態，不需要調整",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                  fontSize: 13,
+                ),
+              ),
+              const Spacer(flex: 2),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(
+                    "關閉",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      );
+    }
 
     // 建立 taskId -> context 的映射 (用於整合卡片顯示)
     final taskContextMap = <String, TaskContext>{};
@@ -765,14 +923,14 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
-                  SizedBox(width: 8),
+                  const Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
+                  const SizedBox(width: 8),
                   Text(
                     "AI 重組建議",
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -780,7 +938,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                 ],
               ),
               IconButton(
-                icon: Icon(Icons.close, color: Colors.white.withOpacity(0.5)),
+                icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -800,21 +958,21 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                     Text(
                       "Topic",
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 13,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       "$currentTopicCount",
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_forward, size: 12, color: Colors.white54),
+                    Icon(Icons.arrow_forward, size: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54)),
                     const SizedBox(width: 4),
                     Text(
                       "$newTopicCount",
@@ -834,13 +992,13 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                       Icon(
                         Icons.move_down,
                         size: 14,
-                        color: const Color(0xFFFFD700).withOpacity(0.8),
+                        color: AppColors.milestoneGold.withOpacity(0.8),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         "$changedCount/$totalTasks 個任務重新分配",
                         style: TextStyle(
-                          color: const Color(0xFFFFD700).withOpacity(0.8),
+                          color: AppColors.milestoneGold.withOpacity(0.8),
                           fontSize: 13,
                         ),
                       ),
@@ -884,7 +1042,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                 "其餘 $unchangedCount 個任務維持原本的分類",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                   fontSize: 13,
                 ),
               ),
@@ -900,7 +1058,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                     Text(
                       "所有任務的分類維持不變",
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                         fontSize: 14,
                       ),
                     ),
@@ -908,7 +1066,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                     Text(
                       "AI 認為目前的分類已經很好了",
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                         fontSize: 12,
                       ),
                     ),
@@ -980,13 +1138,14 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
   }
 
   Widget _buildFlowCard(TopicFlow flow) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -995,7 +1154,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
             child: Text(
               flow.fromTopic,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 13,
               ),
               overflow: TextOverflow.ellipsis,
@@ -1006,13 +1165,13 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFD700).withOpacity(0.1),
+              color: AppColors.milestoneGold.withOpacity(0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               "${flow.taskCount}",
               style: const TextStyle(
-                color: Color(0xFFFFD700),
+                color: AppColors.milestoneGold,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -1022,7 +1181,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
           const Icon(
             Icons.arrow_forward,
             size: 16,
-            color: Color(0xFFFFD700),
+            color: AppColors.milestoneGold,
           ),
           const SizedBox(width: 8),
           // To Topic
@@ -1033,8 +1192,8 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                 Flexible(
                   child: Text(
                     flow.toTopic,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1210,7 +1369,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                    color: Colors.white.withOpacity(0.05),
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.2),
                   ),
                 ),
               ),
@@ -1220,7 +1379,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                   Text(
                     "理由：",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: colorScheme.onSurface.withValues(alpha: 0.5),
                       fontSize: 11,
                     ),
                   ),
@@ -1228,7 +1387,7 @@ class _AIMagicSheetState extends ConsumerState<_AIMagicSheet>
                     child: Text(
                       c.reasoning,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: colorScheme.onSurface.withValues(alpha: 0.4),
                         fontSize: 11,
                       ),
                     ),
@@ -1312,23 +1471,23 @@ class _ProgressBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.1),
+        color: AppColors.statusActive.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: Colors.blue.withValues(alpha: 0.3),
+          color: AppColors.statusActive.withValues(alpha: 0.3),
           width: 0.5,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.incomplete_circle, size: 10, color: Colors.blue),
+          const Icon(Icons.incomplete_circle, size: 10, color: AppColors.statusActive),
           const SizedBox(width: 4),
           Text(
             "$completedCount/$totalCount",
             style: const TextStyle(
               fontSize: 11,
-              color: Colors.blue,
+              color: AppColors.statusActive,
               fontWeight: FontWeight.bold,
             ),
           ),

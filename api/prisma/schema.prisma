@@ -88,10 +88,14 @@ model Product {
   description   String?                @db.VarChar
   status        Status
   lifecycle     Lifecycle
-  embedding     Unsupported("vector")?
-  display_order Int                    @default(0)
-  references    Json                   @default("[]") @db.Json
-  area          Area                   @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  embedding                Unsupported("vector")?
+  blueprint_text           String?                @db.Text
+  blueprint_embedding      Unsupported("vector")?
+  blueprint_updated_at     DateTime?              @db.Timestamp(6)
+  task_count_at_blueprint  Int                    @default(0)
+  display_order            Int                    @default(0)
+  references               Json                   @default("[]") @db.Json
+  area                     Area                   @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user          User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tasks         Task[]
   topics        Topic[]

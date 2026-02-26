@@ -187,6 +187,39 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                   // ═══════════════════════════════════════
                   // Section 2: 任務整合 (violet)
                   // ═══════════════════════════════════════
+                  // 無建議時顯示空白態
+                  if (!hasChanges && !hasConsolidations) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
+                          const SizedBox(height: 12),
+                          Text(
+                            '任務已整理好了',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '目前沒有需要調整的地方',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      ),
+                    ),
+                  ],
+
                   if (hasConsolidations) ...[
                     _buildSection(
                       color: AppColors.statusMaintain,

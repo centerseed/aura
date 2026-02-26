@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:dartz/dartz.dart' hide Task;
 import 'package:flutter/material.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 
@@ -27,12 +29,14 @@ class ChatMessage {
   final MessageType type;
   final Task? task; // AI 回覆時附帶的分類結果
   final List<String>? taskIds; // AI 回覆時創建的任務 IDs (用於編輯按鈕)
+  final File? imageFile; // 用戶傳送的圖片
 
   const ChatMessage({
     required this.content,
     required this.type,
     this.task,
     this.taskIds,
+    this.imageFile,
   });
 }
 
@@ -51,6 +55,12 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   bool _isLoading = false;
   String? _selectedAreaId;
   String? _selectedProductId;
+
+  // 圖片相關
+  final ImagePicker _imagePicker = ImagePicker();
+  File? _selectedImage;
+  static const int _maxImageSizeBytes = 10 * 1024 * 1024;
+  static const List<String> _allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
 
   // 語音輸入相關
   final SpeechToText _speechToText = SpeechToText();
@@ -128,6 +138,85 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     }
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (image == null) return;
+
+      final file = File(image.path);
+      final ext = image.path.split('.').last.toLowerCase();
+      if (!_allowedExtensions.contains(ext)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('僅支援 JPEG、PNG、WebP 格式')),
+          );
+        }
+        return;
+      }
+
+      final fileSize = await file.length();
+      if (fileSize > _maxImageSizeBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('圖片大小不可超過 10MB')),
+          );
+        }
+        return;
+      }
+
+      setState(() => _selectedImage = file);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('選取圖片失敗: $e')),
+        );
+      }
+    }
+  }
+
+  void _removeImage() => setState(() => _selectedImage = null);
+
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('拍照'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('從相簿選取'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _textController.dispose();
@@ -137,7 +226,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
 
   Future<void> _submit() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    final hasImage = _selectedImage != null;
+    if (text.isEmpty && !hasImage) return;
 
     // AI consent check
     final hasConsent = ref.read(aiConsentProvider);
@@ -149,23 +239,26 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
 
     // 構建完整訊息(包含 @ mention)
     final fullMessage = _buildUserMessage(text);
+    final imageToSend = _selectedImage;
 
     setState(() {
       _messages.add(ChatMessage(
-        content: fullMessage,
+        content: hasImage && text.isEmpty ? '📷 圖片' : fullMessage,
         type: MessageType.user,
+        imageFile: imageToSend,
       ));
       _isLoading = true;
+      _selectedImage = null;
     });
 
     _textController.clear();
     FocusScope.of(context).unfocus();
     _scrollToBottom();
 
-    // 呼叫 API 創建任務 - 使用 Brain Dump AI 自動分類
-    // 傳送包含 @ mention 的完整訊息給 AI
     final repo = ref.read(brainDumpRepositoryProvider);
-    final result = await repo.submit(fullMessage);
+    final result = hasImage
+        ? await repo.submitWithImage(imageFile: imageToSend!, text: text)
+        : await repo.submit(fullMessage);
 
     result.fold(
       (failure) {
@@ -717,13 +810,33 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                       bottomRight: Radius.circular(isUser ? 4 : 16),
                     ),
                   ),
-                  child: Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isUser ? Colors.white : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9),
-                      fontSize: 15,
-                      height: 1.4,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (message.imageFile != null) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            message.imageFile!,
+                            width: 200,
+                            height: 150,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        if (message.content.isNotEmpty && message.content != '📷 圖片')
+                          const SizedBox(height: 8),
+                      ],
+                      if (message.content.isNotEmpty && message.content != '📷 圖片')
+                        Text(
+                          message.content,
+                          style: TextStyle(
+                            color: isUser ? Colors.white : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9),
+                            fontSize: 15,
+                            height: 1.4,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -932,6 +1045,40 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               padding: const EdgeInsets.only(bottom: 8),
               child: _buildSelectionBadge(),
             ),
+          // 圖片預覽
+          if (_selectedImage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.file(
+                      _selectedImage!,
+                      height: 80,
+                      width: 80,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: GestureDetector(
+                      onTap: _removeImage,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close, color: Colors.white, size: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // 語音模式界面
           if (_isVoiceMode)
             _buildVoiceModeUI()
@@ -956,6 +1103,28 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                       Icons.mic_rounded,
                       color: AppColors.accentPink,
                       size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 相機按鈕
+                GestureDetector(
+                  onTap: _showImageSourcePicker,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                    ),
+                    child: Icon(
+                      _selectedImage != null ? Icons.image : Icons.camera_alt_outlined,
+                      color: AppColors.primary,
+                      size: 20,
                     ),
                   ),
                 ),

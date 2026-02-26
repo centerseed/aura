@@ -96,7 +96,11 @@ final dailyProgressProvider = Provider<DailyProgress>((ref) {
   final coachState = ref.watch(coachBriefingProvider);
   final plan = coachState.plan;
 
-  if (plan == null) {
+  // 如果 plan 是昨日的（stale），不使用它計算進度
+  if (plan == null || coachState.isStale) {
+    if (coachState.isAutoGenerating || coachState.isLoading) {
+      return const DailyProgress(completed: 0, total: 0, isRefreshing: true);
+    }
     // 沒有 plan 時，fallback 到舊邏輯
     final activeState = ref.watch(activeTasksProvider);
     final completedAsync = ref.watch(completedTodayTasksProvider);

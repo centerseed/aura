@@ -236,19 +236,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return SliverList(
       delegate: SliverChildListDelegate([
         if (overdueTasks.isNotEmpty) ...[
-          _buildSectionHeader('逾期', Colors.red),
+          _buildSectionHeader('逾期', AppColors.error),
           ...overdueTasks.map((task) => _buildTaskCard(task)),
         ],
         if (todayTasks.isNotEmpty) ...[
-          _buildSectionHeader('今天', Colors.orange),
+          _buildSectionHeader('今天', AppColors.warningOrange),
           ...todayTasks.map((task) => _buildTaskCard(task)),
         ],
         if (upcomingTasks.isNotEmpty) ...[
-          _buildSectionHeader('即將到來', Colors.blue),
+          _buildSectionHeader('即將到來', AppColors.statusActive),
           ...upcomingTasks.map((task) => _buildTaskCard(task)),
         ],
         if (noDueTasks.isNotEmpty) ...[
-          _buildSectionHeader('無期限', Colors.grey),
+          _buildSectionHeader('無期限', AppColors.statusArchive),
           ...noDueTasks.map((task) => _buildTaskCard(task)),
         ],
         const SizedBox(height: 80), // Space for FAB
@@ -379,7 +379,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const Icon(
               Icons.error_outline,
               size: 64,
-              color: Colors.red,
+              color: AppColors.error,
             ),
             const SizedBox(height: 16),
             Text(
@@ -521,7 +521,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ],
               ),
               duration: const Duration(seconds: 3),
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: AppColors.error,
               action: SnackBarAction(
                 label: '重試',
                 textColor: Colors.white,

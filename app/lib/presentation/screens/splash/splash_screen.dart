@@ -51,8 +51,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                       : (authState.hasError
                           ? 'Error: ${authState.error}'
                           : 'Checking Auth...')),
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 16,
               ),
             ),

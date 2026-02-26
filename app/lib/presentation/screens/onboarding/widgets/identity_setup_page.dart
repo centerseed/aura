@@ -40,10 +40,14 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
   Widget build(BuildContext context) {
     final selectedAreas = ref.watch(selectedAreasProvider);
     final totalSelected = ref.watch(totalSelectedProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth > 700 ? 3 : 2;
+    final hPadding = screenWidth > 700 ? 32.0 : 16.0;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(hPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -51,7 +55,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
             Text(
               '選擇你的身份 (至少 1 個)',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
@@ -59,12 +63,12 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
 
             const SizedBox(height: 16),
 
-            // 預設身份卡片（2x2 網格）
+            // 預設身份卡片（響應式網格）
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 10,
                 childAspectRatio: 1.5,
@@ -136,10 +140,10 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
+                          Text(
                             '新增自定義身份',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: AppColors.brandTeal,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -155,7 +159,7 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
+                        color: Theme.of(context).colorScheme.surfaceContainer,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: AppColors.primary.withValues(alpha: 0.3),
@@ -164,10 +168,10 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             '身份名稱',
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: onSurface.withValues(alpha: 0.7),
                               fontSize: 14,
                             ),
                           ),
@@ -179,25 +183,16 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                               ref.read(customAreaProvider.notifier).state =
                                   (name: value, scope: custom.scope);
                             },
-                            style: const TextStyle(color: Colors.white),
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               hintText: '例如：健康',
-                              hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.3),
-                              ),
-                              filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.05),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
+                              border: OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 16),
-                          const Text(
+                          Text(
                             '包含內容',
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: onSurface.withValues(alpha: 0.7),
                               fontSize: 14,
                             ),
                           ),
@@ -209,19 +204,10 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                               ref.read(customAreaProvider.notifier).state =
                                   (name: custom.name, scope: value);
                             },
-                            style: const TextStyle(color: Colors.white),
                             maxLines: 2,
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               hintText: '例如：運動健身、飲食規劃、健康檢查',
-                              hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.3),
-                              ),
-                              filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.05),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
+                              border: OutlineInputBorder(),
                             ),
                           ),
                         ],
@@ -243,13 +229,13 @@ class _IdentitySetupPageState extends ConsumerState<IdentitySetupPage> {
                 style: TextStyle(
                   color: totalSelected > 0
                       ? AppColors.success
-                      : Colors.white.withValues(alpha: 0.5),
+                      : onSurface.withValues(alpha: 0.5),
                   fontSize: 13,
                 ),
               ),
             ),
 
-            const SizedBox(height: 80), // 為底部指示器留空間
+            const SizedBox(height: 120), // 為底部指示器留空間
           ],
         ),
       ),

@@ -584,7 +584,7 @@ export function TaskDetailModal({
                           type="time"
                           value={calendarStartTime}
                           onChange={(e) => setCalendarStartTime(e.target.value)}
-                          className="px-2 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm text-white/80 focus:border-blue-400/50 focus:outline-none w-[130px] [&::-webkit-calendar-picker-indicator]:invert"
+                          className="px-2 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm text-white/80 focus:border-blue-400/50 focus:outline-none w-[130px] [&::-webkit-calendar-picker-indicator]:invert [color-scheme:dark]"
                         />
                       </div>
                       <div>
@@ -592,15 +592,15 @@ export function TaskDetailModal({
                         <select
                           value={calendarDuration}
                           onChange={(e) => setCalendarDuration(Number(e.target.value))}
-                          className="px-2 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm text-white/80 focus:border-blue-400/50 focus:outline-none appearance-none w-[110px]"
+                          className="px-2 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm text-white/80 focus:border-blue-400/50 focus:outline-none appearance-none w-[110px] [color-scheme:dark]"
                         >
-                          <option value={10}>10 分鐘</option>
-                          <option value={20}>20 分鐘</option>
-                          <option value={30}>30 分鐘</option>
-                          <option value={60}>1 小時</option>
-                          <option value={90}>1.5 小時</option>
-                          <option value={120}>2 小時</option>
-                          <option value={180}>3 小時</option>
+                          <option value={10} className="bg-slate-800 text-white">10 分鐘</option>
+                          <option value={20} className="bg-slate-800 text-white">20 分鐘</option>
+                          <option value={30} className="bg-slate-800 text-white">30 分鐘</option>
+                          <option value={60} className="bg-slate-800 text-white">1 小時</option>
+                          <option value={90} className="bg-slate-800 text-white">1.5 小時</option>
+                          <option value={120} className="bg-slate-800 text-white">2 小時</option>
+                          <option value={180} className="bg-slate-800 text-white">3 小時</option>
                         </select>
                       </div>
                       <button

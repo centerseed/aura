@@ -127,6 +127,31 @@ class ProductRepositoryImpl implements ProductRepository {
   }
 
   @override
+  Future<Either<Failure, Reference>> updateProductReference({
+    required String productId,
+    required String referenceId,
+    required String content,
+    String? title,
+    String? taskId,
+  }) async {
+    try {
+      final referenceModel = await _apiClient.updateProductReference(
+        productId: productId,
+        referenceId: referenceId,
+        content: content,
+        title: title,
+        taskId: taskId,
+      );
+      return Right(referenceModel.toEntity());
+    } catch (e) {
+      if (e is DioException) {
+        return Left(ServerFailure(e.message ?? 'Failed to update reference'));
+      }
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> deleteProductReference({
     required String productId,
     required String referenceId,

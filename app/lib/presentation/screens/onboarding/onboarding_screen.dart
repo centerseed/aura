@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/onboarding_provider.dart';
 import 'widgets/identity_setup_page.dart';
@@ -83,19 +82,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ],
           ),
 
-          // 進度指示器
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 48,
-            child: PageIndicator(
-              currentPage: currentPage,
-              totalPages: 5,
-              onNext: _nextPage,
-              onPrevious: _previousPage,
-              canProceed: canProceed,
+          // 進度指示器（最後一頁隱藏，由 ReadyPage 自行處理 CTA）
+          if (currentPage < 4)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: PageIndicator(
+                  currentPage: currentPage,
+                  totalPages: 5,
+                  onNext: _nextPage,
+                  onPrevious: _previousPage,
+                  canProceed: canProceed,
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );

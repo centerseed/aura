@@ -76,12 +76,24 @@ class TutorialOverlay extends ConsumerWidget {
 
   /// 步驟 1: 引導點擊 + 按鈕
   Widget _buildAddTaskStep(BuildContext context, WidgetRef ref) {
+    final size = MediaQuery.of(context).size;
+    final padding = MediaQuery.of(context).padding;
+    final tabBarBottom = padding.bottom + 6; // 與 home_screen.dart Positioned bottom 一致
+
+    // 估算 + 按鈕在置中 Row 中的右側位置
+    // Tab bar 膠囊 ≈ 206pt、間距 10pt、+ 按鈕 52pt，Row 總寬約 268pt
+    const estimatedRowWidth = 268.0;
+    final fabRightEdge = (size.width - estimatedRowWidth) / 2;
+
+    // 80x80 高亮圓圈，圓心對齊 + 按鈕圓心（+ 按鈕中心距右緣 = fabRightEdge + 26）
+    final highlightRight = (fabRightEdge - 14).clamp(0.0, double.infinity);
+
     return Stack(
       children: [
-        // 高亮右下角 + 按鈕區域
+        // 高亮 + 按鈕區域
         Positioned(
-          right: 16,
-          bottom: 88, // 底部導航高度 + 間距
+          right: highlightRight,
+          bottom: tabBarBottom,
           child: Container(
             width: 80,
             height: 80,
@@ -104,8 +116,8 @@ class TutorialOverlay extends ConsumerWidget {
 
         // 箭頭指向 + 按鈕
         Positioned(
-          right: 100,
-          bottom: 130,
+          right: highlightRight + 20,
+          bottom: tabBarBottom + 68,
           child: Icon(
             Icons.arrow_downward,
             size: 40,
@@ -113,11 +125,11 @@ class TutorialOverlay extends ConsumerWidget {
           ),
         ),
 
-        // 訊息卡片
+        // 訊息卡片（在 tab bar 上方 140pt）
         Positioned(
           left: 20,
           right: 20,
-          bottom: 200,
+          bottom: tabBarBottom + 140,
           child: _buildMessageCard(
             context,
             ref,
@@ -174,11 +186,11 @@ class TutorialOverlay extends ConsumerWidget {
           ),
         ),
 
-        // 訊息卡片
+        // 訊息卡片（在 tab bar 上方 90pt）
         Positioned(
           left: 20,
           right: 20,
-          bottom: 150,
+          bottom: MediaQuery.of(context).padding.bottom + 6 + 90,
           child: _buildMessageCard(
             context,
             ref,
@@ -244,7 +256,6 @@ class TutorialOverlay extends ConsumerWidget {
     required VoidCallback onNext,
     bool showSkip = false,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: Container(
@@ -275,11 +286,11 @@ class TutorialOverlay extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 標題
+          // 標題（卡片背景固定深色，文字固定白色）
           Text(
             title,
-            style: TextStyle(
-              color: colorScheme.onSurface,
+            style: const TextStyle(
+              color: Colors.white,
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -292,7 +303,7 @@ class TutorialOverlay extends ConsumerWidget {
           Text(
             message,
             style: TextStyle(
-              color: colorScheme.onSurface.withValues(alpha: 0.9),
+              color: Colors.white.withValues(alpha: 0.85),
               fontSize: 16,
               height: 1.5,
             ),
@@ -316,7 +327,7 @@ class TutorialOverlay extends ConsumerWidget {
                   child: Text(
                     '跳過',
                     style: TextStyle(
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 16,
                     ),
                   ),

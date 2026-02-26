@@ -65,6 +65,8 @@ class ReadyPage extends ConsumerWidget {
         customArea.name.trim().isNotEmpty && customArea.scope.trim().isNotEmpty;
     final totalAreas = selectedAreas.length + (hasCustomArea ? 1 : 0);
 
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -117,7 +119,7 @@ class ReadyPage extends ConsumerWidget {
             Text(
               '你已經完成設定',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: onSurface.withValues(alpha: 0.7),
                 fontSize: 18,
               ),
             ),
@@ -128,10 +130,10 @@ class ReadyPage extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.1),
+                  color: Theme.of(context).colorScheme.outlineVariant,
                 ),
               ),
               child: Column(
@@ -147,8 +149,8 @@ class ReadyPage extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           '已設定 $totalAreas 個身份',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: onSurface,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -231,8 +233,9 @@ class ReadyPage extends ConsumerWidget {
       child: Text(
         label,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.primaryDark,
           fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

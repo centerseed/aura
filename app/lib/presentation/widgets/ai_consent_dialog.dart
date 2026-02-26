@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/core/theme/app_colors.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AiConsentDialog {
@@ -13,7 +14,7 @@ class AiConsentDialog {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Icon(Icons.auto_awesome, color: const Color(0xFF818CF8), size: 24),
+            Icon(Icons.auto_awesome, color: AppColors.aiAccent, size: 24),
             const SizedBox(width: 8),
             Text(
               'AI 功能使用同意',
@@ -104,10 +105,10 @@ class AiConsentDialog {
                 child: Text(
                   '查看完整隱私政策 >',
                   style: TextStyle(
-                    color: const Color(0xFF818CF8),
+                    color: AppColors.aiAccent,
                     fontSize: 13,
                     decoration: TextDecoration.underline,
-                    decorationColor: const Color(0xFF818CF8),
+                    decorationColor: AppColors.aiAccent,
                   ),
                 ),
               ),
@@ -125,7 +126,7 @@ class AiConsentDialog {
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF818CF8),
+              backgroundColor: AppColors.aiAccent,
             ),
             child: const Text('同意並使用'),
           ),

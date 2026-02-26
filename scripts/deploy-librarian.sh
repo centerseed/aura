@@ -5,7 +5,7 @@
 # 前提：
 #   1. 已安裝 gcloud CLI 並登入
 #   2. 已設定 GCP project
-#   3. 已在 Neon 建立資料庫
+#   3. Cloud SQL instance zentropy-4f7a5:asia-east1:zentropy-db 已就緒
 #
 # 用法：
 #   ./scripts/deploy.sh                    # 使用預設值
@@ -104,6 +104,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --max-instances 3 \
   --concurrency 80 \
   --timeout 300 \
+  --add-cloudsql-instances "zentropy-4f7a5:asia-east1:zentropy-db" \
   --set-env-vars "NODE_ENV=production" \
   --update-secrets "DATABASE_URL=librarian-database-url:latest" \
   --update-secrets "GOOGLE_GENERATIVE_AI_API_KEY=gemini-api-key:latest" \

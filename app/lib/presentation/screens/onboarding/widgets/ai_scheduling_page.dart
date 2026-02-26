@@ -7,6 +7,9 @@ class AiSchedulingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final cardBackground = Theme.of(context).colorScheme.surfaceContainerHighest;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -34,7 +37,7 @@ class AiSchedulingPage extends StatelessWidget {
             Text(
               '你只需記錄想法，分類和時間都交給 AI',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: onSurface.withValues(alpha: 0.8),
                 fontSize: 16,
               ),
             ),
@@ -48,10 +51,12 @@ class AiSchedulingPage extends StatelessWidget {
               content: '完成 OAuth 登入功能',
               icon: Icons.edit_outlined,
               color: AppColors.brandTeal,
+              onSurface: onSurface,
+              cardBackground: cardBackground,
             ),
 
             const SizedBox(height: 16),
-            _buildArrow(),
+            _buildArrow(onSurface),
             const SizedBox(height: 16),
 
             _buildFlowStep(
@@ -63,10 +68,12 @@ class AiSchedulingPage extends StatelessWidget {
 計算時間: 2026-02-24''',
               icon: Icons.psychology_outlined,
               color: AppColors.statusMaintain,
+              onSurface: onSurface,
+              cardBackground: cardBackground,
             ),
 
             const SizedBox(height: 16),
-            _buildArrow(),
+            _buildArrow(onSurface),
             const SizedBox(height: 16),
 
             _buildFlowStep(
@@ -76,6 +83,8 @@ class AiSchedulingPage extends StatelessWidget {
 ✓ 已自動排程至合適日期''',
               icon: Icons.check_circle_outline,
               color: AppColors.accentEmerald,
+              onSurface: onSurface,
+              cardBackground: cardBackground,
               isResult: true,
             ),
 
@@ -117,7 +126,7 @@ class AiSchedulingPage extends StatelessWidget {
                     child: Text(
                       '不用手動排程，AI 會根據里程碑自動推斷最適合的完成時間',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: onSurface.withValues(alpha: 0.9),
                         fontSize: 15,
                         height: 1.5,
                       ),
@@ -127,7 +136,7 @@ class AiSchedulingPage extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 100), // 為底部指示器留空間
+            const SizedBox(height: 120), // 為底部指示器留空間
           ],
         ),
       ),
@@ -140,6 +149,8 @@ class AiSchedulingPage extends StatelessWidget {
     required String content,
     required IconData icon,
     required Color color,
+    required Color onSurface,
+    required Color cardBackground,
     bool isResult = false,
   }) {
     return Container(
@@ -155,7 +166,7 @@ class AiSchedulingPage extends StatelessWidget {
                 ],
               )
             : null,
-        color: isResult ? null : Colors.white.withValues(alpha: 0.05),
+        color: isResult ? null : cardBackground,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: color.withValues(alpha: 0.3),
@@ -210,7 +221,7 @@ class AiSchedulingPage extends StatelessWidget {
                 Text(
                   content,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: onSurface.withValues(alpha: 0.8),
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -223,11 +234,11 @@ class AiSchedulingPage extends StatelessWidget {
     );
   }
 
-  Widget _buildArrow() {
+  Widget _buildArrow(Color onSurface) {
     return Center(
       child: Icon(
         Icons.arrow_downward,
-        color: Colors.white.withValues(alpha: 0.3),
+        color: onSurface.withValues(alpha: 0.3),
         size: 24,
       ),
     );

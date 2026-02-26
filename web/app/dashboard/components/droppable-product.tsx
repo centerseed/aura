@@ -6,7 +6,8 @@
 
 'use client'
 
-import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   Package,
   GripVertical,
@@ -79,28 +80,10 @@ export function DroppableProduct({
   onEditTaskTitle,
   isReorganizing = false,
 }: DroppableProductProps) {
-  // 作為放置目標（接收 Task 和其他 Product）
-  const { setNodeRef: setDropRef } = useDroppable({
-    id: `product-${productId}`,
-    data: { type: 'product', productId, areaId },
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: productId,
+    data: { type: 'product', productId, productName, areaId },
   })
-
-  // 作為可拖曳項目（拖曳到 Area 或其他 Product）
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-    id: `draggable-product-${productId}`,
-    data: {
-      type: 'product',
-      productId,
-      productName,
-      areaId,
-    },
-  })
-
-  // 合併兩個 refs
-  const setRefs = (element: HTMLDivElement | null) => {
-    setDropRef(element)
-    setDragRef(element)
-  }
 
   // 篩選此 Product 的所有里程碑（支援多個，排除已過期）
   const productMilestones = (Array.isArray(milestones) ? milestones : [])
@@ -117,20 +100,21 @@ export function DroppableProduct({
 
   const hasMilestone = productMilestones.length > 0
 
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
 
   return (
     <div
-      ref={setRefs}
+      ref={setNodeRef}
       style={style}
       {...attributes}
       className={`
-        rounded-xl border-2 transition-all duration-200
-        ${isDragging ? 'opacity-50 scale-105' : ''}
+        rounded-xl border-2 transition-[border-color,background-color,box-shadow,opacity] duration-200
+        ${isDragging ? 'opacity-50' : ''}
         ${isOver
-          ? 'border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/50 scale-[1.02]'
+          ? 'border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/50'
           : 'border-white/10 bg-white/5 backdrop-blur-sm'
         }
       `}
@@ -142,7 +126,7 @@ export function DroppableProduct({
           {...listeners}
         >
           <div className="flex items-center gap-2">
-            <GripVertical className="w-4 h-4 text-white/30 group-hover/header:text-white/60 transition-colors" />
+            <GripVertical className="w-4 h-4 text-white/50 group-hover/header:text-white/80 transition-colors" />
             <Package className="w-4 h-4 text-white/50" />
             <button
               onClick={(e) => {

@@ -17,6 +17,9 @@ class ArchitectureIntroPage extends ConsumerWidget {
         ? selectedAreas.first
         : (customArea.name.isNotEmpty ? customArea.name : '事業');
 
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final surfaceContainer = Theme.of(context).colorScheme.surfaceContainer;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -24,10 +27,10 @@ class ArchitectureIntroPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 標題
-            const Text(
+            Text(
               '剛剛你定義了',
               style: TextStyle(
-                color: Colors.white70,
+                color: onSurface.withValues(alpha: 0.7),
                 fontSize: 16,
               ),
             ),
@@ -53,7 +56,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
             Text(
               '現在看看如何組織一切',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: onSurface.withValues(alpha: 0.7),
                 fontSize: 16,
               ),
             ),
@@ -68,6 +71,8 @@ class ArchitectureIntroPage extends ConsumerWidget {
               example: exampleArea,
               color: AppColors.brandTeal,
               indent: 0,
+              onSurface: onSurface,
+              surfaceContainer: surfaceContainer,
             ),
 
             const SizedBox(height: 16),
@@ -79,6 +84,8 @@ class ArchitectureIntroPage extends ConsumerWidget {
               example: exampleArea == '事業' ? 'Mobile App' : '健康計畫',
               color: AppColors.statusActive,
               indent: 24,
+              onSurface: onSurface,
+              surfaceContainer: surfaceContainer,
             ),
 
             const SizedBox(height: 16),
@@ -90,6 +97,8 @@ class ArchitectureIntroPage extends ConsumerWidget {
               example: '功能開發',
               color: AppColors.statusInbox,
               indent: 48,
+              onSurface: onSurface,
+              surfaceContainer: surfaceContainer,
             ),
 
             const SizedBox(height: 48),
@@ -130,7 +139,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
                     child: Text(
                       'AI 會自動將你的想法分類到對應的身份、專案和主題',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: onSurface.withValues(alpha: 0.9),
                         fontSize: 15,
                         height: 1.5,
                       ),
@@ -140,7 +149,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: 100), // 為底部指示器留空間
+            const SizedBox(height: 120), // 為底部指示器留空間
           ],
         ),
       ),
@@ -154,13 +163,15 @@ class ArchitectureIntroPage extends ConsumerWidget {
     required String example,
     required Color color,
     required double indent,
+    required Color onSurface,
+    required Color surfaceContainer,
   }) {
     return Padding(
       padding: EdgeInsets.only(left: indent),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: surfaceContainer,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: color.withValues(alpha: 0.3),
@@ -189,8 +200,8 @@ class ArchitectureIntroPage extends ConsumerWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: onSurface,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -199,7 +210,7 @@ class ArchitectureIntroPage extends ConsumerWidget {
                       Text(
                         subtitle,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: onSurface.withValues(alpha: 0.5),
                           fontSize: 13,
                         ),
                       ),

@@ -7,6 +7,8 @@ class MilestoneIntroPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -34,7 +36,7 @@ class MilestoneIntroPage extends StatelessWidget {
             Text(
               '里程碑是你為重要目標設定的截止日期',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: onSurface.withValues(alpha: 0.9),
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
                 height: 1.5,
@@ -50,6 +52,7 @@ class MilestoneIntroPage extends StatelessWidget {
               description: '為重要的事情設定明確的完成日期',
               icon: Icons.edit_calendar,
               color: AppColors.brandTeal,
+              onSurface: onSurface,
             ),
 
             const SizedBox(height: 20),
@@ -60,6 +63,7 @@ class MilestoneIntroPage extends StatelessWidget {
               description: '讓系統知道什麼時候必須完成',
               icon: Icons.anchor,
               color: AppColors.statusMaintain,
+              onSurface: onSurface,
             ),
 
             const SizedBox(height: 20),
@@ -70,6 +74,7 @@ class MilestoneIntroPage extends StatelessWidget {
               description: '根據你的里程碑倒推任務時間',
               icon: Icons.auto_awesome,
               color: AppColors.accentEmerald,
+              onSurface: onSurface,
             ),
 
             const SizedBox(height: 48),
@@ -124,7 +129,7 @@ class MilestoneIntroPage extends StatelessWidget {
                   Text(
                     '你設定：「3 月 1 日要完成 MVP Release」\n\nAI 會自動：為相關任務安排合適的完成時間，確保在 3 月 1 日前都能完成',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: onSurface.withValues(alpha: 0.9),
                       fontSize: 15,
                       height: 1.6,
                     ),
@@ -133,7 +138,7 @@ class MilestoneIntroPage extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 100), // 為底部指示器留空間
+            const SizedBox(height: 120), // 為底部指示器留空間
           ],
         ),
       ),
@@ -146,6 +151,7 @@ class MilestoneIntroPage extends StatelessWidget {
     required String description,
     required IconData icon,
     required Color color,
+    required Color onSurface,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,7 +195,7 @@ class MilestoneIntroPage extends StatelessWidget {
                     child: Text(
                       title,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -201,7 +207,7 @@ class MilestoneIntroPage extends StatelessWidget {
               Text(
                 description,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: onSurface.withValues(alpha: 0.7),
                   fontSize: 14,
                   height: 1.4,
                 ),

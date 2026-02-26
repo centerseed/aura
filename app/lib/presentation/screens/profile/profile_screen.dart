@@ -100,6 +100,13 @@ class ProfileScreen extends ConsumerWidget {
               _buildAiConsentTile(context, ref),
               _buildTile(
                 context,
+                icon: Icons.schedule_rounded,
+                title: 'AI 每日用量',
+                subtitle: '每日 50 次，於 UTC 00:00（台灣時間 08:00）重設',
+                onTap: () {},
+              ),
+              _buildTile(
+                context,
                 icon: Icons.tour_outlined,
                 title: '重新觀看導覽',
                 onTap: () async {
@@ -162,16 +169,16 @@ class ProfileScreen extends ConsumerWidget {
                 context,
                 icon: Icons.delete_forever_rounded,
                 title: '刪除帳號',
-                titleColor: const Color(0xFFFF453A),
-                iconColor: const Color(0xFFFF453A),
+                titleColor: AppColors.destructiveRed,
+                iconColor: AppColors.destructiveRed,
                 onTap: () => _showDeleteAccountDialog(context, ref),
               ),
               _buildTile(
                 context,
                 icon: Icons.logout_rounded,
                 title: '登出帳號',
-                titleColor: const Color(0xFFFF453A),
-                iconColor: const Color(0xFFFF453A),
+                titleColor: AppColors.destructiveRed,
+                iconColor: AppColors.destructiveRed,
                 onTap: () async {
                   final analytics = ref.read(analyticsServiceProvider);
                   await analytics.logLogout();
@@ -260,7 +267,7 @@ class ProfileScreen extends ConsumerWidget {
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [AppColors.primary, Color(0xFF8F8AFF)],
+                    colors: [AppColors.primary, AppColors.gradientSecondary],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -333,7 +340,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.totalTasks,
                         label: '總任務',
                         icon: Icons.task_alt,
-                        color: const Color(0xFF5E9FFF),
+                        color: AppColors.statsBlue,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -342,7 +349,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.totalProducts,
                         label: '專案',
                         icon: Icons.folder_outlined,
-                        color: const Color(0xFFFF9F0A),
+                        color: AppColors.statsOrange,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -351,7 +358,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.totalAreas,
                         label: '領域',
                         icon: Icons.category_outlined,
-                        color: const Color(0xFFFF375F),
+                        color: AppColors.statsPink,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -361,7 +368,7 @@ class ProfileScreen extends ConsumerWidget {
                         label: '使用天數',
                         icon: Icons.calendar_today,
                         suffix: '天',
-                        color: const Color(0xFF32D7C9),
+                        color: AppColors.statsTeal,
                       ),
                     ),
                   ],
@@ -383,7 +390,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.archivedTasks,
                         label: '已歸檔',
                         icon: Icons.archive_outlined,
-                        color: const Color(0xFF98A2B3),
+                        color: AppColors.statsSlate,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -392,7 +399,7 @@ class ProfileScreen extends ConsumerWidget {
                         value: stats.completedToday,
                         label: '今日完成',
                         icon: Icons.check_circle_outline,
-                        color: const Color(0xFF30D158),
+                        color: AppColors.statsGreen,
                         showSparkle: stats.completedToday > 0,
                       ),
                     ),
@@ -465,7 +472,7 @@ class ProfileScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFF5E9FFF)],
+                      colors: [AppColors.primary, AppColors.statsBlue],
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -559,7 +566,7 @@ class ProfileScreen extends ConsumerWidget {
               height: 80,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [AppColors.primary, Color(0xFF5E9FFF)],
+                  colors: [AppColors.primary, AppColors.statsBlue],
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -697,7 +704,7 @@ class ProfileScreen extends ConsumerWidget {
                 ref.read(aiConsentProvider.notifier).revoke();
               }
             },
-            activeColor: const Color(0xFF818CF8),
+            activeColor: AppColors.aiAccent,
           ),
         ],
       ),
@@ -714,7 +721,7 @@ class ProfileScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Icon(Icons.warning_rounded, color: const Color(0xFFFF453A), size: 24),
+            Icon(Icons.warning_rounded, color: AppColors.destructiveRed, size: 24),
             const SizedBox(width: 8),
             Text(
               '刪除帳號',
@@ -749,7 +756,7 @@ class ProfileScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
-                  Icon(Icons.remove, color: const Color(0xFFFF453A), size: 16),
+                  Icon(Icons.remove, color: AppColors.destructiveRed, size: 16),
                   const SizedBox(width: 8),
                   Text(
                     item,
@@ -779,7 +786,7 @@ class ProfileScreen extends ConsumerWidget {
             child: const Text(
               '確認刪除',
               style: TextStyle(
-                color: Color(0xFFFF453A),
+                color: AppColors.destructiveRed,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -818,7 +825,7 @@ class ProfileScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: const Color(0xFFFF453A),
+            backgroundColor: AppColors.destructiveRed,
           ),
         );
       },

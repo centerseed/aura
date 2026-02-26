@@ -231,10 +231,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.dark(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
               primary: AppColors.primary,
-              surface: Theme.of(context).colorScheme.surface,
             ),
           ),
           child: child!,
@@ -257,10 +256,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: const Color(0xFFFFB020),
-              surface: Theme.of(context).colorScheme.surface,
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppColors.reminderAmber,
             ),
           ),
           child: child!,
@@ -276,10 +274,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             : TimeOfDay.now(),
         builder: (context, child) {
           return Theme(
-            data: ThemeData.dark().copyWith(
-              colorScheme: ColorScheme.dark(
-                primary: const Color(0xFFFFB020),
-                surface: Theme.of(context).colorScheme.surface,
+            data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: AppColors.reminderAmber,
               ),
             ),
             child: child!,
@@ -592,9 +589,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
     final diffDays = due.difference(today).inDays;
 
-    if (diffDays < 0) return Colors.red;
-    if (diffDays <= 3) return Colors.orange;
-    return Colors.blue.withValues(alpha: 0.7);
+    if (diffDays < 0) return AppColors.error;
+    if (diffDays <= 3) return AppColors.warningOrange;
+    return AppColors.statusActive.withValues(alpha: 0.7);
   }
 
   /// 處理 SubItem 點擊（打開編輯對話框）
@@ -771,7 +768,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('刪除'),
           ),
         ],
@@ -860,10 +857,10 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             Text("選擇專案", style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ...products.map((product) => ListTile(
-              leading: const Icon(Icons.work_outline, color: Colors.green),
+              leading: const Icon(Icons.work_outline, color: AppColors.success),
               title: Text(product.name, style: TextStyle(color: cs.onSurface)),
               selected: product.id == _selectedProductId,
-              selectedTileColor: Colors.green.withValues(alpha: 0.2),
+              selectedTileColor: AppColors.success.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, product),
             )),
           ],
@@ -896,17 +893,17 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
             Text("選擇主題", style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.label_off_outlined, color: Colors.grey),
+              leading: const Icon(Icons.label_off_outlined, color: AppColors.statusArchive),
               title: Text('未分類', style: TextStyle(color: cs.onSurface)),
               selected: _selectedTopicId == null,
-              selectedTileColor: Colors.purple.withValues(alpha: 0.2),
+              selectedTileColor: AppColors.statusMaintain.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, <String, dynamic>{'id': null, 'name': '未分類'}),
             ),
             ...topics.map((topic) => ListTile(
-              leading: const Icon(Icons.label_outline, color: Colors.purple),
+              leading: const Icon(Icons.label_outline, color: AppColors.statusMaintain),
               title: Text(topic['name'] as String, style: TextStyle(color: cs.onSurface)),
               selected: topic['id'] == _selectedTopicId,
-              selectedTileColor: Colors.purple.withValues(alpha: 0.2),
+              selectedTileColor: AppColors.statusMaintain.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, topic),
             )),
           ],
@@ -1012,23 +1009,23 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.2),
+        color: AppColors.error.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 20),
+          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: const TextStyle(color: Colors.red, fontSize: 14),
+              style: const TextStyle(color: AppColors.error, fontSize: 14),
             ),
           ),
           GestureDetector(
             onTap: () => setState(() => _errorMessage = null),
-            child: const Icon(Icons.close, color: Colors.red, size: 18),
+            child: const Icon(Icons.close, color: AppColors.error, size: 18),
           ),
         ],
       ),
@@ -1162,10 +1159,10 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           Expanded(
             child: _buildDateCell(
               icon: Icons.play_circle_outline,
-              iconColor: Colors.blue,
+              iconColor: AppColors.statusActive,
               label: '開始',
               date: _selectedStartDate,
-              dateColor: Colors.blue,
+              dateColor: AppColors.statusActive,
               onTap: () => _pickDate(
                 current: _selectedStartDate,
                 onSelected: (date) => setState(() => _selectedStartDate = date),
@@ -1183,12 +1180,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           Expanded(
             child: _buildDateCell(
               icon: Icons.flag_outlined,
-              iconColor: Colors.orange,
+              iconColor: AppColors.warningOrange,
               label: '截止',
               date: _selectedDueDate,
               dateColor: _selectedDueDate != null && _selectedDueDate!.isBefore(DateTime.now())
-                  ? Colors.red
-                  : Colors.orange,
+                  ? AppColors.error
+                  : AppColors.warningOrange,
               onTap: () => _pickDate(
                 current: _selectedDueDate,
                 onSelected: (date) => setState(() => _selectedDueDate = date),
@@ -1248,7 +1245,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           Icon(
             Icons.notifications_outlined,
             size: 18,
-            color: _reminderEnabled ? const Color(0xFFFFB020) : colorScheme.onSurfaceVariant,
+            color: _reminderEnabled ? AppColors.reminderAmber : colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
           Text('提醒', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
@@ -1287,7 +1284,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                   });
             
                 },
-                activeTrackColor: const Color(0xFFFFB020),
+                activeTrackColor: AppColors.reminderAmber,
                 activeThumbColor: Colors.white,
               ),
             ),
@@ -1342,9 +1339,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                 // Area chip
                 areasAsync.when(
                   data: (eitherAreas) => eitherAreas.fold(
-                    (_) => _buildChip('載入失敗', Colors.red),
+                    (_) => _buildChip('載入失敗', AppColors.error),
                     (areas) {
-                      if (areas.isEmpty) return _buildChip('無領域', Colors.grey);
+                      if (areas.isEmpty) return _buildChip('無領域', AppColors.statusArchive);
                       if (_selectedAreaId == null) {
                         return const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
                       }
@@ -1357,18 +1354,18 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                     },
                   ),
                   loading: () => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  error: (_, __) => _buildChip('載入失敗', Colors.red),
+                  error: (_, __) => _buildChip('載入失敗', AppColors.error),
                 ),
                 // Product chip
                 productsAsync.when(
                   data: (eitherProducts) => eitherProducts.fold(
-                    (_) => _buildChip('載入失敗', Colors.red),
+                    (_) => _buildChip('載入失敗', AppColors.error),
                     (products) {
                       if (_selectedAreaId == null) {
                         return const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
                       }
                       final filtered = products.where((p) => p.areaId == _selectedAreaId).toList();
-                      if (filtered.isEmpty) return _buildChip('無專案', Colors.grey);
+                      if (filtered.isEmpty) return _buildChip('無專案', AppColors.statusArchive);
                       final inArea = filtered.any((p) => p.id == _selectedProductId);
                       if (!inArea) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1384,12 +1381,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                         (p) => p.id == _selectedProductId,
                         orElse: () => filtered.first,
                       );
-                      return _buildChip(selected.name, Colors.green,
+                      return _buildChip(selected.name, AppColors.success,
                         onTap: () => _showProductSelector(filtered));
                     },
                   ),
                   loading: () => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  error: (_, __) => _buildChip('載入失敗', Colors.red),
+                  error: (_, __) => _buildChip('載入失敗', AppColors.error),
                 ),
                 // Topic chip
                 _buildChip(
@@ -1398,7 +1395,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                         ? _availableTopics.firstWhere((t) => t['id'] == _selectedTopicId)['name'] as String
                         : widget.task.topicName ?? '未分類')
                     : '未分類',
-                  Colors.purple,
+                  AppColors.statusMaintain,
                   onTap: _showTopicSelector,
                 ),
               ],
@@ -1454,7 +1451,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       _isSubItemEditMode ? '完成' : '排序',
                       style: TextStyle(
                         fontSize: 12,
-                        color: _isSubItemEditMode ? Colors.orange : Colors.white54,
+                        color: _isSubItemEditMode ? AppColors.warningOrange : Colors.white54,
                       ),
                     ),
                   ),
@@ -1487,7 +1484,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       Icon(
                         sub.completed ? Icons.check_circle : Icons.circle_outlined,
                         size: 18,
-                        color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.5),
+                        color: sub.completed ? AppColors.success : colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -1501,7 +1498,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                         onTap: () => _handlePromoteSubItem(sub.id),
                         child: Padding(
                           padding: const EdgeInsets.all(6),
-                          child: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 16),
+                          child: Icon(Icons.arrow_upward, color: AppColors.statusActive.withValues(alpha: 0.7), size: 16),
                         ),
                       ),
                       GestureDetector(
@@ -1542,7 +1539,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                                 sub.completed ? Icons.check_circle : Icons.circle_outlined,
                                 key: ValueKey(sub.completed),
                                 size: 18,
-                                color: sub.completed ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.5),
+                                color: sub.completed ? AppColors.success : colorScheme.onSurface.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -1580,7 +1577,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                       onTap: () => _handlePromoteSubItem(sub.id),
                       child: Padding(
                         padding: const EdgeInsets.all(6),
-                        child: Icon(Icons.arrow_upward, color: Colors.blue.withValues(alpha: 0.7), size: 16),
+                        child: Icon(Icons.arrow_upward, color: AppColors.statusActive.withValues(alpha: 0.7), size: 16),
                       ),
                     ),
                     GestureDetector(
@@ -1652,11 +1649,11 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            Icon(Icons.delete_outline, size: 18, color: Colors.red.withValues(alpha: 0.6)),
+            Icon(Icons.delete_outline, size: 18, color: AppColors.error.withValues(alpha: 0.6)),
             const SizedBox(width: 8),
             Text(
               '刪除任務',
-              style: TextStyle(color: Colors.red.withValues(alpha: 0.6), fontSize: 15),
+              style: TextStyle(color: AppColors.error.withValues(alpha: 0.6), fontSize: 15),
             ),
           ],
         ),

@@ -21,9 +21,24 @@ class PageIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final surface = Theme.of(context).colorScheme.surface;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            surface.withValues(alpha: 0),
+            surface.withValues(alpha: 0.85),
+            surface,
+          ],
+          stops: const [0.0, 0.25, 1.0],
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -48,13 +63,13 @@ class PageIndicator extends StatelessWidget {
                         : null,
                     color: isPassed
                         ? AppColors.onboardingIndigo.withValues(alpha: 0.5)
-                        : Colors.white.withValues(alpha: 0.2),
+                        : onSurface.withValues(alpha: 0.2),
                   ),
                 );
               }),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // 導航按鈕
             Row(
@@ -66,9 +81,6 @@ class PageIndicator extends StatelessWidget {
                     onPressed: onPrevious,
                     icon: const Icon(Icons.arrow_back, size: 20),
                     label: const Text('上一步'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                    ),
                   )
                 else
                   const SizedBox(width: 100),
@@ -78,9 +90,6 @@ class PageIndicator extends StatelessWidget {
                   TextButton(
                     onPressed: () => context.go('/dashboard'),
                     child: const Text('跳過'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white60,
-                    ),
                   ),
 
                 // 下一步按鈕
@@ -91,7 +100,7 @@ class PageIndicator extends StatelessWidget {
                     label: const Text('下一步'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      disabledBackgroundColor: Colors.white.withValues(alpha: 0.1),
+                      disabledBackgroundColor: onSurface.withValues(alpha: 0.12),
                     ),
                   )
                 else

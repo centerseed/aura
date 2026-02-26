@@ -11,6 +11,9 @@ import {
   DndContext,
   DragOverlay,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -20,6 +23,8 @@ import {
   type DragOverEvent,
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Plus,
   FolderOpen,
@@ -822,28 +827,10 @@ function DroppableProduct({
   onEditTaskTitle?: (taskId: string, newTitle: string) => void;
   isReorganizing?: boolean;
 }) {
-  // 作為放置目標（接收 Task 和其他 Product）
-  const { setNodeRef: setDropRef } = useDroppable({
-    id: `product-${productId}`,
-    data: { type: 'product', productId, areaId }
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: productId,
+    data: { type: 'product', productId, productName, areaId },
   });
-
-  // 作為可拖曳項目（拖曳到 Area 或其他 Product）
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-    id: `draggable-product-${productId}`,
-    data: {
-      type: 'product',
-      productId,
-      productName,
-      areaId
-    },
-  });
-
-  // 合併兩個 refs
-  const setRefs = (element: HTMLDivElement | null) => {
-    setDropRef(element);
-    setDragRef(element);
-  };
 
   // 篩選此 Product 的所有里程碑（支援多個，排除已過期）
   const productMilestones = (Array.isArray(milestones) ? milestones : [])
@@ -860,21 +847,23 @@ function DroppableProduct({
 
   const hasMilestone = productMilestones.length > 0;
 
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <div
-      ref={setRefs}
+      ref={setNodeRef}
       style={style}
       {...attributes}
       className={`
-        rounded-xl border-2 transition-all duration-200
-        ${isDragging ? "opacity-50 scale-105" : ""}
-        ${isOver
-          ? "border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/50 scale-[1.02]"
-          : "border-white/10 bg-white/5 backdrop-blur-sm"
+        rounded-xl border-2 transition-[border-color,background-color,box-shadow,opacity] duration-200
+        ${isDragging
+          ? "opacity-30 border-dashed border-white/20 bg-white/5"
+          : isOver
+            ? "border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/50"
+            : "border-white/10 bg-white/5 backdrop-blur-sm"
         }
       `}
     >
@@ -885,7 +874,7 @@ function DroppableProduct({
           {...listeners}
         >
           <div className="flex items-center gap-2">
-            <GripVertical className="w-4 h-4 text-white/30 group-hover/header:text-white/60 transition-colors" />
+            <GripVertical className="w-4 h-4 text-white/50 group-hover/header:text-white/80 transition-colors" />
             <Package className="w-4 h-4 text-white/50" />
             <button
               onClick={(e) => {
@@ -1203,6 +1192,15 @@ function DashboardContent() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   );
+
+  // 自訂碰撞偵測：拖 Product 時用 rectIntersection（排序更精準），其他用 closestCenter
+  const customCollisionDetection: CollisionDetection = useCallback((...args) => {
+    const [{ active }] = args;
+    if (active.data.current?.type === 'product') {
+      return rectIntersection(...args);
+    }
+    return closestCenter(...args);
+  }, []);
 
   // 載入用戶數據
   useEffect(() => {
@@ -3280,7 +3278,7 @@ function DashboardContent() {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
@@ -3639,6 +3637,7 @@ function DashboardContent() {
 
                       {/* Products Grid */}
                       {area.products.length > 0 ? (
+                        <SortableContext items={area.products.map(p => p.id)} strategy={rectSortingStrategy}>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {area.products.map((product) => (
                             <DroppableProduct
@@ -3650,7 +3649,7 @@ function DashboardContent() {
                               productStatus={product.status}
                               referenceCount={product.referenceCount}
                               tasks={showArchive ? product.tasks : product.tasks.filter((t) => t && t.drawer !== "ARCHIVE")}
-                              isOver={overDropId === `product-${product.id}`}
+                              isOver={overDropId === product.id}
                               milestones={milestones}
                               areaId={area.id}
                               onEditMilestone={(milestone) => {
@@ -3711,6 +3710,7 @@ function DashboardContent() {
                             />
                           ))}
                         </div>
+                        </SortableContext>
                       ) : (
                         <div className="rounded-xl border-2 border-dashed border-white/10 bg-white/5 p-12 text-center">
                           <div className="flex flex-col items-center gap-4">
@@ -3782,7 +3782,7 @@ function DashboardContent() {
         </div>
 
         {/* Drag Overlay */}
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeTask ? (
             <DragOverlayTask task={activeTask} />
           ) : activeProduct ? (

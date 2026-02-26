@@ -8,7 +8,8 @@
 import { prisma } from "@/lib/db"
 import { isValidUUID } from "@/domain/constants/validation"
 import { ValidationException } from "@/lib/api-response"
-import { ensureProductEmbedding } from "@/lib/embedding"
+import { ensureProductEmbedding, ensureTaskEmbedding } from "@/lib/embedding"
+import { maybeRefreshBlueprint } from "@/lib/product-blueprint"
 import type { StructureResult, StructuredItem, Milestone, ExistingArea } from "./generate-brain-dump-structure"
 
 // ============================================================================
@@ -254,6 +255,7 @@ export class ExecuteBrainDumpUseCase {
         content: { in: allTitles },
         deleted_at: null,
         created_at: { gte: twentyFourHoursAgo },
+        status: { not: 'ARCHIVE' },
       },
       select: { content: true },
     })
@@ -467,6 +469,26 @@ export class ExecuteBrainDumpUseCase {
     })
 
     timings["db_persist"] = Date.now() - startDbPersist
+
+    // Fire-and-forget: task embeddings + blueprint updates
+    const affectedProductIds = new Set<string>()
+    for (const task of createdTasks) {
+      // Task embedding
+      ensureTaskEmbedding(task.id, task.title).catch(err => {
+        console.error(`❌ [embedding] Failed to embed task "${task.title}":`, err)
+      })
+      // Collect affected product IDs for blueprint refresh
+      const productKey = `${task.tag.area}::${task.tag.product}`
+      const cached = productCache.get(productKey)
+      if (cached) affectedProductIds.add(cached.id)
+    }
+
+    // Blueprint refresh for affected products
+    for (const productId of affectedProductIds) {
+      maybeRefreshBlueprint(productId).catch(err => {
+        console.error(`❌ [blueprint] Failed to refresh blueprint for ${productId}:`, err)
+      })
+    }
 
     return {
       data: {

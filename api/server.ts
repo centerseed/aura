@@ -24,6 +24,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { parse } from "node:url";
 import next from "next";
+import { prisma } from "./src/lib/db";
 
 let versionInfo = { api: 0, mcp: 0 };
 try {
@@ -100,12 +101,24 @@ async function main() {
 
       // ── Health Check ──────────────────────────────────
       if (pathname === "/health") {
-        res.writeHead(200, { "Content-Type": "application/json" });
+        let dbStatus = "ok";
+        let dbLatencyMs: number | null = null;
+        try {
+          const t0 = Date.now();
+          await prisma.$queryRaw`SELECT 1`;
+          dbLatencyMs = Date.now() - t0;
+        } catch (err) {
+          dbStatus = `error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        const healthy = dbStatus === "ok";
+        res.writeHead(healthy ? 200 : 503, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
-            status: "ok",
+            status: healthy ? "ok" : "degraded",
             service: "zentropy-api",
             version: versionInfo,
+            db: dbStatus,
+            dbLatencyMs,
             mcp: true,
             activeSessions: mcpSessions.size,
             timestamp: new Date().toISOString(),

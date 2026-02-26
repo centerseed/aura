@@ -10,8 +10,6 @@ import { google } from "@ai-sdk/google"
 import { generateObject } from "ai"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
-import { Prisma } from "@prisma/client"
-import { isValidUUID } from "@/domain/constants/validation"
 import { getEmbedding } from "@/lib/embedding"
 import { librarianRecall, LibrarianRule } from "@/lib/librarian-client"
 import { ValidationException } from "@/lib/api-response"
@@ -90,29 +88,6 @@ export type Milestone = {
   [key: string]: any
 }
 
-type CombinedResult = {
-  data_type: string
-  area_id: string | null
-  area_name: string | null
-  area_scope: string | null
-  product_id: string | null
-  product_name: string | null
-  product_similarity: number | null
-  topic_id: string | null
-  topic_name: string | null
-  task_id: string | null
-  task_content: string | null
-  task_status: string | null
-  task_sub_items: any
-  task_updated_at: Date | null
-  task_due_date: Date | null
-  milestone_id: string | null
-  milestone_name: string | null
-  milestone_description: string | null
-  milestone_target_date: Date | null
-  milestone_status: string | null
-}
-
 export interface ExistingArea {
   id: string
   name: string
@@ -121,7 +96,7 @@ export interface ExistingArea {
     id: string
     name: string
     topics: Array<{ id: string; name: string }>
-    tasks: Array<{ id: string; content: string; status: string; sub_items: any; updated_at: Date; due_date: Date | null }>
+    tasks: Array<{ id: string; content: string; status: string; sub_items: any; updated_at: Date; due_date: Date | null; task_similarity?: number | null }>
   }>
 }
 
@@ -173,171 +148,146 @@ export class GenerateBrainDumpStructureUseCase {
 
     const vectorStr = userEmbedding ? `[${userEmbedding.join(",")}]` : null
 
-    // main SQL + librarian recall 並行（recall 可能已完成或仍在跑）
-    const mainQueryPromise = prisma.$queryRaw<CombinedResult[]>`
-      WITH
-      relevant_products AS (
-        SELECT
-          id,
-          name,
-          ${vectorStr ? Prisma.sql`1 - (embedding <=> ${vectorStr}::vector)` : Prisma.sql`1.0`} as similarity
-        FROM products
-        WHERE user_id = ${request.userId}::uuid
-          AND deleted_at IS NULL
-          ${request.explicitProductId
-            ? Prisma.sql`AND id = ${request.explicitProductId}::uuid`
-            : vectorStr
-              ? Prisma.sql`AND embedding IS NOT NULL ORDER BY embedding <=> ${vectorStr}::vector LIMIT 4`
-              : Prisma.sql`LIMIT 10`
-          }
-      ),
-      ranked_tasks AS (
-        SELECT
-          t.*,
-          ROW_NUMBER() OVER (PARTITION BY t.product_id ORDER BY t.updated_at DESC) as row_num
-        FROM tasks t
-        WHERE t.deleted_at IS NULL
-          AND t.status != 'ARCHIVE'
-          AND t.user_id = ${request.userId}::uuid
-      ),
-      main_data AS (
-        SELECT
-          'main'::text as data_type,
-          a.id::text as area_id,
-          a.name as area_name,
-          a.scope as area_scope,
-          p.id::text as product_id,
-          p.name as product_name,
-          rp.similarity as product_similarity,
-          top.id::text as topic_id,
-          top.name as topic_name,
-          rt.id::text as task_id,
-          rt.content as task_content,
-          rt.status::text as task_status,
-          NULL::json as task_sub_items,
-          rt.updated_at as task_updated_at,
-          rt.due_date as task_due_date,
-          NULL::text as milestone_id,
-          NULL::text as milestone_name,
-          NULL::text as milestone_description,
-          NULL::timestamp as milestone_target_date,
-          NULL::text as milestone_status
-        FROM areas a
-        LEFT JOIN products p ON p.area_id = a.id AND p.deleted_at IS NULL
-        LEFT JOIN relevant_products rp ON rp.id = p.id
-        LEFT JOIN topics top ON top.product_id = p.id AND top.deleted_at IS NULL
-        LEFT JOIN ranked_tasks rt ON rt.product_id = p.id AND rt.row_num <= 5
-        WHERE a.user_id = ${request.userId}::uuid
-          AND a.deleted_at IS NULL
-          AND (rp.id IS NOT NULL OR p.id IS NULL)
-      ),
-      milestone_data AS (
-        SELECT
-          'milestone'::text as data_type,
-          NULL::text as area_id,
-          NULL::text as area_name,
-          NULL::text as area_scope,
-          NULL::text as product_id,
-          NULL::text as product_name,
-          NULL::float8 as product_similarity,
-          NULL::text as topic_id,
-          NULL::text as topic_name,
-          NULL::text as task_id,
-          NULL::text as task_content,
-          NULL::text as task_status,
-          NULL::json as task_sub_items,
-          NULL::timestamp as task_updated_at,
-          NULL::timestamp as task_due_date,
-          id::text as milestone_id,
-          name as milestone_name,
-          description as milestone_description,
-          target_date as milestone_target_date,
-          status::text as milestone_status
-        FROM milestones
-        WHERE user_id = ${request.userId}::uuid
-          AND deleted_at IS NULL
-          AND target_date >= ${now}
-          AND target_date <= ${futureDate}
-          AND status IN ('planned', 'in_progress')
-      )
-      SELECT * FROM main_data
-      UNION ALL
-      SELECT * FROM milestone_data
-      ORDER BY data_type DESC, product_similarity DESC NULLS LAST, area_name, product_name
+    // ========================================================================
+    // Two-Stage Retrieval
+    // ========================================================================
+
+    // Stage 1: Product Selection (uses blueprint_embedding with fallback to embedding)
+    type ProductCandidate = { id: string; name: string; area_id: string; similarity: number }
+
+    const stage1Promise = request.explicitProductId
+      ? prisma.$queryRaw<ProductCandidate[]>`
+          SELECT p.id::text, p.name, p.area_id::text, 1.0::float8 as similarity
+          FROM products p
+          WHERE p.id = ${request.explicitProductId}::uuid AND p.deleted_at IS NULL
+        `
+      : vectorStr
+        ? prisma.$queryRaw<ProductCandidate[]>`
+            SELECT p.id::text, p.name, p.area_id::text,
+                   1 - (COALESCE(p.blueprint_embedding, p.embedding) <=> ${vectorStr}::vector) as similarity
+            FROM products p
+            WHERE p.user_id = ${request.userId}::uuid
+              AND p.deleted_at IS NULL
+              AND COALESCE(p.blueprint_embedding, p.embedding) IS NOT NULL
+            ORDER BY COALESCE(p.blueprint_embedding, p.embedding) <=> ${vectorStr}::vector
+            LIMIT 3
+          `
+        : prisma.$queryRaw<ProductCandidate[]>`
+            SELECT p.id::text, p.name, p.area_id::text, 1.0::float8 as similarity
+            FROM products p
+            WHERE p.user_id = ${request.userId}::uuid AND p.deleted_at IS NULL
+            LIMIT 10
+          `
+
+    // Milestone query (parallel)
+    const milestonePromise = prisma.$queryRaw<Milestone[]>`
+      SELECT id::text, name, description, target_date, status::text
+      FROM milestones
+      WHERE user_id = ${request.userId}::uuid
+        AND deleted_at IS NULL
+        AND target_date >= ${now}
+        AND target_date <= ${futureDate}
+        AND status IN ('planned', 'in_progress')
     `
 
-    // 等待 main SQL + librarian recall 並行完成
-    const [combinedResults, librarianRules] = await Promise.all([mainQueryPromise, recallPromise])
-    timings["db_and_recall_parallel"] = Date.now() - startParallel
+    // Wait for Stage 1 + milestones + librarian recall in parallel
+    const [productCandidates, milestones, librarianRules] = await Promise.all([
+      stage1Promise, milestonePromise, recallPromise,
+    ])
+    timings["stage1_and_recall"] = Date.now() - startParallel
 
     if (librarianRules.length > 0) {
       console.log(`📚 [brain-dump] Librarian recalled ${librarianRules.length} rules`)
     }
 
-    // 解析合併結果
-    const rawStructure: Array<{
-      area_id: string
-      area_name: string
-      area_scope: string | null
-      product_id: string | null
-      product_name: string | null
-      topic_id: string | null
-      topic_name: string | null
-      task_id: string | null
-      task_content: string | null
-      task_status: string | null
-      task_sub_items: any
-      task_updated_at: Date | null
-      task_due_date: Date | null
-    }> = []
-
-    const milestones: Milestone[] = []
-    const relevantProducts: Array<{ id: string; name: string; similarity: number }> = []
-    const seenProducts = new Set<string>()
-
-    for (const row of combinedResults) {
-      if (row.data_type === 'main' && row.area_id) {
-        rawStructure.push({
-          area_id: row.area_id,
-          area_name: row.area_name!,
-          area_scope: row.area_scope,
-          product_id: row.product_id,
-          product_name: row.product_name,
-          topic_id: row.topic_id,
-          topic_name: row.topic_name,
-          task_id: row.task_id,
-          task_content: row.task_content,
-          task_status: row.task_status,
-          task_sub_items: row.task_sub_items,
-          task_updated_at: row.task_updated_at,
-          task_due_date: row.task_due_date,
-        })
-        if (row.product_id && row.product_similarity && !seenProducts.has(row.product_id)) {
-          seenProducts.add(row.product_id)
-          relevantProducts.push({
-            id: row.product_id,
-            name: row.product_name!,
-            similarity: row.product_similarity,
-          })
-        }
-      } else if (row.data_type === 'milestone' && row.milestone_id) {
-        milestones.push({
-          id: row.milestone_id,
-          name: row.milestone_name!,
-          description: row.milestone_description,
-          target_date: row.milestone_target_date!,
-        } as Milestone)
-      }
-    }
+    const relevantProducts = productCandidates.map(r => ({
+      id: r.id, name: r.name, similarity: Number(r.similarity),
+    }))
 
     if (relevantProducts.length > 0 && !request.explicitProductId) {
       console.log(
-        `🔍 [brain-dump] Found ${relevantProducts.length} relevant Products (${timings["embedding"]}ms embedding):`,
+        `🔍 [brain-dump] Stage 1: ${relevantProducts.length} Products (${timings["embedding"]}ms embedding):`,
         relevantProducts.map(r => `${r.name} (${(r.similarity * 100).toFixed(0)}%)`).join(", ")
       )
     }
 
-    // 重建嵌套結構
+    // Stage 2: Focused task fetch for selected products + task similarity
+    const selectedProductIds = productCandidates.map(p => p.id)
+
+    type TaskRow = {
+      id: string; content: string; status: string; updated_at: Date; due_date: Date | null
+      product_id: string; task_similarity: number | null
+    }
+
+    let stage2Tasks: TaskRow[] = []
+    let topTaskSimilarity = 0
+    let topSimilarTask: { id: string; content: string; productName: string; similarity: number } | null = null
+
+    if (selectedProductIds.length > 0) {
+      const startStage2 = Date.now()
+      stage2Tasks = vectorStr
+        ? await prisma.$queryRaw<TaskRow[]>`
+            SELECT t.id::text, t.content, t.status::text, t.updated_at, t.due_date,
+                   t.product_id::text,
+                   CASE WHEN t.embedding IS NOT NULL
+                     THEN 1 - (t.embedding <=> ${vectorStr}::vector)
+                     ELSE NULL
+                   END as task_similarity
+            FROM tasks t
+            WHERE t.product_id = ANY(${selectedProductIds}::uuid[])
+              AND t.deleted_at IS NULL AND t.status != 'ARCHIVE'
+            ORDER BY t.updated_at DESC
+            LIMIT 30
+          `
+        : await prisma.$queryRaw<TaskRow[]>`
+            SELECT t.id::text, t.content, t.status::text, t.updated_at, t.due_date,
+                   t.product_id::text, NULL::float8 as task_similarity
+            FROM tasks t
+            WHERE t.product_id = ANY(${selectedProductIds}::uuid[])
+              AND t.deleted_at IS NULL AND t.status != 'ARCHIVE'
+            ORDER BY t.updated_at DESC
+            LIMIT 30
+          `
+      timings["stage2_tasks"] = Date.now() - startStage2
+
+      // Find most similar task for append signal
+      const productNameMap = new Map(productCandidates.map(p => [p.id, p.name]))
+      for (const t of stage2Tasks) {
+        const sim = Number(t.task_similarity ?? 0)
+        if (sim > topTaskSimilarity) {
+          topTaskSimilarity = sim
+          topSimilarTask = {
+            id: t.id,
+            content: t.content,
+            productName: productNameMap.get(t.product_id) || "",
+            similarity: sim,
+          }
+        }
+      }
+
+      if (topSimilarTask) {
+        console.log(
+          `🔍 [brain-dump] Stage 2: Top similar task "${topSimilarTask.content}" (${(topSimilarTask.similarity * 100).toFixed(0)}%)`
+        )
+      }
+    }
+
+    // Build area/product/task structure from Stage 1 + Stage 2
+    // First, fetch all areas for the user (we need them for the context)
+    const allAreas = await prisma.area.findMany({
+      where: { user_id: request.userId, deleted_at: null },
+      select: { id: true, name: true, scope: true },
+    })
+
+    // Fetch topics for selected products
+    const topicRows = selectedProductIds.length > 0
+      ? await prisma.topic.findMany({
+          where: { product_id: { in: selectedProductIds }, deleted_at: null },
+          select: { id: true, name: true, product_id: true },
+        })
+      : []
+
+    // Build areaMap
     const areaMap = new Map<string, {
       id: string
       name: string
@@ -346,49 +296,53 @@ export class GenerateBrainDumpStructureUseCase {
         id: string
         name: string
         topics: Array<{ id: string; name: string }>
-        tasks: Array<{ id: string; content: string; status: string; sub_items: any; updated_at: Date; due_date: Date | null }>
+        tasks: Array<{ id: string; content: string; status: string; sub_items: any; updated_at: Date; due_date: Date | null; task_similarity: number | null }>
       }>
     }>()
 
-    for (const row of rawStructure) {
-      if (!areaMap.has(row.area_id)) {
-        areaMap.set(row.area_id, {
-          id: row.area_id,
-          name: row.area_name,
-          scope: row.area_scope,
-          products: new Map(),
-        })
+    // Seed all areas
+    for (const area of allAreas) {
+      areaMap.set(area.id, { id: area.id, name: area.name, scope: area.scope, products: new Map() })
+    }
+
+    // Add selected products to their areas
+    for (const pc of productCandidates) {
+      const area = areaMap.get(pc.area_id)
+      if (!area) continue
+      area.products.set(pc.id, { id: pc.id, name: pc.name, topics: [], tasks: [] })
+    }
+
+    // Add topics
+    for (const t of topicRows) {
+      for (const area of areaMap.values()) {
+        const product = area.products.get(t.product_id)
+        if (product && !product.topics.some(tp => tp.id === t.id)) {
+          product.topics.push({ id: t.id, name: t.name })
+        }
       }
-      const area = areaMap.get(row.area_id)!
+    }
 
-      if (row.product_id && row.product_name) {
-        if (!area.products.has(row.product_id)) {
-          area.products.set(row.product_id, {
-            id: row.product_id,
-            name: row.product_name,
-            topics: [],
-            tasks: [],
+    // Add tasks (distribute by product, limit per product)
+    const tasksByProduct = new Map<string, TaskRow[]>()
+    for (const t of stage2Tasks) {
+      const list = tasksByProduct.get(t.product_id) || []
+      list.push(t)
+      tasksByProduct.set(t.product_id, list)
+    }
+
+    for (const area of areaMap.values()) {
+      for (const [productId, product] of area.products) {
+        const tasks = (tasksByProduct.get(productId) || []).slice(0, 10)
+        for (const t of tasks) {
+          product.tasks.push({
+            id: t.id,
+            content: t.content,
+            status: t.status || "INBOX",
+            sub_items: [],
+            updated_at: t.updated_at || new Date(),
+            due_date: t.due_date,
+            task_similarity: t.task_similarity != null ? Number(t.task_similarity) : null,
           })
-        }
-        const product = area.products.get(row.product_id)!
-
-        if (row.topic_id && row.topic_name) {
-          if (!product.topics.some(t => t.id === row.topic_id)) {
-            product.topics.push({ id: row.topic_id, name: row.topic_name })
-          }
-        }
-
-        if (row.task_id && row.task_content) {
-          if (!product.tasks.some(t => t.id === row.task_id)) {
-            product.tasks.push({
-              id: row.task_id,
-              content: row.task_content,
-              status: row.task_status || 'INBOX',
-              sub_items: [], // populated below from sub_tasks table
-              updated_at: row.task_updated_at || new Date(),
-              due_date: row.task_due_date,
-            })
-          }
         }
       }
     }
@@ -425,6 +379,8 @@ export class GenerateBrainDumpStructureUseCase {
         }
       }
     }
+
+    timings["db_and_recall_parallel"] = Date.now() - startParallel
 
     let existingAreas: ExistingArea[] = Array.from(areaMap.values()).map(area => ({
       ...area,
@@ -562,6 +518,14 @@ export class GenerateBrainDumpStructureUseCase {
         }
         contextSummary += "\n"
       }
+    }
+
+    // Similarity signal for append vs new task
+    let similaritySignal = ""
+    if (topSimilarTask && topTaskSimilarity > 0.85) {
+      similaritySignal = `\n### 🔍 語意分析信號\n語意分析發現高度相似的既有任務：\n  任務: "${topSimilarTask.content}" (相似度: ${(topSimilarTask.similarity * 100).toFixed(0)}%)\n  Product: ${topSimilarTask.productName}\n  → 請優先考慮是否追加為此任務的 sub-item\n`
+    } else if (topTaskSimilarity < 0.6) {
+      similaritySignal = `\n### 🔍 語意分析信號\n語意分析未發現高度相似的既有任務（最高相似度: ${(topTaskSimilarity * 100).toFixed(0)}%）→ 建議創建新任務\n`
     }
 
     // Librarian 規則提示
@@ -787,6 +751,7 @@ due_date 格式：ISO 8601，如 2026-02-07T00:00:00+08:00
 今天：${now.toLocaleDateString("zh-TW")} (星期${['日', '一', '二', '三', '四', '五', '六'][now.getDay()]})
 
 ${contextSummary}
+${similaritySignal}
 ${librarianHints}
 ---
 

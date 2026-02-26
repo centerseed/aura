@@ -14,7 +14,7 @@
 #   - Min Instances: 0 (按需付費)
 #   - Max Instances: 10
 #   - Memory: 512Mi
-#   - Database: Neon PostgreSQL (ap-southeast-1)
+#   - Database: Google Cloud SQL (zentropy-4f7a5:asia-east1:zentropy-db)
 #   - Embedding: Gemini API (768 維)
 #
 # ==============================================================================
@@ -153,7 +153,23 @@ sync_secret() {
     fi
 }
 
-sync_secret "database-url" "DATABASE_URL"
+# DATABASE_URL 生產版：Cloud Run 用 Unix socket，覆蓋 .env 中的本地 TCP URL
+CLOUDSQL_NARUVIA_PW=$(get_env_value "CLOUDSQL_DATABASE_URL" | sed 's|.*://[^:]*:\([^@]*\)@.*|\1|')
+PROD_DATABASE_URL="postgresql://naruvia_api:${CLOUDSQL_NARUVIA_PW}@localhost/neondb?host=/cloudsql/zentropy-4f7a5:asia-east1:zentropy-db"
+if [ -n "$CLOUDSQL_NARUVIA_PW" ]; then
+    # 直接同步生產 URL（不讀 .env 的 DATABASE_URL）
+    CURRENT_DB=$(gcloud secrets versions access latest --secret="database-url" --project="$PROJECT_ID" 2>/dev/null || echo "")
+    if [ "$PROD_DATABASE_URL" != "$CURRENT_DB" ]; then
+        log_info "更新 database-url (Cloud SQL Unix socket URL)"
+        echo -n "$PROD_DATABASE_URL" | gcloud secrets versions add "database-url" \
+            --data-file=- --project "$PROJECT_ID"
+        log_success "database-url 已更新"
+    else
+        log_info "database-url 無變更，跳過"
+    fi
+else
+    log_warning "CLOUDSQL_DATABASE_URL 未設定，跳過 database-url 同步"
+fi
 sync_secret "gemini-api-key" "GOOGLE_GENERATIVE_AI_API_KEY"
 sync_secret "firebase-admin-key" "FIREBASE_ADMIN_KEY"
 sync_secret "google-oauth-client-id" "GOOGLE_OAUTH_CLIENT_ID"
@@ -231,6 +247,9 @@ DEPLOY_ARGS=(
     --timeout 300
     --concurrency 80
 
+    # Cloud SQL 連線（透過 Unix socket）
+    --add-cloudsql-instances "zentropy-4f7a5:asia-east1:zentropy-db"
+
     # 網路配置
     --port 3001
     --allow-unauthenticated
@@ -247,7 +266,7 @@ DEPLOY_ARGS=(
 
     # Node.js 環境變數
     # NEXT_PUBLIC_API_URL 必須指向 API Backend，用於 OAuth Discovery metadata
-    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://api.zentropy.cc,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5"
+    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://api.zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://api.zentropy.cc,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5"
     --update-secrets NEXT_PUBLIC_FIREBASE_API_KEY=firebase-web-api-key:latest
 )
 
@@ -315,6 +334,42 @@ SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
     --project "${PROJECT_ID}" \
     --format 'value(status.url)')
 
+# 9. 自動 smoke test：確認 /health 回應且 DB 連線正常
+log_info "執行 smoke test..."
+MAX_RETRIES=5
+RETRY_DELAY=5
+HEALTH_OK=false
+
+for i in $(seq 1 $MAX_RETRIES); do
+    log_info "第 ${i}/${MAX_RETRIES} 次嘗試 ${SERVICE_URL}/health ..."
+    HEALTH_RESPONSE=$(curl -sf --max-time 15 "${SERVICE_URL}/health" 2>/dev/null || echo "")
+
+    if [ -n "$HEALTH_RESPONSE" ]; then
+        DB_STATUS=$(echo "$HEALTH_RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('db','unknown'))" 2>/dev/null || echo "parse_error")
+        VERSION=$(echo "$HEALTH_RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); v=d.get('version',{}); print(f\"api={v.get('api','?')}\")" 2>/dev/null || echo "?")
+        DB_LATENCY=$(echo "$HEALTH_RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('dbLatencyMs','?'))" 2>/dev/null || echo "?")
+
+        if [ "$DB_STATUS" = "ok" ]; then
+            log_success "Smoke test 通過！DB 連線正常 (latency: ${DB_LATENCY}ms, ${VERSION})"
+            HEALTH_OK=true
+            break
+        else
+            log_error "DB 狀態異常: $DB_STATUS"
+            log_warning "完整回應: $HEALTH_RESPONSE"
+            break
+        fi
+    else
+        log_warning "服務尚未就緒，等待 ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+    fi
+done
+
+if [ "$HEALTH_OK" != "true" ]; then
+    log_error "Smoke test 失敗！請檢查 Cloud Run logs:"
+    log_error "  gcloud run logs read ${SERVICE_NAME} --region ${REGION} --project ${PROJECT_ID} --limit 50"
+    exit 1
+fi
+
 echo ""
 log_success "======================================"
 log_success "   API 部署成功！"
@@ -322,8 +377,9 @@ log_success "======================================"
 echo ""
 log_info "📍 服務 URL: ${SERVICE_URL}"
 echo ""
-log_info "🧪 測試 API:"
-log_info "   curl ${SERVICE_URL}/api/me"
+log_info "🧪 手動測試:"
+log_info "   curl ${SERVICE_URL}/health"
+log_info "   curl ${SERVICE_URL}/api/me  (需要 auth token)"
 echo ""
 log_info "💰 計費資訊:"
 log_info "   - 最小實例數: 0 (完全按需付費)"
@@ -332,7 +388,7 @@ log_info "   - 記憶體: 512Mi"
 log_info "   - CPU: 1"
 log_info "   - 閒置時自動縮減至 0，無請求時不收費"
 log_info "   - Embedding: Gemini API (零冷啟動)"
-log_info "   - ⚠️ Cold start 約 3-5 秒 (Neon 連線)"
+log_info "   - ⚠️ Cold start 約 2-4 秒 (Cloud SQL Unix socket)"
 echo ""
 log_info "📝 下一步:"
 log_info "   1. 更新 web/.env.production 中的 API URL:"

@@ -22,6 +22,10 @@ class IdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final outline = Theme.of(context).colorScheme.outlineVariant;
+    final surfaceContainer = Theme.of(context).colorScheme.surfaceContainer;
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -30,13 +34,10 @@ class IdentityCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        transform: Matrix4.identity()..scale(isSelected ? 1.02 : 1.0),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected
-                ? color.withValues(alpha: 0.6)
-                : Colors.white.withValues(alpha: 0.1),
+            color: isSelected ? color.withValues(alpha: 0.6) : outline,
             width: isSelected ? 2 : 1,
           ),
           gradient: isSelected
@@ -49,7 +50,7 @@ class IdentityCard extends StatelessWidget {
                   ],
                 )
               : null,
-          color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
+          color: isSelected ? null : surfaceContainer,
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -85,8 +86,8 @@ class IdentityCard extends StatelessWidget {
                 // 名稱
                 Text(
                   name,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -98,7 +99,7 @@ class IdentityCard extends StatelessWidget {
                 Text(
                   scope,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: onSurface.withValues(alpha: 0.6),
                     fontSize: 11,
                     height: 1.3,
                   ),
