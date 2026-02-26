@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/domain/entities/task.dart' as entity;
 import 'package:app/domain/entities/brain_dump_result.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import '../../../core/di/providers.dart';
@@ -24,11 +26,16 @@ class CaptureScreen extends ConsumerStatefulWidget {
 class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final ImagePicker _imagePicker = ImagePicker();
 
   bool _isVoiceMode = false;
   String? _selectedProductId;
   String? _selectedAreaId;
   bool _isProcessing = false;
+  File? _selectedImage;
+
+  static const int _maxImageSizeBytes = 10 * 1024 * 1024; // 10MB
+  static const List<String> _allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
 
   @override
   void dispose() {
@@ -37,9 +44,98 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (image == null) return;
+
+      final file = File(image.path);
+
+      // Validate extension
+      final ext = image.path.split('.').last.toLowerCase();
+      if (!_allowedExtensions.contains(ext)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('僅支援 JPEG、PNG、WebP 格式')),
+          );
+        }
+        return;
+      }
+
+      // Validate file size
+      final fileSize = await file.length();
+      if (fileSize > _maxImageSizeBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('圖片大小不可超過 10MB')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _selectedImage = file;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('選取圖片失敗: $e')),
+        );
+      }
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
+
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('拍照'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('從相簿選取'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _submit() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    final hasImage = _selectedImage != null;
+    if (text.isEmpty && !hasImage) return;
 
     // AI consent check
     final hasConsent = ref.read(aiConsentProvider);
@@ -56,16 +152,22 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     try {
       final repo = ref.read(brainDumpRepositoryProvider);
 
-      String finalText = text;
-      if (_selectedProductId != null) {
-        final products = ref.read(productsUnwrappedProvider).valueOrNull;
-        final product = products?.firstWhere((p) => p.id == _selectedProductId);
-        if (product != null) {
-          finalText = "#${product.name} $text"; // Simple formatting strategy
-        }
-      }
-
-      final result = await repo.submit(finalText);
+      final result = hasImage
+          ? await repo.submitWithImage(
+              imageFile: _selectedImage!,
+              text: text,
+            )
+          : await () async {
+              String finalText = text;
+              if (_selectedProductId != null) {
+                final products = ref.read(productsUnwrappedProvider).valueOrNull;
+                final product = products?.firstWhere((p) => p.id == _selectedProductId);
+                if (product != null) {
+                  finalText = "#${product.name} $text";
+                }
+              }
+              return repo.submit(finalText);
+            }();
 
       result.fold(
         (fail) {
@@ -78,6 +180,9 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         (brainDumpResult) {
           if (mounted) {
             _textController.clear();
+            setState(() {
+              _selectedImage = null;
+            });
             // Dismiss keyboard
             FocusScope.of(context).unfocus();
             // 刷新任務列表
@@ -143,7 +248,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                       Text(
                         'AI 分析結果',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -202,10 +307,10 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Column(
@@ -216,8 +321,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                   Expanded(
                                     child: Text(
                                       item.title,
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface,
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -227,7 +332,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                   Icon(
                                     Icons.edit_outlined,
                                     size: 16,
-                                    color: Colors.white.withOpacity(0.3),
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                                   ),
                                 ],
                               ),
@@ -237,7 +342,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                 Text(
                                   item.narrative,
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.6),
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -376,7 +481,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   Text(
                     '已追加到既有任務',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -388,17 +493,17 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       info.targetTaskContent,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -445,8 +550,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     Expanded(
                       child: Text(
                         item,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 14,
                         ),
                       ),
@@ -861,16 +966,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                       children: [
                                         Icon(
                                           Icons.auto_awesome_outlined,
-                                          color: Colors.white.withOpacity(0.3),
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                                           size: 28,
                                         ),
                                         const SizedBox(height: 12),
                                         Text(
                                           '直接輸入即可，AI 會自動歸類',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(
-                                              0.5,
-                                            ),
+                                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                             fontSize: 14,
                                           ),
                                         ),
@@ -878,9 +981,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                                         Text(
                                           '或選擇 Area 後指定專案',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(
-                                              0.3,
-                                            ),
+                                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                                             fontSize: 12,
                                           ),
                                         ),
@@ -1010,103 +1111,175 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                               ),
                             ],
                           )
-                        : Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Input Field with glassmorphism
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.1),
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                  ),
-                                  child: TextField(
-                                    controller: _textController,
-                                    focusNode: _focusNode,
-                                    maxLines: 5,
-                                    minLines: 1,
-                                    style: const TextStyle(color: Colors.white),
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: "Type text...",
-                                      hintStyle: TextStyle(
-                                        color: Colors.white.withOpacity(0.4),
+                              // Image preview
+                              if (_selectedImage != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.file(
+                                          _selectedImage!,
+                                          height: 120,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                        ),
                                       ),
-                                    ),
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: GestureDetector(
+                                          onTap: _removeImage,
+                                          child: Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).colorScheme.inverseSurface.withValues(alpha: 0.6),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-
-                              // Action Button (Mic or Send) with glow
-                              ValueListenableBuilder<TextEditingValue>(
-                                valueListenable: _textController,
-                                builder: (context, value, child) {
-                                  final hasText = value.text.trim().isNotEmpty;
-                                  return GestureDetector(
-                                    onTap: hasText
-                                        ? (_isProcessing ? null : _submit)
-                                        : _toggleMode,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  // Image picker button
+                                  GestureDetector(
+                                    onTap: _isProcessing ? null : _showImageSourcePicker,
                                     child: Container(
-                                      width: 48,
-                                      height: 48,
+                                      width: 40,
+                                      height: 40,
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: hasText
-                                              ? [
-                                                  AppColors.primaryDeep,
-                                                  AppColors.primaryDark,
-                                                ]
-                                              : [
-                                                  AppColors.accentPink,
-                                                  AppColors.accentPinkDark,
-                                                ],
-                                        ),
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
                                         shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color:
-                                                (hasText
-                                                        ? const Color(
-                                                            0xFF7C3AED,
-                                                          )
-                                                        : const Color(
-                                                            0xFFEC4899,
-                                                          ))
-                                                    .withOpacity(0.4),
-                                            blurRadius: 12,
-                                            spreadRadius: 0,
-                                          ),
-                                        ],
+                                        border: Border.all(
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+                                        ),
                                       ),
-                                      child: _isProcessing
-                                          ? const Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      color: Colors.white,
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
-                                            )
-                                          : Icon(
-                                              hasText
-                                                  ? Icons.send_rounded
-                                                  : Icons.mic_rounded,
-                                              color: Colors.white,
-                                              size: 22,
-                                            ),
+                                      child: Icon(
+                                        _selectedImage != null
+                                            ? Icons.image
+                                            : Icons.camera_alt_outlined,
+                                        color: _selectedImage != null
+                                            ? AppColors.accentEmerald
+                                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                        size: 20,
+                                      ),
                                     ),
-                                  );
-                                },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Input Field with glassmorphism
+                                  Expanded(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.05),
+                                        borderRadius: BorderRadius.circular(24),
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.1),
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: TextField(
+                                        controller: _textController,
+                                        focusNode: _focusNode,
+                                        maxLines: 5,
+                                        minLines: 1,
+                                        style: const TextStyle(color: Colors.white),
+                                        decoration: InputDecoration(
+                                          border: InputBorder.none,
+                                          hintText: _selectedImage != null
+                                              ? "補充說明（可選）..."
+                                              : "Type text...",
+                                          hintStyle: TextStyle(
+                                            color: Colors.white.withOpacity(0.4),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // Action Button (Mic or Send) with glow
+                                  ValueListenableBuilder<TextEditingValue>(
+                                    valueListenable: _textController,
+                                    builder: (context, value, child) {
+                                      final hasText = value.text.trim().isNotEmpty;
+                                      final hasImage = _selectedImage != null;
+                                      final canSubmit = hasText || hasImage;
+                                      return GestureDetector(
+                                        onTap: canSubmit
+                                            ? (_isProcessing ? null : _submit)
+                                            : _toggleMode,
+                                        child: Container(
+                                          width: 48,
+                                          height: 48,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: canSubmit
+                                                  ? [
+                                                      AppColors.primaryDeep,
+                                                      AppColors.primaryDark,
+                                                    ]
+                                                  : [
+                                                      AppColors.accentPink,
+                                                      AppColors.accentPinkDark,
+                                                    ],
+                                            ),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color:
+                                                    (canSubmit
+                                                            ? const Color(
+                                                                0xFF7C3AED,
+                                                              )
+                                                            : const Color(
+                                                                0xFFEC4899,
+                                                              ))
+                                                        .withOpacity(0.4),
+                                                blurRadius: 12,
+                                                spreadRadius: 0,
+                                              ),
+                                            ],
+                                          ),
+                                          child: _isProcessing
+                                              ? const Center(
+                                                  child: SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          color: Colors.white,
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  ),
+                                                )
+                                              : Icon(
+                                                  canSubmit
+                                                      ? Icons.send_rounded
+                                                      : Icons.mic_rounded,
+                                                  color: Colors.white,
+                                                  size: 22,
+                                                ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1138,12 +1311,12 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         curve: Curves.easeInOut,
         decoration: BoxDecoration(
           // Glassmorphism: semi-transparent with blur
-          color: isSelected ? indigoBlue : Colors.white.withOpacity(0.05),
+          color: isSelected ? indigoBlue : Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? indigoBlue.withOpacity(0.8)
-                : Colors.white.withOpacity(0.15),
+                : Theme.of(context).colorScheme.outlineVariant,
             width: 1,
           ),
           // Subtle indigo glow for selected state (matching web)
@@ -1170,7 +1343,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 style: TextStyle(
                   color: isSelected
                       ? Colors.white
-                      : Colors.white.withOpacity(0.9),
+                      : Theme.of(context).colorScheme.onSurface,
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   letterSpacing: 0.3,

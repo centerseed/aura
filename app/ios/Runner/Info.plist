@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -45,6 +49,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>我們需要使用相機來拍攝照片，AI 將分析圖片內容並自動建立任務。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>我們需要存取您的相簿來選取圖片，AI 將分析圖片內容並自動建立任務。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>我們需要您的麥克風權限來進行語音輸入任務。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

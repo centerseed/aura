@@ -67,6 +67,9 @@ dependencies:
   # 語音輸入
   speech_to_text: ^7.0.0
   permission_handler: ^11.3.1
+
+  # 圖片選取
+  image_picker: ^1.1.2
   google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.4
   crypto: ^3.0.3

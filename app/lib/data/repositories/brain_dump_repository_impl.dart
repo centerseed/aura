@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dartz/dartz.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/brain_dump_result.dart';
@@ -15,55 +16,87 @@ class BrainDumpRepositoryImpl implements BrainDumpRepository {
     try {
       final request = BrainDumpRequest(text: text);
       final response = await _apiClient.brainDump(request);
-
-      // 使用 when 方法處理不同的回應類型
-      return response.when(
-        createNewTasks: (success, items) {
-          final result = BrainDumpResult(
-            success: success,
-            action: BrainDumpAction.createNewTasks,
-            items: items
-                .map(
-                  (item) => BrainDumpResultItem(
-                    id: item.id,
-                    title: item.title,
-                    narrative: item.narrative,
-                    drawer: item.drawer,
-                    areaName: item.tag.area,
-                    productName: item.tag.product,
-                    topicName: item.tag.topic,
-                    strategyUsed: item.strategyUsed,
-                    reasoning: item.reasoning,
-                    dueDate: item.dueDate != null
-                        ? DateTime.tryParse(item.dueDate!)
-                        : null,
-                    timeConfidence: item.timeConfidence,
-                    timeReasoning: null, // timeReasoning 已從 BrainDumpItem 移除
-                  ),
-                )
-                .toList(),
-          );
-          return Right(result);
-        },
-        appendSubItem: (success, targetTask, appendedSubItems, reasoning) {
-          // 對於 append sub-item 的情況，返回追加資訊
-          final result = BrainDumpResult(
-            success: success,
-            action: BrainDumpAction.appendSubItem,
-            items: [],
-            appendInfo: AppendSubItemInfo(
-              targetTaskId: targetTask.id,
-              targetTaskContent: targetTask.content,
-              targetProductName: targetTask.product,
-              appendedItems: appendedSubItems.map((s) => s.content).toList(),
-              reasoning: reasoning,
-            ),
-          );
-          return Right(result);
-        },
-      );
+      return Right(_mapResponse(response));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
+  }
+
+  @override
+  Future<Either<Failure, BrainDumpResult>> submitWithImage({
+    required File imageFile,
+    String text = '',
+  }) async {
+    try {
+      final mimeType = _getMimeType(imageFile.path);
+      final response = await _apiClient.brainDumpWithImage(
+        imagePath: imageFile.path,
+        mimeType: mimeType,
+        text: text,
+      );
+      return Right(_mapResponse(response));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  String _getMimeType(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  BrainDumpResult _mapResponse(BrainDumpResponse response) {
+    return response.when(
+      createNewTasks: (success, items) {
+        return BrainDumpResult(
+          success: success,
+          action: BrainDumpAction.createNewTasks,
+          items: items
+              .map(
+                (item) => BrainDumpResultItem(
+                  id: item.id,
+                  title: item.title,
+                  narrative: item.narrative,
+                  drawer: item.drawer,
+                  areaName: item.tag.area,
+                  productName: item.tag.product,
+                  topicName: item.tag.topic,
+                  strategyUsed: item.strategyUsed,
+                  reasoning: item.reasoning,
+                  dueDate: item.dueDate != null
+                      ? DateTime.tryParse(item.dueDate!)
+                      : null,
+                  timeConfidence: item.timeConfidence,
+                  timeReasoning: null,
+                ),
+              )
+              .toList(),
+        );
+      },
+      appendSubItem: (success, targetTask, appendedSubItems, reasoning) {
+        return BrainDumpResult(
+          success: success,
+          action: BrainDumpAction.appendSubItem,
+          items: [],
+          appendInfo: AppendSubItemInfo(
+            targetTaskId: targetTask.id,
+            targetTaskContent: targetTask.content,
+            targetProductName: targetTask.product,
+            appendedItems: appendedSubItems.map((s) => s.content).toList(),
+            reasoning: reasoning,
+          ),
+        );
+      },
+    );
   }
 }

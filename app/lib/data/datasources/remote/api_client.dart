@@ -237,6 +237,30 @@ class ApiClient {
     return BrainDumpResponse.fromJson(dataWithSuccess);
   }
 
+  Future<BrainDumpResponse> brainDumpWithImage({
+    required String imagePath,
+    required String mimeType,
+    String text = '',
+  }) async {
+    final inputType = text.isNotEmpty ? 'image_with_text' : 'image';
+    final formData = FormData.fromMap({
+      'image': await MultipartFile.fromFile(
+        imagePath,
+        contentType: DioMediaType.parse(mimeType),
+      ),
+      if (text.isNotEmpty) 'text': text,
+      'input_type': inputType,
+    });
+
+    final response = await _dio.post('/brain-dump', data: formData);
+    final data = response.data['data'] as Map<String, dynamic>;
+    final dataWithSuccess = {
+      'success': response.data['success'] ?? true,
+      ...data,
+    };
+    return BrainDumpResponse.fromJson(dataWithSuccess);
+  }
+
   // ==================== Auth ====================
 
   Future<Map<String, dynamic>> signIn(Map<String, dynamic> body) async {
