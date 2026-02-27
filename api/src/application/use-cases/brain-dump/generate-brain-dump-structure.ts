@@ -162,16 +162,17 @@ export class GenerateBrainDumpStructureUseCase {
           WHERE p.id = ${request.explicitProductId}::uuid AND p.deleted_at IS NULL
         `
       : vectorStr
-        ? prisma.$queryRaw<ProductCandidate[]>`
-            SELECT p.id::text, p.name, p.area_id::text,
-                   1 - (COALESCE(p.blueprint_embedding, p.embedding) <=> ${vectorStr}::vector) as similarity
-            FROM products p
-            WHERE p.user_id = ${request.userId}::uuid
-              AND p.deleted_at IS NULL
-              AND COALESCE(p.blueprint_embedding, p.embedding) IS NOT NULL
-            ORDER BY COALESCE(p.blueprint_embedding, p.embedding) <=> ${vectorStr}::vector
-            LIMIT 3
-          `
+        ? prisma.$queryRawUnsafe<ProductCandidate[]>(
+            `SELECT p.id::text, p.name, p.area_id::text,
+                    1 - (COALESCE(p.blueprint_embedding, p.embedding) <=> $1::vector) as similarity
+             FROM products p
+             WHERE p.user_id = $2::uuid
+               AND p.deleted_at IS NULL
+               AND COALESCE(p.blueprint_embedding, p.embedding) IS NOT NULL
+             ORDER BY COALESCE(p.blueprint_embedding, p.embedding) <=> $1::vector
+             LIMIT 3`,
+            vectorStr, request.userId
+          )
         : prisma.$queryRaw<ProductCandidate[]>`
             SELECT p.id::text, p.name, p.area_id::text, 1.0::float8 as similarity
             FROM products p

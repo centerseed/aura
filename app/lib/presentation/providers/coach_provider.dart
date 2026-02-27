@@ -68,6 +68,9 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
 
   CoachBriefingNotifier(this._repository, this._ref) : super(const CoachBriefingState());
 
+  /// Generation counter：forceRefresh 時遞增，讓舊的 _autoGeneratePlan 知道結果已過時
+  int _generation = 0;
+
   /// 根據時間自動判斷應該顯示晨報還是晚報
   BriefingType get currentBriefingType {
     final hour = DateTime.now().hour;
@@ -75,10 +78,15 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
   }
 
   /// 載入最新的 briefing + plan（三階段：今日 → 昨日快取 → 骨架屏+自動生成）
-  Future<void> loadLatest() async {
+  Future<void> loadLatest({bool forceRefresh = false}) async {
     if (state.isLoading) return;
-    // 如果已在背景生成中，不重複呼叫
-    if (state.isAutoGenerating) return;
+    if (state.isAutoGenerating && !forceRefresh) return;
+    // 強制刷新時重置所有 stale 狀態（如跨日後恢復 app）
+    // 遞增 generation，讓舊的 _autoGeneratePlan future 知道結果已過時
+    if (state.isAutoGenerating && forceRefresh) {
+      _generation++;
+      state = const CoachBriefingState();
+    }
 
     state = state.copyWith(isLoading: true, clearError: true);
 
@@ -153,7 +161,11 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
 
   /// 背景自動生成 plan，完成後更新 state
   Future<void> _autoGeneratePlan(CoachBriefing? briefing) async {
+    final myGeneration = _generation;
     final result = await _repository.generatePlan();
+
+    // 若 forceRefresh 已重置 generation，丟棄過時的結果
+    if (_generation != myGeneration) return;
 
     result.fold(
       (f) {
@@ -163,14 +175,33 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
           error: f.message,
         );
       },
-      (plan) {
-        state = CoachBriefingState(
-          briefing: state.briefing ?? briefing,
-          plan: plan,
-          isStale: false,
-          isAutoGenerating: false,
-        );
-      },
+      (plan) => _finalizePlanGeneration(plan, myGeneration),
+    );
+  }
+
+  /// plan 生成完成後，確保 briefing 與當前時段一致（防止保留舊的 evening briefing）
+  Future<void> _finalizePlanGeneration(DailyPlan plan, int myGeneration) async {
+    final currentType = currentBriefingType;
+    CoachBriefing? freshBriefing;
+
+    // 若 state.briefing 的 type 與當前時段相符，直接沿用（避免多餘 API 呼叫）
+    if (state.briefing != null && state.briefing!.type == currentType) {
+      freshBriefing = state.briefing;
+    } else {
+      // type 不符（e.g., 昨晚 evening → 今早 morning），重新 fetch 正確的 briefing
+      final result = await _repository.getLatestBriefing(type: currentType);
+
+      // 再次確認 generation，避免 getLatestBriefing 等待期間 forceRefresh 又介入
+      if (_generation != myGeneration) return;
+
+      result.fold((_) {}, (b) => freshBriefing = b);
+    }
+
+    state = CoachBriefingState(
+      briefing: freshBriefing,
+      plan: plan,
+      isStale: false,
+      isAutoGenerating: false,
     );
   }
 

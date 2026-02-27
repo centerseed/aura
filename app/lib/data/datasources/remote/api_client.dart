@@ -90,7 +90,9 @@ class ApiClient {
   Future<AreaModel> createArea(Map<String, dynamic> body) async {
     final response = await _dio.post('/areas', data: body);
     final data = response.data['data'] ?? response.data;
-    return AreaModel.fromJson(data);
+    // API returns { area: {...}, created, updated, message }
+    final areaData = data is Map && data.containsKey('area') ? data['area'] : data;
+    return AreaModel.fromJson(areaData);
   }
 
   // ==================== Products ====================
@@ -106,7 +108,9 @@ class ApiClient {
   Future<ProductModel> createProduct(Map<String, dynamic> body) async {
     final response = await _dio.post('/products', data: body);
     final data = response.data['data'] ?? response.data;
-    return ProductModel.fromJson(data);
+    // API returns { product: {...}, message }
+    final productData = data is Map && data.containsKey('product') ? data['product'] : data;
+    return ProductModel.fromJson(productData);
   }
 
   /// 更新 Product
@@ -135,6 +139,12 @@ class ApiClient {
     final dataWrapper = response.data['data'];
     final List<dynamic> topics = dataWrapper is Map ? (dataWrapper['topics'] ?? []) : dataWrapper;
     return topics.map((t) => {'id': t['id'] as String, 'name': t['name'] as String}).toList();
+  }
+
+  Future<Map<String, dynamic>> createTopic(String productId, String name) async {
+    final response = await _dio.post('/products/$productId/topics', data: {'name': name});
+    final data = response.data['data'] ?? response.data;
+    return {'id': data['id'] as String, 'name': data['name'] as String};
   }
 
   Future<Map<String, dynamic>> reorganizeProductTopics(String productId) async {
@@ -266,6 +276,11 @@ class ApiClient {
   Future<Map<String, dynamic>> signIn(Map<String, dynamic> body) async {
     final response = await _dio.post('/auth/signin', data: body);
     return response.data;
+  }
+
+  Future<String> getDebugToken(String uid) async {
+    final response = await _dio.post('/auth/debug-token', data: {'uid': uid});
+    return response.data['data']['token'] as String;
   }
 
   // ==================== User ====================

@@ -108,7 +108,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
     try {
       final payload = {
         'name': name,
-        'area_id': areaId,
+        'areaId': areaId,
         'description': '',
       };
       final model = await _apiClient.createProduct(payload);

@@ -1131,6 +1131,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
+                    key: const ValueKey('capture_input'),
                     controller: _textController,
                     autofocus: false,
                     style: TextStyle(color: colorScheme.onSurface, fontSize: 16),

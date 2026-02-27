@@ -17,22 +17,32 @@ model User {
   name                 String?               @db.VarChar
   auth_provider        AuthProvider          @default(EMAIL)
   auth_provider_id     String?               @db.VarChar
-  timezone             String?               @default("Asia/Taipei") @db.VarChar(50)
   settings             Json?                 @db.Json
+  timezone             String?               @default("Asia/Taipei") @db.VarChar(50)
+  plan_type            plantypeenum          @default(ATOM)
+  stripe_customer_id   String?               @db.VarChar
+  stripe_sub_id        String?               @db.VarChar
+  stripe_sub_status    substatusenum         @default(INACTIVE)
+  stripe_sub_end_at    DateTime?             @db.Timestamp(6)
+  trial_start_at       DateTime?             @db.Timestamp(6)
+  trial_end_at         DateTime?             @db.Timestamp(6)
+  ai_usage_count       Int                   @default(0)
+  ai_usage_reset_at    DateTime              @default(now()) @db.Timestamp(6)
   areas                Area[]
+  coach_briefings      CoachBriefing[]
+  daily_ai_usage       DailyAiUsage[]
+  daily_plans          DailyPlan[]
   governance_proposals GovernanceProposal[]
+  mcp_access_tokens    McpAccessToken[]
+  mcp_refresh_tokens   McpRefreshToken[]
   milestones           Milestone[]
+  oauth_tokens         OAuthToken[]
+  orders               orders[]
   products             Product[]
+  sub_tasks            SubTask[]
+  evaluation_logs      SystemEvaluationLog[]
   tasks                Task[]
   topics               Topic[]
-  evaluation_logs      SystemEvaluationLog[]
-  oauth_tokens         OAuthToken[]
-  coach_briefings      CoachBriefing[]
-  sub_tasks            SubTask[]
-  daily_plans          DailyPlan[]
-  mcp_refresh_tokens   McpRefreshToken[]
-  mcp_access_tokens    McpAccessToken[]
-  daily_ai_usage       DailyAiUsage[]
 
   @@index([auth_provider_id])
   @@index([auth_provider, auth_provider_id])
@@ -40,17 +50,17 @@ model User {
 }
 
 model OAuthToken {
-  id                String        @id @default(uuid()) @db.Uuid
-  user_id           String        @db.Uuid
-  provider          OAuthProvider
-  access_token      String        @db.VarChar
-  refresh_token     String?       @db.VarChar
-  expires_at        DateTime      @db.Timestamp(6)
-  scopes            String[]      @db.VarChar
-  authorized_email  String?       @db.VarChar
-  created_at        DateTime      @default(now()) @db.Timestamp(6)
-  updated_at        DateTime      @updatedAt @db.Timestamp(6)
-  user              User          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id               String        @id @default(uuid()) @db.Uuid
+  user_id          String        @db.Uuid
+  provider         OAuthProvider
+  access_token     String        @db.VarChar
+  refresh_token    String?       @db.VarChar
+  expires_at       DateTime      @db.Timestamp(6)
+  scopes           String[]      @db.VarChar
+  authorized_email String?       @db.VarChar
+  created_at       DateTime      @default(now()) @db.Timestamp(6)
+  updated_at       DateTime      @updatedAt @db.Timestamp(6)
+  user             User          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([user_id, provider])
   @@index([user_id])
@@ -78,27 +88,27 @@ model Area {
 }
 
 model Product {
-  id            String                 @id @default(uuid()) @db.Uuid
-  created_at    DateTime               @default(now()) @db.Timestamp(6)
-  updated_at    DateTime               @updatedAt @db.Timestamp(6)
-  deleted_at    DateTime?              @db.Timestamp(6)
-  user_id       String                 @db.Uuid
-  area_id       String                 @db.Uuid
-  name          String                 @db.VarChar
-  description   String?                @db.VarChar
-  status        Status
-  lifecycle     Lifecycle
-  embedding                Unsupported("vector")?
-  blueprint_text           String?                @db.Text
-  blueprint_embedding      Unsupported("vector")?
-  blueprint_updated_at     DateTime?              @db.Timestamp(6)
-  task_count_at_blueprint  Int                    @default(0)
-  display_order            Int                    @default(0)
-  references               Json                   @default("[]") @db.Json
-  area                     Area                   @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  user          User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tasks         Task[]
-  topics        Topic[]
+  id                      String                 @id @default(uuid()) @db.Uuid
+  created_at              DateTime               @default(now()) @db.Timestamp(6)
+  updated_at              DateTime               @updatedAt @db.Timestamp(6)
+  deleted_at              DateTime?              @db.Timestamp(6)
+  user_id                 String                 @db.Uuid
+  area_id                 String                 @db.Uuid
+  name                    String                 @db.VarChar
+  description             String?                @db.VarChar
+  status                  Status
+  lifecycle               Lifecycle
+  embedding               Unsupported("vector")?
+  display_order           Int                    @default(0)
+  references              Json                   @default("[]") @db.Json
+  blueprint_text          String?
+  blueprint_embedding     Unsupported("vector")?
+  blueprint_updated_at    DateTime?              @db.Timestamptz(6)
+  task_count_at_blueprint Int?                   @default(0)
+  area                    Area                   @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tasks                   Task[]
+  topics                  Topic[]
 
   @@index([user_id, deleted_at])
   @@index([area_id, deleted_at])
@@ -147,14 +157,14 @@ model Task {
   notification_id         Int?
   date_source             String?                @db.VarChar(10)
   completed_at            DateTime?              @db.Timestamp(6)
+  calendar_events         CalendarEvent[]
+  daily_plan_items        DailyPlanItem[]
+  reminders               ReminderConfig[]
+  sub_tasks               SubTask[]
+  ai_metadata             TaskAIMetadata?
   product                 Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   topic                   Topic?                 @relation(fields: [topic_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  ai_metadata             TaskAIMetadata?
-  calendar_events         CalendarEvent[]
-  reminders               ReminderConfig[]
-  sub_tasks               SubTask[]
-  daily_plan_items        DailyPlanItem[]
 
   @@index([product_id, deleted_at, status])
   @@index([user_id, deleted_at, status])
@@ -169,7 +179,7 @@ model Task {
 model TaskAIMetadata {
   id                       String    @id @default(uuid()) @db.Uuid
   task_id                  String    @unique @db.Uuid
-  time_inference_reasoning String?   @db.Text
+  time_inference_reasoning String?
   urgency_level            String?   @db.VarChar(20)
   reorganized_at           DateTime? @db.Timestamp(6)
   created_at               DateTime  @default(now()) @db.Timestamp(6)
@@ -221,6 +231,290 @@ model Milestone {
   @@map("milestones")
 }
 
+model SystemEvaluationLog {
+  id             String               @id @default(uuid()) @db.Uuid
+  user_id        String               @db.Uuid
+  type           EvaluationLogType
+  input_content  Json                 @db.Json
+  output_content Json                 @db.Json
+  user_action    EvaluationUserAction
+  metadata       Json?                @db.Json
+  created_at     DateTime             @default(now()) @db.Timestamp(6)
+  user           User                 @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id])
+  @@index([type])
+  @@index([user_action])
+  @@index([created_at])
+  @@index([user_id, type])
+  @@index([user_id, type, user_action])
+  @@map("system_evaluation_logs")
+}
+
+model CalendarEvent {
+  id                String           @id @default(uuid()) @db.Uuid
+  created_at        DateTime         @default(now()) @db.Timestamp(6)
+  updated_at        DateTime         @updatedAt @db.Timestamp(6)
+  deleted_at        DateTime?        @db.Timestamp(6)
+  user_id           String           @db.Uuid
+  task_id           String?          @db.Uuid
+  calendar_event_id String           @unique @db.VarChar
+  summary           String           @db.VarChar
+  description       String?
+  start_date_time   DateTime         @db.Timestamp(6)
+  end_date_time     DateTime         @db.Timestamp(6)
+  meet_link         String?          @db.VarChar
+  event_link        String           @db.VarChar
+  attendees         String[]         @default([]) @db.VarChar
+  task              Task?            @relation(fields: [task_id], references: [id], onUpdate: NoAction)
+  reminders         ReminderConfig[]
+
+  @@index([user_id, deleted_at])
+  @@index([task_id, deleted_at])
+  @@index([start_date_time])
+  @@map("calendar_events")
+}
+
+model ReminderConfig {
+  id                       String         @id @default(uuid()) @db.Uuid
+  created_at               DateTime       @default(now()) @db.Timestamp(6)
+  updated_at               DateTime       @updatedAt @db.Timestamp(6)
+  deleted_at               DateTime?      @db.Timestamp(6)
+  user_id                  String         @db.Uuid
+  task_id                  String?        @db.Uuid
+  calendar_event_id        String?        @db.Uuid
+  remind_at                DateTime       @db.Timestamp(6)
+  message                  String?        @db.VarChar
+  reminder_type            ReminderType
+  notification_id          Int?
+  calendar_remind_event_id String?        @db.VarChar
+  calendar_event           CalendarEvent? @relation(fields: [calendar_event_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  task                     Task?          @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, deleted_at])
+  @@index([task_id, deleted_at])
+  @@index([calendar_event_id, deleted_at])
+  @@index([remind_at])
+  @@index([user_id, reminder_type, remind_at])
+  @@map("reminder_configs")
+}
+
+model SubTask {
+  id                String          @id @default(uuid()) @db.Uuid
+  created_at        DateTime        @default(now()) @db.Timestamp(6)
+  updated_at        DateTime        @updatedAt @db.Timestamp(6)
+  deleted_at        DateTime?       @db.Timestamp(6)
+  task_id           String          @db.Uuid
+  user_id           String          @db.Uuid
+  content           String          @db.VarChar
+  completed         Boolean         @default(false)
+  completed_at      DateTime?       @db.Timestamp(6)
+  order             Int             @default(0)
+  start_date        DateTime?       @db.Timestamp(6)
+  due_date          DateTime?       @db.Timestamp(6)
+  estimated_minutes Int?
+  source            String          @default("user") @db.VarChar(20)
+  original_task_id  String?         @db.Uuid
+  daily_plan_items  DailyPlanItem[]
+  task              Task            @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user              User            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([task_id, deleted_at, order])
+  @@index([user_id, deleted_at, due_date])
+  @@index([user_id, deleted_at, completed])
+  @@map("sub_tasks")
+}
+
+model CoachBriefing {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime     @default(now()) @db.Timestamp(6)
+  updated_at        DateTime     @updatedAt @db.Timestamp(6)
+  user_id           String       @db.Uuid
+  type              BriefingType
+  briefing_date     DateTime     @db.Date
+  calendar_events   Json         @default("[]") @db.Json
+  overdue_tasks     Json         @default("[]") @db.Json
+  approaching_tasks Json         @default("[]") @db.Json
+  conflicts         Json         @default("[]") @db.Json
+  stagnations       Json         @default("[]") @db.Json
+  completed_tasks   Json         @default("[]") @db.Json
+  remaining_tasks   Json         @default("[]") @db.Json
+  tomorrow_preview  Json         @default("[]") @db.Json
+  summary           String
+  recommendations   Json         @default("[]") @db.Json
+  defer_suggestions Json         @default("[]") @db.Json
+  user              User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, type, briefing_date])
+  @@index([user_id, briefing_date])
+  @@index([user_id, type, created_at])
+  @@map("coach_briefings")
+}
+
+model DailyPlan {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime        @default(now()) @db.Timestamp(6)
+  updated_at        DateTime        @updatedAt @db.Timestamp(6)
+  user_id           String          @db.Uuid
+  plan_date         DateTime        @db.Date
+  coach_message     String?
+  capacity_note     String?
+  available_minutes Int?
+  meeting_minutes   Int?
+  planned_minutes   Int?
+  overflow_items    Json?
+  items             DailyPlanItem[]
+  user              User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, plan_date])
+  @@index([user_id, plan_date])
+  @@map("daily_plans")
+}
+
+model DailyPlanItem {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamp(6)
+  updated_at        DateTime  @updatedAt @db.Timestamp(6)
+  plan_id           String    @db.Uuid
+  task_id           String    @db.Uuid
+  sub_task_id       String?   @db.Uuid
+  content           String    @db.VarChar
+  area_name         String    @db.VarChar
+  product_name      String    @db.VarChar
+  estimated_minutes Int?
+  due_date          DateTime? @db.Timestamp(6)
+  order             Int
+  reasoning         String?
+  completed         Boolean   @default(false)
+  completed_at      DateTime? @db.Timestamp(6)
+  pinned            Boolean   @default(false)
+  deferred          Boolean   @default(false)
+  actual_minutes    Int?
+  item_type         String?   @default("subtask") @db.VarChar(10)
+  status            String    @default("today") @db.VarChar(10)
+  user_adjusted     Boolean   @default(false)
+  adjusted_at       DateTime? @db.Timestamp(6)
+  plan              DailyPlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  sub_task          SubTask?  @relation(fields: [sub_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  task              Task      @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([plan_id, order])
+  @@index([plan_id, status])
+  @@map("daily_plan_items")
+}
+
+model DailyAiUsage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  usage_date DateTime @db.Date
+  count      Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at DateTime @updatedAt @db.Timestamp(6)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, usage_date])
+  @@index([user_id, usage_date])
+  @@map("daily_ai_usage")
+}
+
+/// Temporary authorization codes for the MCP OAuth PKCE flow.
+/// Codes are single-use and expire after 10 minutes.
+model McpAuthCode {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code           String   @unique @db.VarChar(128)
+  user_id        String   @db.Uuid
+  client_id      String   @db.VarChar(200)
+  redirect_uri   String   @db.VarChar(2000)
+  code_challenge String   @db.VarChar(128)
+  scope          String   @db.VarChar(500)
+  expires_at     DateTime @db.Timestamp(6)
+  created_at     DateTime @default(now()) @db.Timestamp(6)
+  used           Boolean  @default(false)
+
+  @@index([code])
+  @@index([expires_at])
+  @@map("mcp_auth_codes")
+}
+
+/// Access tokens for MCP clients.
+/// Enables revocation tracking and sliding window expiry (last_used).
+model McpAccessToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token_hash String    @unique @db.VarChar(128)
+  user_id    String    @db.Uuid
+  client_id  String    @db.VarChar(200)
+  scope      String    @db.VarChar(500)
+  issued_at  DateTime  @db.Timestamp(6)
+  expires_at DateTime  @db.Timestamp(6)
+  last_used  DateTime? @db.Timestamp(6)
+  revoked_at DateTime? @db.Timestamp(6)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("mcp_access_tokens")
+}
+
+/// Long-lived refresh tokens for MCP clients.
+/// Access tokens are stateless JWTs; refresh tokens are stored for revocation.
+model McpRefreshToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token_hash String    @unique @db.VarChar(128)
+  user_id    String    @db.Uuid
+  client_id  String    @db.VarChar(200)
+  scope      String    @db.VarChar(500)
+  expires_at DateTime  @db.Timestamp(6)
+  created_at DateTime  @default(now()) @db.Timestamp(6)
+  revoked_at DateTime? @db.Timestamp(6)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("mcp_refresh_tokens")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model coaching_memory {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String
+  content      String
+  embedding    Unsupported("vector")?
+  metadata     Json?                  @default("{}")
+  created_at   DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?              @default(now()) @db.Timestamptz(6)
+  agent_type   String                 @default("rizo")
+  scope        String                 @default("shared")
+  category     String                 @default("general")
+  confidence   Float?                 @default(1.0)
+  source_event String?
+  expires_at   DateTime?              @db.Timestamptz(6)
+
+  @@index([user_id, category], map: "idx_memories_category")
+  @@index([user_id, agent_type], map: "idx_memories_user_agent")
+  @@index([user_id, scope], map: "idx_memories_user_scope")
+  @@index([embedding], map: "idx_memory_embedding")
+  @@index([user_id], map: "idx_memory_user_id")
+}
+
+model orders {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at       DateTime        @default(now()) @db.Timestamp(6)
+  updated_at       DateTime        @db.Timestamp(6)
+  user_id          String          @db.Uuid
+  gateway          paygatewayenum
+  gateway_order_id String?         @db.VarChar
+  amount           Int
+  currency         String          @default("usd") @db.VarChar(3)
+  status           orderstatusenum @default(PENDING)
+  plan_type        plantypeenum
+  metadata         Json?           @db.Json
+  users            User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([gateway_order_id])
+  @@index([status])
+  @@index([user_id])
+}
+
 enum Status {
   INBOX     @map("INBOX")
   ACTIVE    @map("ACTIVE")
@@ -267,6 +561,7 @@ enum EntityType {
 enum AuthProvider {
   EMAIL
   GOOGLE
+  ANONYMOUS
   APPLE
 
   @@map("authproviderenum")
@@ -297,102 +592,6 @@ enum EvaluationUserAction {
   @@map("evaluationuseractionenum")
 }
 
-model SystemEvaluationLog {
-  id             String               @id @default(uuid()) @db.Uuid
-  user_id        String               @db.Uuid
-  type           EvaluationLogType
-  input_content  Json                 @db.Json
-  output_content Json                 @db.Json
-  user_action    EvaluationUserAction
-  metadata       Json?                @db.Json
-  created_at     DateTime             @default(now()) @db.Timestamp(6)
-  user           User                 @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@index([user_id])
-  @@index([type])
-  @@index([user_action])
-  @@index([created_at])
-  @@index([user_id, type])
-  @@index([user_id, type, user_action])
-  @@map("system_evaluation_logs")
-}
-
-model CalendarEvent {
-  id                  String           @id @default(uuid()) @db.Uuid
-  created_at          DateTime         @default(now()) @db.Timestamp(6)
-  updated_at          DateTime         @updatedAt @db.Timestamp(6)
-  deleted_at          DateTime?        @db.Timestamp(6)
-  user_id             String           @db.Uuid
-  task_id             String?          @db.Uuid
-  calendar_event_id   String           @db.VarChar
-  summary             String           @db.VarChar
-  description         String?          @db.Text
-  start_date_time     DateTime         @db.Timestamp(6)
-  end_date_time       DateTime         @db.Timestamp(6)
-  meet_link           String?          @db.VarChar
-  event_link          String           @db.VarChar
-  attendees           String[]         @default([]) @db.VarChar
-  task                Task?            @relation(fields: [task_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  reminders           ReminderConfig[]
-
-  @@unique([calendar_event_id])
-  @@index([user_id, deleted_at])
-  @@index([task_id, deleted_at])
-  @@index([start_date_time])
-  @@map("calendar_events")
-}
-
-model ReminderConfig {
-  id                  String         @id @default(uuid()) @db.Uuid
-  created_at          DateTime       @default(now()) @db.Timestamp(6)
-  updated_at          DateTime       @updatedAt @db.Timestamp(6)
-  deleted_at          DateTime?      @db.Timestamp(6)
-  user_id             String         @db.Uuid
-  task_id             String?        @db.Uuid
-  calendar_event_id   String?        @db.Uuid
-  remind_at           DateTime       @db.Timestamp(6)
-  message             String?        @db.VarChar
-  reminder_type       ReminderType
-  notification_id     Int?
-  calendar_remind_event_id String?   @db.VarChar
-  task                Task?          @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  calendar_event      CalendarEvent? @relation(fields: [calendar_event_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([user_id, deleted_at])
-  @@index([task_id, deleted_at])
-  @@index([calendar_event_id, deleted_at])
-  @@index([remind_at])
-  @@index([user_id, reminder_type, remind_at])
-  @@map("reminder_configs")
-}
-
-model SubTask {
-  id                String    @id @default(uuid()) @db.Uuid
-  created_at        DateTime  @default(now()) @db.Timestamp(6)
-  updated_at        DateTime  @updatedAt @db.Timestamp(6)
-  deleted_at        DateTime? @db.Timestamp(6)
-  task_id           String    @db.Uuid
-  user_id           String    @db.Uuid
-  content           String    @db.VarChar
-  completed         Boolean   @default(false)
-  completed_at      DateTime? @db.Timestamp(6)
-  order             Int       @default(0)
-  start_date        DateTime? @db.Timestamp(6)
-  due_date          DateTime? @db.Timestamp(6)
-  estimated_minutes Int?
-  source            String    @default("user") @db.VarChar(20)
-  original_task_id  String?   @db.Uuid
-
-  task             Task            @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  user             User            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  daily_plan_items DailyPlanItem[]
-
-  @@index([task_id, deleted_at, order])
-  @@index([user_id, deleted_at, due_date])
-  @@index([user_id, deleted_at, completed])
-  @@map("sub_tasks")
-}
-
 enum ReminderType {
   CALENDAR_REMINDER
   LOCAL_NOTIFICATION
@@ -407,164 +606,25 @@ enum BriefingType {
   @@map("briefingtypeenum")
 }
 
-model CoachBriefing {
-  id                String       @id @default(uuid()) @db.Uuid
-  created_at        DateTime     @default(now()) @db.Timestamp(6)
-  updated_at        DateTime     @updatedAt @db.Timestamp(6)
-  user_id           String       @db.Uuid
-  type              BriefingType
-  briefing_date     DateTime     @db.Date
-
-  // 聚合資料快照 (JSON)
-  calendar_events   Json         @default("[]") @db.Json
-  overdue_tasks     Json         @default("[]") @db.Json
-  approaching_tasks Json         @default("[]") @db.Json
-  conflicts         Json         @default("[]") @db.Json
-  stagnations       Json         @default("[]") @db.Json
-  completed_tasks   Json         @default("[]") @db.Json
-  remaining_tasks   Json         @default("[]") @db.Json
-  tomorrow_preview  Json         @default("[]") @db.Json
-
-  // AI 生成內容
-  summary           String       @db.Text
-  recommendations   Json         @default("[]") @db.Json
-  defer_suggestions Json         @default("[]") @db.Json
-
-  user              User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@unique([user_id, type, briefing_date])
-  @@index([user_id, briefing_date])
-  @@index([user_id, type, created_at])
-  @@map("coach_briefings")
+enum orderstatusenum {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
 }
 
-model DailyPlan {
-  id                String          @id @default(uuid()) @db.Uuid
-  created_at        DateTime        @default(now()) @db.Timestamp(6)
-  updated_at        DateTime        @updatedAt @db.Timestamp(6)
-  user_id           String          @db.Uuid
-  plan_date         DateTime        @db.Date
-  coach_message     String?         @db.Text
-  capacity_note     String?         @db.Text
-  available_minutes Int?
-  meeting_minutes   Int?
-  planned_minutes   Int?
-  overflow_items    Json?           @db.JsonB
-
-  user              User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  items             DailyPlanItem[]
-
-  @@unique([user_id, plan_date])
-  @@index([user_id, plan_date])
-  @@map("daily_plans")
+enum paygatewayenum {
+  STRIPE
 }
 
-model DailyPlanItem {
-  id                String    @id @default(uuid()) @db.Uuid
-  created_at        DateTime  @default(now()) @db.Timestamp(6)
-  updated_at        DateTime  @updatedAt @db.Timestamp(6)
-  plan_id           String    @db.Uuid
-  task_id           String    @db.Uuid
-  sub_task_id       String?   @db.Uuid
-  content           String    @db.VarChar
-  area_name         String    @db.VarChar
-  product_name      String    @db.VarChar
-  estimated_minutes Int?
-  item_type         String    @default("subtask") @db.VarChar(10)
-  due_date          DateTime? @db.Date
-  order             Int
-  reasoning         String?   @db.Text
-  completed         Boolean   @default(false)
-  completed_at      DateTime? @db.Timestamp(6)
-  actual_minutes    Int?
-  pinned            Boolean   @default(false)
-  deferred          Boolean   @default(false)
-  status            String    @default("today") @db.VarChar(10)
-  user_adjusted     Boolean   @default(false)
-  adjusted_at       DateTime? @db.Timestamp(6)
-
-  plan              DailyPlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
-  task              Task      @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  sub_task          SubTask?  @relation(fields: [sub_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@index([plan_id, order])
-  @@index([plan_id, status])
-  @@map("daily_plan_items")
+enum plantypeenum {
+  ATOM
+  FUSION
+  NEXUS
 }
 
-// ─── AI Rate Limiting ───────────────────────────────────────
-
-model DailyAiUsage {
-  id         String   @id @default(uuid()) @db.Uuid
-  user_id    String   @db.Uuid
-  usage_date DateTime @db.Date
-  count      Int      @default(0)
-  created_at DateTime @default(now()) @db.Timestamp(6)
-  updated_at DateTime @updatedAt @db.Timestamp(6)
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@unique([user_id, usage_date])
-  @@index([user_id, usage_date])
-  @@map("daily_ai_usage")
-}
-
-// ─── MCP OAuth 2.1 ──────────────────────────────────────────
-
-/// Temporary authorization codes for the MCP OAuth PKCE flow.
-/// Codes are single-use and expire after 10 minutes.
-model McpAuthCode {
-  id                String   @id @default(uuid()) @db.Uuid
-  code              String   @unique @db.VarChar(128)
-  user_id           String   @db.Uuid
-  client_id         String   @db.VarChar(200)
-  redirect_uri      String   @db.VarChar(2000)
-  code_challenge    String   @db.VarChar(128)
-  scope             String   @db.VarChar(500)
-  expires_at        DateTime @db.Timestamp(6)
-  created_at        DateTime @default(now()) @db.Timestamp(6)
-  used              Boolean  @default(false)
-
-  @@index([code])
-  @@index([expires_at])
-  @@map("mcp_auth_codes")
-}
-
-/// Access tokens for MCP clients.
-/// Enables revocation tracking and sliding window expiry (last_used).
-model McpAccessToken {
-  id          String    @id @default(uuid()) @db.Uuid
-  token_hash  String    @unique @db.VarChar(128)
-  user_id     String    @db.Uuid
-  client_id   String    @db.VarChar(200)
-  scope       String    @db.VarChar(500)
-  issued_at   DateTime  @db.Timestamp(6)
-  expires_at  DateTime  @db.Timestamp(6)
-  last_used   DateTime? @db.Timestamp(6)
-  revoked_at  DateTime? @db.Timestamp(6)
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@index([expires_at])
-  @@map("mcp_access_tokens")
-}
-
-/// Long-lived refresh tokens for MCP clients.
-/// Access tokens are stateless JWTs; refresh tokens are stored for revocation.
-model McpRefreshToken {
-  id           String    @id @default(uuid()) @db.Uuid
-  token_hash   String    @unique @db.VarChar(128)
-  user_id      String    @db.Uuid
-  client_id    String    @db.VarChar(200)
-  scope        String    @db.VarChar(500)
-  expires_at   DateTime  @db.Timestamp(6)
-  created_at   DateTime  @default(now()) @db.Timestamp(6)
-  revoked_at   DateTime? @db.Timestamp(6)
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@index([expires_at])
-  @@map("mcp_refresh_tokens")
+enum substatusenum {
+  ACTIVE
+  INACTIVE
+  CANCELLED
 }

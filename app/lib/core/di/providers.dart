@@ -35,7 +35,10 @@ import '../../data/repositories/dashboard_repository_impl.dart';
 import '../../application/use_cases/add_product_reference_use_case.dart';
 import '../../application/use_cases/add_sub_item_use_case.dart';
 import '../../application/use_cases/apply_reorganization_use_case.dart';
+import '../../application/use_cases/create_area_use_case.dart';
+import '../../application/use_cases/create_product_use_case.dart';
 import '../../application/use_cases/create_task_use_case.dart';
+import '../../application/use_cases/create_topic_use_case.dart';
 import '../../application/use_cases/delete_product_reference_use_case.dart';
 import '../../application/use_cases/delete_product_use_case.dart';
 import '../../application/use_cases/delete_sub_item_use_case.dart';
@@ -336,6 +339,24 @@ final promoteSubItemUseCaseProvider = Provider<PromoteSubItemUseCase>((ref) {
 final reorderSubItemsUseCaseProvider = Provider<ReorderSubItemsUseCase>((ref) {
   final repository = ref.watch(taskRepositoryProvider);
   return ReorderSubItemsUseCase(repository);
+});
+
+/// Create Area Use Case Provider
+final createAreaUseCaseProvider = Provider<CreateAreaUseCase>((ref) {
+  final repository = ref.watch(areaRepositoryProvider);
+  return CreateAreaUseCase(repository);
+});
+
+/// Create Product Use Case Provider
+final createProductUseCaseProvider = Provider<CreateProductUseCase>((ref) {
+  final repository = ref.watch(productRepositoryProvider);
+  return CreateProductUseCase(repository);
+});
+
+/// Create Topic Use Case Provider
+final createTopicUseCaseProvider = Provider<CreateTopicUseCase>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return CreateTopicUseCase(apiClient);
 });
 
 /// Get Areas Use Case Provider

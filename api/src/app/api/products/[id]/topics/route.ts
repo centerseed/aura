@@ -41,3 +41,53 @@ export async function GET(
     );
   }
 }
+
+// POST /api/products/[id]/topics
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await authenticateRequest(request, prisma);
+    const { id: productId } = await params;
+
+    // Verify product belongs to user
+    const product = await prisma.product.findUnique({
+      where: { id: productId, user_id: userId, deleted_at: null },
+    });
+
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    const body = await request.json() as { name?: string };
+    const { name } = body;
+
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Name is required" },
+        { status: 400 }
+      );
+    }
+
+    const topic = await prisma.topic.create({
+      data: {
+        name: name.trim(),
+        user_id: userId,
+        product_id: productId,
+      },
+      select: { id: true, name: true },
+    });
+
+    return NextResponse.json({ data: topic }, { status: 201 });
+  } catch (error) {
+    if (error instanceof UnauthorizedException) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    console.error("Create topic failed:", error);
+    return NextResponse.json(
+      { error: "Failed to create topic" },
+      { status: 500 }
+    );
+  }
+}

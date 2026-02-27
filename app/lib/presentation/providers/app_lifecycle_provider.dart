@@ -87,7 +87,7 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
 
   /// 跨日偵測後的全面刷新
   void _onDayChanged() {
-    _triggerSilentRefresh();
+    _triggerSilentRefresh(forceRefresh: true);
     // invalidate 跨日失效的 providers
     _ref.invalidate(completedTodayTasksProvider);
   }
@@ -122,8 +122,8 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
     }
   }
 
-  void _triggerSilentRefresh() {
-    debugPrint('[AppLifecycle] Triggering silent refresh...');
+  void _triggerSilentRefresh({bool forceRefresh = false}) {
+    debugPrint('[AppLifecycle] Triggering silent refresh... forceRefresh=$forceRefresh');
 
     // 使用統一 Repository 觸發靜默刷新
     ((_ref.read(taskRepositoryProvider) as TaskUnifiedRepository))
@@ -134,7 +134,7 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
         .silentRefresh();
 
     // 刷新晨報/今日計劃（若今日尚未有資料則自動生成）
-    _ref.read(coachBriefingProvider.notifier).loadLatest();
+    _ref.read(coachBriefingProvider.notifier).loadLatest(forceRefresh: forceRefresh);
 
     // 確保 completedToday 也重新查詢
     _ref.invalidate(completedTodayTasksProvider);
@@ -144,7 +144,7 @@ class AppLifecycleNotifier extends StateNotifier<AppLifecycleData>
 
   /// 手動觸發刷新 (用於特殊場景)
   void forceRefresh() {
-    _triggerSilentRefresh();
+    _triggerSilentRefresh(forceRefresh: true);
   }
 }
 

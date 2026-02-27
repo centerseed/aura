@@ -163,6 +163,20 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, User>> signInWithCustomToken(String token) async {
+    try {
+      final credential = await _firebaseAuth.signInWithCustomToken(token);
+      if (credential.user == null) {
+        return Left(AuthFailure('Custom token sign in failed'));
+      }
+      await _syncWithBackend(credential.user!, provider: 'debug');
+      return Right(credential.user!);
+    } catch (e) {
+      return Left(AuthFailure(e.toString()));
+    }
+  }
+
   String _generateNonce([int length = 32]) {
     const charset =
         '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';

@@ -17,6 +17,9 @@ import '../../../../application/use_cases/add_sub_item_use_case.dart';
 import '../../../../application/use_cases/delete_sub_item_use_case.dart';
 import '../../../../application/use_cases/promote_sub_item_use_case.dart';
 import '../../../../application/use_cases/reorder_sub_items_use_case.dart';
+import '../../../../application/use_cases/create_area_use_case.dart';
+import '../../../../application/use_cases/create_product_use_case.dart';
+import '../../../../application/use_cases/create_topic_use_case.dart';
 import '../../../../application/use_cases/schedule_task_reminder_use_case.dart';
 import '../../../../application/use_cases/cancel_task_reminder_use_case.dart';
 import '../../../providers/area_provider.dart';
@@ -48,6 +51,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   late String? _selectedProductId;
   late String? _selectedTopicId;
   String? _selectedAreaId;
+
+  // 分類資料（本地狀態，避免在 build 中 ref.watch 導致 _dependents.isEmpty crash）
+  List<Area> _areas = [];
+  List<Product> _products = [];
+  bool _areasLoading = true;
+  bool _productsLoading = true;
 
   // Topic 選擇用
   List<Map<String, dynamic>> _availableTopics = [];
@@ -87,6 +96,9 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     if (_selectedProductId != null) {
       _fetchTopics(_selectedProductId!);
     }
+
+    // 載入 areas 和 products（用本地狀態避免 ref.watch crash）
+    _loadAreasAndProducts();
 
     // 監聽 cachedTasksStreamProvider，當同一 task 的 sub_items 有更新時同步
     // （因為 modal sheet 是獨立 Overlay，不受父層 widget tree 重建影響，
@@ -129,6 +141,42 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       }
     } catch (e) {
       // Silently fail - topics are optional
+    }
+  }
+
+  Future<void> _loadAreasAndProducts() async {
+    final apiClient = ref.read(apiClientProvider);
+    try {
+      final areaModels = await apiClient.getAreas();
+      if (mounted) {
+        setState(() {
+          _areas = areaModels.map((m) => m.toEntity()).toList();
+          _areasLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _areasLoading = false);
+    }
+
+    try {
+      final productModels = await apiClient.getProducts();
+      if (mounted) {
+        final products = productModels.map((m) => m.toEntity()).toList();
+        setState(() {
+          _products = products;
+          _productsLoading = false;
+          // 初始化 _selectedAreaId
+          if (_selectedAreaId == null && products.isNotEmpty && _selectedProductId != null) {
+            final currentProduct = products.firstWhere(
+              (p) => p.id == _selectedProductId,
+              orElse: () => products.first,
+            );
+            _selectedAreaId = currentProduct.areaId;
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _productsLoading = false);
     }
   }
 
@@ -807,44 +855,131 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     );
   }
 
+  // ========== 共用建立對話框 ==========
+
+  Future<String?> _showCreateDialog(String title, String hint) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          backgroundColor: cs.surfaceContainerHighest,
+          title: Text(title, style: TextStyle(color: cs.onSurface)),
+          content: TextField(
+            key: const ValueKey('create_dialog_input'),
+            controller: controller,
+            autofocus: true,
+            style: TextStyle(color: cs.onSurface),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)),
+            ),
+            onSubmitted: (value) {
+              if (value.trim().isNotEmpty) Navigator.pop(context, value.trim());
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.isNotEmpty) Navigator.pop(context, value);
+              },
+              child: const Text('建立'),
+            ),
+          ],
+        );
+      },
+    );
+    // Note: controller will be GC'd. Manual dispose here can cause
+    // _dependents.isEmpty crash if dialog close animation hasn't completed.
+    return result;
+  }
+
   // ========== 分類選擇器 ==========
 
   Future<void> _showAreaSelector(List<Area> areas) async {
-    final selected = await showModalBottomSheet<Area>(
+    const createSentinel = 'CREATE_NEW_AREA';
+    final selected = await showModalBottomSheet<Object>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       builder: (context) {
         final cs = Theme.of(context).colorScheme;
         return Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text("選擇領域", style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            ...areas.map((area) => ListTile(
-              leading: const Icon(Icons.category, color: AppColors.primary),
-              title: Text(area.name, style: TextStyle(color: cs.onSurface)),
-              selected: area.id == _selectedAreaId,
-              selectedTileColor: AppColors.primary.withValues(alpha: 0.2),
-              onTap: () => Navigator.pop(context, area),
-            )),
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+              title: Text('+ 新增領域', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(context, createSentinel),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: areas.map((area) => ListTile(
+                  leading: const Icon(Icons.category, color: AppColors.primary),
+                  title: Text(area.name, style: TextStyle(color: cs.onSurface)),
+                  selected: area.id == _selectedAreaId,
+                  selectedTileColor: AppColors.primary.withValues(alpha: 0.2),
+                  onTap: () => Navigator.pop(context, area),
+                )).toList(),
+              ),
+            ),
           ],
         ),
       );
       },
     );
-    if (selected != null) {
+    if (selected == createSentinel) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      await _handleCreateArea();
+    } else if (selected is Area) {
       setState(() {
         _selectedAreaId = selected.id;
         _selectedTopicId = null;
       });
-
     }
   }
 
+  Future<void> _handleCreateArea() async {
+    final name = await _showCreateDialog('新增領域', '輸入領域名稱');
+    if (name == null) return;
+    final useCase = ref.read(createAreaUseCaseProvider);
+    final result = await useCase(CreateAreaParams(name: name));
+    result.fold(
+      (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('建立失敗：${failure.message}')),
+          );
+        }
+      },
+      (area) {
+        if (!mounted) return;
+        setState(() {
+          _areas = [..._areas, area];
+          _selectedAreaId = area.id;
+          _selectedTopicId = null;
+        });
+      },
+    );
+  }
+
   Future<void> _showProductSelector(List<Product> products) async {
-    final selected = await showModalBottomSheet<Product>(
+    // Use a sentinel value to distinguish "create new" from dismiss
+    const createSentinel = 'CREATE_NEW';
+    final selected = await showModalBottomSheet<Object>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       builder: (context) {
@@ -856,6 +991,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
           children: [
             Text("選擇專案", style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline, color: AppColors.success),
+              title: Text('+ 新增專案', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(context, createSentinel),
+            ),
+            const Divider(height: 1),
             ...products.map((product) => ListTile(
               leading: const Icon(Icons.work_outline, color: AppColors.success),
               title: Text(product.name, style: TextStyle(color: cs.onSurface)),
@@ -868,7 +1009,11 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       );
       },
     );
-    if (selected != null) {
+    if (selected == createSentinel) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      await _handleCreateProduct();
+    } else if (selected is Product) {
       setState(() {
         _selectedProductId = selected.id;
         _selectedTopicId = null;
@@ -878,9 +1023,44 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     }
   }
 
+  Future<void> _handleCreateProduct() async {
+    if (_selectedAreaId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('請先選擇領域')),
+        );
+      }
+      return;
+    }
+    final name = await _showCreateDialog('新增專案', '輸入專案名稱');
+    if (name == null) return;
+    final useCase = ref.read(createProductUseCaseProvider);
+    final result = await useCase(CreateProductParams(name: name, areaId: _selectedAreaId!));
+    result.fold(
+      (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('建立失敗：${failure.message}')),
+          );
+        }
+      },
+      (product) {
+        if (!mounted) return;
+        setState(() {
+          _products = [..._products, product];
+          _selectedProductId = product.id;
+          _selectedTopicId = null;
+          _availableTopics = [];
+        });
+        _fetchTopics(product.id);
+      },
+    );
+  }
+
   Future<void> _showTopicSelector() async {
     final topics = _availableTopics;
-    final selected = await showModalBottomSheet<Map<String, dynamic>?>(
+    const createSentinel = 'CREATE_NEW_TOPIC';
+    final selected = await showModalBottomSheet<Object?>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       builder: (context) {
@@ -899,6 +1079,12 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               selectedTileColor: AppColors.statusMaintain.withValues(alpha: 0.2),
               onTap: () => Navigator.pop(context, <String, dynamic>{'id': null, 'name': '未分類'}),
             ),
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline, color: AppColors.statusMaintain),
+              title: Text('+ 新增主題', style: TextStyle(color: AppColors.statusMaintain, fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(context, createSentinel),
+            ),
+            const Divider(height: 1),
             ...topics.map((topic) => ListTile(
               leading: const Icon(Icons.label_outline, color: AppColors.statusMaintain),
               title: Text(topic['name'] as String, style: TextStyle(color: cs.onSurface)),
@@ -911,11 +1097,46 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       );
       },
     );
-    if (selected != null) {
+    if (selected == createSentinel) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      await _handleCreateTopic();
+    } else if (selected is Map<String, dynamic>) {
       setState(() {
         _selectedTopicId = selected['id'] as String?;
       });
     }
+  }
+
+  Future<void> _handleCreateTopic() async {
+    if (_selectedProductId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('請先選擇專案')),
+        );
+      }
+      return;
+    }
+    final name = await _showCreateDialog('新增主題', '輸入主題名稱');
+    if (name == null) return;
+    final useCase = ref.read(createTopicUseCaseProvider);
+    final result = await useCase(CreateTopicParams(productId: _selectedProductId!, name: name));
+    result.fold(
+      (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('建立失敗：${failure.message}')),
+          );
+        }
+      },
+      (topic) {
+        if (!mounted) return;
+        setState(() {
+          _availableTopics = [..._availableTopics, topic];
+          _selectedTopicId = topic['id'] as String?;
+        });
+      },
+    );
   }
 
   // ========== Build ==========
@@ -1294,33 +1515,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     );
   }
 
-  /// 分類 chips
+  /// 分類 chips（使用本地狀態，不用 ref.watch 避免 _dependents.isEmpty crash）
   Widget _buildCategoryChips() {
-    final areasAsync = ref.watch(areasProvider);
-    final productsAsync = ref.watch(productsProvider);
-
-    // 初始化 _selectedAreaId
-    if (_selectedAreaId == null) {
-      productsAsync.whenData((eitherProducts) {
-        eitherProducts.fold(
-          (_) {},
-          (products) {
-            if (products.isNotEmpty && _selectedProductId != null) {
-              final currentProduct = products.firstWhere(
-                (p) => p.id == _selectedProductId,
-                orElse: () => products.first,
-              );
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && _selectedAreaId == null) {
-                  setState(() => _selectedAreaId = currentProduct.areaId);
-                }
-              });
-            }
-          },
-        );
-      });
-    }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
@@ -1337,57 +1533,49 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               runSpacing: 6,
               children: [
                 // Area chip
-                areasAsync.when(
-                  data: (eitherAreas) => eitherAreas.fold(
-                    (_) => _buildChip('載入失敗', AppColors.error),
-                    (areas) {
-                      if (areas.isEmpty) return _buildChip('無領域', AppColors.statusArchive);
-                      if (_selectedAreaId == null) {
-                        return const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
-                      }
-                      final selectedArea = areas.firstWhere(
-                        (a) => a.id == _selectedAreaId,
-                        orElse: () => areas.first,
-                      );
-                      return _buildChip(selectedArea.name, AppColors.primary,
-                        onTap: () => _showAreaSelector(areas));
-                    },
-                  ),
-                  loading: () => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  error: (_, __) => _buildChip('載入失敗', AppColors.error),
-                ),
+                if (_areasLoading)
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                else if (_areas.isEmpty)
+                  _buildChip('無領域', AppColors.statusArchive)
+                else if (_selectedAreaId == null)
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  Builder(builder: (_) {
+                    final selectedArea = _areas.firstWhere(
+                      (a) => a.id == _selectedAreaId,
+                      orElse: () => _areas.first,
+                    );
+                    return _buildChip(selectedArea.name, AppColors.primary,
+                      onTap: () => _showAreaSelector(_areas));
+                  }),
                 // Product chip
-                productsAsync.when(
-                  data: (eitherProducts) => eitherProducts.fold(
-                    (_) => _buildChip('載入失敗', AppColors.error),
-                    (products) {
-                      if (_selectedAreaId == null) {
-                        return const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
-                      }
-                      final filtered = products.where((p) => p.areaId == _selectedAreaId).toList();
-                      if (filtered.isEmpty) return _buildChip('無專案', AppColors.statusArchive);
-                      final inArea = filtered.any((p) => p.id == _selectedProductId);
-                      if (!inArea) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
-                            setState(() {
-                              _selectedProductId = filtered.first.id;
-                              _selectedTopicId = null;
-                            });
-                          }
-                        });
-                      }
-                      final selected = filtered.firstWhere(
-                        (p) => p.id == _selectedProductId,
-                        orElse: () => filtered.first,
-                      );
-                      return _buildChip(selected.name, AppColors.success,
-                        onTap: () => _showProductSelector(filtered));
-                    },
-                  ),
-                  loading: () => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  error: (_, __) => _buildChip('載入失敗', AppColors.error),
-                ),
+                if (_productsLoading)
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                else if (_selectedAreaId == null)
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  Builder(builder: (_) {
+                    final filtered = _products.where((p) => p.areaId == _selectedAreaId).toList();
+                    if (filtered.isEmpty) return _buildChip('無專案', AppColors.statusArchive,
+                      onTap: () => _showProductSelector(filtered));
+                    final inArea = filtered.any((p) => p.id == _selectedProductId);
+                    if (!inArea && filtered.isNotEmpty) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() {
+                            _selectedProductId = filtered.first.id;
+                            _selectedTopicId = null;
+                          });
+                        }
+                      });
+                    }
+                    final selected = filtered.firstWhere(
+                      (p) => p.id == _selectedProductId,
+                      orElse: () => filtered.first,
+                    );
+                    return _buildChip(selected.name, AppColors.success,
+                      onTap: () => _showProductSelector(filtered));
+                  }),
                 // Topic chip
                 _buildChip(
                   _selectedTopicId != null

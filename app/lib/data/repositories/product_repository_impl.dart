@@ -34,7 +34,7 @@ class ProductRepositoryImpl implements ProductRepository {
     try {
       final payload = {
         'name': name,
-        'area_id': areaId,
+        'areaId': areaId,
         'description': '',
         // Default lifecycle and status handled by backend if omitted?
         // Or we might need to specify enum strings.

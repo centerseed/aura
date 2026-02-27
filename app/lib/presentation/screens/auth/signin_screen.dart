@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/di/providers.dart' show analyticsServiceProvider, taskUnifiedRepositoryProvider, areaRepositoryProvider, productRepositoryProvider;
+import '../../../core/di/providers.dart' show analyticsServiceProvider, taskUnifiedRepositoryProvider, areaRepositoryProvider, productRepositoryProvider, apiClientProvider;
 import '../../../data/repositories/unified/unified_repositories.dart';
 import '../../providers/auth_provider.dart';
 
@@ -36,6 +37,43 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     // Product cache
     final productRepo = ref.read(productRepositoryProvider) as ProductUnifiedRepository;
     productRepo.refresh();
+  }
+
+  static const _debugTestUid = 'HXa5Pnojnqe6z2eL80tGwkNZA5I3';
+
+  Future<void> _signInWithDebugToken() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final token = await apiClient.getDebugToken(_debugTestUid);
+
+      final authRepo = ref.read(authRepositoryProvider);
+      final result = await authRepo.signInWithCustomToken(token);
+
+      if (mounted) {
+        setState(() { _isLoading = false; });
+        result.fold(
+          (failure) {
+            setState(() { _errorMessage = failure.message; });
+          },
+          (user) {
+            _refreshAllCaches();
+            if (mounted) context.go('/splash');
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Debug login failed: $e';
+        });
+      }
+    }
   }
 
   Future<void> _signInWithApple() async {
@@ -236,6 +274,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                     style: TextStyle(fontSize: 16),
                                   ),
                                 ),
+                                if (kDebugMode) ...[
+                                  const SizedBox(height: 12),
+                                  OutlinedButton.icon(
+                                    key: const ValueKey('debug_login'),
+                                    onPressed: _signInWithDebugToken,
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.bug_report),
+                                    label: const Text(
+                                      'Debug 測試登入',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                       const SizedBox(height: 24),
