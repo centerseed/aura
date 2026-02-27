@@ -41,27 +41,11 @@ const hostname = process.env.HOSTNAME || "0.0.0.0";
 const port = parseInt(process.env.PORT || "3002", 10);
 
 /**
- * Session management for MCP connections.
- * Each session gets its own McpServer + transport pair because
- * McpServer.connect() replaces the previous transport (no concurrency support).
+ * MCP runs in stateless mode — no in-memory session store.
+ * Each request creates a fresh McpServer + transport, so Cloud Run
+ * cold starts and scale-to-zero never cause "session_not_found" errors.
+ * Auth is handled per-request via Bearer token (stored in DB).
  */
-const mcpSessions = new Map<
-  string,
-  { transport: StreamableHTTPServerTransport; createdAt: number }
->();
-
-const SESSION_TTL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days (matching access token TTL)
-const MAX_SESSIONS = 100;
-
-function cleanupStaleSessions() {
-  const now = Date.now();
-  for (const [id, session] of mcpSessions) {
-    if (now - session.createdAt > SESSION_TTL_MS) {
-      session.transport.close?.();
-      mcpSessions.delete(id);
-    }
-  }
-}
 
 /**
  * Extract Bearer token from Authorization header and attach as req.auth
@@ -87,11 +71,7 @@ async function main() {
   const handleNextRequest = app.getRequestHandler();
   await app.prepare();
 
-  console.log(`[server] Starting Zentropy API + MCP Server...`);
-
-  // Periodic session cleanup (every 5 minutes)
-  const cleanupInterval = setInterval(cleanupStaleSessions, 5 * 60 * 1000);
-  cleanupInterval.unref();
+  console.log(`[server] Starting Zentropy API + MCP Server (stateless mode)...`);
 
   // 3. Create unified HTTP server
   const httpServer = createHttpServer(async (req, res) => {
@@ -120,76 +100,28 @@ async function main() {
             db: dbStatus,
             dbLatencyMs,
             mcp: true,
-            activeSessions: mcpSessions.size,
+            mcpMode: "stateless",
             timestamp: new Date().toISOString(),
           }),
         );
         return;
       }
 
-      // ── MCP Endpoint (Streamable HTTP) ────────────────
+      // ── MCP Endpoint (Stateless Streamable HTTP) ──────
       if (pathname === "/mcp") {
-        console.log(`[mcp] ${req.method} /mcp | auth header present: ${!!req.headers.authorization} | session: ${req.headers["mcp-session-id"] || "none"}`);
-        // Check for existing session
-        const sessionId = req.headers["mcp-session-id"] as string | undefined;
+        console.log(`[mcp] ${req.method} /mcp | auth header present: ${!!req.headers.authorization}`);
 
-        if (sessionId && mcpSessions.has(sessionId)) {
-          // Reuse existing session's transport
-          const session = mcpSessions.get(sessionId)!;
-
-          // Attach auth info to req so SDK passes it to tool handlers via extra.authInfo
-          attachAuthInfo(req);
-          await session.transport.handleRequest(req, res);
-          return;
-        }
-
-        // Session ID provided but not found — tell client to reinitialize.
-        // DO NOT fall through to create a new transport: the new transport would reject
-        // the request (wrong session ID) and return a confusing "Server not initialized" error.
-        if (sessionId) {
-          console.log(`[mcp] Session ${sessionId} not found (expired or server restarted). Returning 404.`);
-          res.writeHead(404, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({
-            error: "session_not_found",
-            message: "MCP session expired or not found. Please reconnect (send a fresh initialize).",
-          }));
-          return;
-        }
-
-        // Enforce session limit to prevent resource exhaustion
-        if (mcpSessions.size >= MAX_SESSIONS) {
-          cleanupStaleSessions();
-          if (mcpSessions.size >= MAX_SESSIONS) {
-            res.writeHead(503, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: "too_many_sessions", message: "Server session limit reached. Try again later." }));
-            return;
-          }
-        }
-
-        // New session: create dedicated McpServer + transport
+        // Stateless: each request gets a fresh McpServer + transport
         const mcpServer = createMcpServer({ port });
         const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => crypto.randomUUID(),
+          sessionIdGenerator: undefined, // stateless — no session tracking
         });
 
-        // Clean up when transport closes
-        transport.onclose = () => {
-          const sid = transport.sessionId;
-          if (sid) mcpSessions.delete(sid);
-          mcpServer.close();
-        };
+        transport.onclose = () => mcpServer.close();
 
         await mcpServer.connect(transport);
-
-        // Attach auth info to req so SDK passes it to tool handlers via extra.authInfo
         attachAuthInfo(req);
         await transport.handleRequest(req, res);
-
-        // Store session for reuse
-        const sid = transport.sessionId;
-        if (sid) {
-          mcpSessions.set(sid, { transport, createdAt: Date.now() });
-        }
         return;
       }
 
@@ -313,11 +245,6 @@ async function main() {
   // Graceful shutdown
   const shutdown = () => {
     console.log("\n[server] Shutting down...");
-    // Close all MCP sessions
-    for (const [id, session] of mcpSessions) {
-      session.transport.close?.();
-      mcpSessions.delete(id);
-    }
     httpServer.close(() => {
       process.exit(0);
     });
