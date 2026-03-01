@@ -24,6 +24,7 @@ export default function HomeDemo() {
   const isDark = !mounted || resolvedTheme === "dark";
 
   const [activeDemoTab, setActiveDemoTab] = useState(0);
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [currentUser, setCurrentUser] = useState<{ uid: string; email?: string; name?: string } | null>(null);
   const [hasLibraryData, setHasLibraryData] = useState(false);
@@ -125,11 +126,11 @@ export default function HomeDemo() {
       name: "自動分類",
       icon: Sparkles,
       scenario: {
-        input: "下週要見投資人",
+        input: "老闆說下週要提案，但客戶又約週五開會",
         category: "Active",
         icon: Zap,
         color: "amber",
-        result: "自動設定提醒、加入日曆、準備相關資料"
+        result: "自動識別衝突、設定提醒、加入日曆"
       }
     },
     {
@@ -137,14 +138,15 @@ export default function HomeDemo() {
       name: "零碎整理",
       icon: ListTodo,
       scenario: {
-        input: "明天要打電話給客戶\n記得準備簡報\n下午3點開會",
+        input: "想寫 Substack 但又要記得繳健保\n靈感：新專案用 AI 工具\n下週要提案",
         category: "TodoList",
         icon: ListTodo,
         color: "blue",
         outputItems: [
-          { text: "打電話給客戶", time: "明天", priority: "高" },
-          { text: "準備簡報", time: "明天", priority: "中" },
-          { text: "參加會議", time: "下午 3:00", priority: "高" }
+          { text: "寫 Substack 文章", time: "本週" },
+          { text: "繳健保費", time: "本月底" },
+          { text: "研究 AI 工具新專案", time: "靈感存檔" },
+          { text: "準備下週提案", time: "下週" }
         ]
       }
     },
@@ -383,16 +385,22 @@ export default function HomeDemo() {
 
             <div className="space-y-3 max-w-2xl">
               <p className={`text-2xl md:text-3xl font-semibold ${theme.text} leading-relaxed`}>
-                讓一切井然有序
+                幫你管住混亂
+              </p>
+              <p className={`text-xl md:text-2xl font-bold ${isDark ? "text-indigo-300" : "text-indigo-600"} leading-relaxed`}>
+                腦袋爆炸的上班/斜槓族的 AI 救星
               </p>
               <p className={`text-base md:text-lg ${theme.textMuted} leading-relaxed`}>
-                你的 AI 營運長——讓一人多角的你，不再害怕漏掉任何事。
+                上班寫報告、下班接案、週末拍影片⋯⋯所有想法隨手丟進來，AI 自動分類、排程、預警，你什麼都不用管。
+              </p>
+              <p className={`text-xs ${isDark ? "text-emerald-400/80" : "text-emerald-700"} mt-4 font-medium`}>
+                已幫助 500+ 斜槓族每天省 80% 整理時間｜限時 Fusion 免費升級
               </p>
             </div>
           </div>
 
           {/* 🎯 互動式演示區 - Brain Dump 體驗 */}
-          <div className="max-w-5xl w-full mb-20">
+          <div id="demo-showcase" className="max-w-5xl w-full mb-20">
             <div
               className={`relative p-8 md:p-12 rounded-3xl overflow-hidden ${isDark ? "border border-white/20 bg-white/5 backdrop-blur-xl shadow-2xl shadow-indigo-500/10" : ""}`}
               style={isDark ? {} : { background: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 25px 60px -15px rgba(0,0,0,0.08), 0 10px 25px -10px rgba(0,0,0,0.04)" }}
@@ -411,10 +419,10 @@ export default function HomeDemo() {
                     </span>
                   </div>
                   <h3 className={`text-2xl md:text-3xl font-bold ${theme.text}`}>
-                    AI 如何整理你的思緒
+                    腦袋爆炸？看 AI 3 秒幫你管住混亂
                   </h3>
                   <p className={`text-sm ${theme.textMuted}`}>
-                    點擊下方任一想法，看系統如何瞬間分類與組織
+                    只要把想法倒出來，AI 全部幫你治理
                   </p>
                 </div>
 
@@ -446,8 +454,26 @@ export default function HomeDemo() {
                 <div className="max-w-2xl mx-auto">
                   {/* 輸入示例（靜態顯示） */}
                   <div className="mb-6">
-                    <div className={`text-xs uppercase tracking-wider ${theme.textMutedDarker} font-semibold mb-3 text-center`}>
-                      📝 隨意輸入
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <span className={`text-xs uppercase tracking-wider ${theme.textMutedDarker} font-semibold`}>
+                        📝 隨意輸入
+                      </span>
+                      <span className={`text-xs ${theme.textMutedDarker}`}>—</span>
+                      {[
+                        { icon: "⌨️", label: "文字" },
+                        { icon: "🖼️", label: "圖片" },
+                        { icon: "🎙️", label: "語音" },
+                      ].map((m) => (
+                        <span
+                          key={m.label}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDark
+                            ? "bg-indigo-500/15 border border-indigo-400/30 text-indigo-300"
+                            : "bg-indigo-50 border border-indigo-200 text-indigo-600"
+                          }`}
+                        >
+                          {m.icon} {m.label}
+                        </span>
+                      ))}
                     </div>
                     <div className={`p-5 rounded-2xl ${isDark ? "bg-white/5" : "bg-indigo-50/50"} border-2 ${isDark ? "border-indigo-400/30" : "border-indigo-300"}`}>
                       <div className="flex items-center gap-3">
@@ -515,27 +541,29 @@ export default function HomeDemo() {
                         Briefing: "📅 Coach 晨報"
                       };
 
-                      // Tab 0: 自動分類 - 顯示分類卡片
+                      // Tab 0: 自動分類 - 顯示分類卡片（對齊真實 app UI）
                       if (activeDemoTab === 0 && 'result' in scenario) {
                         return (
                           <div
-                            className={`p-6 rounded-2xl border-2 transition-all transform scale-105 ${colors.border} bg-gradient-to-br ${colors.bg} to-transparent shadow-xl ${colors.shadow}`}
+                            className={`p-6 rounded-2xl border-2 ${colors.border} shadow-xl ${colors.shadow}`}
+                            style={isDark
+                              ? { background: "rgba(251,191,36,0.08)" }
+                              : { background: "#fffbeb", border: "2px solid #fbbf24" }
+                            }
                           >
-                            <div className="flex items-start gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${colors.iconBg}`}>
-                                <ActiveIcon className={`w-6 h-6 ${colors.iconText}`} />
+                            <div className="flex items-start gap-5">
+                              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${colors.iconBg}`}>
+                                <ActiveIcon className={`w-7 h-7 ${colors.iconText}`} />
                               </div>
                               <div className="flex-1 min-w-0 space-y-3">
-                                <div>
-                                  <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${colors.text}`}>
-                                    {categoryLabels[scenario.category]}
-                                  </div>
-                                  <div className={`text-sm font-medium ${theme.text} mb-2`}>
-                                    {scenario.input}
-                                  </div>
+                                <div className={`text-xs font-bold uppercase tracking-wider ${colors.text}`}>
+                                  {categoryLabels[scenario.category]}
                                 </div>
-                                <div className={`text-sm ${theme.textMutedLighter} flex items-start gap-2`}>
-                                  <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                <div className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"} leading-snug`}>
+                                  {scenario.input}
+                                </div>
+                                <div className={`text-sm ${theme.textMutedLighter} flex items-center gap-2`}>
+                                  <Check className="w-4 h-4 flex-shrink-0" />
                                   <span>{scenario.result}</span>
                                 </div>
                               </div>
@@ -544,43 +572,58 @@ export default function HomeDemo() {
                         );
                       }
 
-                      // Tab 1: 零碎整理 - 顯示待辦清單
+                      // Tab 1: 零碎整理 - 顯示待辦清單（對齊真實 app UI）
                       if (activeDemoTab === 1 && 'outputItems' in scenario) {
                         return (
-                          <div className={`space-y-3 p-6 rounded-2xl border-2 ${colors.border} bg-gradient-to-br ${colors.bg} to-transparent shadow-xl ${colors.shadow}`}>
-                            <div className={`flex items-center gap-2 mb-4`}>
-                              <ActiveIcon className={`w-5 h-5 ${colors.iconText}`} />
-                              <span className={`text-sm font-bold ${colors.text}`}>AI 智能拆解</span>
+                          <div
+                            className="rounded-2xl overflow-hidden shadow-lg"
+                            style={isDark
+                              ? { border: "1px solid rgba(99,102,241,0.4)", background: "rgba(25,26,45,0.95)" }
+                              : { border: "1px solid #c7d2fe", background: "#ffffff" }
+                            }
+                          >
+                            {/* 標題列 */}
+                            <div
+                              className="flex items-center gap-2 px-5 py-3.5"
+                              style={isDark ? { borderBottom: "1px solid rgba(255,255,255,0.08)" } : { borderBottom: "1px solid #e0e7ff" }}
+                            >
+                              <ActiveIcon className={`w-5 h-5 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
+                              <span className={`text-sm font-bold ${isDark ? "text-indigo-400" : "text-indigo-700"}`}>AI 智能拆解</span>
                             </div>
-                            {scenario.outputItems?.map((item: any, i: number) => (
-                              <div
-                                key={i}
-                                className={`flex items-start gap-3 p-3 rounded-lg ${isDark ? "bg-white/5" : "bg-white"} border ${theme.borderLight} hover:scale-105 transition-transform`}
-                              >
-                                <div className={`w-5 h-5 rounded border-2 ${colors.border} flex-shrink-0 mt-0.5`} />
-                                <div className="flex-1 min-w-0">
-                                  <div className={`text-sm font-medium ${theme.text} mb-1`}>
-                                    {item.order && <span className="mr-2">{item.order}</span>}
-                                    {item.text}
-                                  </div>
-                                  <div className="flex items-center gap-3 text-xs">
+                            {/* 每個 item — 橫線分隔，不是獨立卡片 */}
+                            <div>
+                              {scenario.outputItems?.map((item: any, i: number) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center gap-4 px-5 py-4"
+                                  style={i < (scenario.outputItems?.length ?? 0) - 1
+                                    ? isDark
+                                      ? { borderBottom: "1px solid rgba(255,255,255,0.06)" }
+                                      : { borderBottom: "1px solid #f1f5f9" }
+                                    : {}
+                                  }
+                                >
+                                  {/* 大圓角 checkbox */}
+                                  <div
+                                    className="flex-shrink-0 rounded-xl"
+                                    style={{
+                                      width: 36, height: 36,
+                                      border: isDark ? "2px solid rgba(99,102,241,0.5)" : "2px solid #a5b4fc"
+                                    }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className={`text-base font-bold mb-1 ${isDark ? "text-white" : "text-slate-900"}`}>
+                                      {item.text}
+                                    </div>
                                     {item.time && (
-                                      <span className={`${theme.textMutedDarker}`}>
+                                      <span className={`flex items-center gap-1 text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                                         📅 {item.time}
-                                      </span>
-                                    )}
-                                    {item.priority && (
-                                      <span className={`px-2 py-0.5 rounded ${item.priority === "高"
-                                        ? isDark ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-700"
-                                        : isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"
-                                        }`}>
-                                        {item.priority}
                                       </span>
                                     )}
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         );
                       }
@@ -781,7 +824,7 @@ export default function HomeDemo() {
                 </div>
 
                 {/* 底部說明 */}
-                <div className={`text-center pt-6 border-t ${theme.borderLight}`}>
+                <div className={`text-center pt-6 border-t ${theme.borderLight} space-y-2`}>
                   <p className={`text-sm ${theme.textMuted} leading-relaxed`}>
                     {activeDemoTab === 0 && (
                       <>✨ <strong>AI 自動識別優先級、自動建立關聯、自動提醒</strong> — 你只需要倒出腦中的想法</>
@@ -795,6 +838,9 @@ export default function HomeDemo() {
                     {activeDemoTab === 3 && (
                       <>📅 <strong>每日 8:30 自動分析全局、偵測衝突、標記停滯</strong> — 不是你管系統，是系統幫你管全局</>
                     )}
+                  </p>
+                  <p className={`text-xs ${theme.textMutedDarker} italic`}>
+                    不是幫你做事，而是幫你管住腦袋不亂 — 零治理、零壓力。
                   </p>
                 </div>
               </div>
@@ -823,203 +869,150 @@ export default function HomeDemo() {
 
           {/* CTA */}
           {!showAuthPanel && (
-            <button
-              onClick={() => setShowAuthPanel(true)}
-              className={`group inline-flex items-center gap-3 px-8 py-4 rounded-xl
-                font-semibold text-lg transition-all duration-300 hover:gap-4 hover:scale-105
-                hover:shadow-2xl hover:shadow-indigo-500/30 ${isDark
-                  ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white border-2 border-emerald-400/40 hover:border-emerald-400/80"
-                  : "border-2 border-indigo-700/20 shadow-lg"
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <button
+                onClick={() => setShowAuthPanel(true)}
+                className={`group inline-flex items-center gap-3 px-8 py-4 rounded-xl
+                  font-semibold text-lg transition-all duration-300 hover:gap-4 hover:scale-105
+                  hover:shadow-2xl hover:shadow-indigo-500/30 ${isDark
+                    ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white border-2 border-emerald-400/40 hover:border-emerald-400/80"
+                    : "border-2 border-indigo-700/20 shadow-lg"
+                  }`}
+                style={isDark ? {} : { background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "#fff" }}
+              >
+                免費即時體驗
+                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              </button>
+              <a
+                href="#demo-showcase"
+                className={`inline-flex items-center gap-2 px-6 py-4 rounded-xl font-semibold text-base transition-all duration-300 hover:scale-105 ${isDark
+                  ? "border-2 border-white/20 text-white/80 hover:border-white/40 hover:text-white bg-white/5"
+                  : "border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-700 bg-white"
                 }`}
-              style={isDark ? {} : { background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "#fff" }}
-            >
-              立即開始體驗
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </button>
+              >
+                看 60 秒治理前後對比
+              </a>
+            </div>
           )}
         </div>
 
         {/* 功能詳情 Section */}
-        <div className="relative min-h-screen flex items-center py-20 px-6">
+        <div className="relative py-20 px-6">
           <div className="max-w-6xl mx-auto w-full space-y-24">
 
-            {/* 功能: 不失控的優先級管理 - 場景化展示 */}
-            <div className="space-y-12">
-              <div className="text-center space-y-4">
-                <div className={`text-xs uppercase tracking-widest ${isDark ? "text-emerald-400" : "text-emerald-600"} font-semibold`}>三大分類系統</div>
-                <h2 className={`text-4xl md:text-5xl font-bold ${theme.text} leading-tight`}>不失控的優先級管理</h2>
-                <p className={`${theme.textMuted} max-w-2xl mx-auto text-lg`}>
-                  系統自動識別哪些是緊急衝刺、哪些是日常維護、哪些是知識參考
+            {/* 統一功能 Section: AI 全局治理 */}
+            <div className="space-y-14">
+              <div className="text-center space-y-5">
+                <div className={`text-xs uppercase tracking-widest ${isDark ? "text-indigo-400" : "text-indigo-600"} font-semibold`}>AI 全局治理</div>
+                <h2 className={`text-4xl md:text-5xl font-bold ${theme.text} leading-tight`}>
+                  不失控的優先級管理 —<br className="hidden md:block" />
+                  <span className={isDark ? "text-emerald-400" : "text-emerald-600"}>你睡覺，AI 幫你盯住一切</span>
+                </h2>
+                <p className={`${theme.textMuted} max-w-2xl mx-auto text-lg leading-relaxed`}>
+                  你的 AI 大腦管家，主動掃描全局、自動分類優先級、預警衝突與停滯。<br />
+                  <span className={`font-semibold ${isDark ? "text-white/80" : "text-slate-700"}`}>零手動，腦袋從此不爆炸。</span>
                 </p>
               </div>
 
-              {/* 三大分類 - 視覺化卡片 */}
-              <div className="grid md:grid-cols-3 gap-6">
+              {/* 三張卡片連成一體的橫幅 */}
+              <div
+                className="grid md:grid-cols-3 rounded-3xl overflow-hidden border shadow-xl"
+                style={isDark
+                  ? { background: "rgba(15,16,30,0.8)", borderColor: "rgba(255,255,255,0.1)" }
+                  : { background: "#f8f9ff", borderColor: "#e2e8f0" }
+                }
+              >
                 {[
                   {
-                    icon: Zap,
-                    title: "衝刺 Active",
-                    subtitle: "緊急事項",
-                    desc: "有期限、需主動推進的任務",
-                    examples: ["產品上線倒數", "融資截止日", "重要客戶會議"],
-                    color: isDark ? "amber" : "amber",
-                    bgGradient: isDark ? "from-amber-500/20 to-transparent" : "from-amber-50 to-white",
-                    borderColor: isDark ? "border-amber-500/40" : "border-amber-400"
+                    emoji: "🗂️",
+                    title: "三大分類系統",
+                    subtitle: "自動把想法丟進對的 bucket，不再手動拖拉",
+                    points: [
+                      "衝刺 Active — 緊急有期限的任務",
+                      "維護 Maintain — 日常營運異常亮燈",
+                      "參考 Reference — 知識庫 AI 自動推薦"
+                    ],
+                    result: "優先級一目了然，斜槓日常不崩",
+                    color: "amber"
                   },
                   {
-                    icon: RefreshCw,
-                    title: "維護 Maintain",
-                    subtitle: "日常營運",
-                    desc: "穩定營運、異常時亮燈",
-                    examples: ["客戶回覆流程", "定期財務檢查", "日常行政作業"],
-                    color: isDark ? "blue" : "blue",
-                    bgGradient: isDark ? "from-blue-500/20 to-transparent" : "from-blue-50 to-white",
-                    borderColor: isDark ? "border-blue-500/40" : "border-blue-400"
+                    emoji: "🌅",
+                    title: "每日晨報 + 主動盯梢",
+                    subtitle: "一早自動給你今日優先清單",
+                    points: [
+                      "衝突偵測 — 跨領域時間資源自動掃描",
+                      "停滯警示 — N 天無進展主動提醒",
+                      "逾期預警 — 問題發生前就告訴你"
+                    ],
+                    result: "你睡覺，它在幫你盯 — 斜槓日常不再撞車",
+                    color: "emerald"
                   },
                   {
-                    icon: BookOpen,
-                    title: "參考 Reference",
-                    subtitle: "知識庫",
-                    desc: "無時效性、AI 自動推薦",
-                    examples: ["過往案例", "SOP 文檔", "經驗總結"],
-                    color: isDark ? "emerald" : "emerald",
-                    bgGradient: isDark ? "from-emerald-500/20 to-transparent" : "from-emerald-50 to-white",
-                    borderColor: isDark ? "border-emerald-500/40" : "border-emerald-400"
-                  }
-                ].map((item, i) => {
-                  const Icon = item.icon;
-                  return (
-                    <div
-                      key={i}
-                      className={`group relative p-8 rounded-2xl transition-all hover:scale-105 hover:shadow-2xl ${isDark ? `border-2 ${item.borderColor} bg-gradient-to-br ${item.bgGradient}` : ""} ${item.color === "amber"
-                        ? isDark ? "hover:shadow-amber-500/20" : "hover:shadow-amber-300/20"
-                        : item.color === "blue"
-                          ? isDark ? "hover:shadow-blue-500/20" : "hover:shadow-blue-300/20"
-                          : isDark ? "hover:shadow-emerald-500/20" : "hover:shadow-emerald-300/20"
-                        }`}
-                      style={isDark ? {} : {
-                        background: "#fff",
-                        border: `2px solid ${item.color === "amber" ? "#fbbf24" : item.color === "blue" ? "#60a5fa" : "#34d399"}`,
-                        boxShadow: "0 8px 30px -8px rgba(0,0,0,0.06)"
-                      }}
-                    >
-                      {/* Icon */}
-                      <div className={`w-16 h-16 rounded-2xl ${item.color === "amber"
-                        ? isDark ? "bg-amber-500/20" : "bg-amber-100"
-                        : item.color === "blue"
-                          ? isDark ? "bg-blue-500/20" : "bg-blue-100"
-                          : isDark ? "bg-emerald-500/20" : "bg-emerald-100"
-                        } flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-                        <Icon className={`w-8 h-8 ${item.color === "amber"
-                          ? isDark ? "text-amber-400" : "text-amber-600"
-                          : item.color === "blue"
-                            ? isDark ? "text-blue-400" : "text-blue-600"
-                            : isDark ? "text-emerald-400" : "text-emerald-600"
-                          }`} />
-                      </div>
-
-                      {/* 標題 */}
-                      <div className="space-y-2 mb-4">
-                        <h3 className={`text-xl font-bold ${theme.text}`}>{item.title}</h3>
-                        <p className={`text-sm ${item.color === "amber"
-                          ? isDark ? "text-amber-400/80" : "text-amber-700"
-                          : item.color === "blue"
-                            ? isDark ? "text-blue-400/80" : "text-blue-700"
-                            : isDark ? "text-emerald-400/80" : "text-emerald-700"
-                          } font-medium`}>{item.subtitle}</p>
-                      </div>
-
-                      {/* 描述 */}
-                      <p className={`text-sm ${theme.textMuted} mb-6 leading-relaxed`}>{item.desc}</p>
-
-                      {/* 範例 */}
-                      <div className="space-y-2">
-                        <div className={`text-xs uppercase tracking-wider ${theme.textMutedDarker} font-semibold mb-3`}>
-                          範例:
-                        </div>
-                        {item.examples.map((example, j) => (
-                          <div key={j} className={`flex items-start gap-2 text-sm ${theme.textMutedLighter}`}>
-                            <span className={`${item.color === "amber"
-                              ? isDark ? "text-amber-400" : "text-amber-600"
-                              : item.color === "blue"
-                                ? isDark ? "text-blue-400" : "text-blue-600"
-                                : isDark ? "text-emerald-400" : "text-emerald-600"
-                              }`}>•</span>
-                            <span>{example}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 分隔線 */}
-            <div className={`h-px bg-gradient-to-r from-transparent ${isDark ? "via-emerald-500/20" : "via-emerald-400/30"} to-transparent`} />
-
-            {/* AI 主動治理 Section */}
-            <div className="space-y-12">
-              <div className="text-center space-y-4">
-                <div className={`text-xs uppercase tracking-widest ${isDark ? "text-emerald-400" : "text-emerald-600"} font-semibold`}>AI 主動治理</div>
-                <h2 className={`text-4xl md:text-5xl font-bold ${theme.text} leading-tight`}>不是你管 Zentropy</h2>
-                <p className={`${theme.textMuted} max-w-2xl mx-auto text-lg`}>
-                  是 Zentropy 幫你管全局 — 主動偵測、主動預警、主動提醒
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-6">
-                {[
-                  {
-                    icon: "🌅",
-                    title: "每日晨報",
-                    subtitle: "08:30 自動啟動",
-                    desc: "每天早上自動分析全局，給出今日優先事項、逾期任務、行程摘要，讓你清醒就掌握全局。",
-                    color: isDark ? "border-emerald-500/40" : "border-emerald-400",
-                    bgGradient: isDark ? "from-emerald-500/10 to-transparent" : "from-emerald-50 to-white",
-                    textColor: isDark ? "text-emerald-400" : "text-emerald-700"
-                  },
-                  {
-                    icon: "⚡",
-                    title: "衝突偵測",
-                    subtitle: "跨 Area 預警",
-                    desc: "自動掃描跨領域的時間衝突和資源競爭，在問題發生前提前預警，避免手忙腳亂。",
-                    color: isDark ? "border-amber-500/40" : "border-amber-400",
-                    bgGradient: isDark ? "from-amber-500/10 to-transparent" : "from-amber-50 to-white",
-                    textColor: isDark ? "text-amber-400" : "text-amber-700"
-                  },
-                  {
-                    icon: "🔍",
-                    title: "停滯警示",
-                    subtitle: "不讓任何事掉落",
-                    desc: "追蹤哪些專案超過 N 天沒有進展，在晨報中主動提醒，確保重要事項不在忙碌中被遺忘。",
-                    color: isDark ? "border-red-500/40" : "border-red-400",
-                    bgGradient: isDark ? "from-red-500/10 to-transparent" : "from-red-50 to-white",
-                    textColor: isDark ? "text-red-400" : "text-red-700"
+                    emoji: "🧠",
+                    title: "零治理的管家模式",
+                    subtitle: "不是第二大腦，是 AI 大腦管家",
+                    points: [
+                      "vs Notion：你不用建資料庫，它自動分類",
+                      "vs Jira：專為一人多角，零配置即用",
+                      "輸入亂七八糟，輸出清晰行動 + 行事曆"
+                    ],
+                    result: "今天用今天就爽，零學習曲線",
+                    color: "indigo"
                   }
                 ].map((item, i) => (
                   <div
                     key={i}
-                    className={`group relative p-8 rounded-2xl transition-all hover:scale-105 hover:shadow-2xl ${isDark ? `border-2 ${item.color} bg-gradient-to-br ${item.bgGradient}` : ""}`}
-                    style={isDark ? {} : {
-                      background: "#fff",
-                      border: `2px solid ${i === 0 ? "#34d399" : i === 1 ? "#fbbf24" : "#f87171"}`,
-                      boxShadow: "0 8px 30px -8px rgba(0,0,0,0.06)"
-                    }}
+                    className="p-8 transition-all hover:scale-[1.01]"
+                    style={i < 2
+                      ? isDark
+                        ? { borderRight: "1px solid rgba(255,255,255,0.08)" }
+                        : { borderRight: "1px solid #e2e8f0" }
+                      : {}
+                    }
                   >
-                    <div className="text-4xl mb-5 group-hover:scale-110 transition-transform">{item.icon}</div>
-                    <div className="space-y-2 mb-4">
-                      <h3 className={`text-xl font-bold ${theme.text}`}>{item.title}</h3>
-                      <p className={`text-sm font-medium ${item.textColor}`}>{item.subtitle}</p>
-                    </div>
-                    <p className={`text-sm ${theme.textMuted} leading-relaxed`}>{item.desc}</p>
+                    <div className="text-4xl mb-5">{item.emoji}</div>
+                    <h3 className={`text-xl font-bold mb-2 ${theme.text}`}>{item.title}</h3>
+                    <p className={`text-sm mb-5 font-semibold ${
+                      item.color === "amber"
+                        ? isDark ? "text-amber-400" : "text-amber-700"
+                        : item.color === "emerald"
+                          ? isDark ? "text-emerald-400" : "text-emerald-700"
+                          : isDark ? "text-indigo-400" : "text-indigo-700"
+                    }`}>{item.subtitle}</p>
+                    <ul className="space-y-2.5 mb-6">
+                      {item.points.map((pt, j) => (
+                        <li key={j} className={`flex items-start gap-2 text-sm ${theme.textMutedLighter}`}>
+                          <span className={`mt-0.5 flex-shrink-0 ${
+                            item.color === "amber"
+                              ? isDark ? "text-amber-400" : "text-amber-500"
+                              : item.color === "emerald"
+                                ? isDark ? "text-emerald-400" : "text-emerald-500"
+                                : isDark ? "text-indigo-400" : "text-indigo-500"
+                          }`}>•</span>
+                          <span>{pt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className={`text-sm font-semibold ${isDark ? "text-emerald-400" : "text-emerald-700"}`}>✓ {item.result}</p>
                   </div>
                 ))}
               </div>
+
+              {/* 統一底部 CTA */}
+              <div className="text-center pt-2 space-y-4">
+                <p className={`text-base font-semibold ${theme.textMutedAlt}`}>腦袋還在爆炸？讓 AI 幫你盯一晚</p>
+                <button
+                  onClick={() => setShowAuthPanel(true)}
+                  className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-base transition-all hover:scale-105 hover:shadow-xl bg-gradient-to-r from-indigo-600 to-emerald-600 text-white shadow-lg"
+                >
+                  現在免費試用 → 感受「混亂瞬間被管住」
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* 第二條分隔線 */}
-            <div className={`h-px bg-gradient-to-r from-transparent ${isDark ? "via-emerald-500/20" : "via-emerald-400/30"} to-transparent`} />
+            {/* 分隔線 */}
+            <div className={`h-px bg-gradient-to-r from-transparent ${isDark ? "via-indigo-500/20" : "via-indigo-400/30"} to-transparent`} />
 
             {/* 定價與計畫 */}
             <div className="space-y-12">
@@ -1050,6 +1043,7 @@ export default function HomeDemo() {
                     period: "月",
                     highlight: true,
                     isActive: true,
+                    desc: "上班族最愛的入門方案",
                     features: [
                       "Atom 所有功能，無限制",
                       "多 Area 管理",
@@ -1087,8 +1081,8 @@ export default function HomeDemo() {
                     }
                   >
                     {plan.highlight && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-full text-xs font-bold text-white shadow-lg">
-                        最受歡迎
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-full text-xs font-bold text-white shadow-lg whitespace-nowrap">
+                        最受歡迎 · 限時免費
                       </div>
                     )}
 
@@ -1107,6 +1101,9 @@ export default function HomeDemo() {
                           <span className={`text-5xl font-bold ${isDark ? "text-indigo-400" : "text-indigo-600"}`}>{plan.price}</span>
                           <span className={theme.textMutedDarker}>/ {plan.period}</span>
                         </div>
+                        {(plan as any).desc && (
+                          <p className={`text-sm mt-2 ${isDark ? "text-indigo-300/80" : "text-indigo-700"} font-medium`}>{(plan as any).desc}</p>
+                        )}
                       </div>
 
                       {/* 功能列表 */}
@@ -1140,13 +1137,67 @@ export default function HomeDemo() {
                 ))}
               </div>
 
-              <div className={`mt-12 pt-8 border-t ${isDark ? "border-white/5" : "border-slate-200"}`}>
+              <div className={`mt-12 pt-8 border-t ${isDark ? "border-white/5" : "border-slate-200"} space-y-3`}>
                 <p className={`text-sm ${theme.textMuted} text-center`}>所有計畫都可以隨時升級或降級，沒有鎖定期</p>
+                <p className={`text-xs ${theme.textMutedDarker} text-center`}>
+                  📱 iOS / Android App 即將上線 — 搶先登記，解鎖優先體驗資格
+                </p>
               </div>
             </div>
 
           </div>
         </div>
+
+        {/* FAQ 區塊 */}
+        <div className={`py-20 px-6 border-t ${isDark ? "border-white/5" : "border-slate-100"}`}>
+          <div className="max-w-3xl mx-auto space-y-10">
+            <div className="text-center space-y-4">
+              <div className={`text-xs uppercase tracking-widest ${isDark ? "text-emerald-400" : "text-emerald-600"} font-semibold`}>常見問題</div>
+              <h2 className={`text-3xl md:text-4xl font-bold ${theme.text}`}>你可能想知道</h2>
+            </div>
+            <div className="space-y-3">
+              {[
+                {
+                  q: "上班族也能用嗎？",
+                  a: "當然！90% 用戶都是斜槓上班族 — 白天處理公司任務、晚上管理個人接案、週末追靈感，Zentropy 統統幫你管。"
+                },
+                {
+                  q: "需要自己整理分類嗎？",
+                  a: "完全不用。你只管把想法隨手丟進來，AI 幫你自動分類到 Active / Maintain / Reference，你不需要建資料夾、打標籤、手動排序。"
+                },
+                {
+                  q: "和 Notion 有什麼不同？",
+                  a: "Notion 讓你建資料庫，Zentropy 讓你不用管資料庫。Notion 是工具，Zentropy 是管家 — 你不用想怎麼整理，系統自動幫你整理好。"
+                }
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className={`rounded-xl overflow-hidden transition-all ${isDark
+                    ? "bg-white/5 border border-white/10"
+                    : "bg-white border border-slate-200 shadow-sm"
+                  }`}
+                >
+                  <button
+                    onClick={() => setFaqOpenIndex(faqOpenIndex === i ? null : i)}
+                    className={`w-full flex items-center justify-between px-6 py-5 text-left font-semibold transition-colors ${isDark
+                      ? "text-white hover:text-indigo-300"
+                      : "text-slate-800 hover:text-indigo-700"
+                    }`}
+                  >
+                    <span>{item.q}</span>
+                    <span className={`ml-4 flex-shrink-0 text-lg transition-transform duration-200 ${faqOpenIndex === i ? "rotate-45" : ""}`}>+</span>
+                  </button>
+                  {faqOpenIndex === i && (
+                    <div className={`px-6 pb-5 text-sm ${theme.textMuted} leading-relaxed`}>
+                      {item.a}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* 認證面板 */}
@@ -1274,7 +1325,7 @@ export default function HomeDemo() {
               </a>
             </div>
             <p className={`text-xs uppercase tracking-widest ${isDark ? "text-white/30" : "text-slate-300"} font-mono`}>
-              你的 AI 營運長 · 讓一切井然有序
+              你的 AI 大腦管家 · 幫你管住混亂
             </p>
           </div>
         </div>
