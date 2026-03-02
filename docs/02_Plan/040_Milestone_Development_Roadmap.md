@@ -195,15 +195,21 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 
 ## Milestone 4: MCP Server（3 週）
 > 目標：讓 Zentropy 成為 AI 生態的「Context Provider」
+>
+> **狀態**：✅ 核心完成（2026-03-02）
 
 ### 4.1 MCP Server 核心
-- [ ] 實作 `zentropy://` URI scheme
-- [ ] Resources: Areas, Products, Tasks, Briefings
-- [ ] Tools: `capture_thought`, `get_briefing`, `search_context`
-- [ ] 發布為獨立 npm 套件
+- [x] 實作 `zentropy://` URI scheme ✅
+  - `zentropy://areas`、`zentropy://knowledge/{area}/{product}/{topic}`、`zentropy://saga/{product_id}`、`zentropy://memory/bias`、`zentropy://handoff/ready`
+- [x] Resources: `areas-hierarchy`, `context-now`, `memory-bias`, `handoff-ready`, `knowledge-assets`, `rolling-sagas`, `user-preferences` ✅
+- [x] Tools（14 個）: `capture`, `capture_thought`, `list_tasks`, `create_task`, `update_task`, `list_products`, `get_plan`, `get_reference`, `add_reference`, `add_sub_item`, `update_sub_item`, `report_done`, `append_to_knowledge`, `query_memory` ✅
+- [x] Prompts: `summarize_for_zentropy`, `generate_spec` ✅
+- [x] 完整安全架構：Auth → Rate Limiter → Input Validator → Content Sanitizer → Scope Checker → Output Sanitizer → Audit Logger ✅
+- [x] Stateless 模式（Cloud Run 重啟不影響 session）✅
+- [ ] 發布為獨立 npm 套件（MCP Server 目前整合在 API server，待拆出）
 
 ### 4.2 整合驗證
-- [ ] Claude Desktop 連接測試
+- [ ] Claude Desktop 連接測試（文件確認）
 - [ ] Cursor 連接測試（開發者在寫 code 時讀取 Zentropy 的 Spec）
 
 ---
@@ -211,24 +217,18 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 ## Milestone 5: Public Beta（4 週）
 > 目標：準備公開測試，驗證核心假設
 
-### 5.1 Onboarding 優化
-- [ ] 「3 分鐘設定」流程：
-  1. 登入（Google/Apple）
-  2. 選擇 Area 模板（或自訂）
-  3. 第一次 Brain Dump
-  4. 收到第一份 Coach 晨報
-- [ ] 引導式教學更新
+### 5.1 Onboarding
+- [x] 「3 分鐘設定」流程已完成 ✅
 
-### 5.2 定價與計費
-- [ ] Atom（免費）：50 則/月、1 Area、無 Coach
-- [ ] Fusion（$29/月）：無限、多 Area、晨晚報、衝突偵測
-- [ ] Nexus（$79/月）：MCP、API、優先支援
-- [ ] Stripe 整合
+### 5.2 安全與合規（核心重點）
+- [ ] SOC 2 Type I 準備（控制項盤點、政策文件）
+- [ ] Privacy Policy / Terms of Service 更新
+- [ ] 資料匯出功能（GDPR 合規）
+- [ ] 安全漏洞掃描（OWASP Top 10 確認）
+- [ ] 資料保留政策明文化
 
-### 5.3 安全與合規
-- [ ] SOC 2 Type I 準備
-- [ ] Privacy Policy / Terms 更新
-- [ ] 資料匯出功能（GDPR）
+### 5.3 定價與計費（延後）
+> 暫緩，待 Beta 驗證後再規劃 Stripe 整合與 tier 設計
 
 ### 5.4 Launch
 - [ ] Product Hunt Launch
@@ -245,7 +245,7 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 | **M1: Coach** 🟡 | 6 週 | 8 週 | 晨晚報 + 衝突偵測 + 停滯偵測 | ~90% 完成 |
 | **M2: Intake** 🟡 | 4 週 | 12 週 | 語音/圖片/多模態零摩擦輸入 | 進行中（語音完成，前端建議 UI 待做） |
 | **M3: Governance** | 4 週 | 16 週 | 自動排程治理 + 主動關聯 | 待開始 |
-| **M4: MCP** | 3 週 | 19 週 | zentropy:// MCP Server | 待開始 |
+| **M4: MCP** ✅ | 3 週 | 19 週 | zentropy:// MCP Server | 核心完成（待拆 npm 套件 + 整合驗證） |
 | **M5: Beta** | 4 週 | 23 週 | 公開測試 + 定價 + Launch | 待開始 |
 
 **總計：約 6 個月**，從現有基礎到 Public Beta。
@@ -271,8 +271,8 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
   - 🟡 端到端整合測試（進行中）
 - **M2**: 語音/圖片 → 自動結構化為 Task，正確掛載 Entity 率 > 70%
 - **M3**: Cron 每日蒸餾 + 每週結構掃描自動執行 → 晨報顯示重組建議 + Task 相關脈絡浮現可用
-- **M4**: Claude Desktop 成功透過 MCP 讀取 Zentropy 資料
-- **M5**: 20 位 Beta 用戶連續使用 2 週，NPS > 40
+- **M4**: ✅ MCP Server 核心完成（14 tools + 6 resources + `zentropy://` URI）；待完成：獨立 npm 套件 + Claude Desktop/Cursor 連接驗證
+- **M5**: Onboarding ✅；安全合規文件完備（SOC 2 準備、Privacy Policy、GDPR 匯出）；定價延後；20 位 Beta 用戶連續使用 2 週，NPS > 40
 
 ---
 

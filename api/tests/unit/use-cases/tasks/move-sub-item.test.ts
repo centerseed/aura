@@ -16,6 +16,9 @@ vi.mock('@/lib/db', () => ({
       update: vi.fn(),
       aggregate: vi.fn(),
     },
+    product: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     $transaction: vi.fn(),
   },
 }))

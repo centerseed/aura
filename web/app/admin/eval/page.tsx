@@ -96,10 +96,16 @@ export default function EvaluationDashboard() {
       const res = await fetch(`${API_BASE_URL}/api/evaluation/logs?${params.toString()}`, {
         headers: authHeaders
       });
+
+      if (res.status === 403) {
+        router.push("/");
+        return;
+      }
+
       const data = await res.json();
 
       if (data.success) {
-        setLogs(data.logs);
+        setLogs(data.data?.logs ?? []);
       }
     } catch (err) {
       console.error("Failed to fetch logs:", err);
@@ -182,6 +188,12 @@ export default function EvaluationDashboard() {
                 返回
               </Button>
               <h1 className="text-2xl font-bold text-white">AI 評估紀錄</h1>
+              <a
+                href="/admin/analytics"
+                className="text-sm text-indigo-400 hover:text-indigo-300 underline"
+              >
+                Flywheel 分析 →
+              </a>
             </div>
             <Button
               size="sm"

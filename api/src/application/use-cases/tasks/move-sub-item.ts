@@ -134,12 +134,16 @@ export class MoveSubItemUseCase {
     const targetTaskMeta = await getSubTasksMeta(request.targetTaskId)
 
     // 11. 通知 Librarian（fire-and-forget）
-    librarianObserve({
-      userId: request.userId,
-      taskContent: subTask.content,
-      originalProduct: (sourceTask as any).product_id || (sourceTask as any).productId || '',
-      correctedProduct: (targetTask as any).product_id || (targetTask as any).productId || '',
-    }).catch(() => {})
+    const srcProdName = sourceTask.product?.name
+    const tgtProdName = targetTask.product?.name
+    if (srcProdName && tgtProdName && srcProdName !== tgtProdName) {
+      librarianObserve({
+        userId: request.userId,
+        taskContent: subTask.content,
+        originalProduct: srcProdName,
+        correctedProduct: tgtProdName,
+      }).catch(() => {})
+    }
 
     return {
       subItem: {

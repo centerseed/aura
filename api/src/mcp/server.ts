@@ -534,13 +534,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
   // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
   server.tool(
     "create_task",
-    "Create a task with known product_id/topic_id. Use this for precise task creation when classification is known. Content must start with a verb, max 300 chars. Returns {id,title,status,message}.",
+    "Create a task with known product_id/topic_id. The 'content' field is the task title shown in the UI — start with a verb, max 300 chars (e.g. 'Fix login bug', 'Write spec for payment'). Returns {id,title,status,message}.",
     {
       content: z
         .string()
         .min(1)
         .max(300)
-        .describe("任務內容（嚴格限制 300 字元，務必精簡）"),
+        .describe("任務標題（即 UI 顯示的 title），須以動詞開頭，最多 300 字元"),
       product_id: z
         .string()
         .optional()

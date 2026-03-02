@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getAuth } from "./firebase-admin";
-import { UnauthorizedException } from "./api-response";
+import { UnauthorizedException, ForbiddenException } from "./api-response";
 import { verifyInternalAuth } from "@/mcp/oauth/jwt";
 
 /**
@@ -69,6 +69,26 @@ export async function getOrCreateUser(
   }
 
   return user.id;
+}
+
+/**
+ * 驗證 Admin 請求：Firebase UID 必須在 ADMIN_UIDS 白名單內
+ * 返回 DB UUID
+ */
+export async function authenticateAdminRequest(
+  request: NextRequest,
+  prisma: any
+): Promise<string> {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw new UnauthorizedException("Missing or invalid token");
+  }
+  const decodedToken = await getAuth().verifyIdToken(authHeader.substring(7));
+  const adminUids = (process.env.ADMIN_UIDS ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  if (!adminUids.includes(decodedToken.uid)) {
+    throw new ForbiddenException('Admin only')
+  }
+  return getOrCreateUser(decodedToken.uid, decodedToken, prisma)
 }
 
 /**

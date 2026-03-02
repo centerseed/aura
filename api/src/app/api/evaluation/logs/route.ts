@@ -3,7 +3,7 @@
  */
 
 import { NextRequest } from 'next/server'
-import { authenticateRequest } from '@/lib/auth-middleware'
+import { authenticateAdminRequest } from '@/lib/auth-middleware'
 import { prisma } from '@/lib/db'
 import { ApiResponseBuilder, catchDomainException } from '@/lib/api-response'
 import { GetEvaluationLogsUseCase } from '@/application/use-cases/evaluation/get-logs'
@@ -15,7 +15,7 @@ import { UpdateEvaluationLogUseCase } from '@/application/use-cases/evaluation/u
 
 export async function GET(request: NextRequest) {
   return catchDomainException(async () => {
-    const userId = await authenticateRequest(request, prisma)
+    const userId = await authenticateAdminRequest(request, prisma)
     const { searchParams } = new URL(request.url)
 
     const type = searchParams.get('type') || undefined

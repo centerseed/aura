@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/db"
+import { isValidUUID } from "@/domain/constants/validation"
 
 // 在函數內讀取，避免 Next.js build 時固定為 undefined
 function getLibrarianConfig() {
@@ -30,6 +31,14 @@ export async function librarianObserve(params: {
   originalTopic?: string | null
   correctedTopic?: string | null
 }): Promise<void> {
+  if (isValidUUID(params.originalProduct) || isValidUUID(params.correctedProduct)) {
+    console.warn('[librarian] skipping observe: product looks like UUID, expected name', {
+      originalProduct: params.originalProduct,
+      correctedProduct: params.correctedProduct,
+    })
+    return
+  }
+
   const { url: LIBRARIAN_URL, apiKey: LIBRARIAN_API_KEY } = getLibrarianConfig()
   if (!LIBRARIAN_URL || !LIBRARIAN_API_KEY) {
     return
