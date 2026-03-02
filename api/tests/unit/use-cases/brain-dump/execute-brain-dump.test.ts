@@ -28,6 +28,7 @@ const mockTx = {
 vi.mock('@/lib/db', () => ({
   prisma: {
     task: { findMany: vi.fn() },
+    product: { findMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
@@ -129,6 +130,7 @@ describe('ExecuteBrainDumpUseCase', () => {
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => {
       return await callback(mockTx)
     })
+    vi.mocked(prisma.product.findMany).mockResolvedValue([])  // no cross-area match by default
     mockTx.product.create.mockResolvedValue(MOCK_PRODUCT)
     mockTx.task.create.mockResolvedValue(buildMockTask())
     mockTx.systemEvaluationLog.create.mockResolvedValue({})

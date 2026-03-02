@@ -202,7 +202,7 @@ export class GenerateBrainDumpStructureUseCase {
     }
 
     const relevantProducts = productCandidates.map(r => ({
-      id: r.id, name: r.name, similarity: Number(r.similarity),
+      id: r.id, name: r.name, area_id: r.area_id, similarity: Number(r.similarity),
     }))
 
     if (relevantProducts.length > 0 && !request.explicitProductId) {
@@ -382,6 +382,21 @@ export class GenerateBrainDumpStructureUseCase {
     }
 
     timings["db_and_recall_parallel"] = Date.now() - startParallel
+
+    // Build product similarity signal from Stage 1 results (using areaMap for area names)
+    let productSimilaritySignal = ""
+    if (relevantProducts.length > 0 && !request.explicitProductId) {
+      const productSignalLines = relevantProducts.map(p => {
+        const area = areaMap.get(p.area_id)
+        const areaName = area ? area.name : "未知"
+        return `  - ${p.name}（在「${areaName}」下，相似度 ${(p.similarity * 100).toFixed(0)}%）`
+      })
+      productSimilaritySignal = `\n### ⚠️ 語意相似度系統提示（優先級高於一般規則）\n` +
+        `以下 Products 與本次輸入最相關，**強烈優先使用這些 Products 及其所在 Area**：\n` +
+        productSignalLines.join('\n') +
+        `\n如確實無法歸類才考慮其他 Product 或新建 Product。\n` +
+        `**如果以上任何 Product 名稱與你想新建的 Product 相同或相似，必須使用已存在的 Product，不可重複建立。**\n`
+    }
 
     let existingAreas: ExistingArea[] = Array.from(areaMap.values()).map(area => ({
       ...area,
@@ -695,9 +710,11 @@ ${request.explicitProductId ? `# 🚨 用戶明確指定了 Product
 
 ## 4. Product 選擇
 問自己：**「這個新任務和哪個 Product 的現有任務最像？」**
-- 看每個 Product 下的「最近任務」
+- 先看「語意相似度系統提示」列出的 Products，**優先使用分數最高的 Product**
+- 再看每個 Product 下的「最近任務」
 - 選擇任務類型最相似的 Product
-- 可以在既有 Area 下創建新 Product（如果沒有匹配的）
+- **如果 context 中任何 Area 下已存在同名的 Product，必須使用既有的 Product 及其所在 Area，絕對不可跨 Area 重複建立**
+- 可以在既有 Area 下創建新 Product（僅當確實沒有任何匹配的既有 Product 時）
 
 ## 5. Topic 選擇（🔥 必須盡量填寫）
 
@@ -750,7 +767,7 @@ due_date 格式：ISO 8601，如 2026-02-07T00:00:00+08:00
 # 背景資訊
 
 今天：${now.toLocaleDateString("zh-TW")} (星期${['日', '一', '二', '三', '四', '五', '六'][now.getDay()]})
-
+${productSimilaritySignal}
 ${contextSummary}
 ${similaritySignal}
 ${librarianHints}

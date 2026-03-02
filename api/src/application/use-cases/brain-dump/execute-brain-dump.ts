@@ -246,6 +246,14 @@ export class ExecuteBrainDumpUseCase {
       }
     }
 
+    // 預先批次查詢：收集 cache miss 可能的 product 名稱，一次 findMany 取代 transaction 內 N 次 findFirst
+    const allProductNames = [...new Set(result.items.map(i => i.tag.product))]
+    const existingProductsByName = await prisma.product.findMany({
+      where: { user_id: request.userId, name: { in: allProductNames }, deleted_at: null },
+      select: { id: true, name: true },
+    })
+    const crossAreaProductMap = new Map(existingProductsByName.map(p => [p.name, p.id]))
+
     // 批次檢查重複任務
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const allTitles = result.items.map(item => item.title)
@@ -317,21 +325,30 @@ export class ExecuteBrainDumpUseCase {
         if (cachedProduct) {
           productId = cachedProduct.id
         } else {
-          const product = await tx.product.create({
-            data: {
-              user_id: request.userId,
-              area_id: areaId,
-              name: item.tag.product,
-              status: item.drawer as any,
-              lifecycle: item.lifecycle as any,
-            },
-          })
-          productId = product.id
-          productCache.set(productKey, { id: product.id })
-          // 非同步計算 embedding（不阻塞 transaction）
-          ensureProductEmbedding(product.id, product.name, null).catch(err => {
-            console.error(`❌ [embedding] Failed to compute embedding for new Product "${product.name}":`, err)
-          })
+          // Cross-area dedup: check pre-fetched map before creating
+          const crossAreaId = crossAreaProductMap.get(item.tag.product)
+          if (crossAreaId) {
+            // Reuse existing product (possibly in a different area) — do not create duplicate
+            productId = crossAreaId
+            productCache.set(productKey, { id: crossAreaId })
+            console.log(`🔄 [brain-dump] Reusing existing product "${item.tag.product}" (cross-area dedup, skipping create)`)
+          } else {
+            const product = await tx.product.create({
+              data: {
+                user_id: request.userId,
+                area_id: areaId,
+                name: item.tag.product,
+                status: item.drawer as any,
+                lifecycle: item.lifecycle as any,
+              },
+            })
+            productId = product.id
+            productCache.set(productKey, { id: product.id })
+            // 非同步計算 embedding（不阻塞 transaction）
+            ensureProductEmbedding(product.id, product.name, null).catch(err => {
+              console.error(`❌ [embedding] Failed to compute embedding for new Product "${product.name}":`, err)
+            })
+          }
         }
 
         // 3. Topic
