@@ -21,6 +21,21 @@ vi.mock('@/lib/db', () => ({
     topic: {
       findUnique: vi.fn(),
     },
+    dailyPlanItem: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      create: vi.fn().mockResolvedValue({}),
+    },
+    dailyPlan: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    subTask: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    coachBriefing: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue(null),
+    },
   },
 }))
 
@@ -983,6 +998,162 @@ describe('UpdateTaskUseCase', () => {
           dateSource: expect.anything(),
         })
       )
+    })
+  })
+
+  describe.skip('M3.5 Episodic Memory — 已封存，待重設計', () => {
+    // 共用的基本 task 結構（含新欄位）
+    const baseTask = {
+      id: 'task-123',
+      userId: 'user-123',
+      productId: 'product-123',
+      topicId: null,
+      content: 'Test Task',
+      aiAnalysis: null,
+      references: [],
+      subItems: [],
+      dueDate: null,
+      timeConfidence: null,
+      inferredFromMilestone: null,
+      estimatedDurationHours: null,
+      actualDurationHours: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+
+    it('ARCHIVE + 有 start_date → 自動計算 actualDurationHours', async () => {
+      // 任務 10 小時前開始
+      const startDate = new Date(Date.now() - 10 * 60 * 60 * 1000)
+      const existingTask = { ...baseTask, status: 'ACTIVE', startDate }
+      const updatedTask = { ...existingTask, status: 'ARCHIVE', actualDurationHours: 10.0 }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({ taskId: 'task-123', userId: 'user-123', status: 'ARCHIVE' })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.objectContaining({
+          status: TaskStatus.ARCHIVE,
+          actualDurationHours: expect.any(Number),
+        })
+      )
+      // 驗證計算值在合理範圍內（9.5 ~ 10.5 小時）
+      const updateArg = mockUpdate.mock.calls[0][2]
+      expect(updateArg.actualDurationHours).toBeGreaterThan(9.5)
+      expect(updateArg.actualDurationHours).toBeLessThan(10.5)
+    })
+
+    it('ARCHIVE + 沒有 start_date → 不填入 actualDurationHours', async () => {
+      const existingTask = { ...baseTask, status: 'ACTIVE', startDate: null }
+      const updatedTask = { ...existingTask, status: 'ARCHIVE' }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({ taskId: 'task-123', userId: 'user-123', status: 'ARCHIVE' })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.not.objectContaining({ actualDurationHours: expect.anything() })
+      )
+    })
+
+    it('ARCHIVE + actualDurationHours 已有值 → 不覆蓋', async () => {
+      const startDate = new Date(Date.now() - 5 * 60 * 60 * 1000)
+      // 已有值代表之前已由其他流程計算過
+      const existingTask = { ...baseTask, status: 'ACTIVE', startDate, actualDurationHours: 99.9 }
+      const updatedTask = { ...existingTask, status: 'ARCHIVE' }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({ taskId: 'task-123', userId: 'user-123', status: 'ARCHIVE' })
+
+      // 不應傳入 actualDurationHours（因為 !existingTaskData.actualDurationHours 為 false）
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.not.objectContaining({ actualDurationHours: expect.anything() })
+      )
+    })
+
+    it('狀態非 ARCHIVE → 不計算 actualDurationHours', async () => {
+      const startDate = new Date(Date.now() - 3 * 60 * 60 * 1000)
+      const existingTask = { ...baseTask, status: 'INBOX', startDate }
+      const updatedTask = { ...existingTask, status: 'ACTIVE' }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({ taskId: 'task-123', userId: 'user-123', status: 'ACTIVE' })
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.not.objectContaining({ actualDurationHours: expect.anything() })
+      )
+    })
+
+    it('已是 ARCHIVE 再次 ARCHIVE → 不重複計算', async () => {
+      const startDate = new Date(Date.now() - 2 * 60 * 60 * 1000)
+      const existingTask = { ...baseTask, status: 'ARCHIVE', startDate, actualDurationHours: null }
+      const updatedTask = { ...existingTask }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+
+      await useCase.execute({ taskId: 'task-123', userId: 'user-123', status: 'ARCHIVE' })
+
+      // wasArchived === isNowArchived，不觸發計算
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'task-123',
+        'user-123',
+        expect.not.objectContaining({ actualDurationHours: expect.anything() })
+      )
+    })
+
+    it('ARCHIVE + actualDurationHours=10 → DailyPlanItem.actual_minutes 回填為 600', async () => {
+      const { prisma } = await import('@/lib/db')
+      const startDate = new Date(Date.now() - 10 * 60 * 60 * 1000)
+      const existingTask = { ...baseTask, status: 'ACTIVE', startDate }
+      // 模擬 repository 回傳含有 actualDurationHours 的更新後任務
+      const updatedTask = { ...existingTask, status: 'ARCHIVE', actualDurationHours: 10.0 }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+      vi.mocked(prisma.dailyPlanItem.updateMany).mockResolvedValue({ count: 1 })
+
+      await useCase.execute({ taskId: 'task-123', userId: 'user-123', status: 'ARCHIVE' })
+
+      expect(prisma.dailyPlanItem.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            completed: true,
+            actual_minutes: 600,  // 10 * 60
+          }),
+        })
+      )
+    })
+
+    it('ARCHIVE + actualDurationHours=null → DailyPlanItem 不設 actual_minutes', async () => {
+      const { prisma } = await import('@/lib/db')
+      const startDate = new Date(Date.now() - 5 * 60 * 60 * 1000)
+      const existingTask = { ...baseTask, status: 'ACTIVE', startDate: null }
+      // 沒有 start_date 所以不計算 actualDurationHours
+      const updatedTask = { ...existingTask, status: 'ARCHIVE', actualDurationHours: null }
+
+      mockFindById.mockResolvedValue(existingTask)
+      mockUpdate.mockResolvedValue(updatedTask)
+      vi.mocked(prisma.dailyPlanItem.updateMany).mockResolvedValue({ count: 1 })
+
+      await useCase.execute({ taskId: 'task-123', userId: 'user-123', status: 'ARCHIVE' })
+
+      const callArg = vi.mocked(prisma.dailyPlanItem.updateMany).mock.calls[0][0]
+      expect(callArg?.data).not.toHaveProperty('actual_minutes')
     })
   })
 

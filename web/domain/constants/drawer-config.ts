@@ -20,6 +20,7 @@ export interface DrawerConfigItem {
   badgeText: string
   columnGradient: string
   columnBorder: string
+  userSelectable: boolean
 }
 
 export const DRAWER_CONFIG: Record<DrawerStatus, DrawerConfigItem> = {
@@ -33,6 +34,7 @@ export const DRAWER_CONFIG: Record<DrawerStatus, DrawerConfigItem> = {
     badgeText: 'text-amber-400',
     columnGradient: 'from-amber-500/10 to-orange-500/5',
     columnBorder: 'border-amber-200 dark:border-amber-800',
+    userSelectable: true,
   },
   ACTIVE: {
     label: '進行中',
@@ -44,6 +46,7 @@ export const DRAWER_CONFIG: Record<DrawerStatus, DrawerConfigItem> = {
     badgeText: 'text-blue-400',
     columnGradient: 'from-blue-500/10 to-cyan-500/5',
     columnBorder: 'border-blue-200 dark:border-blue-800',
+    userSelectable: true,
   },
   MAINTAIN: {
     label: '維護中',
@@ -55,6 +58,7 @@ export const DRAWER_CONFIG: Record<DrawerStatus, DrawerConfigItem> = {
     badgeText: 'text-indigo-400',
     columnGradient: 'from-indigo-500/10 to-emerald-500/5',
     columnBorder: 'border-indigo-200 dark:border-blue-800',
+    userSelectable: false,
   },
   REFERENCE: {
     label: '參考資料',
@@ -66,6 +70,7 @@ export const DRAWER_CONFIG: Record<DrawerStatus, DrawerConfigItem> = {
     badgeText: 'text-green-400',
     columnGradient: 'from-green-500/10 to-emerald-500/5',
     columnBorder: 'border-green-200 dark:border-green-800',
+    userSelectable: true,
   },
   ARCHIVE: {
     label: '已歸檔',
@@ -77,5 +82,6 @@ export const DRAWER_CONFIG: Record<DrawerStatus, DrawerConfigItem> = {
     badgeText: 'text-slate-400',
     columnGradient: 'from-slate-500/10 to-slate-500/5',
     columnBorder: 'border-slate-200 dark:border-slate-700',
+    userSelectable: true,
   },
 }

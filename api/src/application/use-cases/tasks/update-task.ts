@@ -251,12 +251,11 @@ export class UpdateTaskUseCase {
 
     if (request.topicId !== undefined && request.topicId !== existingTaskData.topicId) {
       // Topic 變更：保持 product 不變，只改 topic
-      const product = await prisma.product.findUnique({
-        where: { id: existingTaskData.productId },
-        select: { name: true },
-      })
-
-      const [oldTopic, newTopic] = await Promise.all([
+      const [product, oldTopic, newTopic] = await Promise.all([
+        prisma.product.findUnique({
+          where: { id: existingTaskData.productId },
+          select: { name: true },
+        }),
         existingTaskData.topicId
           ? prisma.topic.findUnique({
               where: { id: existingTaskData.topicId },
@@ -304,24 +303,19 @@ export class UpdateTaskUseCase {
     taskData?: TaskData | null
   ): Promise<void> {
     try {
-      // 查找對應的 plan item
-      const planItem = await prisma.dailyPlanItem.findFirst({
+      // 更新所有對應的 plan item（可能跨多天）
+      const { count } = await prisma.dailyPlanItem.updateMany({
         where: {
           task_id: taskId,
           ...(subTaskId ? { sub_task_id: subTaskId } : { sub_task_id: null }),
         },
+        data: {
+          completed,
+          completed_at: completed ? new Date() : null,
+        },
       })
 
-      if (planItem) {
-        // 更新 plan item 的完成狀態
-        await prisma.dailyPlanItem.update({
-          where: { id: planItem.id },
-          data: {
-            completed,
-            completed_at: completed ? new Date() : null,
-          },
-        })
-      } else if (completed && taskData) {
+      if (count === 0 && completed && taskData) {
         // Plan 裡沒有對應 item，自動創建一個已完成的 plan item
         const today = new Date()
         const todayDate = today.toISOString().slice(0, 10)
@@ -334,12 +328,6 @@ export class UpdateTaskUseCase {
         })
 
         if (todayPlan) {
-          // 查詢 product name 和 area name
-          const product = await prisma.product.findUnique({
-            where: { id: taskData.productId },
-            select: { name: true, area: { select: { name: true } } },
-          })
-
           await prisma.dailyPlanItem.create({
             data: {
               plan_id: todayPlan.id,
@@ -347,8 +335,8 @@ export class UpdateTaskUseCase {
               sub_task_id: subTaskId,
               item_type: 'task',
               content: taskData.content,
-              area_name: product?.area?.name ?? '',
-              product_name: product?.name ?? '',
+              area_name: taskData.product?.area?.name ?? '',
+              product_name: taskData.product?.name ?? '',
               estimated_minutes: 30,
               status: 'today',
               completed: true,

@@ -51,6 +51,8 @@ export interface TaskData {
   reminderEnabled: boolean
   reminderTimezone: string | null
   notificationId: number | null
+  estimatedDurationHours: number | null
+  actualDurationHours: number | null
   createdAt: Date
   updatedAt: Date
 
@@ -106,6 +108,7 @@ export interface TaskUpdateData {
   reminderTimezone?: string | null
   notificationId?: number | null
   dateSource?: string | null
+  actualDurationHours?: number | null
 }
 
 // ============================================================================

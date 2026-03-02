@@ -1,0 +1,2 @@
+ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "estimated_duration_hours" DOUBLE PRECISION;
+ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "actual_duration_hours" DOUBLE PRECISION;

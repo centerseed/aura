@@ -677,6 +677,33 @@ function SettingsContent() {
             </Alert>
           )}
 
+          {/* iOS App 下載 */}
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle className="flex items-center text-white text-base">
+                <span className="mr-2 text-lg">📱</span>
+                iOS App
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                在 iPhone 上隨時隨地管住混亂
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <a
+                href="https://apps.apple.com/tw/app/id6758665776"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block transition-all duration-300 hover:scale-105 hover:opacity-90"
+              >
+                <img
+                  src="/app-store-badge.svg"
+                  alt="Download on the App Store"
+                  style={{ height: "40px", width: "auto" }}
+                />
+              </a>
+            </CardContent>
+          </Card>
+
           {/* 帳號操作 */}
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="pt-6">

@@ -24,7 +24,6 @@ import { TaskCardComponent } from "./task-card";
 const COLUMNS: { id: DrawerStatus; title: string; color: string }[] = [
   { id: "INBOX", title: "規劃中", color: "amber" },
   { id: "ACTIVE", title: "進行中", color: "blue" },
-  { id: "MAINTAIN", title: "維護中", color: "blue" },
   { id: "REFERENCE", title: "參考資料", color: "green" },
 ];
 
@@ -93,7 +92,7 @@ export function KanbanBoard({ tasks, onTaskMove, onToggleSubItem, onSetDueDate, 
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-4 gap-4 bg-app min-h-screen p-6 rounded-xl">
+      <div className="grid grid-cols-3 gap-4 bg-app min-h-screen p-6 rounded-xl">
         {COLUMNS.map((column) => (
           <SortableContext
             key={column.id}

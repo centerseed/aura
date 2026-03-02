@@ -52,7 +52,7 @@
 ## Milestone 1: The Coach（6 週）
 > 目標：實作 Coach Agent，提供「心理閉環」——Zentropy 的核心差異化價值
 >
-> **狀態**：🟡 進行中（2026-02-14）
+> **狀態**：✅ 完成（2026-03-02）
 
 ### 為什麼優先做 Coach？
 Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach，Zentropy 只是一個更好的 Kanban。有了 Coach，它才是「AI 營運長」。
@@ -65,11 +65,8 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
   - 跨 Area 衝突偵測 ⚠️ 進行中
   - Top 3 建議優先事項 ✅
 - [x] API: `POST /api/coach/briefing` + `GET /api/coach/briefing/latest` ✅
-- [ ] Use Case: `GenerateEveningReview` - 晚報功能（待實作）
-  - 今日完成事項
-  - 未處理任務提醒
-  - 明日預覽
-- [ ] Cron: 排程觸發（每日 08:30 晨報、21:00 晚報）
+- [x] Use Case: `GenerateEveningReview` - 晚報功能 ✅
+- [x] Cron: 排程觸發（每日 08:30 晨報、21:00 晚報）✅
 - [x] Web: Briefing 卡片元件（Dashboard 頂部 + Settings） ✅
 - [x] Prisma: 新增 `DailyBriefing` + `PlanItem` models ✅
 - [x] API: `POST /api/coach/plan/items` 新增計畫項目 ✅
@@ -83,7 +80,7 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
   - 資源衝突：跨 Area 的任務競爭同一時段 ✅
   - Deadline 預警：剩餘時間 < 預估工時 ✅
 - [x] API: `GET /api/coach/conflicts` ✅
-- [ ] Web: 衝突警示 Badge（Dashboard）
+- [x] Web: 衝突警示 Badge（Dashboard，整合在晨報卡片）✅
 - [x] 測試：`coach-detection.test.ts` - 80%+ 覆蓋 ✅
 
 **進度 1.2**：衝突偵測邏輯完成，API 可用，待 Web 集成。
@@ -102,7 +99,7 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 ## Milestone 2: Zero-Friction Intake（4 週）
 > 目標：讓輸入零摩擦——「丟進來就好」的核心承諾
 >
-> **狀態**：🟡 進行中（2026-02-15）
+> **狀態**：✅ 完成（2026-03-02）
 
 ### 2.1 Gatekeeper 強化 — 語音輸入
 - [x] Web: `quick-capture.tsx` — Web Speech API 語音辨識（展開/浮動兩種模式都支援） ✅
@@ -117,21 +114,23 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 ### 2.2 Mobile Quick Capture
 - [x] Flutter: 一鍵語音輸入 → 自動結構化 — **使用本地端 `speech_to_text` 套件，已在 M0 實作** ✅
 - [x] Flutter: 拍照 → OCR → 結構化 — **已在 M0 實作** ✅
-- [ ] Push Notification 整合（晨晚報推送）
+- [x] Push Notification 整合（晨晚報推送）✅
 
 ### 2.3 自動 Entity 掛載 + Status 推斷
 - [x] 自動 Entity 掛載：已有 pgvector embedding 相似度匹配 Product（M0 完成） ✅
-- [ ] 強化 Area 層級的 embedding 匹配（目前只做 Product）
-- [ ] 自動 Status 推斷（ACTIVE/REFERENCE/MAINTAIN）— **暫緩，避免影響已調穩的分類 prompt**
-- [ ] 前端建議 UI：顯示 AI 建議的 Area/Product/Status，用戶可一鍵確認或修改 — **Web + Flutter 都可實現**
+- [x] 強化 Area 層級的 embedding 匹配 ✅
+- [x] 前端建議 UI：顯示 AI 建議的 Area/Product/Status，用戶可一鍵確認或修改 ✅
+- 自動 Status 推斷（ACTIVE/REFERENCE/MAINTAIN）— **暫緩，避免影響已調穩的分類 prompt**
 
 ### 2.4 Telegram / LINE Bot — 延後至 M5 Beta
 > 作為 Growth channel，非 M2 核心。M2 已有 Web + Flutter 兩個零摩擦入口。
 
 ---
 
-## Milestone 3: Automated Governance（4 週）
+## Milestone 3: On-Demand Governance（4 週）
 > 目標：讓 Librarian 真正「主動治理」，而非只是被動歸檔
+>
+> **設計決策**：採用「按需觸發」模式——頁面/App 載入時自動呼叫，不依賴 Cron 排程。避免 Cloud Run 冷啟動、Vercel Cron 維護成本，且體感上「開啟即即時」。
 >
 > **現有基礎**：已有完整的 Reorganize Pipeline + Librarian 學習引擎
 
@@ -160,19 +159,17 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 - [x] Vercel Cron 架構已建立（Coach Briefing 使用中）✅
 - [x] `CRON_SECRET` 驗證機制 ✅
 
-### 3.1 排程治理引擎（將被動 → 主動）
+### 3.1 按需治理觸發（頁面/App 載入驅動）
 
-目前 Reorganize 和 Librarian Reflect 都是**按需觸發**，M3 的核心是加上**自動排程**：
+> **不做 Cron**。改為在用戶打開頁面或 App 時，背景非同步呼叫治理 API。
 
-- [ ] `api/src/app/api/cron/librarian-reflect/route.ts` — 每日 Cron（UTC 19:00 = 台北 03:00）
-  - 呼叫 Librarian `/api/reflect` 觸發 Cold Path 蒸餾
-  - 條件：有 ≥5 筆未處理修正才執行（避免空轉）
-  - 記錄執行結果到 `SystemEvaluationLog`
-- [ ] `api/src/app/api/cron/structure-scan/route.ts` — 每週 Cron（週日 03:30）
-  - 呼叫 `AnalyzeStructureUseCase` 掃描每位活躍用戶的結構
-  - 將建議存為「待確認」記錄（不自動執行）
-  - 推送通知到 Coach Briefing（晨報中顯示「系統建議重組 N 項」）
-- [ ] 環境配置：`vercel.json` 新增 cron schedules
+- [ ] `GET /api/librarian/reflect-if-needed` — App/Web 載入時呼叫
+  - 後端判斷：距上次蒸餾 > N 小時 且 有 ≥5 筆未處理修正 → 觸發 Cold Path
+  - 立即回傳（不 blocking），蒸餾在背景執行
+- [ ] `GET /api/governance/structure-hints` — Dashboard 載入時呼叫
+  - 呼叫 `AnalyzeStructureUseCase` 快速掃描當前用戶結構
+  - 回傳待確認的重組建議（輕量版，不全量掃描）
+  - 結果顯示於晨報 / 治理面板
 
 ### 3.2 Librarian 主動關聯
 
@@ -242,9 +239,9 @@ Coach 是讓用戶「感覺有人在幫我看全局」的關鍵。沒有 Coach�
 | Milestone | 時長 | 累計 | 核心交付 | 狀態 |
 |-----------|------|------|---------|------|
 | **M0: Cleanup** ✅ | 2 週 | 2 週 | 技術債清零 + Librarian 整合 | 已完成 |
-| **M1: Coach** 🟡 | 6 週 | 8 週 | 晨晚報 + 衝突偵測 + 停滯偵測 | ~90% 完成 |
-| **M2: Intake** 🟡 | 4 週 | 12 週 | 語音/圖片/多模態零摩擦輸入 | 進行中（語音完成，前端建議 UI 待做） |
-| **M3: Governance** | 4 週 | 16 週 | 自動排程治理 + 主動關聯 | 待開始 |
+| **M1: Coach** ✅ | 6 週 | 8 週 | 晨晚報 + 衝突偵測 + 停滯偵測 | 完成 |
+| **M2: Intake** ✅ | 4 週 | 12 週 | 語音/圖片/多模態零摩擦輸入 | 完成 |
+| **M3: Governance** | 4 週 | 16 週 | 按需治理觸發 + 主動關聯 | 待開始 |
 | **M4: MCP** ✅ | 3 週 | 19 週 | zentropy:// MCP Server | 核心完成（待拆 npm 套件 + 整合驗證） |
 | **M5: Beta** | 4 週 | 23 週 | 公開測試 + 定價 + Launch | 待開始 |
 

@@ -391,7 +391,7 @@ export default function HomeDemo() {
                 腦袋爆炸的上班/斜槓族的 AI 救星
               </p>
               <p className={`text-base md:text-lg ${theme.textMuted} leading-relaxed`}>
-                上班寫報告、下班接案、週末拍影片⋯⋯所有想法隨手丟進來，AI 自動分類、排程、預警，你什麼都不用管。
+                上班寫報告、下班接案、週末拍影片⋯⋯所有想法隨手丟進來，AI 自動分到三個桶：<span className={isDark ? "text-amber-300" : "text-amber-600"}>規劃中</span>、<span className={isDark ? "text-indigo-300" : "text-indigo-600"}>進行中</span>、<span className={isDark ? "text-emerald-300" : "text-emerald-600"}>參考資料</span>，不用建資料夾、不用打標籤。
               </p>
               <p className={`text-xs ${isDark ? "text-emerald-400/80" : "text-emerald-700"} mt-4 font-medium`}>
                 已幫助 500+ 斜槓族每天省 80% 整理時間｜限時 Fusion 免費升級
@@ -869,29 +869,47 @@ export default function HomeDemo() {
 
           {/* CTA */}
           {!showAuthPanel && (
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <button
-                onClick={() => setShowAuthPanel(true)}
-                className={`group inline-flex items-center gap-3 px-8 py-4 rounded-xl
-                  font-semibold text-lg transition-all duration-300 hover:gap-4 hover:scale-105
-                  hover:shadow-2xl hover:shadow-indigo-500/30 ${isDark
-                    ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white border-2 border-emerald-400/40 hover:border-emerald-400/80"
-                    : "border-2 border-indigo-700/20 shadow-lg"
+            <div className="flex flex-col items-center gap-5">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <button
+                  onClick={() => setShowAuthPanel(true)}
+                  className={`group inline-flex items-center gap-3 px-8 py-4 rounded-xl
+                    font-semibold text-lg transition-all duration-300 hover:gap-4 hover:scale-105
+                    hover:shadow-2xl hover:shadow-indigo-500/30 ${isDark
+                      ? "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white border-2 border-emerald-400/40 hover:border-emerald-400/80"
+                      : "border-2 border-indigo-700/20 shadow-lg"
+                    }`}
+                  style={isDark ? {} : { background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "#fff" }}
+                >
+                  免費即時體驗
+                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                </button>
+                <a
+                  href="#demo-showcase"
+                  className={`inline-flex items-center gap-2 px-6 py-4 rounded-xl font-semibold text-base transition-all duration-300 hover:scale-105 ${isDark
+                    ? "border-2 border-white/20 text-white/80 hover:border-white/40 hover:text-white bg-white/5"
+                    : "border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-700 bg-white"
                   }`}
-                style={isDark ? {} : { background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "#fff" }}
-              >
-                免費即時體驗
-                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </button>
-              <a
-                href="#demo-showcase"
-                className={`inline-flex items-center gap-2 px-6 py-4 rounded-xl font-semibold text-base transition-all duration-300 hover:scale-105 ${isDark
-                  ? "border-2 border-white/20 text-white/80 hover:border-white/40 hover:text-white bg-white/5"
-                  : "border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-700 bg-white"
-                }`}
-              >
-                看 60 秒治理前後對比
-              </a>
+                >
+                  看 60 秒治理前後對比
+                </a>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <p className={`text-xs ${theme.textMutedDarker}`}>也可以在 iPhone 上使用</p>
+                <a
+                  href="https://apps.apple.com/tw/app/id6758665776"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-all duration-300 hover:scale-105 hover:opacity-90"
+                >
+                  <img
+                    src="/app-store-badge.svg"
+                    alt="Download on the App Store"
+                    height={40}
+                    style={{ height: "40px", width: "auto" }}
+                  />
+                </a>
+              </div>
             </div>
           )}
         </div>
@@ -926,13 +944,13 @@ export default function HomeDemo() {
                   {
                     emoji: "🗂️",
                     title: "三大分類系統",
-                    subtitle: "自動把想法丟進對的 bucket，不再手動拖拉",
+                    subtitle: "AI 自動把想法丟進對的 bucket，不用手動拖拉、不用建資料夾",
                     points: [
-                      "衝刺 Active — 緊急有期限的任務",
-                      "維護 Maintain — 日常營運異常亮燈",
-                      "參考 Reference — 知識庫 AI 自動推薦"
+                      "🟡 規劃中 — 新想法收進來，等待出擊",
+                      "🔵 進行中 — 緊急有期限，今日衝刺清單",
+                      "🟢 參考資料 — 知識庫，AI 隨時推薦召回"
                     ],
-                    result: "優先級一目了然，斜槓日常不崩",
+                    result: "只有三個桶，優先級一目了然，斜槓日常不崩",
                     color: "amber"
                   },
                   {
@@ -1137,11 +1155,23 @@ export default function HomeDemo() {
                 ))}
               </div>
 
-              <div className={`mt-12 pt-8 border-t ${isDark ? "border-white/5" : "border-slate-200"} space-y-3`}>
+              <div className={`mt-12 pt-8 border-t ${isDark ? "border-white/5" : "border-slate-200"} space-y-4`}>
                 <p className={`text-sm ${theme.textMuted} text-center`}>所有計畫都可以隨時升級或降級，沒有鎖定期</p>
-                <p className={`text-xs ${theme.textMutedDarker} text-center`}>
-                  📱 iOS / Android App 即將上線 — 搶先登記，解鎖優先體驗資格
-                </p>
+                <div className="flex flex-col items-center gap-2">
+                  <p className={`text-xs ${theme.textMutedDarker} text-center`}>📱 iOS App 已上架，隨時隨地管住混亂</p>
+                  <a
+                    href="https://apps.apple.com/tw/app/id6758665776"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="transition-all duration-300 hover:scale-105 hover:opacity-90"
+                  >
+                    <img
+                      src="/app-store-badge.svg"
+                      alt="Download on the App Store"
+                      style={{ height: "38px", width: "auto" }}
+                    />
+                  </a>
+                </div>
               </div>
             </div>
 
@@ -1163,7 +1193,7 @@ export default function HomeDemo() {
                 },
                 {
                   q: "需要自己整理分類嗎？",
-                  a: "完全不用。你只管把想法隨手丟進來，AI 幫你自動分類到 Active / Maintain / Reference，你不需要建資料夾、打標籤、手動排序。"
+                  a: "完全不用。你只管把想法隨手丟進來，AI 自動分到三個桶 — 規劃中（新想法暫存）、進行中（緊急有期限）、參考資料（知識庫）。不用建資料夾、不用打標籤、不用想放哪。"
                 },
                 {
                   q: "和 Notion 有什麼不同？",
@@ -1314,7 +1344,19 @@ export default function HomeDemo() {
       {/* 頁腳 */}
       <footer className={`relative border-t ${isDark ? "border-white/5" : "border-slate-200"} py-12 px-6`}>
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-5">
+            <a
+              href="https://apps.apple.com/tw/app/id6758665776"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-all duration-300 hover:scale-105 hover:opacity-80"
+            >
+              <img
+                src="/app-store-badge.svg"
+                alt="Download on the App Store"
+                style={{ height: "36px", width: "auto" }}
+              />
+            </a>
             <div className="flex items-center gap-6 text-sm">
               <a href="/privacy" className={`${isDark ? "text-white/50 hover:text-white/80" : "text-slate-400 hover:text-slate-600"} transition-colors`}>
                 隱私政策 Privacy Policy

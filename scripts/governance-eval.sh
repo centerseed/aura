@@ -147,6 +147,141 @@ $PSQL "$DB" -t -A -F'|' -c "
   LIMIT 15
 " 2>&1 || echo "(poc_librarian.corrections 不可用)"
 
+
+# -------------------------------------------------------
+# 7. Episodic Memory L1：DailyPlanItem 估時偏差（report_done）
+# -------------------------------------------------------
+echo ""
+echo "=== [7] Episodic Memory L1 — DailyPlanItem 估時偏差（近 90 天）==="
+echo "email|total_samples|completed_with_actual|avg_ratio|overall_bias"
+$PSQL "$DB" -t -A -F'|' -c "
+  SELECT
+    COALESCE(u.email, LEFT(dp.user_id::text, 8))     AS email,
+    COUNT(dpi.id)                                     AS total_samples,
+    COUNT(*) FILTER (WHERE dpi.actual_minutes IS NOT NULL)  AS completed_with_actual,
+    ROUND(
+      AVG(dpi.actual_minutes::numeric / NULLIF(dpi.estimated_minutes,0))
+        FILTER (WHERE dpi.actual_minutes IS NOT NULL AND dpi.estimated_minutes > 0)
+    , 2)                                              AS avg_ratio,
+    CASE
+      WHEN COUNT(*) FILTER (WHERE dpi.actual_minutes IS NOT NULL AND dpi.estimated_minutes > 0) < 3
+        THEN 'cold_start'
+      WHEN AVG(dpi.actual_minutes::numeric / NULLIF(dpi.estimated_minutes,0))
+            FILTER (WHERE dpi.actual_minutes IS NOT NULL AND dpi.estimated_minutes > 0) > 1.3
+        THEN 'underestimate'
+      WHEN AVG(dpi.actual_minutes::numeric / NULLIF(dpi.estimated_minutes,0))
+            FILTER (WHERE dpi.actual_minutes IS NOT NULL AND dpi.estimated_minutes > 0) < 0.7
+        THEN 'overestimate'
+      ELSE 'calibrated'
+    END                                               AS overall_bias
+  FROM daily_plan_items dpi
+  JOIN daily_plans dp ON dp.id = dpi.plan_id
+  LEFT JOIN users u ON u.id = dp.user_id
+  WHERE dpi.completed = true
+    AND dpi.estimated_minutes IS NOT NULL
+    AND dpi.created_at >= NOW() - INTERVAL '90 days'
+  GROUP BY dp.user_id, u.email
+  ORDER BY total_samples DESC
+" 2>&1
+
+echo ""
+echo "=== [7b] Episodic Memory L1 — 分 Area 偏差明細 ==="
+echo "email|area|samples|avg_ratio"
+$PSQL "$DB" -t -A -F'|' -c "
+  SELECT
+    COALESCE(u.email, LEFT(dp.user_id::text, 8))     AS email,
+    dpi.area_name                                     AS area,
+    COUNT(*)                                          AS samples,
+    ROUND(
+      AVG(dpi.actual_minutes::numeric / NULLIF(dpi.estimated_minutes,0))
+    , 2)                                              AS avg_ratio
+  FROM daily_plan_items dpi
+  JOIN daily_plans dp ON dp.id = dpi.plan_id
+  LEFT JOIN users u ON u.id = dp.user_id
+  WHERE dpi.completed = true
+    AND dpi.actual_minutes IS NOT NULL
+    AND dpi.estimated_minutes > 0
+  GROUP BY dp.user_id, u.email, dpi.area_name
+  HAVING COUNT(*) >= 2
+  ORDER BY u.email, samples DESC
+" 2>&1
+
+# -------------------------------------------------------
+# 8. Episodic Memory L2：Task 層級估時偏差（auto-calc on ARCHIVE）
+# -------------------------------------------------------
+echo ""
+echo "=== [8] Episodic Memory L2 — Task 估時偏差（estimated_duration_hours）==="
+echo "email|tasks_with_estimate|tasks_with_actual|avg_ratio"
+$PSQL "$DB" -t -A -F'|' -c "
+  SELECT
+    COALESCE(u.email, LEFT(t.user_id::text, 8))          AS email,
+    COUNT(*) FILTER (WHERE t.estimated_duration_hours IS NOT NULL)   AS tasks_with_estimate,
+    COUNT(*) FILTER (WHERE t.actual_duration_hours IS NOT NULL)      AS tasks_with_actual,
+    ROUND(
+      AVG(t.actual_duration_hours / NULLIF(t.estimated_duration_hours,0))
+        FILTER (WHERE t.actual_duration_hours IS NOT NULL AND t.estimated_duration_hours > 0)
+      ::numeric
+    , 2)                                                             AS avg_ratio
+  FROM tasks t
+  LEFT JOIN users u ON u.id = t.user_id
+  WHERE t.deleted_at IS NULL
+  GROUP BY t.user_id, u.email
+  HAVING COUNT(*) FILTER (WHERE t.estimated_duration_hours IS NOT NULL) > 0
+  ORDER BY tasks_with_actual DESC
+" 2>&1
+
+# -------------------------------------------------------
+# 9. coaching_memory 表（Episodic Memory 持久化層）
+# -------------------------------------------------------
+echo ""
+echo "=== [9] coaching_memory 表狀況（Episodic Memory 持久化層）==="
+$PSQL "$DB" -t -A -F'|' -c "
+  SELECT
+    COUNT(*)                                                        AS total_memories,
+    COUNT(DISTINCT user_id)                                         AS unique_users,
+    COUNT(*) FILTER (WHERE agent_type = 'rizo')                     AS rizo_memories,
+    COUNT(*) FILTER (WHERE embedding IS NOT NULL)                   AS with_embedding,
+    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS last_7d,
+    MIN(created_at)::date                                           AS first_date,
+    MAX(created_at)::date                                           AS last_date
+  FROM coaching_memory
+" 2>&1 || echo "(coaching_memory 表不可用)"
+
+echo ""
+echo "=== [9b] coaching_memory 分 category 分佈 ==="
+echo "category|agent_type|count|avg_confidence"
+$PSQL "$DB" -t -A -F'|' -c "
+  SELECT
+    category,
+    agent_type,
+    COUNT(*)                              AS count,
+    ROUND(AVG(confidence)::numeric, 3)    AS avg_confidence
+  FROM coaching_memory
+  GROUP BY category, agent_type
+  ORDER BY count DESC
+" 2>&1 || echo "(coaching_memory 表不可用)"
+
+# -------------------------------------------------------
+# 10. report_done 閉環追蹤（MCP 工具使用）
+# -------------------------------------------------------
+echo ""
+echo "=== [10] report_done 閉環追蹤（tasks ARCHIVE 近 30 天）==="
+echo "email|archived_tasks|with_actual_hours|avg_actual_hrs"
+$PSQL "$DB" -t -A -F'|' -c "
+  SELECT
+    COALESCE(u.email, LEFT(t.user_id::text, 8))                   AS email,
+    COUNT(*) FILTER (WHERE t.status = 'ARCHIVE')                   AS archived_tasks,
+    COUNT(*) FILTER (WHERE t.actual_duration_hours IS NOT NULL)    AS with_actual_hours,
+    ROUND(AVG(t.actual_duration_hours)::numeric, 1)                AS avg_actual_hrs
+  FROM tasks t
+  LEFT JOIN users u ON u.id = t.user_id
+  WHERE t.deleted_at IS NULL
+    AND t.status = 'ARCHIVE'
+    AND t.completed_at >= NOW() - INTERVAL '30 days'
+  GROUP BY t.user_id, u.email
+  ORDER BY archived_tasks DESC
+" 2>&1
+
 echo ""
 echo "======================================================="
 echo " End of Data"

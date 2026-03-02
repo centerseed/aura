@@ -157,6 +157,8 @@ model Task {
   notification_id         Int?
   date_source             String?                @db.VarChar(10)
   completed_at            DateTime?              @db.Timestamp(6)
+  estimated_duration_hours Float?
+  actual_duration_hours    Float?
   calendar_events         CalendarEvent[]
   daily_plan_items        DailyPlanItem[]
   reminders               ReminderConfig[]

@@ -72,6 +72,8 @@ export class CreateTaskUseCase {
       reminderTimezone: null,
       notificationId: null,
       dateSource: null,
+      estimatedDurationHours: null,
+      actualDurationHours: null,
     }
 
     // 4. 業務規則驗證

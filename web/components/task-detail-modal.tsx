@@ -402,14 +402,13 @@ export function TaskDetailModal({
                     })()
                   }`}
                 >
-                  {({ INBOX: ClipboardList, ACTIVE: Rocket, MAINTAIN: RefreshCw, REFERENCE: BookOpen, ARCHIVE: Archive } as Record<string, typeof ClipboardList>)[task.drawer] &&
-                    (() => { const Icon = ({ INBOX: ClipboardList, ACTIVE: Rocket, MAINTAIN: RefreshCw, REFERENCE: BookOpen, ARCHIVE: Archive } as Record<string, typeof ClipboardList>)[task.drawer]; return <Icon className="w-3.5 h-3.5" />; })()}
-                  {{ INBOX: "規劃中", ACTIVE: "進行中", MAINTAIN: "維護中", REFERENCE: "參考資料", ARCHIVE: "已歸檔" }[task.drawer]}
+                  {(() => { const dc = DRAWER_CONFIG[task.drawer as DrawerStatus]; return dc ? <dc.icon className="w-3.5 h-3.5" /> : null; })()}
+                  {DRAWER_CONFIG[task.drawer as DrawerStatus]?.label}
                   <ChevronDown className="w-3 h-3" />
                 </button>
                 {showStatusDropdown && (
                   <div className="absolute top-full left-0 mt-1 z-10 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
-                    {(Object.entries(DRAWER_CONFIG) as [DrawerStatus, typeof DRAWER_CONFIG[DrawerStatus]][]).map(([id, dc]) => (
+                    {(Object.entries(DRAWER_CONFIG) as [DrawerStatus, typeof DRAWER_CONFIG[DrawerStatus]][]).filter(([, dc]) => dc.userSelectable).map(([id, dc]) => (
                       <button
                         key={id}
                         onClick={() => {

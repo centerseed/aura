@@ -38,6 +38,8 @@ interface RawTaskRow {
   date_source: string | null
   reminder_timezone: string | null
   notification_id: number | null
+  estimated_duration_hours: number | null
+  actual_duration_hours: number | null
   created_at: Date
   updated_at: Date
   // JOIN 結果
@@ -76,6 +78,8 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.reminder_enabled,
         t.reminder_timezone,
         t.notification_id,
+        t.estimated_duration_hours,
+        t.actual_duration_hours,
         t.created_at,
         t.updated_at,
         p.name as product_name,
@@ -123,6 +127,8 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.reminder_enabled,
         t.reminder_timezone,
         t.notification_id,
+        t.estimated_duration_hours,
+        t.actual_duration_hours,
         t.created_at,
         t.updated_at,
         p.name as product_name,
@@ -167,6 +173,8 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.reminder_enabled,
         t.reminder_timezone,
         t.notification_id,
+        t.estimated_duration_hours,
+        t.actual_duration_hours,
         t.created_at,
         t.updated_at,
         p.name as product_name,
@@ -298,6 +306,9 @@ export class PrismaTaskRepository implements ITaskRepository {
         ...(data.dateSource !== undefined && {
           date_source: data.dateSource,
         }),
+        ...(data.actualDurationHours !== undefined && {
+          actual_duration_hours: data.actualDurationHours,
+        }),
       } as any,
     })
 
@@ -414,6 +425,8 @@ export class PrismaTaskRepository implements ITaskRepository {
       reminderEnabled: row.reminder_enabled || false,
       reminderTimezone: row.reminder_timezone,
       notificationId: row.notification_id,
+      estimatedDurationHours: row.estimated_duration_hours,
+      actualDurationHours: row.actual_duration_hours,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       // Relations (from JOIN)
@@ -599,69 +612,6 @@ export class PrismaTaskRepository implements ITaskRepository {
     }
 
     return where
-  }
-
-  /**
-   * Prisma Model → Domain Entity
-   */
-  private toDomain(prismaTask: any): TaskData {
-    const analysis = (prismaTask.ai_analysis as Record<string, unknown>) || {}
-    const references = (prismaTask.references as Array<any>) || []
-
-    return {
-      id: prismaTask.id,
-      userId: prismaTask.user_id,
-      productId: prismaTask.product_id,
-      topicId: prismaTask.topic_id,
-      content: prismaTask.content,
-      status: this.fromPrismaStatus(prismaTask.status),
-      aiAnalysis: {
-        narrative: (analysis.narrative as string) || undefined,
-        lifecycle: (analysis.lifecycle as string) || undefined,
-        strategyUsed: (analysis.strategy_used as string) || undefined,
-        reasoning: (analysis.reasoning as string) || undefined,
-        mergedItems: (analysis.merged_items as string[]) || undefined,
-      },
-      references: references.map((r) => ({
-        id: r.id,
-        type: r.type,
-        content: r.content,
-        title: r.title,
-        createdAt: r.created_at ? new Date(r.created_at) : prismaTask.created_at,
-      })),
-      subItems: [], // populated by enrichWithSubTasks() from sub_tasks table
-      startDate: prismaTask.start_date,
-      dueDate: prismaTask.due_date,
-      timeConfidence: prismaTask.time_confidence,
-      inferredFromMilestone: prismaTask.inferred_from_milestone,
-      dateSource: prismaTask.date_source ?? null,
-      remindAt: prismaTask.remind_at,
-      reminderEnabled: prismaTask.reminder_enabled || false,
-      reminderTimezone: prismaTask.reminder_timezone,
-      notificationId: prismaTask.notification_id,
-      createdAt: prismaTask.created_at,
-      updatedAt: prismaTask.updated_at,
-      // Relations
-      product: prismaTask.product
-        ? {
-            id: prismaTask.product.id,
-            name: prismaTask.product.name,
-            areaId: prismaTask.product.area_id,
-            area: prismaTask.product.area
-              ? {
-                  id: prismaTask.product.area.id,
-                  name: prismaTask.product.area.name,
-                }
-              : undefined,
-          }
-        : undefined,
-      topic: prismaTask.topic
-        ? {
-            id: prismaTask.topic.id,
-            name: prismaTask.topic.name,
-          }
-        : undefined,
-    }
   }
 
   /**
