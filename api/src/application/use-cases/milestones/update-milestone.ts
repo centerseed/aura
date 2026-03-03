@@ -19,7 +19,6 @@ export interface UpdateMilestoneRequest {
   target_date?: string // ISO 8601 date string
   entity_type?: 'AREA' | 'PRODUCT' | 'TOPIC'
   entity_id?: string
-  priority?: number
   description?: string
   status?: 'planned' | 'in_progress' | 'completed' | 'delayed' | 'cancelled'
 }
@@ -32,7 +31,6 @@ export interface UpdateMilestoneResponse {
     target_date: Date
     entity_type: string
     entity_id: string
-    priority: number
     description: string | null
     status: string
     created_at: Date
@@ -68,7 +66,6 @@ export class UpdateMilestoneUseCase {
     if (request.target_date !== undefined) updateData.target_date = new Date(request.target_date)
     if (request.entity_type !== undefined) updateData.entity_type = request.entity_type
     if (request.entity_id !== undefined) updateData.entity_id = request.entity_id
-    if (request.priority !== undefined) updateData.priority = request.priority
     if (request.description !== undefined) updateData.description = request.description
     if (request.status !== undefined) updateData.status = request.status
 
@@ -118,12 +115,6 @@ export class UpdateMilestoneUseCase {
           'Entity type must be AREA, PRODUCT, or TOPIC',
           'entity_type'
         )
-      }
-    }
-
-    if (request.priority !== undefined) {
-      if (!Number.isInteger(request.priority) || request.priority < 1 || request.priority > 10) {
-        throw new ValidationException('Priority must be an integer between 1 and 10', 'priority')
       }
     }
 

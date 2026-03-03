@@ -25,7 +25,6 @@ export interface ReorganizePromptContext {
     name: string;
     target_date: string;
     status: string;
-    priority: number;
     description: string;
   }>;
   today: string;

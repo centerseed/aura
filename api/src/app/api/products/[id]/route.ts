@@ -39,7 +39,7 @@ export async function PATCH(
     // 2. 解析參數
     const { id: productId } = await params
     const body = await request.json() as any
-    const { name, description, area_id, status, lifecycle } = body
+    const { name, description, area_id, status, lifecycle, priority } = body
 
     // 3. 執行 Use Case
     const useCase = new UpdateProductUseCase()
@@ -51,6 +51,7 @@ export async function PATCH(
       areaId: area_id,
       status,
       lifecycle,
+      priority,
     })
 
     // 4. 統一回應格式

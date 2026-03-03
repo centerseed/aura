@@ -127,7 +127,6 @@ export function DroppableProduct({
         >
           <div className="flex items-center gap-2">
             <GripVertical className="w-4 h-4 text-white/50 group-hover/header:text-white/80 transition-colors" />
-            <Package className="w-4 h-4 text-white/50" />
             <button
               onClick={(e) => {
                 e.stopPropagation()

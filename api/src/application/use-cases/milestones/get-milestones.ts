@@ -25,7 +25,6 @@ export interface MilestoneWithEntity {
   target_date: Date
   entity_type: 'AREA' | 'PRODUCT' | 'TOPIC'
   entity_id: string
-  priority: number
   description: string | null
   status: string
   created_at: Date
@@ -52,7 +51,6 @@ interface RawMilestoneRow {
   milestone_target_date: Date
   milestone_entity_type: string
   milestone_entity_id: string
-  milestone_priority: number
   milestone_description: string | null
   milestone_status: string
   milestone_created_at: Date
@@ -82,7 +80,6 @@ export class GetMilestonesUseCase {
         m.target_date as milestone_target_date,
         m.entity_type::text as milestone_entity_type,
         m.entity_id as milestone_entity_id,
-        m.priority as milestone_priority,
         m.description as milestone_description,
         m.status as milestone_status,
         m.created_at as milestone_created_at,
@@ -124,7 +121,6 @@ export class GetMilestonesUseCase {
       target_date: row.milestone_target_date,
       entity_type: row.milestone_entity_type as 'AREA' | 'PRODUCT' | 'TOPIC',
       entity_id: row.milestone_entity_id,
-      priority: row.milestone_priority,
       description: row.milestone_description,
       status: row.milestone_status,
       created_at: row.milestone_created_at,

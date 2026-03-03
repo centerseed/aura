@@ -23,7 +23,7 @@ import {
   detectStuckTasks,
   detectStuckSubTasks,
 } from '@/application/services/coach-detection'
-import { CoachAIGenerator } from '@/application/services/coach-ai-generator'
+import { CoachAIGenerator, type FocusDriftData } from '@/application/services/coach-ai-generator'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { ValidationException } from '@/lib/api-response'
 import { prisma } from '@/lib/db'
@@ -106,6 +106,16 @@ export class GenerateBriefingUseCase {
     const stagnations = [...stuckTasks, ...stuckSubTasks]
     timings.detection = Date.now() - start
 
+    // 6.5. 計算焦點偏差（Focus Drift）
+    let focusDrift: FocusDriftData | undefined
+    if (request.type === 'MORNING') {
+      try {
+        focusDrift = await this.computeFocusDrift(request.userId)
+      } catch (err) {
+        console.error('[GenerateBriefing] Focus drift computation failed (non-blocking):', err)
+      }
+    }
+
     // 7. 晨報：生成每日計畫 + 從結果組裝摘要（單次 LLM）
     //    晚報：呼叫 AI 生成回顧（單次 LLM）
     let aiResult: import('@/application/services/coach-ai-generator').CoachAIOutput
@@ -140,6 +150,7 @@ export class GenerateBriefingUseCase {
         completedTasks: aggregatedData.completedTasks,
         remainingTasks: aggregatedData.remainingTasks,
         tomorrowPreview: aggregatedData.tomorrowPreview,
+        focusDrift,
         dailyPlan: planResult ? {
           items: planResult.plan.items
             .filter(i => i.status === 'today')
@@ -259,6 +270,66 @@ export class GenerateBriefingUseCase {
   // ============================================================================
   // Private Methods
   // ============================================================================
+
+  /**
+   * 計算焦點偏差：過去 7 天完成任務的優先度分佈
+   */
+  private async computeFocusDrift(userId: string): Promise<FocusDriftData> {
+    const rows = await prisma.$queryRaw<Array<{
+      priority: string
+      completed_count: bigint
+      last_active_at: Date | null
+    }>>`
+      SELECT
+        p.priority::text AS priority,
+        COUNT(t.id) FILTER (
+          WHERE t.status = 'ARCHIVE'
+            AND t.updated_at > NOW() - INTERVAL '7 days'
+        ) AS completed_count,
+        MAX(t.updated_at) FILTER (WHERE t.status = 'ARCHIVE') AS last_active_at,
+        p.id,
+        p.name
+      FROM products p
+      LEFT JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
+      WHERE p.user_id = ${userId}
+        AND p.deleted_at IS NULL
+        AND p.status != 'ARCHIVE'
+      GROUP BY p.id, p.name, p.priority
+    `
+
+    const now = new Date()
+    const stagnantThresholdMs = 5 * 24 * 60 * 60 * 1000
+
+    const productsWithData = (rows as Array<{
+      priority: string
+      completed_count: bigint
+      last_active_at: Date | null
+      id: string
+      name: string
+    }>).map(row => ({
+      id: row.id,
+      name: row.name,
+      priority: row.priority,
+      completedCount: Number(row.completed_count),
+      isStagnant: (row.priority === 'P0' || row.priority === 'P1') &&
+        (row.last_active_at === null || now.getTime() - row.last_active_at.getTime() > stagnantThresholdMs),
+    }))
+
+    const totalCompleted = productsWithData.reduce((sum, p) => sum + p.completedCount, 0)
+    const lowPriorityCompleted = productsWithData
+      .filter(p => p.priority === 'P2' || p.priority === 'P3')
+      .reduce((sum, p) => sum + p.completedCount, 0)
+    const lowPriorityRatio = totalCompleted > 0 ? lowPriorityCompleted / totalCompleted : 0
+    const stagnantHighPriorityProducts = productsWithData
+      .filter(p => p.isStagnant)
+      .map(p => ({ id: p.id, name: p.name, priority: p.priority }))
+
+    return {
+      detected: stagnantHighPriorityProducts.length > 0 || lowPriorityRatio > 0.7,
+      lowPriorityRatio: Math.round(lowPriorityRatio * 100) / 100,
+      stagnantHighPriorityProducts,
+    }
+  }
 
   /**
    * 基於規則生成 defer suggestions（不靠 AI）

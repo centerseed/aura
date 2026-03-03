@@ -19,6 +19,7 @@ interface RawProductRow {
   product_description: string | null
   product_status: string
   product_lifecycle: string
+  product_priority: string
   product_display_order: number
   product_references: unknown
   product_created_at: Date
@@ -60,6 +61,7 @@ export interface ProductData {
   description: string | null
   status: string
   lifecycle: string
+  priority: string
   display_order: number
   created_at: Date
   updated_at: Date
@@ -139,6 +141,7 @@ export class GetProductsUseCase {
         p.description as product_description,
         p.status::text as product_status,
         p.lifecycle::text as product_lifecycle,
+        p.priority::text as product_priority,
         p.display_order as product_display_order,
         p.references as product_references,
         p.created_at as product_created_at,
@@ -169,7 +172,11 @@ export class GetProductsUseCase {
         AND t.status != 'ARCHIVE'::"statusenum"
       LEFT JOIN topics top ON top.id = t.topic_id
       WHERE p.user_id = ${request.userId}::uuid AND p.deleted_at IS NULL
-      ORDER BY p.display_order ASC, p.created_at DESC, t.created_at DESC
+      ORDER BY
+        CASE p.priority::text WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 1 END ASC,
+        p.display_order ASC,
+        p.created_at DESC,
+        t.created_at DESC
     `
 
     // 3. 批次查詢 sub_tasks
@@ -231,6 +238,7 @@ export class GetProductsUseCase {
           description: row.product_description,
           status: row.product_status,
           lifecycle: row.product_lifecycle,
+          priority: row.product_priority,
           display_order: row.product_display_order,
           created_at: row.product_created_at,
           updated_at: row.product_updated_at,

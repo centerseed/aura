@@ -98,6 +98,7 @@ model Product {
   description             String?                @db.VarChar
   status                  Status
   lifecycle               Lifecycle
+  priority                Priority               @default(P1)
   embedding               Unsupported("vector")?
   display_order           Int                    @default(0)
   references              Json                   @default("[]") @db.Json
@@ -225,7 +226,6 @@ model Milestone {
   status      String    @default("planned") @db.VarChar
   entity_type String    @db.VarChar
   entity_id   String    @db.Uuid
-  priority    Int       @default(5)
   description String?   @db.VarChar
   user        User      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
@@ -515,6 +515,15 @@ model orders {
   @@index([gateway_order_id])
   @@index([status])
   @@index([user_id])
+}
+
+enum Priority {
+  P0
+  P1
+  P2
+  P3
+
+  @@map("priorityenum")
 }
 
 enum Status {

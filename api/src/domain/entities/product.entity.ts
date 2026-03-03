@@ -17,6 +17,8 @@ export interface Area {
   created_at: string
 }
 
+export type ProductPriority = 'P0' | 'P1' | 'P2' | 'P3'
+
 /**
  * Product - 資產/專案（L2）
  */
@@ -26,6 +28,7 @@ export interface Product {
   area_id: string
   name: string
   description: string | null
+  priority: ProductPriority
   created_at: string
   // Relations
   area?: Area

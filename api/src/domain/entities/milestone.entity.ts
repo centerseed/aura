@@ -26,7 +26,6 @@ export interface Milestone {
   status: MilestoneStatus
   entity_type: EntityType
   entity_id: string
-  priority: number
   description: string | null
   created_at: string
   updated_at: string

@@ -101,6 +101,7 @@ export function createMockProduct(overrides: MockProductOverrides = {}): Product
     area_id: 'test-area-id',
     name: 'Test Product',
     description: null,
+    priority: 'P1',
     created_at: new Date().toISOString(),
     ...overrides,
   }

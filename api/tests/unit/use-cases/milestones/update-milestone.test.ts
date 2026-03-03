@@ -88,16 +88,6 @@ describe('UpdateMilestoneUseCase', () => {
       ).rejects.toThrow('Entity type must be AREA, PRODUCT, or TOPIC')
     })
 
-    it('應該拋出錯誤當 priority 超出範圍', async () => {
-      await expect(
-        useCase.execute({
-          milestoneId: 'milestone-123',
-          userId: 'user-123',
-          priority: 15,
-        })
-      ).rejects.toThrow('Priority must be an integer between 1 and 10')
-    })
-
     it('應該拋出錯誤當 status 無效', async () => {
       await expect(
         useCase.execute({
@@ -130,7 +120,6 @@ describe('UpdateMilestoneUseCase', () => {
         target_date: new Date('2024-12-31'),
         entity_type: 'PRODUCT',
         entity_id: 'product-123',
-        priority: 5,
         description: null,
         status: 'planned',
         created_at: new Date(),
@@ -171,7 +160,6 @@ describe('UpdateMilestoneUseCase', () => {
         target_date: new Date('2024-12-31'),
         entity_type: 'PRODUCT',
         entity_id: 'product-123',
-        priority: 5,
         description: null,
         status: 'planned',
         created_at: new Date(),
@@ -205,7 +193,6 @@ describe('UpdateMilestoneUseCase', () => {
         target_date: new Date('2024-12-31'),
         entity_type: 'PRODUCT',
         entity_id: 'product-123',
-        priority: 5,
         description: null,
         status: 'planned',
         created_at: new Date(),
@@ -216,7 +203,6 @@ describe('UpdateMilestoneUseCase', () => {
       const updatedMilestone = {
         ...existingMilestone,
         name: 'New Name',
-        priority: 8,
         status: 'in_progress',
         description: 'Updated description',
         updated_at: new Date(),
@@ -229,13 +215,11 @@ describe('UpdateMilestoneUseCase', () => {
         milestoneId: 'milestone-123',
         userId: 'user-123',
         name: 'New Name',
-        priority: 8,
         status: 'in_progress',
         description: 'Updated description',
       })
 
       expect(result.milestone.name).toBe('New Name')
-      expect(result.milestone.priority).toBe(8)
       expect(result.milestone.status).toBe('in_progress')
       expect(result.milestone.description).toBe('Updated description')
     })

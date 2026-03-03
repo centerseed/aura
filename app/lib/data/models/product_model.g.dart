@@ -15,6 +15,7 @@ _$ProductModelImpl _$$ProductModelImplFromJson(Map<String, dynamic> json) =>
       description: json['description'] as String?,
       status: json['status'] as String,
       lifecycle: json['lifecycle'] as String,
+      priority: json['priority'] as String? ?? 'P1',
       displayOrder: (json['display_order'] as num?)?.toInt() ?? 0,
       createdAt: json['created_at'] == null
           ? null
@@ -47,6 +48,7 @@ Map<String, dynamic> _$$ProductModelImplToJson(
   if (instance.description case final value?) 'description': value,
   'status': instance.status,
   'lifecycle': instance.lifecycle,
+  'priority': instance.priority,
   'display_order': instance.displayOrder,
   if (instance.createdAt?.toIso8601String() case final value?)
     'created_at': value,

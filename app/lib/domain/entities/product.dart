@@ -9,6 +9,7 @@ class Product extends Equatable {
   final String description;
   final ProductStatus status;
   final ProductLifecycle lifecycle;
+  final ProductPriority priority;
   final String areaId;
   final int displayOrder;
   final DateTime? createdAt;
@@ -26,6 +27,7 @@ class Product extends Equatable {
     required this.description,
     required this.status,
     required this.lifecycle,
+    this.priority = ProductPriority.p1,
     required this.areaId,
     required this.displayOrder,
     this.createdAt,
@@ -53,4 +55,23 @@ enum ProductStatus { inbox, active, maintain, reference, archive }
 enum ProductLifecycle {
   finite, // 有終點的專案
   perpetual, // 永續維護
+}
+
+/// Product 優先度
+enum ProductPriority {
+  p0, // 最高優先，本週必推進
+  p1, // 重要，本月目標
+  p2, // 一般，有空再做
+  p3, // 低優先，長期擱置
+}
+
+/// 從 API 字串解析 Priority（domain layer utility）
+ProductPriority parsePriority(String? value) {
+  switch (value?.toUpperCase()) {
+    case 'P0': return ProductPriority.p0;
+    case 'P1': return ProductPriority.p1;
+    case 'P2': return ProductPriority.p2;
+    case 'P3': return ProductPriority.p3;
+    default: return ProductPriority.p1;
+  }
 }

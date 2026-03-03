@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   return catchDomainException(async () => {
     const userId = await authenticateRequest(request, prisma)
     const body = await request.json() as any
-    const { name, target_date, entity_type, entity_id, priority, description, status } = body
+    const { name, target_date, entity_type, entity_id, description, status } = body
 
     const useCase = new CreateMilestoneUseCase()
     const result = await useCase.execute({
@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
       target_date,
       entity_type,
       entity_id,
-      priority,
       description,
       status,
     })

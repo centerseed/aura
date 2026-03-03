@@ -1,18 +1,30 @@
 # Zentropy Milestone 發展藍圖 V2
 
-**版本**: 2.0
-**日期**: 2026-03-02
-**基於**: 競爭策略研究報告（Zentropy_vs_OpenClaw_Strategy_Report.md）+ M0-M4 實際完成狀態
+**版本**: 2.1
+**日期**: 2026-03-03
+**基於**: 競爭策略研究報告（Zentropy_vs_OpenClaw_Strategy_Report.md）+ M0-M4 實際完成狀態 + Planner 主動治理設計意見
 
 ---
 
-## 背景與修正說明
+## 產品方向：從「AI 大腦管家」到「AI 營運長」
 
-V1 路線圖（040）在策略研究報告完成之前撰寫，缺少策略核心功能的執行計劃。本 V2 針對以下缺口進行修正：
+Zentropy 的核心護城河是治理引擎（三大分類 + rule distillation）。V2.1 的關鍵洞察是：**讓這個引擎從被動回應升級為主動規劃**。
+
+- **現況（M0-M4）**：用戶把混亂輸入 → Zentropy 幫你整理清楚
+- **M6 之後（Planner）**：用戶說出一個方向 → Zentropy 幫你規劃好再整理好
+
+這不是加功能，是同一個治理引擎往上走一層。所有 Planner 輸出都走 rule distillation 迴路，確保個人化、不失控、越用越懂你。
+
+---
+
+## 背景與修正說明（V2.0 → V2.1）
+
+V1 路線圖（040）在策略研究報告完成之前撰寫，缺少策略核心功能的執行計劃。V2.0 插入 M3.5（Episodic Memory）與 M3 優先度治理。V2.1 進一步更新：
 
 1. **插入 M3.5**：Episodic Memory（偏差追蹤），策略報告的 Phase 1 Wedge Feature，是讓 Coach 真正成為「教練」而非「提醒器」的關鍵
 2. **插入 M3 的用戶治理功能**：Project 優先度管理（純用戶治理，AI 不介入）
 3. **Beta 前必須有差異化**：M5 Beta 若沒有 M3.5，上線的是更好的 Kanban，而不是 AI 營運教練
+4. **M6 大幅升級為 Active Governance Planner**：Thought Partner 概念擴展為完整的主動治理模組，Zentropy 從「管住混亂」變成「幫你把事情規劃好再管住」
 
 ---
 
@@ -43,9 +55,12 @@ V1 路線圖（040）在策略研究報告完成之前撰寫，缺少策略核�
 ## 路線圖總覽
 
 ```
-M3           M3.5          M4補完       M5           M6           M7
-Governance → Episodic   → MCP驗證  → Public    → Thought   → Growth
-(4週)        Memory(4週)   (2週)       Beta(5週)   Partner(6週) (持續)
+M3           M3.5          M4補完       M5           M6                  M7
+Governance → Episodic   → MCP驗證  → Public    → Active Governance → Growth
+(4週)        Memory(4週)   (2週)       Beta(5週)   Planner(12週)       (持續)
+                                                    └ Phase1: 3個Skill
+                                                    └ Phase2: Calendar整合
+                                                    └ Phase3: 自訂Skill請求
 ```
 
 ---
@@ -368,101 +383,209 @@ M5 Beta 必須在 M3.5 完成後才啟動。沒有偏差追蹤功能的 Beta 等
 
 ---
 
-## Milestone 6: Thought Partner（L3 Refine）（6 週）
+## Milestone 6: Active Governance Planner（12 週）
 
-> **目標**：實作策略報告的武器三——從「執行系統」升級為「思考夥伴」，進入競品無法複製的護城河地帶
+> **目標**：從被動治理升級為主動治理——用戶只需說出一個方向，Planner 自動規劃並轉成 Zentropy 原生格式（task + subtask + Area + Due Date + 優先級）
+>
+> **策略地位**：這是讓 Zentropy 從「AI 大腦管家」升級為「AI 營運長」的關鍵一步。護城河來自治理引擎（rule distillation）確保所有規劃輸出都個人化、不失控，競品抄 UI 容易，抄規劃品質極難。
 
 ### 設計原則
 
-**目前所有任務管理工具（包括 OpenClaw）都只做 Execution**：你說什麼，它做什麼。Zentropy 的 Coach 要做的是：在你說「我要 2 週上線」之前，先問你幾個問題。
+**零治理原則**：用戶不用選 skill、不用管 prompt。一句話輸入 → 後台自動判斷類型 → 呼叫對應規劃邏輯 → 全部轉成 Zentropy 格式 → 問用戶「要現在套用嗎？」。
 
-但這條原則有一個邊界：**Coach 提供資訊和問題，不提供答案**。它呈現取捨，用戶做決定。
+**Planner 永遠是治理引擎的延伸，不是獨立工具**：所有輸出都走 rule distillation 迴路，讓它「越用越懂你」。
+
+**Coach 提供資訊和問題，不提供答案**：呈現取捨，用戶做決定；Planner 提供完整規劃，用戶一鍵確認。
 
 ---
 
-### 6.1 想法具體化（Idea → Action Path）
+### 技術架構：MCP `run_planner` Tool
 
-**觸發方式**：Brain Dump 輸入的內容被判定為「模糊想法」而非具體任務時，Coach 主動介入
+在現有 MCP server 新增 `run_planner` tool：
 
-**範例流程**：
+```
+輸入：user_query + user_history_embedding
+
+內部流程：
+1. embedding 判斷任務類型（產品規劃 / 學習 / 行銷 / 行政…）
+2. 自動匹配最適合的預設 Skill（不暴露給用戶）
+3. 呼叫 remote Claude Code 產生結構化規劃
+4. 把 Claude 產出的 JSON 強制轉成 Zentropy task schema
+5. 走 rule distillation 做最後個人化調整
+
+輸出：8–12 個 task + subtask，帶 Area / Due Date / 優先級
+```
+
+用戶介面：一個輸入框「Planner，幫我規劃……」+ 一鍵套用確認。
+
+---
+
+### Phase 1（M6 前 4 週）：2 個核心 Skill 上線
+
+> **市場研究依據（2026-03）**：ClawHub 2026/2 月數據、GitHub awesome list、50+ 篇文章；OpenClaw registry；Upwork 2026 報告。**優先順序依零治理契合度 × 需求量交叉評分**，非單純依需求量排列。
+>
+> **Content Planning（需求最高 28-35%）刻意延後至 Phase 2**：因為最終執行需用戶管外部發文工具（LinkedIn、Substack），容易違反零治理原則；等 MCP 接發文 API 後再上更完整。
+
+#### 6.1 產品功能 / MVP 規劃 Skill ⭐（最優先，契合度 9.5/10）
+
+**觸發**：輸入涉及「新功能 / 產品規劃 / MVP / 技術實作」
+
+**市場證據**：需求 21%（#2）；GitHub adhd-founder-planner、project roadmap skill 大宗；Reddit & GitHub 開發者最常問「幫我把新功能拆成 user story + technical task + milestone」；solopreneur 報告指出「從 idea 到 shipped」是最痛環節；用戶付費意願最高。
+
+**流程**：
+```
+用戶輸入：「我想規劃新產品的支付功能」
+
+Planner 自動：
+- 呼叫 Claude Code 做任務拆解
+  （user story → technical task → milestone）
+- 根據 rule distillation 判斷「這是衝刺區」
+- 自動設 Due Date + 能量分配
+- 輸出 8–12 個 task + subtask
+
+預覽輸出：
+┌─ 支付功能規劃（P0 衝刺，3 週）──────────────────────────┐
+│ Week 1: 調查與設計                                       │
+│   ├ 研究 Stripe / 綠界 API 差異（2h）                    │
+│   ├ 繪製支付流程圖（3h）                                  │
+│   └ 確認後端 schema 設計（1h）                            │
+│ Week 2: 實作                                             │
+│   ├ 建立 payment intent API（4h）                         │
+│   └ ...                                                   │
+└───────────────────────────────────────────────────────────┘
+
+[立即套用] [調整後套用] [取消]
+```
+
+**爽感**：創業者輸入「新功能規劃」→ 直接變成可執行的衝刺任務，技術型斜槓族會瘋狂分享。
+
+---
+
+#### 6.2 學習安排 Skill（契合度 9.2/10，成長最快）
+
+**觸發**：輸入涉及「學習 / 課程 / 自學 / side project」
+
+**市場證據**：需求 12%（#4）但成長最快；OpenClaw 有 spaced repetition / study plan 類別；台灣一人公司社群最常見「想學 Next.js，幫我拆 3 個月計劃」；100% 的輸出都能落地成 Zentropy 原生 task，無需外部工具，零治理完美契合。
+
+**流程**：
+```
+用戶輸入：「我想學 Next.js 做 side project，3 個月內上線」
+
+Planner 自動拆解：
+- Week 1–4：基礎學習（每天 1.5h 小任務）
+- Week 5–8：開始做專案（每週 2–3 個里程碑）
+- Week 9–12：測試 + 上線準備
+- 加入複習間隔提示（spaced repetition 概念）
+- 全部掛到「維護區」task + 停滯警示設定
+```
+
+**爽感**：「終於有人懂我腦袋裡的學習焦慮」——上班族斜槓族最容易病毒式傳播。
+
+---
+
+### Phase 2（M6 第 5–8 週）：Content Planning + 想法深化
+
+#### 6.3 內容 / 行銷規劃 Skill（需求最高 28-35%，但延後至 Phase 2）
+
+**為何延後**：Content Planning 需求雖最高，但最終執行需要管外部工具（LinkedIn、Substack、Instagram），在 MCP 接通發文 API 前上線，用戶最後還是得自己管發文，違反零治理原則。Phase 2 同步完成 MCP 發文 API 整合，讓輸出真正落地。
+
+**觸發**：輸入涉及「寫作 / 文章 / 行銷 / 發文 / 社群內容」
+
+**流程**：
+```
+用戶輸入：「幫我規劃下一期 Substack 關於 AI Agent」
+
+Planner 自動產出：
+- 大綱（5 個段落方向）
+- 研究清單（3–5 個需要查的資料點）
+- 寫作日程（每天 30min，共 5 天）
+- 發文排程（可直接 propose 到 Buffer / 原生發文工具）
+- 全部轉成 task，標記「行銷區」
+```
+
+---
+
+#### 6.4 想法具體化（Idea → Action Path）
+
+**觸發**：Brain Dump 輸入被判定為「模糊想法」而非具體任務時，Coach 主動介入
 
 ```
 用戶輸入：「想做一個幫設計師管案子的 SaaS」
 
 Coach：
-這是個值得探索的方向！在建立任何任務之前，讓我問幾個問題：
+這是個值得探索的方向！在規劃之前，讓我問幾個問題：
 
 1. 你說的「管案子」，目前設計師最痛的環節是哪一個？
-   （報價追蹤 / 客戶溝通 / 版本管理 / 收款...）
-
 2. 你打算自己做，還是這是某個客戶的需求？
-
 3. 你希望 3 個月後，這件事到什麼程度算成功？
 
-[用戶回答後]
-
-Coach 根據回答，生成：
-- 具體下一步行動（3 個）
-- 關鍵假設（需要先驗證的事）
-- 建議掛到哪個 Area / Product
+[用戶回答後 → Planner 直接輸出完整規劃並一鍵套用]
 ```
 
----
+#### 6.5 假設挑戰（Assumption Challenge）
 
-### 6.2 假設挑戰（Assumption Challenge）
-
-**觸發方式**：任務描述含有時間承諾或強烈假設時
-
-**範例**：
+**觸發**：任務描述含有時間承諾或強烈假設時，結合 M3.5 的歷史數據
 
 ```
 用戶：「兩週內上線這個功能」
 
-Coach（有了 M3.5 的歷史數據）：
+Planner（使用 M3.5 個人偏差數據）：
 
-讓我補充一些脈絡：
-
-📊 數據面（來自你的歷史）：
+📊 根據你的歷史數據：
 - 你過去 5 次功能上線平均花 3.5 週
-- 你在有外部依賴的任務上平均多加 40% 時間
-- 這個任務依賴 [X API]，上次類似整合花了 9 天
+- 你在設計任務上平均低估 2.1 倍
+- 這個任務有外部 API 依賴，類似整合上次花了 9 天
 
-🤔 值得確認的事：
-1. 「兩週」是硬性的嗎？（客戶承諾 / 自我設定）
-2. 可以縮小範圍，先上線核心功能嗎？
-3. 延誤的代價是什麼？
+🤔 值得確認的取捨：
+1. 「兩週」是硬性承諾嗎？
+2. 可以先上線核心功能嗎？
 
 我沒有建議——這些是值得想清楚的取捨。
 ```
 
----
-
-### 6.3 信任校準介面
-
-用戶可設定每個 Coach 功能的自主程度：
+#### 6.6 信任校準介面
 
 ```
 Coach 行為設定：
 - 估時建議：顯示（我自己決定要不要調整）
-- 假設挑戰：有時（只在我有時間承諾的任務上觸發）
+- 假設挑戰：有時（只在有時間承諾的任務上觸發）
 - 想法具體化：總是（每次模糊輸入都引導）
-- 衝突警示：顯示（我自己決定怎麼處理）
+- Planner 自動套用：詢問確認（不自動套用）
 ```
+
+---
+
+### Phase 3（M6 第 9–12 週）：自訂 Skill 請求
+
+- 用戶可以提出「我想要一個 ___ 的規劃方式」
+- 後台（你）審核後加入，不讓用戶自己管 prompt
+- 確保 Planner 不變成 OpenClaw（零治理原則不打折）
 
 ---
 
 ### M6 驗收標準
 
-- [ ] Brain Dump 模糊想法觸發想法具體化流程，生成可執行下一步
-- [ ] 有時間承諾的任務觸發假設挑戰（使用 M3.5 的歷史數據）
+**Phase 1（前 4 週）：**
+- [ ] 產品功能/MVP 規劃 Skill 上線，輸入需求 → 輸出完整衝刺任務 + 一鍵套用
+- [ ] 學習安排 Skill 上線，12 週計劃自動拆成每日任務
+- [ ] MCP `run_planner` tool 可呼叫，輸出符合 Zentropy task schema
+- [ ] embedding 自動判斷輸入類型並匹配 Skill（用戶無感）
+
+**Phase 2（第 5–8 週）：**
+- [ ] 內容/行銷規劃 Skill 上線（含 MCP 發文 API 整合）
+- [ ] Brain Dump 模糊想法觸發想法具體化 + Planner 輸出整合
+- [ ] 有時間承諾的任務觸發假設挑戰（使用 M3.5 歷史數據）
 - [ ] 信任校準設定可在 Settings 頁調整
-- [ ] 用戶訪談中至少 3 位表示「Coach 幫我想到我沒想到的事」
+
+**Phase 3（第 9–12 週）：**
+- [ ] 用戶自訂 Skill 請求機制（Typeform → 後台審核 → 上線）
+- [ ] 用戶訪談中至少 3 位表示「輸入一句話，3 分鐘後看到完整計劃」
 
 ---
 
 ## Milestone 7: Growth & Scale（持續）
 
-> **目標**：驗證付費模式、開拓 Growth Channel、準備規模化
+> **目標**：驗證付費模式、開拓 Growth Channel、準備規模化；同時完成 Planner Phase 2 Calendar 整合
 
 ### 7.1 Stripe 正式計費
 
@@ -475,14 +598,21 @@ Coach 行為設定：
 - Telegram / LINE Bot（訊息轉發進 Inbox，降低手機使用門檻）
 - Gmail Add-on（郵件轉任務）
 - 偏差報告分享功能（截圖分享 → 病毒傳播）
+- Planner 成果分享（「我用 Zentropy 3 分鐘規劃了 12 週學習計劃」）
 
-### 7.3 團隊協作（Nexus Tier）
+### 7.3 Planner Phase 2：Calendar 整合
+
+- Planner 輸出任務後，可直接 propose 到 Google Calendar / Apple Calendar
+- 用戶確認一次 → 全部寫入日曆 + Zentropy task
+- 這是讓 Planner 真正「排程落地」的關鍵步驟
+
+### 7.4 團隊協作（Nexus Tier）
 
 - Product 層級的協作者邀請
 - OWNER / EDITOR / VIEWER 權限分級
-- AI 重組權限只有 OWNER 可觸發
+- AI 重組 + Planner 建議權限只有 OWNER 可觸發
 
-### 7.4 MCP npm 套件
+### 7.5 MCP npm 套件
 
 - 從 API Server 拆出，發布為獨立 npm 套件
 - 開發者文件完整化
@@ -497,10 +627,15 @@ Coach 行為設定：
 | **M3.5: Episodic Memory** ⭐ | 4 週 | 偏差追蹤 + Reference Class Forecasting | 5 用戶看到個人準確度報告 |
 | **M4 補完** | 2 週 | Claude Desktop + Cursor 連線驗證 | 連線截圖 + 步驟文件 |
 | **M5: Public Beta** | 5 週 | 20 用戶、NPS > 40、WTP > 30% | NPS + WTP Survey |
-| **M6: Thought Partner** | 6 週 | L3 Refine：想法具體化 + 假設挑戰 | 3 位用戶主動引用 Coach 的問題 |
-| **M7: Growth** | 持續 | Stripe 計費 + Bot + 協作 | MRR |
+| **M6: Active Governance Planner** ⭐ | 12 週 | Planner（3 Skill）+ 想法具體化 + 假設挑戰 + 自訂 Skill | 「輸入一句話，3 分鐘後完整計劃」用戶回饋 |
+| **M7: Growth** | 持續 | Stripe 計費 + Planner Phase 2 + 協作 | MRR |
 
 **預計總時程（M3 開始到 M5 Beta 啟動）**：約 15 週（3.5 個月）
+
+**M6 Planner 6 個月路線**：
+- Month 1–2：產品功能規劃 + 學習安排兩個 Skill 上線，推出「Planner」入口
+- Month 3–4：一鍵套用全部 task + Calendar propose 整合
+- Month 5–6：開放自訂 Skill 請求（後台審核，不讓用戶自己管）
 
 ---
 
@@ -525,6 +660,20 @@ Coach 行為設定：
 **決定**：在 M3.5 開發期間同步進行 5 位用戶深度訪談，不等功能完成。
 
 **理由**：訪談目的是驗證假設和找到用戶的真實語言，不需要功能完成才能進行。等功能完成才找用戶，會讓訪談流於展示而非探索。
+
+### DDR-004：Planner 不暴露 Skill 給用戶
+
+**決定**：用戶只看到一個輸入框「Planner，幫我規劃……」，後台自動判斷類型並匹配 Skill，不讓用戶選擇或管理 Skill。
+
+**理由**：一旦讓用戶「自己選 skill」或「自己寫 prompt」，立刻違反零治理原則，用戶會覺得「又要管東西」。Zentropy 的核心承諾是降低認知負擔，而不是提供更多旋鈕。開放的 Skill 系統（OpenClaw 模式）是護城河的反面——任何人都能抄，但個人化規劃品質只有走 rule distillation 迴路的 Planner 才能做到。
+
+**邊界**：Phase 3 開放「自訂 Skill 請求」，但由後台審核並上線，用戶不接觸 Skill 管理介面。
+
+### DDR-005：Planner 是治理引擎延伸，不是獨立工具
+
+**決定**：所有 Planner 輸出都必須通過 rule distillation 迴路，才能寫入 Zentropy。
+
+**理由**：若 Planner 輸出繞過治理引擎，會製造兩套不一致的任務資料——一套是 Brain Dump 進來的（有治理），一套是 Planner 生成的（沒治理）。長期下來會破壞 Librarian 的個人化品質，也讓 Distill 的護城河失效。**Planner 的差異化不在於規劃能力，而在於「規劃 + 治理的整合」。**
 
 ---
 

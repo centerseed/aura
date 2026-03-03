@@ -21,7 +21,7 @@ export async function PUT(
     const userId = await authenticateRequest(request, prisma)
     const { id: milestoneId } = await params
     const body = await request.json() as any
-    const { name, target_date, entity_type, entity_id, priority, description, status } = body
+    const { name, target_date, entity_type, entity_id, description, status } = body
 
     const useCase = new UpdateMilestoneUseCase()
     const result = await useCase.execute({
@@ -31,7 +31,6 @@ export async function PUT(
       target_date,
       entity_type,
       entity_id,
-      priority,
       description,
       status,
     })

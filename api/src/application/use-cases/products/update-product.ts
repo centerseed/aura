@@ -21,6 +21,7 @@ export interface UpdateProductRequest {
   areaId?: string
   status?: 'INBOX' | 'ACTIVE' | 'MAINTAIN' | 'REFERENCE' | 'ARCHIVE'
   lifecycle?: 'FINITE' | 'PERPETUAL'
+  priority?: 'P0' | 'P1' | 'P2' | 'P3'
 }
 
 export interface ProductData {
@@ -31,6 +32,7 @@ export interface ProductData {
   description: string | null
   status: string
   lifecycle: string
+  priority: string
   display_order: number
   created_at: Date
   updated_at: Date
@@ -95,6 +97,7 @@ export class UpdateProductUseCase {
         area_id: request.areaId,
         status: request.status as any,
         lifecycle: request.lifecycle as any,
+        priority: request.priority as any,
       },
     })
 
@@ -137,6 +140,12 @@ export class UpdateProductUseCase {
           'Name must be between 1 and 200 characters',
           'name'
         )
+      }
+    }
+
+    if (request.priority !== undefined) {
+      if (!['P0', 'P1', 'P2', 'P3'].includes(request.priority)) {
+        throw new ValidationException('Priority must be P0, P1, P2, or P3', 'priority')
       }
     }
   }

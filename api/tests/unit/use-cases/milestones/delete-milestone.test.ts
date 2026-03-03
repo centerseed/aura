@@ -67,7 +67,6 @@ describe('DeleteMilestoneUseCase', () => {
         target_date: new Date('2024-12-31'),
         entity_type: 'PRODUCT',
         entity_id: 'product-123',
-        priority: 5,
         description: null,
         status: 'planned',
         created_at: new Date(),

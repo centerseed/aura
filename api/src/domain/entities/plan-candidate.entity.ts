@@ -30,7 +30,6 @@ export interface MilestoneContext {
   id: string
   name: string
   targetDate: Date
-  priority: number
   entityType: string
   entityName: string
 }

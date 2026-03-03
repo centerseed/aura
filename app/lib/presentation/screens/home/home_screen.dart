@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'tabs/today_focus_tab.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/load_view_tab.dart';
+import 'tabs/priority_view_tab.dart';
 import 'widgets/tutorial_overlay.dart';
 import '../../providers/first_time_tutorial_provider.dart'
     show
@@ -30,6 +31,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     TodayFocusTab(),
     OverviewTab(),
     LoadViewTab(),
+    PriorityViewTab(),
   ];
 
   @override
@@ -120,6 +122,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           icon: Icons.insights_outlined,
                           activeIcon: Icons.insights,
                           label: '負載',
+                        ),
+                        _buildNavItem(
+                          index: 3,
+                          icon: Icons.sort_outlined,
+                          activeIcon: Icons.sort,
+                          label: '優先度',
                         ),
                       ],
                     ),

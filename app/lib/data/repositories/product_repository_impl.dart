@@ -180,6 +180,7 @@ class ProductRepositoryImpl implements ProductRepository {
     String? areaId,
     ProductStatus? status,
     ProductLifecycle? lifecycle,
+    ProductPriority? priority,
   }) async {
     try {
       final payload = <String, dynamic>{};
@@ -188,6 +189,7 @@ class ProductRepositoryImpl implements ProductRepository {
       if (areaId != null) payload['area_id'] = areaId;
       if (status != null) payload['status'] = status.name.toUpperCase();
       if (lifecycle != null) payload['lifecycle'] = lifecycle.name.toUpperCase();
+      if (priority != null) payload['priority'] = priority.name.toUpperCase();
 
       final model = await _apiClient.updateProduct(productId, payload);
       return Right(model.toEntity());

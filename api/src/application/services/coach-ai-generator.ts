@@ -68,6 +68,12 @@ export interface DailyPlanForBriefing {
   overflowItems: Array<{ itemId: string; suggestion: string }>
 }
 
+export interface FocusDriftData {
+  detected: boolean
+  lowPriorityRatio: number
+  stagnantHighPriorityProducts: Array<{ id: string; name: string; priority: string }>
+}
+
 export interface CoachAIInput {
   type: BriefingType
   calendarEvents: CalendarEventSummary[]
@@ -79,6 +85,7 @@ export interface CoachAIInput {
   remainingTasks: TaskSummary[]
   tomorrowPreview: CalendarEventSummary[]
   dailyPlan?: DailyPlanForBriefing
+  focusDrift?: FocusDriftData
 }
 
 export interface CoachAIOutput {
@@ -199,6 +206,19 @@ export class CoachAIGenerator {
         }
         sections.push('')
       }
+    }
+
+    // 焦點偏差警告
+    if (input.focusDrift?.detected) {
+      const { lowPriorityRatio, stagnantHighPriorityProducts } = input.focusDrift
+      sections.push('## ⚠️ 焦點偏差警告（Focus Drift）')
+      sections.push(`過去 7 天，有 ${Math.round(lowPriorityRatio * 100)}% 的完成任務屬於低優先度（P2/P3）。`)
+      if (stagnantHighPriorityProducts.length > 0) {
+        const names = stagnantHighPriorityProducts.map(p => `${p.name}（${p.priority}）`).join('、')
+        sections.push(`高優先度專案已停滯超過 5 天：${names}`)
+      }
+      sections.push('請在建議中明確質詢用戶：是否有意識地暫緩高優先度專案？還是不知不覺在做「安全任務」？')
+      sections.push('')
     }
 
     // 明日預覽

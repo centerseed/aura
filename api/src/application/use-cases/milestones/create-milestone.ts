@@ -18,7 +18,6 @@ export interface CreateMilestoneRequest {
   target_date: string // ISO 8601 date string
   entity_type: 'AREA' | 'PRODUCT' | 'TOPIC'
   entity_id: string
-  priority?: number
   description?: string
   status?: 'planned' | 'in_progress' | 'completed' | 'delayed' | 'cancelled'
 }
@@ -31,7 +30,6 @@ export interface CreateMilestoneResponse {
     target_date: Date
     entity_type: string
     entity_id: string
-    priority: number
     description: string | null
     status: string
     created_at: Date
@@ -53,7 +51,6 @@ export class CreateMilestoneUseCase {
     this.validateRequest(request)
 
     // 2. 設定預設值
-    const priority = request.priority ?? 5
     const status = request.status ?? 'planned'
 
     // 3. 創建里程碑
@@ -64,7 +61,6 @@ export class CreateMilestoneUseCase {
         target_date: new Date(request.target_date),
         entity_type: request.entity_type,
         entity_id: request.entity_id,
-        priority: priority,
         description: request.description,
         status: status,
       },
@@ -115,12 +111,6 @@ export class CreateMilestoneUseCase {
 
     if (!request.entity_id) {
       throw new ValidationException('Entity ID is required', 'entity_id')
-    }
-
-    if (request.priority !== undefined) {
-      if (!Number.isInteger(request.priority) || request.priority < 1 || request.priority > 10) {
-        throw new ValidationException('Priority must be an integer between 1 and 10', 'priority')
-      }
     }
 
     if (request.status !== undefined) {

@@ -167,7 +167,6 @@ export async function POST(
       name: m.name,
       target_date: m.target_date.toISOString(),
       status: m.status,
-      priority: m.priority,
       description: m.description || "",
     }));
 

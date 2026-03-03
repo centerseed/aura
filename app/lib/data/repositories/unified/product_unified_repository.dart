@@ -130,6 +130,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
     String? areaId,
     ProductStatus? status,
     ProductLifecycle? lifecycle,
+    ProductPriority? priority,
   }) async {
     try {
       final body = <String, dynamic>{};
@@ -138,6 +139,7 @@ class ProductUnifiedRepository extends CachedRepository<Product, String>
       if (areaId != null) body['area_id'] = areaId;
       if (status != null) body['status'] = status.name.toUpperCase();
       if (lifecycle != null) body['lifecycle'] = lifecycle.name.toUpperCase();
+      if (priority != null) body['priority'] = priority.name.toUpperCase();
 
       final model = await _apiClient.updateProduct(productId, body);
       final product = model.toEntity();

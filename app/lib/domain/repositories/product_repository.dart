@@ -16,6 +16,7 @@ abstract class ProductRepository {
     String? areaId,
     ProductStatus? status,
     ProductLifecycle? lifecycle,
+    ProductPriority? priority,
   });
 
   /// 刪除 Product（軟刪除）

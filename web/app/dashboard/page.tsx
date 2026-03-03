@@ -52,6 +52,7 @@ import {
   ExternalLink,
   FileText,
   Trash2,
+  ListOrdered,
 } from "lucide-react";
 import type {
   TaskCard,
@@ -62,12 +63,14 @@ import type {
   ReorganizeProposal,
   EntityType,
 } from "@/types";
+import type { ProductPriority } from "@/domain/entities/product.entity";
 import { QuickCapture } from "@/components/quick-capture";
 import { TodayOverviewSheet } from "@/components/today-overview-sheet";
 import { AIButtonTip } from "@/components/ai-button-tip";
 import { QuickInputGuide } from "@/components/quick-input-guide";
 import { TimelineView } from "@/components/timeline-view";
 import { MilestoneLoadView } from "@/components/milestone-load-view";
+import { PriorityView } from "./components/priority-view";
 import { MilestoneModal } from "@/components/milestone-modal";
 import { MilestoneList } from "@/components/milestone-list";
 import { ProductModal } from "@/components/product-modal";
@@ -77,7 +80,10 @@ import { TaskDueDateModal } from "@/components/task-due-date-modal";
 import { ReorganizeModal } from "@/components/reorganize-modal";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { DRAWER_CONFIG } from "@/domain/constants/drawer-config";
+import { DRAWER_CONFIG } from "@/domain/constants/drawer-config"
+import { PriorityPicker } from "@/components/priority-picker"
+import { FocusBiasPanel } from "@/app/dashboard/components/focus-bias-panel";
+import type { ViewMode, ApiArea, ApiProduct } from "./context/types";
 
 // Helper function to get auth headers
 async function getAuthHeaders() {
@@ -85,29 +91,6 @@ async function getAuthHeaders() {
   if (!user) throw new Error("No authenticated user");
   const token = await user.getIdToken();
   return { 'Authorization': `Bearer ${token}` };
-}
-
-// 視圖類型
-type ViewMode = "structure" | "timeline" | "load";
-
-// API 返回的 Area 結構
-interface ApiArea {
-  id: string;
-  name: string;
-  description: string | null;
-  scope: string | null;
-  products: ApiProduct[];
-}
-
-interface ApiProduct {
-  id: string;
-  name: string;
-  description: string | null;
-  status: string;
-  lifecycle: "FINITE" | "PERPETUAL";
-  referenceCount: number;
-  tasks: TaskCard[];
-  topics?: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -132,6 +115,7 @@ function cleanLibraryData(areas: any[]): ApiArea[] {
           description: product.description || null,
           status: product.status || 'ACTIVE',
           lifecycle: product.lifecycle || 'FINITE',
+          priority: product.priority || 'P1',
           referenceCount: Number(product.referenceCount) || 0,
           topics: (Array.isArray(product.topics) ? product.topics : [])
             .filter((t: any) => t != null && t.id && t.name),
@@ -776,6 +760,7 @@ function DroppableProduct({
   productDescription,
   productLifecycle,
   productStatus,
+  productPriority = "P1",
   referenceCount = 0,
   tasks,
   isOver,
@@ -797,6 +782,7 @@ function DroppableProduct({
   onEdit,
   onShowReferences,
   onEditTaskTitle,
+  onPriorityChange,
   isReorganizing = false,
 }: {
   productId: string;
@@ -804,6 +790,7 @@ function DroppableProduct({
   productDescription?: string | null;
   productLifecycle: "FINITE" | "PERPETUAL";
   productStatus: string;
+  productPriority?: ProductPriority;
   referenceCount?: number;
   tasks: TaskCard[];
   isOver: boolean;
@@ -825,6 +812,7 @@ function DroppableProduct({
   onEdit?: (product: { id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string }) => void;
   onShowReferences?: (product: { id: string; name: string; description?: string | null; lifecycle: "FINITE" | "PERPETUAL"; status: string }) => void;
   onEditTaskTitle?: (taskId: string, newTitle: string) => void;
+  onPriorityChange?: (productId: string, priority: ProductPriority) => void;
   isReorganizing?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -875,7 +863,10 @@ function DroppableProduct({
         >
           <div className="flex items-center gap-2">
             <GripVertical className="w-4 h-4 text-white/50 group-hover/header:text-white/80 transition-colors" />
-            <Package className="w-4 h-4 text-white/50" />
+            <PriorityPicker
+              priority={productPriority}
+              onSelect={(p) => onPriorityChange?.(productId, p)}
+            />
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -2965,6 +2956,43 @@ function DashboardContent() {
     }
   };
 
+  // 更新 Product Priority
+  const handlePriorityChange = async (productId: string, priority: ProductPriority) => {
+    if (!userId) return;
+
+    // Capture snapshot for revert
+    let snapshot: ApiArea[] = [];
+    setAreas((prev) => {
+      snapshot = prev;
+      return updateAreasState(prev, (areas) =>
+        areas.map((area) => ({
+          ...area,
+          products: area.products.map((product) =>
+            product.id === productId ? { ...product, priority } : product
+          ),
+        }))
+      );
+    });
+
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ priority }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "更新優先度失敗");
+      }
+    } catch (err) {
+      console.error("Failed to update product priority:", err);
+      alert(err instanceof Error ? err.message : "更新優先度失敗，請稍後再試");
+      setAreas(snapshot);
+    }
+  };
+
   // AI 重組 Product Topics
   const handleReorganize = async (productId: string, productName: string) => {
     if (!userId) {
@@ -3401,6 +3429,17 @@ function DashboardContent() {
                 <Target className="w-4 h-4" />
                 <span className="text-sm font-medium">負載視圖</span>
               </button>
+              <button
+                onClick={() => setViewMode("priority")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
+                  viewMode === "priority"
+                    ? "bg-blue-500/30 text-blue-300"
+                    : "text-white/60 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <ListOrdered className="w-4 h-4" />
+                <span className="text-sm font-medium">優先度視圖</span>
+              </button>
             </div>
 
 
@@ -3617,6 +3656,8 @@ function DashboardContent() {
               {/* 視圖切換 */}
               {viewMode === "structure" && (
                 <div className="space-y-8">
+                  {/* Focus Bias Panel */}
+                  <FocusBiasPanel />
                   {(Array.isArray(displayAreas) ? displayAreas : []).map((area) => (
                     <div key={area.id}>
                       {/* Area Header (可放置 Product) */}
@@ -3647,6 +3688,7 @@ function DashboardContent() {
                               productDescription={product.description}
                               productLifecycle={product.lifecycle}
                               productStatus={product.status}
+                              productPriority={product.priority}
                               referenceCount={product.referenceCount}
                               tasks={showArchive ? product.tasks : product.tasks.filter((t) => t && t.drawer !== "ARCHIVE")}
                               isOver={overDropId === product.id}
@@ -3680,6 +3722,7 @@ function DashboardContent() {
                               onEditSubItem={handleEditSubItem}
                               onAddSubItem={handleAddSubItem}
                               onDeleteReference={handleDeleteReference}
+                              onPriorityChange={handlePriorityChange}
                               onRename={handleRenameProduct}
                               onEdit={(product) => {
                                 setEditingProduct(product);
@@ -3775,6 +3818,13 @@ function DashboardContent() {
                     })),
                   }))}
                   milestones={milestones}
+                />
+              )}
+
+              {viewMode === "priority" && (
+                <PriorityView
+                  areas={displayAreas}
+                  onPriorityChange={handlePriorityChange}
                 />
               )}
             </main>

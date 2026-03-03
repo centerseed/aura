@@ -79,7 +79,6 @@ export interface UnifiedRawData {
     id: string
     name: string
     target_date: Date
-    priority: number
     entity_type: string
     entity_name: string
   }>

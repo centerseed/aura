@@ -10,11 +10,12 @@ import type {
   Milestone,
   ReorganizeProposal,
 } from '@/types'
+import type { ProductPriority } from '@/domain/entities/product.entity'
 
 /**
  * 視圖模式
  */
-export type ViewMode = 'structure' | 'timeline' | 'load'
+export type ViewMode = 'structure' | 'timeline' | 'load' | 'priority'
 
 /**
  * API 返回的 Area 結構
@@ -36,8 +37,10 @@ export interface ApiProduct {
   description: string | null
   status: string
   lifecycle: 'FINITE' | 'PERPETUAL'
+  priority: ProductPriority
   referenceCount: number
   tasks: TaskCard[]
+  topics?: Array<{ id: string; name: string }>
 }
 
 /**

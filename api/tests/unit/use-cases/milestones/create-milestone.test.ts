@@ -110,19 +110,6 @@ describe('CreateMilestoneUseCase', () => {
       ).rejects.toThrow('Entity ID is required')
     })
 
-    it('應該拋出錯誤當 priority 超出範圍', async () => {
-      await expect(
-        useCase.execute({
-          userId: 'user-123',
-          name: 'Test Milestone',
-          target_date: '2024-12-31',
-          entity_type: 'PRODUCT',
-          entity_id: 'product-123',
-          priority: 11,
-        })
-      ).rejects.toThrow('Priority must be an integer between 1 and 10')
-    })
-
     it('應該拋出錯誤當 status 無效', async () => {
       await expect(
         useCase.execute({
@@ -146,7 +133,6 @@ describe('CreateMilestoneUseCase', () => {
         target_date: new Date('2024-12-31'),
         entity_type: 'PRODUCT',
         entity_id: 'product-123',
-        priority: 5,
         description: null,
         status: 'planned',
         created_at: new Date(),
@@ -172,13 +158,12 @@ describe('CreateMilestoneUseCase', () => {
           name: 'Test Milestone',
           entity_type: 'PRODUCT',
           entity_id: 'product-123',
-          priority: 5,
           status: 'planned',
         }),
       })
     })
 
-    it('應該使用自訂的 priority 和 status', async () => {
+    it('應該使用自訂的 status', async () => {
       const mockMilestone = {
         id: 'milestone-123',
         user_id: 'user-123',
@@ -186,7 +171,6 @@ describe('CreateMilestoneUseCase', () => {
         target_date: new Date('2024-12-31'),
         entity_type: 'AREA',
         entity_id: 'area-123',
-        priority: 8,
         description: 'Test description',
         status: 'in_progress',
         created_at: new Date(),
@@ -202,12 +186,10 @@ describe('CreateMilestoneUseCase', () => {
         target_date: '2024-12-31',
         entity_type: 'AREA',
         entity_id: 'area-123',
-        priority: 8,
         description: 'Test description',
         status: 'in_progress',
       })
 
-      expect(result.milestone.priority).toBe(8)
       expect(result.milestone.status).toBe('in_progress')
       expect(result.milestone.description).toBe('Test description')
     })

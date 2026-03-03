@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Slider } from "@/components/ui/slider";
 import { X, Calendar, Target, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
@@ -43,7 +42,6 @@ export function MilestoneModal({
   const [targetDate, setTargetDate] = useState<Date | undefined>();
   const [entityType, setEntityType] = useState<EntityType>("PRODUCT");
   const [entityId, setEntityId] = useState("");
-  const [priority, setPriority] = useState(5);
   const [status, setStatus] = useState<MilestoneStatus>("planned");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +54,6 @@ export function MilestoneModal({
       setTargetDate(editingMilestone.target_date ? new Date(editingMilestone.target_date) : undefined);
       setEntityType(editingMilestone.entity_type || "PRODUCT");
       setEntityId(editingMilestone.entity_id || "");
-      setPriority(editingMilestone.priority ?? 5);
       setStatus(editingMilestone.status || "planned");
       setDescription(editingMilestone.description || "");
     } else {
@@ -65,7 +62,6 @@ export function MilestoneModal({
       setTargetDate(undefined);
       setEntityType("PRODUCT");
       setEntityId("");
-      setPriority(5);
       setStatus("planned");
       setDescription("");
     }
@@ -139,7 +135,6 @@ export function MilestoneModal({
         status,
         entity_type: entityType,
         entity_id: entityId,
-        priority,
         description: description.trim() || undefined,
       };
 
@@ -367,29 +362,6 @@ export function MilestoneModal({
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
-
-          {/* 優先級滑桿 */}
-          <div>
-            <label className="block text-sm font-medium text-white/70 mb-2">
-              優先級（1-10）
-              <span className="ml-2 text-white/90 text-base font-semibold">{priority}</span>
-            </label>
-            <div className="px-2 py-4">
-              <Slider
-                value={[priority]}
-                onValueChange={(values) => setPriority(values[0])}
-                min={1}
-                max={10}
-                step={1}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-white/40 mt-2 px-1">
-                <span>低</span>
-                <span>中</span>
-                <span>高</span>
-              </div>
             </div>
           </div>
 

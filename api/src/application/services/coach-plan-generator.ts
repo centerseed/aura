@@ -226,7 +226,7 @@ export class CoachPlanGenerator {
       sections.push('## 里程碑（排程參考）')
       for (const m of milestones) {
         const targetStr = new Date(m.targetDate).toISOString().substring(0, 10)
-        sections.push(`- [${m.entityType}] ${m.entityName}: "${m.name}" target=${targetStr} priority=${m.priority}`)
+        sections.push(`- [${m.entityType}] ${m.entityName}: "${m.name}" target=${targetStr}`)
       }
       sections.push('')
     }

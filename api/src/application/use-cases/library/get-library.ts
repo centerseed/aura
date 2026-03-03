@@ -73,6 +73,7 @@ export interface ProductData {
   description: string | null
   status: string
   lifecycle: string
+  priority: string | null
   referenceCount: number
   tasks: TaskData[]
   topics: TopicData[]
@@ -105,6 +106,7 @@ interface RawLibraryRow {
   product_description: string | null
   product_status: string | null
   product_lifecycle: string | null
+  product_priority: string | null
   product_references: unknown
   product_display_order: number | null
   task_id: string | null
@@ -138,6 +140,7 @@ export class GetLibraryUseCase {
         p.description as product_description,
         p.status::text as product_status,
         p.lifecycle::text as product_lifecycle,
+        p.priority::text as product_priority,
         p.references as product_references,
         p.display_order as product_display_order,
         t.id::text as task_id,
@@ -243,6 +246,7 @@ export class GetLibraryUseCase {
           description: row.product_description,
           status: row.product_status!,
           lifecycle: row.product_lifecycle!,
+          priority: row.product_priority ?? null,
           referenceCount: productRefs.length, // 先計算 product refs，後面加 task refs
           tasks: [],
           topics: [],

@@ -12,6 +12,7 @@ class UpdateProductParams {
   final String? areaId;
   final ProductStatus? status;
   final ProductLifecycle? lifecycle;
+  final ProductPriority? priority;
 
   const UpdateProductParams({
     required this.productId,
@@ -20,6 +21,7 @@ class UpdateProductParams {
     this.areaId,
     this.status,
     this.lifecycle,
+    this.priority,
   });
 }
 
@@ -38,6 +40,7 @@ class UpdateProductUseCase extends UseCase<Product, UpdateProductParams> {
       areaId: params.areaId,
       status: params.status,
       lifecycle: params.lifecycle,
+      priority: params.priority,
     );
   }
 }

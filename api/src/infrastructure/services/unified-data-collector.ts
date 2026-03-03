@@ -62,7 +62,6 @@ interface RawMilestone {
   id: string
   name: string
   target_date: Date
-  priority: number
   entity_type: string
   entity_name: string
 }
@@ -350,7 +349,6 @@ export class UnifiedDataCollector implements IDataCollector {
         m.id::text,
         m.name,
         m.target_date,
-        m.priority,
         m.entity_type,
         COALESCE(p.name, a.name, 'General') as entity_name
       FROM milestones m
@@ -360,7 +358,7 @@ export class UnifiedDataCollector implements IDataCollector {
         AND m.deleted_at IS NULL
         AND m.target_date >= ${todayStart}
         AND m.target_date < ${threeMonthsLater}
-      ORDER BY m.target_date ASC, m.priority DESC
+      ORDER BY m.target_date ASC
       LIMIT ${MAX_MILESTONES}
     `
   }

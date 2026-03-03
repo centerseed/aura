@@ -30,6 +30,8 @@ mixin _$ProductModel {
   String? get description => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   String get lifecycle => throw _privateConstructorUsedError;
+  @JsonKey(name: 'priority', defaultValue: 'P1')
+  String get priority => throw _privateConstructorUsedError;
   @JsonKey(name: 'display_order', defaultValue: 0)
   int get displayOrder => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
@@ -70,6 +72,7 @@ abstract class $ProductModelCopyWith<$Res> {
     String? description,
     String status,
     String lifecycle,
+    @JsonKey(name: 'priority', defaultValue: 'P1') String priority,
     @JsonKey(name: 'display_order', defaultValue: 0) int displayOrder,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
@@ -103,6 +106,7 @@ class _$ProductModelCopyWithImpl<$Res, $Val extends ProductModel>
     Object? description = freezed,
     Object? status = null,
     Object? lifecycle = null,
+    Object? priority = null,
     Object? displayOrder = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
@@ -141,6 +145,10 @@ class _$ProductModelCopyWithImpl<$Res, $Val extends ProductModel>
             lifecycle: null == lifecycle
                 ? _value.lifecycle
                 : lifecycle // ignore: cast_nullable_to_non_nullable
+                      as String,
+            priority: null == priority
+                ? _value.priority
+                : priority // ignore: cast_nullable_to_non_nullable
                       as String,
             displayOrder: null == displayOrder
                 ? _value.displayOrder
@@ -197,6 +205,7 @@ abstract class _$$ProductModelImplCopyWith<$Res>
     String? description,
     String status,
     String lifecycle,
+    @JsonKey(name: 'priority', defaultValue: 'P1') String priority,
     @JsonKey(name: 'display_order', defaultValue: 0) int displayOrder,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
@@ -229,6 +238,7 @@ class __$$ProductModelImplCopyWithImpl<$Res>
     Object? description = freezed,
     Object? status = null,
     Object? lifecycle = null,
+    Object? priority = null,
     Object? displayOrder = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
@@ -267,6 +277,10 @@ class __$$ProductModelImplCopyWithImpl<$Res>
         lifecycle: null == lifecycle
             ? _value.lifecycle
             : lifecycle // ignore: cast_nullable_to_non_nullable
+                  as String,
+        priority: null == priority
+            ? _value.priority
+            : priority // ignore: cast_nullable_to_non_nullable
                   as String,
         displayOrder: null == displayOrder
             ? _value.displayOrder
@@ -316,6 +330,7 @@ class _$ProductModelImpl extends _ProductModel {
     this.description,
     required this.status,
     required this.lifecycle,
+    @JsonKey(name: 'priority', defaultValue: 'P1') this.priority = 'P1',
     @JsonKey(name: 'display_order', defaultValue: 0) required this.displayOrder,
     @JsonKey(name: 'created_at') this.createdAt,
     @JsonKey(name: 'updated_at') this.updatedAt,
@@ -348,6 +363,9 @@ class _$ProductModelImpl extends _ProductModel {
   final String status;
   @override
   final String lifecycle;
+  @override
+  @JsonKey(name: 'priority', defaultValue: 'P1')
+  final String priority;
   @override
   @JsonKey(name: 'display_order', defaultValue: 0)
   final int displayOrder;
@@ -398,7 +416,7 @@ class _$ProductModelImpl extends _ProductModel {
 
   @override
   String toString() {
-    return 'ProductModel(id: $id, userId: $userId, areaId: $areaId, name: $name, description: $description, status: $status, lifecycle: $lifecycle, displayOrder: $displayOrder, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, references: $references, totalReferenceCount: $totalReferenceCount, tasks: $tasks, recentTasks: $recentTasks)';
+    return 'ProductModel(id: $id, userId: $userId, areaId: $areaId, name: $name, description: $description, status: $status, lifecycle: $lifecycle, priority: $priority, displayOrder: $displayOrder, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, references: $references, totalReferenceCount: $totalReferenceCount, tasks: $tasks, recentTasks: $recentTasks)';
   }
 
   @override
@@ -415,6 +433,8 @@ class _$ProductModelImpl extends _ProductModel {
             (identical(other.status, status) || other.status == status) &&
             (identical(other.lifecycle, lifecycle) ||
                 other.lifecycle == lifecycle) &&
+            (identical(other.priority, priority) ||
+                other.priority == priority) &&
             (identical(other.displayOrder, displayOrder) ||
                 other.displayOrder == displayOrder) &&
             (identical(other.createdAt, createdAt) ||
@@ -447,6 +467,7 @@ class _$ProductModelImpl extends _ProductModel {
     description,
     status,
     lifecycle,
+    priority,
     displayOrder,
     createdAt,
     updatedAt,
@@ -480,6 +501,7 @@ abstract class _ProductModel extends ProductModel {
     final String? description,
     required final String status,
     required final String lifecycle,
+    @JsonKey(name: 'priority', defaultValue: 'P1') final String priority,
     @JsonKey(name: 'display_order', defaultValue: 0)
     required final int displayOrder,
     @JsonKey(name: 'created_at') final DateTime? createdAt,
@@ -511,6 +533,9 @@ abstract class _ProductModel extends ProductModel {
   String get status;
   @override
   String get lifecycle;
+  @override
+  @JsonKey(name: 'priority', defaultValue: 'P1')
+  String get priority;
   @override
   @JsonKey(name: 'display_order', defaultValue: 0)
   int get displayOrder;

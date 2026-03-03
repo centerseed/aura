@@ -12,8 +12,11 @@ import '../../../../domain/entities/reference.dart';
 import '../../../../application/use_cases/add_product_reference_use_case.dart';
 import '../../../../application/use_cases/delete_product_reference_use_case.dart';
 import '../../../../application/use_cases/update_product_reference_use_case.dart';
+import '../../../../application/use_cases/update_product_use_case.dart';
 import '../../../../application/use_cases/reorganize_product_topics_use_case.dart';
 import '../../../../application/use_cases/apply_reorganization_use_case.dart';
+import '../../../utils/product_priority_colors.dart';
+import '../../../widgets/product_priority_badge.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../../providers/product_provider.dart';
 import '../../../providers/product_reference_provider.dart';
@@ -342,6 +345,12 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                           ),
                         ),
                         const SizedBox(width: 10),
+                        // Priority Badge
+                        ProductPriorityBadge(
+                          priority: product.priority,
+                          onChanged: (p) => _handlePriorityChange(product, p),
+                        ),
+                        const SizedBox(width: 8),
                         // Product 名稱
                         Expanded(
                           child: GestureDetector(
@@ -887,6 +896,23 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
           },
         ),
       ),
+    );
+  }
+
+  Future<void> _handlePriorityChange(Product product, ProductPriority priority) async {
+    final useCase = ref.read(updateProductUseCaseProvider);
+    final result = await useCase(UpdateProductParams(
+      productId: product.id,
+      priority: priority,
+    ));
+    result.fold(
+      (failure) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失敗：${failure.message}')),
+        );
+      },
+      (_) => ref.invalidate(dashboardProvider),
     );
   }
 

@@ -5,7 +5,7 @@
  */
 
 import { apiGet, apiPost, apiPatch, apiDelete } from './client'
-import type { Product, ReorganizeProposal } from '@/domain/entities/product.entity'
+import type { Product, ProductPriority, ReorganizeProposal } from '@/domain/entities/product.entity'
 
 /**
  * 創建產品 DTO
@@ -26,6 +26,7 @@ export interface UpdateProductDTO {
   description?: string | null
   status?: 'INBOX' | 'ACTIVE' | 'MAINTAIN' | 'REFERENCE' | 'ARCHIVE'
   lifecycle?: 'FINITE' | 'PERPETUAL'
+  priority?: ProductPriority
 }
 
 /**

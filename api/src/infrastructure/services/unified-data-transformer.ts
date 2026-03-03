@@ -180,7 +180,6 @@ export class UnifiedDataTransformer implements IDataTransformer {
       id: m.id,
       name: m.name,
       targetDate: m.target_date,
-      priority: m.priority,
       entityType: m.entity_type,
       entityName: m.entity_name,
     }))
