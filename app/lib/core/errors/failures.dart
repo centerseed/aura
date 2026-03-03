@@ -39,3 +39,11 @@ class ValidationFailure extends Failure {
 class UnknownFailure extends Failure {
   const UnknownFailure(super.message);
 }
+
+/// AI 速率限制錯誤（今日額度已用完）
+class RateLimitFailure extends Failure {
+  const RateLimitFailure([
+    String message =
+        '今日 AI 額度已用完，明天 UTC 00:00（台灣時間 08:00）後將自動重置。',
+  ]) : super(message);
+}

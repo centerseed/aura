@@ -387,6 +387,11 @@ class ApiClient {
     return response.data;
   }
 
+  Future<Map<String, dynamic>> getAiUsage() async {
+    final response = await _dio.get('/me/ai-usage');
+    return response.data['data'] as Map<String, dynamic>;
+  }
+
   /// 刪除帳號（soft-delete 所有使用者資料）
   /// DELETE /api/me
   Future<void> deleteAccount() async {

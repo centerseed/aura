@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import '../../../core/di/providers.dart';
+import '../../../core/errors/failures.dart';
 import '../../providers/ai_consent_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/product_provider.dart';
@@ -172,9 +173,26 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       result.fold(
         (fail) {
           if (mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Error: ${fail.message}')));
+            if (fail is RateLimitFailure) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(fail.message)),
+                    ],
+                  ),
+                  backgroundColor: AppColors.error,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: ${fail.message}')),
+              );
+            }
           }
         },
         (brainDumpResult) {

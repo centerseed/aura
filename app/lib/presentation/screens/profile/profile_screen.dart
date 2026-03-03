@@ -10,6 +10,7 @@ import '../../providers/theme_provider.dart';
 import '../../providers/user_provider.dart';
 import 'widgets/statistics_card.dart';
 import '../../providers/ai_consent_provider.dart';
+import '../../providers/ai_usage_provider.dart';
 import '../../providers/first_time_tutorial_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -98,13 +99,7 @@ class ProfileScreen extends ConsumerWidget {
 
             _buildSection(context, '帳戶', [
               _buildAiConsentTile(context, ref),
-              _buildTile(
-                context,
-                icon: Icons.schedule_rounded,
-                title: 'AI 每日用量',
-                subtitle: '每日 50 次，於 UTC 00:00（台灣時間 08:00）重設',
-                onTap: () {},
-              ),
+              _buildAiUsageTile(context, ref),
               _buildTile(
                 context,
                 icon: Icons.tour_outlined,
@@ -663,6 +658,86 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   String _pad(int value) => value.toString().padLeft(2, '0');
+
+  Widget _buildAiUsageTile(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final aiUsageAsync = ref.watch(aiUsageProvider);
+
+    return aiUsageAsync.when(
+      loading: () => _buildTile(
+        context,
+        icon: Icons.schedule_rounded,
+        title: 'AI 每日用量',
+        subtitle: '載入中...',
+        onTap: () {},
+      ),
+      error: (_, __) => _buildTile(
+        context,
+        icon: Icons.schedule_rounded,
+        title: 'AI 每日用量',
+        subtitle: '載入失敗',
+        onTap: () {},
+      ),
+      data: (usage) {
+        final used = usage.used;
+        final limit = usage.limit;
+        final ratio = limit > 0 ? used / limit : 0.0;
+        final isExceeded = used >= limit;
+        final isWarning = !isExceeded && ratio >= 0.8;
+
+        Color subtitleColor = colorScheme.onSurface.withOpacity(0.5);
+        if (isExceeded) subtitleColor = AppColors.error;
+        else if (isWarning) subtitleColor = Colors.amber.shade700;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.schedule_rounded,
+                  color: colorScheme.onSurfaceVariant, size: 22),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI 每日用量',
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: ratio.clamp(0.0, 1.0),
+                      backgroundColor: colorScheme.onSurface.withValues(alpha: 0.1),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isExceeded
+                            ? AppColors.error
+                            : isWarning
+                                ? Colors.amber.shade700
+                                : AppColors.primary,
+                      ),
+                      minHeight: 3,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isExceeded
+                          ? '$used / $limit 次（明天 08:00 重設）'
+                          : '$used / $limit 次已使用',
+                      style: TextStyle(color: subtitleColor, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildAiConsentTile(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;

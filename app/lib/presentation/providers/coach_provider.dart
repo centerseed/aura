@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/di/providers.dart';
+import '../../core/errors/failures.dart';
 import '../../data/repositories/coach_repository_impl.dart';
 import '../../domain/entities/coach_briefing.dart';
 import '../../domain/entities/daily_plan.dart';
@@ -22,7 +23,7 @@ class CoachBriefingState {
   final bool isGenerating;
   final bool isStale; // plan 是昨日的快取
   final bool isAutoGenerating; // 背景自動生成中
-  final String? error;
+  final Failure? error;
 
   const CoachBriefingState({
     this.briefing,
@@ -41,7 +42,7 @@ class CoachBriefingState {
     bool? isGenerating,
     bool? isStale,
     bool? isAutoGenerating,
-    String? error,
+    Failure? error,
     bool clearError = false,
     bool clearBriefing = false,
     bool clearPlan = false,
@@ -103,15 +104,15 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
 
     CoachBriefing? briefing;
     DailyPlan? plan;
-    String? error;
+    Failure? error;
 
     briefingResult.fold(
-      (f) => error = f.message,
+      (f) => error = f,
       (b) => briefing = b as CoachBriefing?,
     );
 
     planResult.fold(
-      (f) => error ??= f.message,
+      (f) => error ??= f,
       (p) => plan = p as DailyPlan?,
     );
 
@@ -172,7 +173,7 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
         state = state.copyWith(
           isAutoGenerating: false,
           isStale: false,
-          error: f.message,
+          error: f,
         );
       },
       (plan) => _finalizePlanGeneration(plan, myGeneration),
@@ -214,7 +215,7 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
     final result = await _repository.generateBriefing(type: type);
 
     result.fold(
-      (f) => state = state.copyWith(isGenerating: false, error: f.message),
+      (f) => state = state.copyWith(isGenerating: false, error: f),
       (briefing) => state = state.copyWith(
         briefing: briefing,
         isGenerating: false,
@@ -230,7 +231,7 @@ class CoachBriefingNotifier extends StateNotifier<CoachBriefingState> {
     final result = await _repository.generatePlan();
 
     result.fold(
-      (f) => state = state.copyWith(isGenerating: false, error: f.message),
+      (f) => state = state.copyWith(isGenerating: false, error: f),
       (plan) => state = state.copyWith(
         plan: plan,
         isGenerating: false,

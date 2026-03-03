@@ -5,6 +5,7 @@ class ApiEndpoints {
   // ==================== Auth ====================
   static const String signIn = '/api/auth/signin';
   static const String me = '/api/me';
+  static const String aiUsage = '/api/me/ai-usage';
 
   // ==================== Brain Dump ====================
   static const String brainDump = '/api/brain-dump';

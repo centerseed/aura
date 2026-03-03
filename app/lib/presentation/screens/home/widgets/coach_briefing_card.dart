@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/failures.dart';
 import '../../../../domain/entities/coach_briefing.dart';
 import '../../../providers/coach_provider.dart';
 import 'coach_briefing_sheet.dart';
@@ -284,41 +285,49 @@ class _CoachBriefingCardState extends ConsumerState<CoachBriefingCard>
     );
   }
 
-  Widget _buildErrorCard(String error) {
+  Widget _buildErrorCard(Failure error) {
+    final isRateLimit = error is RateLimitFailure;
+    final cardColor = isRateLimit ? Colors.amber : AppColors.error;
+
     return Container(
       key: const ValueKey('error'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.06),
+        color: cardColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.error.withValues(alpha: 0.15),
+          color: cardColor.withValues(alpha: 0.15),
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+          Icon(
+            isRateLimit ? Icons.speed_rounded : Icons.error_outline,
+            color: cardColor,
+            size: 20,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '簡報載入失敗',
+              isRateLimit ? error.message : '簡報載入失敗',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 13,
               ),
             ),
           ),
-          GestureDetector(
-            onTap: () => ref.read(coachBriefingProvider.notifier).loadLatest(),
-            child: Text(
-              '重試',
-              style: TextStyle(
-                color: AppColors.onboardingIndigo.withValues(alpha: 0.8),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+          if (!isRateLimit)
+            GestureDetector(
+              onTap: () => ref.read(coachBriefingProvider.notifier).loadLatest(),
+              child: Text(
+                '重試',
+                style: TextStyle(
+                  color: AppColors.onboardingIndigo.withValues(alpha: 0.8),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

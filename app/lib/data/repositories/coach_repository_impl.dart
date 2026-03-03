@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart' hide Task;
 import 'package:dio/dio.dart';
 
+import '../../core/errors/dio_error_handler.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/coach_briefing.dart';
 import '../../domain/entities/daily_plan.dart';
@@ -44,10 +45,8 @@ class CoachRepositoryImpl implements CoachRepository {
               : null;
       final json = await _apiClient.generateBriefing(type: typeStr);
       return Right(CoachBriefing.fromJson(json));
-    } on DioException catch (e) {
-      return Left(ServerFailure(
-        e.response?.data?['error']?.toString() ?? '生成簡報失敗',
-      ));
+    } catch (e) {
+      return Left(handleDioError(e));
     }
   }
 
@@ -75,10 +74,8 @@ class CoachRepositoryImpl implements CoachRepository {
     try {
       final json = await _apiClient.generatePlan(date: date, timezone: timezone);
       return Right(DailyPlan.fromJson(json));
-    } on DioException catch (e) {
-      return Left(ServerFailure(
-        e.response?.data?['error']?.toString() ?? '生成計畫失敗',
-      ));
+    } catch (e) {
+      return Left(handleDioError(e));
     }
   }
 

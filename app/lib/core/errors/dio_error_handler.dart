@@ -96,6 +96,8 @@ Failure _mapErrorCodeToFailure(String? code, String message) {
       return AuthFailure(message);
     case 'NOT_FOUND':
       return ServerFailure('Resource not found: $message');
+    case 'RATE_LIMIT_EXCEEDED':
+      return RateLimitFailure(message);
     default:
       return ServerFailure(message);
   }
@@ -111,6 +113,9 @@ Failure _mapStatusCodeToFailure(int? statusCode) {
   }
   if (statusCode == 404) {
     return const ServerFailure('Resource not found');
+  }
+  if (statusCode == 429) {
+    return const RateLimitFailure();
   }
   if (statusCode >= 500) {
     return ServerFailure('Server error: $statusCode');

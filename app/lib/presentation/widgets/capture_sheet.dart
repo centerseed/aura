@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/core/di/providers.dart';
+import 'package:app/core/errors/failures.dart';
 import 'package:app/presentation/providers/ai_consent_provider.dart';
 import 'package:app/presentation/providers/task_provider.dart';
 import 'package:app/presentation/widgets/ai_consent_dialog.dart';
@@ -41,9 +42,26 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
       result.fold(
         (fail) {
           if (mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Error: ${fail.message}')));
+            if (fail is RateLimitFailure) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(fail.message)),
+                    ],
+                  ),
+                  backgroundColor: AppColors.error,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: ${fail.message}')),
+              );
+            }
           }
         },
         (_) async {

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dartz/dartz.dart';
+import '../../core/errors/dio_error_handler.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/brain_dump_result.dart';
 import '../../domain/repositories/brain_dump_repository.dart';
@@ -18,7 +19,7 @@ class BrainDumpRepositoryImpl implements BrainDumpRepository {
       final response = await _apiClient.brainDump(request);
       return Right(_mapResponse(response));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
@@ -36,7 +37,7 @@ class BrainDumpRepositoryImpl implements BrainDumpRepository {
       );
       return Right(_mapResponse(response));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(handleDioError(e));
     }
   }
 
