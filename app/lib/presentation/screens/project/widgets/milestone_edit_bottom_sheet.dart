@@ -36,8 +36,6 @@ class _MilestoneEditBottomSheetState
 
   DateTime? _targetDate;
   MilestoneStatus _status = MilestoneStatus.planned;
-  int _priority = 5;
-
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -56,7 +54,6 @@ class _MilestoneEditBottomSheetState
       _descriptionController.text = m.description ?? '';
       _targetDate = m.targetDate;
       _status = m.status;
-      _priority = m.priority;
     }
   }
 
@@ -285,13 +282,6 @@ class _MilestoneEditBottomSheetState
                         const SizedBox(height: 20),
                       ],
 
-                      // 優先級
-                      _buildLabel('優先級'),
-                      const SizedBox(height: 8),
-                      _buildPrioritySlider(colorScheme),
-
-                      const SizedBox(height: 20),
-
                       // 描述
                       _buildLabel('描述（選填）'),
                       const SizedBox(height: 8),
@@ -454,95 +444,6 @@ class _MilestoneEditBottomSheetState
     );
   }
 
-  Widget _buildPrioritySlider(ColorScheme colorScheme) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Text(
-              '$_priority',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: _priority >= 8
-                    ? AppColors.statusInbox
-                    : _priority >= 5
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _priority >= 8
-                  ? '高優先級'
-                  : _priority >= 5
-                      ? '一般'
-                      : '低優先級',
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: _priority >= 8
-                ? AppColors.statusInbox
-                : _priority >= 5
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-            inactiveTrackColor:
-                colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
-            thumbColor: _priority >= 8
-                ? AppColors.statusInbox
-                : _priority >= 5
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-            overlayColor: colorScheme.primary.withValues(alpha: 0.1),
-          ),
-          child: Slider(
-            value: _priority.toDouble(),
-            min: 1,
-            max: 10,
-            divisions: 9,
-            onChanged: (value) {
-              setState(() => _priority = value.round());
-              HapticFeedback.selectionClick();
-            },
-          ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '低',
-              style: TextStyle(
-                fontSize: 11,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
-              ),
-            ),
-            Text(
-              '中',
-              style: TextStyle(
-                fontSize: 11,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
-              ),
-            ),
-            Text(
-              '高',
-              style: TextStyle(
-                fontSize: 11,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Future<void> _selectDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -587,7 +488,6 @@ class _MilestoneEditBottomSheetState
           name: name,
           targetDate: _targetDate,
           status: _status,
-          priority: _priority,
           description: description.isEmpty ? null : description,
         );
 
@@ -604,7 +504,6 @@ class _MilestoneEditBottomSheetState
           targetDate: _targetDate!,
           entityType: MilestoneEntityType.product,
           entityId: widget.productId,
-          priority: _priority,
           description: description.isEmpty ? null : description,
         );
 

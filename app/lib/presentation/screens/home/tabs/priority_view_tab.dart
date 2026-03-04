@@ -239,8 +239,9 @@ class _PriorityViewTabState extends ConsumerState<PriorityViewTab> {
     Product product,
     String areaName,
   ) {
+    // 外層 padding: 20*2, section padding: 16*2, card spacing: 10
     final cardWidth =
-        (MediaQuery.of(context).size.width - 16 * 2 - 16 * 2 - 10) / 2;
+        (MediaQuery.of(context).size.width - 20 * 2 - 16 * 2 - 10) / 2;
 
     return LongPressDraggable<Product>(
       data: product,

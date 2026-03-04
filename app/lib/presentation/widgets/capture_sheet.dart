@@ -3,9 +3,8 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/core/di/providers.dart';
 import 'package:app/core/errors/failures.dart';
-import 'package:app/presentation/providers/ai_consent_provider.dart';
 import 'package:app/presentation/providers/task_provider.dart';
-import 'package:app/presentation/widgets/ai_consent_dialog.dart';
+import 'package:app/presentation/utils/ai_consent_guard.dart';
 
 class CaptureSheet extends ConsumerStatefulWidget {
   const CaptureSheet({super.key});
@@ -22,13 +21,7 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    // AI consent check
-    final hasConsent = ref.read(aiConsentProvider);
-    if (!hasConsent) {
-      final granted = await AiConsentDialog.show(context);
-      if (!granted) return;
-      ref.read(aiConsentProvider.notifier).grant();
-    }
+    if (!await checkAndRequestAiConsent(context, ref)) return;
 
     setState(() {
       _isProcessing = true;

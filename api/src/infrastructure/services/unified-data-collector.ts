@@ -31,6 +31,7 @@ interface RawTask {
   product_id: string
   product_name: string
   product_description: string | null
+  product_priority: string | null
   inferred_from_milestone: string | null
   date_source: string | null
 }
@@ -172,6 +173,7 @@ export class UnifiedDataCollector implements IDataCollector {
       product_id: string
       product_name: string
       product_description: string | null
+      product_priority: string | null
     }
 
     // 分開查詢 tasks 和 subtasks（避免 JOIN 的 cartesian product）
@@ -191,7 +193,8 @@ export class UnifiedDataCollector implements IDataCollector {
           a.name as area_name,
           p.id::text as product_id,
           p.name as product_name,
-          p.description as product_description
+          p.description as product_description,
+          p.priority as product_priority
         FROM tasks t
         JOIN products p ON p.id = t.product_id
         JOIN areas a ON a.id = p.area_id
@@ -246,6 +249,7 @@ export class UnifiedDataCollector implements IDataCollector {
       product_id: row.product_id,
       product_name: row.product_name,
       product_description: row.product_description,
+      product_priority: row.product_priority,
     }))
 
     // 記憶體分類（極快）

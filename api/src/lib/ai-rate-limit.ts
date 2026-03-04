@@ -29,25 +29,30 @@ export async function checkAiRateLimit(userId: string): Promise<void> {
 
 /**
  * AI 呼叫成功後遞增 quota（先檢查再遞增模式）
+ * 此操作不應阻斷 AI 回應：DB 短暫失敗時只記錄 warning，不拋出例外
  */
 export async function incrementAiUsage(userId: string): Promise<void> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  await prisma.dailyAiUsage.upsert({
-    where: {
-      user_id_usage_date: {
+  try {
+    await prisma.dailyAiUsage.upsert({
+      where: {
+        user_id_usage_date: {
+          user_id: userId,
+          usage_date: today,
+        },
+      },
+      update: {
+        count: { increment: 1 },
+      },
+      create: {
         user_id: userId,
         usage_date: today,
+        count: 1,
       },
-    },
-    update: {
-      count: { increment: 1 },
-    },
-    create: {
-      user_id: userId,
-      usage_date: today,
-      count: 1,
-    },
-  })
+    })
+  } catch (err) {
+    console.warn('[ai-rate-limit] incrementAiUsage failed (non-fatal):', err)
+  }
 }

@@ -9,6 +9,7 @@
 import type { UnifiedRawData } from '@/domain/interfaces/data-collector'
 import type { AggregatedData } from './coach-data-aggregator'
 import type { CollectedData, PlanCandidate, WeeklyDayInfo } from '@/domain/entities/plan-candidate.entity'
+import type { ProductPriority } from '@/domain/entities/product.entity'
 import type { CalendarEventSummary, TaskSummary, SubTaskSummary } from '@/domain/entities/coach-briefing.entity'
 import type { IDataTransformer } from '@/domain/interfaces/data-transformer'
 import { WORK_HOURS_PER_DAY, MAX_TODAY_CANDIDATES } from '@/lib/coach-constants'
@@ -113,6 +114,7 @@ export class UnifiedDataTransformer implements IDataTransformer {
       const subTasks = subTasksByTaskForFilter.get(task.id) || []
       const uncompletedSubTasks = subTasks.filter(st => !st.completed)
 
+      const priority = (task.product_priority as ProductPriority | null) ?? null
       if (uncompletedSubTasks.length > 0) {
         // 展開 SubTask
         for (const st of uncompletedSubTasks) {
@@ -132,6 +134,7 @@ export class UnifiedDataTransformer implements IDataTransformer {
             ...this.calcDays(st.due_date || task.due_date, st.updated_at, now),
             milestoneId: task.inferred_from_milestone,
             dateSource: task.date_source,
+            productPriority: priority,
           })
         }
       } else {
@@ -152,6 +155,7 @@ export class UnifiedDataTransformer implements IDataTransformer {
           ...this.calcDays(task.due_date, task.updated_at, now),
           milestoneId: task.inferred_from_milestone,
           dateSource: task.date_source,
+          productPriority: priority,
         })
       }
     }
@@ -173,6 +177,7 @@ export class UnifiedDataTransformer implements IDataTransformer {
       ...this.calcDays(task.due_date, task.updated_at, now),
       milestoneId: task.inferred_from_milestone,
       dateSource: task.date_source,
+      productPriority: (task.product_priority as ProductPriority | null) ?? null,
     }))
 
     // 里程碑

@@ -29,8 +29,7 @@ function isValidTimezone(tz: string): boolean {
 
 const BriefingRequestSchema = z.object({
   type: z.enum(['MORNING', 'EVENING'], {
-    required_error: 'type is required (MORNING or EVENING)',
-    invalid_type_error: 'type must be MORNING or EVENING',
+    error: 'type is required and must be MORNING or EVENING',
   }),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD format').optional(),
   timezone: z.string().refine(isValidTimezone, { message: 'Invalid timezone' }).optional(),

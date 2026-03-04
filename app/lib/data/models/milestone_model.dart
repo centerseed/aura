@@ -16,7 +16,7 @@ class MilestoneModel with _$MilestoneModel {
     required String status,
     @JsonKey(name: 'entity_type') required String entityType,
     @JsonKey(name: 'entity_id') required String entityId,
-    required int priority,
+    @Default(1) int priority,
     String? description,
     // 關聯物件（API 返回的巢狀結構）
     Map<String, dynamic>? product,

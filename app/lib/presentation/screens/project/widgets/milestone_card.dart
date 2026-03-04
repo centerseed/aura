@@ -165,27 +165,6 @@ class MilestoneCard extends StatelessWidget {
                 ),
               ],
 
-              // 優先級指示器（高優先級才顯示）
-              if (milestone.priority >= 8) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.priority_high_rounded,
-                      size: 14,
-                      color: AppColors.statusInbox.withValues(alpha: 0.8),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '高優先級',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.statusInbox.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),

@@ -18,6 +18,7 @@ export interface UnifiedRawData {
     product_id: string
     product_name: string
     product_description: string | null
+    product_priority: string | null
     inferred_from_milestone: string | null
     date_source: string | null
   }>
@@ -68,6 +69,7 @@ export interface UnifiedRawData {
     product_id: string
     product_name: string
     product_description: string | null
+    product_priority: string | null
     due_date: Date | null
     start_date: Date | null
     updated_at: Date

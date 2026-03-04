@@ -6,6 +6,8 @@
  * 2. CoachPlanGenerator 的輸入格式
  */
 
+import type { ProductPriority } from './product.entity'
+
 export interface PlanCandidate {
   itemType: 'task' | 'subtask'
   taskId: string
@@ -24,6 +26,7 @@ export interface PlanCandidate {
   daysStagnant: number
   milestoneId: string | null
   dateSource: string | null
+  productPriority: ProductPriority | null
 }
 
 export interface MilestoneContext {

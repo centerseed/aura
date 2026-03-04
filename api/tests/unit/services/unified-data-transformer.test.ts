@@ -26,6 +26,7 @@ function makeTask(overrides: Partial<UnifiedRawData['allTasks'][0]> = {}): Unifi
     product_id: 'prod-1',
     product_name: 'Zentropy',
     product_description: null,
+    product_priority: null,
     inferred_from_milestone: null,
     date_source: null,
     ...overrides,
@@ -211,6 +212,57 @@ describe('UnifiedDataTransformer', () => {
         })
         const result = transformer.toPlanCollectedData(raw, TODAY, 'Asia/Taipei')
         expect(result.candidates[0].dueDate).toEqual(TODAY)
+      })
+    })
+
+    describe('productPriority 傳遞', () => {
+      it('P0 task 應將 productPriority 帶入 candidate', () => {
+        const raw = makeRawData({
+          allTasks: [makeTask({ id: 't1', due_date: TODAY, product_priority: 'P0' })],
+        })
+        const result = transformer.toPlanCollectedData(raw, TODAY, 'Asia/Taipei')
+        expect(result.candidates[0].productPriority).toBe('P0')
+      })
+
+      it('priority 為 null 時 candidate.productPriority 應為 null', () => {
+        const raw = makeRawData({
+          allTasks: [makeTask({ id: 't1', due_date: TODAY, product_priority: null })],
+        })
+        const result = transformer.toPlanCollectedData(raw, TODAY, 'Asia/Taipei')
+        expect(result.candidates[0].productPriority).toBeNull()
+      })
+
+      it('展開 subtask 時應繼承父任務的 productPriority', () => {
+        const raw = makeRawData({
+          allTasks: [makeTask({ id: 't1', due_date: TODAY, product_priority: 'P1' })],
+          allSubTasks: [makeSubTask({ id: 's1', task_id: 't1' })],
+        })
+        const result = transformer.toPlanCollectedData(raw, TODAY, 'Asia/Taipei')
+        expect(result.candidates[0].itemType).toBe('subtask')
+        expect(result.candidates[0].productPriority).toBe('P1')
+      })
+
+      it('unscheduledTasks 應正確帶入 productPriority', () => {
+        const raw = makeRawData({
+          unscheduledTasks: [{
+            id: 'u1',
+            content: '待排程任務',
+            status: 'ACTIVE',
+            area_name: '事業',
+            product_id: 'prod-1',
+            product_name: 'Zentropy',
+            product_description: null,
+            product_priority: 'P2',
+            due_date: null,
+            start_date: null,
+            updated_at: YESTERDAY,
+            completed_at: null,
+            inferred_from_milestone: null,
+            date_source: null,
+          }],
+        })
+        const result = transformer.toPlanCollectedData(raw, TODAY, 'Asia/Taipei')
+        expect(result.unscheduledTasks[0].productPriority).toBe('P2')
       })
     })
 

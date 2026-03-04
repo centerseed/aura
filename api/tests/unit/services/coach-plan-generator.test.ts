@@ -47,6 +47,7 @@ function makeCandidate(overrides: Partial<PlanCandidate> = {}): PlanCandidate {
     daysStagnant: 0,
     milestoneId: null,
     dateSource: null,
+    productPriority: null,
     ...overrides,
   }
 }
@@ -218,6 +219,34 @@ describe('CoachPlanGenerator', () => {
       expect(prompt).toContain('🔶 剩 3 天')
 
       vi.useRealTimers()
+    })
+  })
+
+  describe('Product Priority 顯示', () => {
+    it('P0 任務應在 prompt 中顯示 [P0] 標記', async () => {
+      const { prompt } = await generator.generate(
+        [makeCandidate({ productPriority: 'P0', productName: 'Zentropy' })], 480, 0,
+      )
+      expect(prompt).toContain('[P0]')
+      expect(prompt).toContain('[P0] Zentropy')
+    })
+
+    it('無 priority 的任務不應有 priority 標記', async () => {
+      const { prompt } = await generator.generate(
+        [makeCandidate({ productPriority: null, productName: 'Zentropy' })], 480, 0,
+      )
+      expect(prompt).not.toContain('[P0]')
+      expect(prompt).not.toContain('[P1]')
+      expect(prompt).not.toContain('[P2]')
+      expect(prompt).not.toContain('[P3]')
+    })
+
+    it('排序原則應包含 Priority 規則', async () => {
+      const { prompt } = await generator.generate(
+        [makeCandidate()], 480, 0,
+      )
+      expect(prompt).toContain('Product Priority 排序')
+      expect(prompt).toContain('P0')
     })
   })
 

@@ -316,7 +316,7 @@ class _$MilestoneModelImpl extends _MilestoneModel {
     required this.status,
     @JsonKey(name: 'entity_type') required this.entityType,
     @JsonKey(name: 'entity_id') required this.entityId,
-    required this.priority,
+    this.priority = 1,
     this.description,
     final Map<String, dynamic>? product,
     final Map<String, dynamic>? area,
@@ -351,6 +351,7 @@ class _$MilestoneModelImpl extends _MilestoneModel {
   @JsonKey(name: 'entity_id')
   final String entityId;
   @override
+  @JsonKey()
   final int priority;
   @override
   final String? description;
@@ -478,7 +479,7 @@ abstract class _MilestoneModel extends MilestoneModel {
     required final String status,
     @JsonKey(name: 'entity_type') required final String entityType,
     @JsonKey(name: 'entity_id') required final String entityId,
-    required final int priority,
+    final int priority,
     final String? description,
     final Map<String, dynamic>? product,
     final Map<String, dynamic>? area,

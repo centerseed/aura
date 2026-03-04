@@ -7,6 +7,7 @@
  */
 
 import { google } from "@ai-sdk/google"
+import { createOpenAI } from "@ai-sdk/openai"
 import { generateObject } from "ai"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
@@ -53,25 +54,23 @@ const StructuredItemSchema = z.object({
   estimated_days_needed: z.number().min(0.25).max(30).optional().describe("AI 估算完成此任務需要的天數（包含等待時間），最小值為 0.25（即 2 小時）"),
   depends_on_task: z.string().max(50).optional().describe("如果此任務依賴同批次的其他任務，填入該任務的 title"),
   time_confidence: z.number().min(0).max(1).optional().describe("Confidence score for time inference (0-1)"),
-  sub_items: z.array(SubItemSchema).optional().describe("如果任務包含多個可獨立勾選的步驟/項目，拆成 sub-items - 不可遺漏用戶提到的任何事項"),
+  sub_items: z.array(SubItemSchema).optional().describe("【清單模式強制填寫】當輸入格式為「主題：A、B、C」或「主題：1. A 2. B」時，必須將列表中的每個項目填入 sub_items，禁止將它們合併到 narrative。每個 sub-item 使用用戶的原話。"),
 })
 
-const AppendSubItemActionSchema = z.object({
-  action: z.literal("append_sub_item"),
-  target_task_id: z.string().describe("要追加到的任務 ID —— 只能使用背景資訊「用戶的 Products 與任務」清單中格式為 '- [uuid]' 的 UUID，絕對不可使用里程碑區塊的 milestone_id"),
-  sub_items: z.array(SubItemSchema).describe("要追加的待辦事項清單"),
-  reasoning: z.string().max(100).describe("簡要說明為什麼判斷這是追加而非新任務（1 句話，最多 100 字元）"),
+const StructureResultSchema = z.object({
+  action: z.enum(["create_new_tasks", "append_sub_item"])
+    .describe("create_new_tasks = 建立新任務；append_sub_item = 追加到現有任務"),
+  // create_new_tasks 時填寫
+  items: z.array(StructuredItemSchema).optional()
+    .describe("action=create_new_tasks 時必填：要建立的任務清單"),
+  // append_sub_item 時填寫
+  target_task_id: z.string().optional()
+    .describe("action=append_sub_item 時必填：要追加到的任務 UUID，只能使用背景資訊中格式為 '- [uuid]' 的 UUID"),
+  sub_items: z.array(SubItemSchema).optional()
+    .describe("action=append_sub_item 時必填：要追加的待辦事項清單"),
+  reasoning: z.string().max(100).optional()
+    .describe("action=append_sub_item 時必填：簡要說明為什麼判斷這是追加而非新任務"),
 })
-
-const CreateNewTasksActionSchema = z.object({
-  action: z.literal("create_new_tasks"),
-  items: z.array(StructuredItemSchema),
-})
-
-const StructureResultSchema = z.discriminatedUnion("action", [
-  AppendSubItemActionSchema,
-  CreateNewTasksActionSchema,
-])
 
 export type StructuredItem = z.infer<typeof StructuredItemSchema>
 export type StructureResult = z.infer<typeof StructureResultSchema>
@@ -536,9 +535,23 @@ export class GenerateBrainDumpStructureUseCase {
       }
     }
 
+    // 偵測時間指示詞 / 緊急程度詞（在 similarity signal 之前，出現則強制 create）
+    const urgencyTimeKeywords = [
+      '今天', '明天', '後天', '大後天',
+      '週一', '週二', '週三', '週四', '週五', '週六', '週日',
+      '下週', '本週', '這週', '上週',
+      '月底', '月初', '本月底', '年底', '年初',
+      '馬上', '立刻', '現在', '趕快', '盡快', '緊急', '趕緊',
+    ]
+    const inputText = request.text || request.cleanedText || ''
+    const hasUrgencyOrTime = urgencyTimeKeywords.some(kw => inputText.includes(kw))
+
     // Similarity signal for append vs new task
     let similaritySignal = ""
-    if (topSimilarTask && topTaskSimilarity > 0.85) {
+    if (hasUrgencyOrTime) {
+      // 有時間/緊急詞：直接壓制 similarity signal，強制指向 create
+      similaritySignal = `\n### 🔍 語意分析信號\n⚠️ 偵測到時間指示詞或緊急程度詞（「馬上」「月底」「今天」等）→ **必須 create_new_tasks，禁止 append_sub_item**（即使語意高度相似）\n`
+    } else if (topSimilarTask && topTaskSimilarity > 0.85) {
       similaritySignal = `\n### 🔍 語意分析信號\n語意分析發現高度相似的既有任務：\n  任務: "${topSimilarTask.content}" (相似度: ${(topSimilarTask.similarity * 100).toFixed(0)}%)\n  Product: ${topSimilarTask.productName}\n  → 請優先考慮是否追加為此任務的 sub-item\n`
     } else if (topTaskSimilarity < 0.6) {
       similaritySignal = `\n### 🔍 語意分析信號\n語意分析未發現高度相似的既有任務（最高相似度: ${(topTaskSimilarity * 100).toFixed(0)}%）→ 建議創建新任務\n`
@@ -554,28 +567,53 @@ export class GenerateBrainDumpStructureUseCase {
       librarianHints += "\n**重要**：這些規則來自用戶的實際修正，代表用戶的真實意圖。當規則與語意推斷衝突時，優先使用規則。\n"
     }
 
-    // Step 4: 呼叫 AI
+    // Step 4: 呼叫 AI（最多 3 次重試）
     const startAI = Date.now()
-    const { object: result } = await generateObject({
-      model: google("gemini-2.5-flash-lite"),
-      schema: StructureResultSchema,
-      prompt: `你是任務記錄專家。將用戶輸入轉成結構化的 Task。
+    let result: z.infer<typeof StructureResultSchema> | undefined
+    let lastError: unknown
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { object } = await generateObject({
+          model: process.env.OPENROUTER_MODEL
+            ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
+            : google("gemini-2.5-flash-lite"),
+          schema: StructureResultSchema,
+          prompt: `你是任務記錄專家。將用戶輸入轉成結構化的 Task。
 
 # 🔥🔥🔥 最最優先：清單模式偵測
 
 **在做任何其他判斷之前**，先檢查用戶輸入的結構：
 
-用戶輸入是否有「主題 + 列表」的結構？（例：「XX更新：1. A 2. B」「XX事項：- C - D」）
+用戶輸入是否有「主題 + 列表」的結構？（例：「XX更新：1. A 2. B」「XX事項：- C - D」「XX計畫：A、B、C」）
 
-- **是** → 創建 **1 個新任務**，主題當 title，列表項目當 sub-items
-  - sub-item 的 content 必須**直接使用用戶的原話**，禁止改寫
-  - 不需要做追加判斷，直接 create_new_tasks
-  - 範例：「App更新：1. 刪除project 2. 加今日計劃」→ title=「App更新」, sub_items=[「要可以刪除project」,「加入今日計劃頁面」]
+- **是** → 清單模式強制觸發，規則如下：
+  1. 創建 **1 個新任務**，主題當 title
+  2. **sub_items 必須填入列表中的每個項目（這是清單模式的核心，絕對不可省略）**
+  3. sub-item 的 content 必須**直接使用用戶的原話**，禁止改寫、合併、省略任何項目
+  4. 不需要做追加判斷，直接 create_new_tasks
+  5. 如果輸入同時含有時間指示詞（如「明天」「下週」）→ 時間指示詞用來設定父任務的 due_date，**不影響清單模式結構，仍然是 1 個任務 + sub_items**
+  - 範例1：「App更新：1. 刪除project 2. 加今日計劃」→ title=「App更新」, sub_items=[{content:「刪除project」},{content:「加今日計劃」}]
+  - 範例2：「明天要做的事：發email、更新README、部署」→ title=「明天要做的事」, due_date=明天, sub_items=[{content:「發email」},{content:「更新README」},{content:「部署」}]
+  - 範例3：「健身計畫：週一跑步、週三游泳、週五瑜伽」→ title=「健身計畫」, sub_items=[{content:「週一跑步」},{content:「週三游泳」},{content:「週五瑜伽」}]
 - **否** → 繼續往下做追加判斷
 
 ---
 
-# 🔥 是追加還是新任務？（僅當上面不是清單模式時）
+# 🔥🔥 第二優先：時間指示詞 / 緊急程度強制規則
+
+**在做追加判斷之前**，先掃描輸入是否含有以下詞語：
+
+- **時間指示詞**：今天、明天、後天、大後天、週一、週二、週三、週四、週五、週六、週日、下週、本週、這週、上週、月底、月初、本月底、年底、年初、X日前、X號前、X月前、幾天內、幾週內
+- **緊急程度詞**：馬上、立刻、現在、ASAP、趕快、盡快、緊急、急、趕緊
+
+**只要出現以上任一詞** → **必須 create_new_tasks，禁止 append_sub_item**
+- 理由：時間指示詞代表用戶在為**這件事**設定截止日期；sub-item 無法攜帶截止日期
+- 緊急程度詞代表用戶要**立刻執行這件新事**，不是補充現有任務的細節
+- **此規則優先級高於語意相似度**，無論現有任務多相似，只要有時間/緊急詞就創建新任務
+
+---
+
+# 🔥 是追加還是新任務？（僅當上面兩項都不適用時）
 
 ## 核心判斷原則：因果關係測試
 
@@ -607,25 +645,8 @@ export class GenerateBrainDumpStructureUseCase {
 ### 追加的絕對禁止（出現任一條即為新任務）
 
 - 輸入含有「動詞 + 獨立目標」結構（如「修復X」「處理Y」「完成Z」「開發A」「設計B」）→ 這是獨立任務，不追加
-- 輸入含有時間指示詞（「今天」「明天」「後天」「週五」「下週」等）→ 用戶在設定截止日期，必須創建新任務（sub-item 無法攜帶日期）
+- 輸入含有時間指示詞或緊急程度詞（已在上方「第二優先」規則中定義）→ 必須創建新任務，此處再次確認
 - 既有任務是「大傘任務」（名稱寬泛如「開發 XX 功能」「推進 XX 專案」）→ 不追加。大傘任務會吸引所有相關輸入，但「相關」不等於「子步驟」
-
-### 常見誤判情況（這些都是新任務）
-
-- 「語意相關」≠「是子步驟」（封存 vs 封版，都有「封」字但無因果關係）
-- 「同一專案」≠「是子步驟」（同一個 Product 下的兩件不同的事）
-- 「時間相近」≠「是子步驟」（今天要做的兩件獨立的事）
-- 「同屬一個大方向」≠「是子步驟」（「加 A 功能」和「開發 B 功能」都是 App 開發，但完成 A 不推進 B 的進度）
-
-### 判斷流程
-
-\`\`\`
-1. 找出最相關的既有任務
-2. 執行完成度測試：「勾掉 X 後，Y 的完成進度推進了嗎？」
-3. 如果進度不變 → 創建新任務
-4. 如果進度推進 → 再確認粒度是否更細
-5. 兩個都通過 → 追加
-\`\`\`
 
 **預設行為**：有任何疑慮，創建新任務。追加是例外，不是常態。
 
@@ -661,6 +682,8 @@ ${request.explicitProductId ? `# 🚨 用戶明確指定了 Product
 # 核心原則（創建新任務時使用）
 
 ## 1. 完整記錄
+**items 是任務清單，不是固定 1 個**：輸入中若有多個各自獨立、可分別完成的目標，建立對應數量的 items。獨立性測試：移除其中一個目標，另一個仍然完整成立 → 它們是獨立任務。
+
 問自己：**「把輸出念給用戶聽，用戶會說『你漏了 X』嗎？」**
 - 會 → 你漏了東西，補上
 - 不會 → OK
@@ -674,14 +697,11 @@ ${request.explicitProductId ? `# 🚨 用戶明確指定了 Product
 
 **第一原則：你是記錄員，不是 PM。忠實記錄用戶說的，不要自作主張拆解。**
 
-### 什麼時候拆 sub-items？
+⚠️ **注意**：如果輸入已由「最最優先：清單模式」處理，sub_items 已強制填入，本節規則不再適用。
 
-**情況 A：用戶自己列了清單**
-用戶輸入帶有主題 + 列表（如「XX更新：1. A 2. B」、「要做 A、B、C」）→ 主題當 title，列表項目照用戶原話當 sub-items
-🚨 sub-item 的 content 必須直接使用用戶的原話，禁止改寫、禁止展開、禁止加工
+### 什麼時候拆 sub-items？（排除清單模式後）
 
-**情況 B：任務規模明顯很大（預估 > 3 天）且用戶沒列清單**
-例如「重構整個認證系統」→ 可以拆出合理的里程碑級子項
+**任務規模明顯很大（預估 > 3 天）且用戶沒列清單**時，可以拆出合理的里程碑級子項（如「重構整個認證系統」）。
 
 ### 什麼時候不拆？
 
@@ -732,15 +752,6 @@ ${request.explicitProductId ? `# 🚨 用戶明確指定了 Product
    - 好的 Topic 命名：「技術開發」「客戶溝通」「財務處理」「行銷活動」「產品規劃」
    - 避免太籠統的命名：「其他」「雜項」「一般」
 
-3. **什麼情況可以留空？**
-   - **只有當任務真的無法歸類時**才填 ""
-   - 這應該是極少數情況（< 10%）
-
-**Topic 命名原則：**
-- 使用 2-4 字的中文名詞短語
-- 描述任務的「類型」或「面向」，不是具體內容
-- 範例：「內部協調」「外部溝通」「系統維護」「資料分析」「流程優化」
-
 ## 4. 時間推斷
 
 **規則：只要你能推斷出時間，就必須填 due_date**
@@ -751,16 +762,26 @@ ${request.explicitProductId ? `# 🚨 用戶明確指定了 Product
 
 due_date 格式：ISO 8601，如 2026-02-07T00:00:00+08:00
 
+**「下週X」計算規則（嚴格）：**
+- 「下週」= 本週結束後的下一個完整週（從下週一算起）
+- 「下週三」= 下週的星期三，不是本週後的第一個星期三
+- 計算方式：若今天是星期X，「下週Y」= 今天 + (7 - X + Y) % 7 + 7 天（不足 7 天時再加 7）
+- 例：今天星期三(3)，「下週三」= +7 天 = 下週三；「下週五」= +9 天 = 下週五
+
 **task_type**（當任務與里程碑相關時填寫）：
 - waiting：需等待結果
 - booking：需預約
 - preparation：需準備
 - execution：可立即執行
 
-## 5. Drawer 狀態（與 due_date 連動）
+## 5. Drawer 狀態
+
 - **有填 due_date → 必須是 ACTIVE**（有明確期限，需要追蹤進度）
-- **沒有 due_date → 必須是 INBOX**（還沒決定什麼時候做）
+- **沒有 due_date → 預設 INBOX**（還沒決定什麼時候做）
 - **例行性/週期性任務 → MAINTAIN**（穩定運作中，異常時才需關注）
+- **研究/參考資料類任務 → REFERENCE**（不需執行，只是蒐集資訊或供決策參考）
+  - 判斷關鍵詞：「研究」「調查」「評估」「分析」「整理成文件」「供決策參考」「參考資料」
+  - 例：「研究 Redis 快取方案，供決策參考」→ REFERENCE（無需執行，只是探索選項）
 
 ---
 
@@ -799,11 +820,28 @@ ${request.text}
 - reasoning 範例：「提到專案名稱，判斷為工作相關」
 - narrative 範例：「整理本週功能，準備週報給主管」（≤ 100 字）
 - 如果用戶提供了大量細節，提煉最重要的資訊`,
-    })
+        })
+        result = object
+        break
+      } catch (err) {
+        lastError = err
+        const isTransient = err instanceof Error && (
+          err.message.includes('fetch failed') ||
+          err.message.includes('network') ||
+          err.message.includes('ECONNRESET') ||
+          err.message.includes('timeout')
+        )
+        if (!isTransient || attempt === 2) throw err
+        console.warn(`⚠️ [brain-dump] AI call attempt ${attempt + 1} failed (transient), retrying...`, err)
+        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
+      }
+    }
+    if (!result) throw lastError
     timings["ai_generateObject"] = Date.now() - startAI
+    console.log("🤖 [brain-dump] AI raw result:", JSON.stringify(result, null, 2).slice(0, 1000))
 
     // 驗證 append_sub_item 的 target_task_id 必須來自 context 中的真實 task
-    if (result.action === 'append_sub_item' && !validTaskIds.has(result.target_task_id)) {
+    if (result.action === 'append_sub_item' && !validTaskIds.has(result.target_task_id ?? '')) {
       console.warn(
         `⚠️ [brain-dump] AI returned invalid target_task_id: ${result.target_task_id}. ` +
         `Valid task IDs in context: [${Array.from(validTaskIds).join(', ')}]`

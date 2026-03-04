@@ -28,14 +28,16 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@ai-sdk/google": "^1.0.0",
+    "@ai-sdk/google": "^3.0.37",
+    "@ai-sdk/openai": "^3.0.39",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@prisma/client": "^6.0.0",
-    "ai": "^4.0.0",
+    "ai": "^6.0.111",
     "firebase-admin": "^13.6.0",
     "next": "^16.1.4",
+    "openai": "^6.25.0",
     "tsx": "^4.21.0",
-    "zod": "^3.23.0"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

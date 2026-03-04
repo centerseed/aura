@@ -286,6 +286,7 @@ export class ExecuteBrainDumpUseCase {
         inferred_from_milestone: string | null
         task_type: string | null
         estimated_days_needed: number | null
+        sub_items: Array<{ id: string; content: string }>
       }> = []
 
       for (const item of result.items) {
@@ -459,6 +460,7 @@ export class ExecuteBrainDumpUseCase {
           inferred_from_milestone: inferredFromMilestone,
           task_type: item.task_type || null,
           estimated_days_needed: item.estimated_days_needed || null,
+          sub_items: pendingSubItems.map(s => ({ id: s.id, content: s.content })),
         })
       }
 
@@ -483,7 +485,7 @@ export class ExecuteBrainDumpUseCase {
       })
 
       return tasks
-    })
+    }, { timeout: 60000 })
 
     timings["db_persist"] = Date.now() - startDbPersist
 

@@ -10,11 +10,10 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/errors/failures.dart';
-import '../../providers/ai_consent_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/area_provider.dart';
-import '../../widgets/ai_consent_dialog.dart';
+import '../../utils/ai_consent_guard.dart';
 import '../home/widgets/task_detail_bottom_sheet.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
@@ -138,13 +137,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     final hasImage = _selectedImage != null;
     if (text.isEmpty && !hasImage) return;
 
-    // AI consent check
-    final hasConsent = ref.read(aiConsentProvider);
-    if (!hasConsent) {
-      final granted = await AiConsentDialog.show(context);
-      if (!granted) return;
-      ref.read(aiConsentProvider.notifier).grant();
-    }
+    if (!await checkAndRequestAiConsent(context, ref)) return;
 
     setState(() {
       _isProcessing = true;

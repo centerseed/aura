@@ -89,7 +89,7 @@ export async function understandImage(
           {
             type: "image",
             image: base64Image,
-            mimeType: mimeType as SupportedMimeType,
+            mediaType: mimeType as SupportedMimeType,
           },
           {
             type: "text",

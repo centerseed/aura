@@ -15,7 +15,7 @@ _$MilestoneModelImpl _$$MilestoneModelImplFromJson(Map<String, dynamic> json) =>
       status: json['status'] as String,
       entityType: json['entity_type'] as String,
       entityId: json['entity_id'] as String,
-      priority: (json['priority'] as num).toInt(),
+      priority: (json['priority'] as num?)?.toInt() ?? 1,
       description: json['description'] as String?,
       product: json['product'] as Map<String, dynamic>?,
       area: json['area'] as Map<String, dynamic>?,

@@ -13,10 +13,9 @@ import '../../../../core/errors/failures.dart';
 import '../../../../domain/entities/task.dart';
 import '../../../../domain/entities/area.dart';
 import '../../../../domain/entities/product.dart';
-import '../../../providers/ai_consent_provider.dart';
 import '../../../providers/task_provider.dart';
 import '../../../providers/area_provider.dart';
-import '../../../widgets/ai_consent_dialog.dart';
+import '../../../utils/ai_consent_guard.dart';
 import '../../../providers/product_provider.dart';
 import 'task_detail_bottom_sheet.dart';
 
@@ -229,13 +228,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
     final hasImage = _selectedImage != null;
     if (text.isEmpty && !hasImage) return;
 
-    // AI consent check
-    final hasConsent = ref.read(aiConsentProvider);
-    if (!hasConsent) {
-      final granted = await AiConsentDialog.show(context);
-      if (!granted) return;
-      ref.read(aiConsentProvider.notifier).grant();
-    }
+    if (!await checkAndRequestAiConsent(context, ref)) return;
 
     // 構建完整訊息(包含 @ mention)
     final fullMessage = _buildUserMessage(text);

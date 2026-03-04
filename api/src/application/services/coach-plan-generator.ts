@@ -122,17 +122,14 @@ export class CoachPlanGenerator {
     sections.push('## 排序原則（嚴格遵守）')
     sections.push('1. 逾期任務最優先')
     sections.push('2. 今日到期必須排入')
-    sections.push('3. **週表只用來找過載日**：如果未來某天負荷率 > 80%，把那天的任務提前到今天處理。週表不是把今天任務推給未來的理由')
-    sections.push('4. **今天容量優先消化**：今天有空就盡量做，不要把今天能做的任務推給明後天')
+    sections.push('3. **週表只用來找過載日**：未來某天負荷率 > 80% 就提前到今天處理；今天有空就盡量做，不要推給明後天')
+    sections.push('4. **Product Priority 排序**：P0 最優先，P1 次之，P2 再次，P3 最後；同優先級再按期限排序')
     if (isWeekend) {
       sections.push('5. daily_plan 控制在 2-3 項，優先選擇生活相關、個人專案、可獨自完成的任務。其餘放 overflow')
     } else {
-      sections.push('5. daily_plan 目標 5 項左右（3-7 項）。只要今天容量許可且任務沒有特殊限制（需特定地點、需他人配合），就排進今天，不要推給未來')
+      sections.push(`5. daily_plan 目標 3-7 項，容量上限 80%（今天有 ${availableMinutes} 分鐘，目標 ${Math.round(availableMinutes * 0.6)}-${Math.round(availableMinutes * 0.8)} 分鐘）；容量許可且無特殊限制就排進今天，不要推給未來`)
     }
-    sections.push('6. 容量上限 80%，留 20% 緩衝給意外事務')
-    sections.push('7. 同 Product 任務排一起減少上下文切換')
-    sections.push('8. 考慮任務的現實可行性（需要到特定地點、需要他人配合的任務是否今天能做）')
-    sections.push(`9. 容量利用目標：今天有 ${availableMinutes} 分鐘，目標使用 60-80%（${Math.round(availableMinutes * 0.6)}-${Math.round(availableMinutes * 0.8)} 分鐘）。在容量許可內盡量多排，但確保每項都是真正能完成的`)
+    sections.push('6. 同 Product 任務排一起；需特定地點/他人配合的任務考慮現實可行性')
     sections.push('')
     sections.push('## 估時指引')
     sections.push('- 為每個項目估計完成時間（分鐘），填入 estimated_minutes')
@@ -215,8 +212,9 @@ export class CoachPlanGenerator {
         ? ` (父任務: ${c.taskContent}, 第${c.subTaskOrder ?? '?'}步)`
         : ''
 
+      const priorityTag = c.productPriority !== null && c.productPriority !== undefined ? ` [${c.productPriority}]` : ''
       sections.push(
-        `- [${c.itemType}] id=${id} | ${c.productName}: ${c.content}${parentInfo} | ${est} | ${urgency || '無期限'}${c.daysStagnant > 3 ? ` | 停滯${c.daysStagnant}天` : ''}`
+        `- [${c.itemType}] id=${id} |${priorityTag} ${c.productName}: ${c.content}${parentInfo} | ${est} | ${urgency || '無期限'}${c.daysStagnant > 3 ? ` | 停滯${c.daysStagnant}天` : ''}`
       )
     }
     sections.push('')

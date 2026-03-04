@@ -10,25 +10,23 @@ import { buildReorganizePrompt } from "@/lib/reorganize-prompt";
 
 // Zod Schema for AI structured output (極簡版 - 減少 74% 輸出量)
 const ReorganizeProposalSchema = z.object({
-  // Topic 治理（可選，向後兼容）
-  topic_operations: z.array(z.discriminatedUnion("action", [
-    z.object({
-      action: z.literal("keep"),
-      topic_name: z.string(),
-    }),
-    z.object({
-      action: z.literal("rename"),
-      old_name: z.string(),
-      new_name: z.string().describe("新名稱，5-10 字"),
-      reasoning: z.string().max(20),
-    }),
-    z.object({
-      action: z.literal("merge"),
-      source_names: z.array(z.string()).min(1),
-      target_name: z.string(),
-      reasoning: z.string().max(20),
-    }),
-  ])).optional(),
+  // Topic 治理（可選，向後兼容）—— 使用 flat schema 確保 Gemini 相容性
+  topic_operations: z.array(z.object({
+    action: z.enum(["keep", "rename", "merge"])
+      .describe("keep=保留, rename=重命名, merge=合併"),
+    topic_name: z.string().optional()
+      .describe("action=keep 時：Topic 名稱"),
+    old_name: z.string().optional()
+      .describe("action=rename 時：舊名稱"),
+    new_name: z.string().optional()
+      .describe("action=rename 時：新名稱，5-10 字"),
+    source_names: z.array(z.string()).optional()
+      .describe("action=merge 時：要合併的來源 Topic 名稱（至少 2 個）"),
+    target_name: z.string().optional()
+      .describe("action=merge 時：合併後的目標 Topic 名稱"),
+    reasoning: z.string().max(20).optional()
+      .describe("action=rename/merge 時：理由（最多 20 字）"),
+  })).optional(),
 
   // Topic 分群
   proposed_clusters: z.array(

@@ -771,7 +771,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
           Switch(
-            value: aiConsent,
+            value: aiConsent.granted,
             onChanged: (value) {
               if (value) {
                 ref.read(aiConsentProvider.notifier).grant();
