@@ -10,6 +10,7 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { ValidationException } from '@/lib/api-response'
+import type { AiTokenUsage } from '@/lib/ai-rate-limit'
 
 // ============================================================================
 // DTOs (Data Transfer Objects)
@@ -30,6 +31,7 @@ export interface SuggestProductResponse {
     reasoning: string
     alternative_names: string[]
   }
+  usage?: AiTokenUsage
 }
 
 // ============================================================================
@@ -71,7 +73,7 @@ export class SuggestProductUseCase {
     const existingProductNames = existingProducts.map((p) => p.name)
 
     // 3. 調用 AI 推薦專案名稱
-    const { object: suggestion } = await generateObject({
+    const { object: suggestion, usage: aiUsage } = await generateObject({
       model: google('gemini-2.5-flash-lite'),
       schema: ProductSuggestionSchema,
       prompt: `你是 Zentropy 的專案命名助手。用戶想要將一個任務移到「${request.areaName}」身分下,但該身分下還沒有合適的專案。
@@ -111,6 +113,7 @@ ${existingProductNames.length > 0 ? existingProductNames.map((name) => `- ${name
         reasoning: string
         alternative_names: string[]
       },
+      usage: aiUsage,
     }
   }
 

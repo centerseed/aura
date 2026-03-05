@@ -6,9 +6,9 @@
 
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { Loader2, AlertCircle, Sparkles, Settings } from 'lucide-react'
+import { Loader2, AlertCircle, Sparkles } from 'lucide-react'
 import { QuickCapture } from '@/components/quick-capture'
+import { DashboardHeader } from './dashboard-header'
 import type { ApiArea } from '../context/types'
 
 /**
@@ -60,32 +60,16 @@ export function DashboardWelcome({
   areas,
   onItemsCreated,
 }: DashboardWelcomeProps) {
-  const router = useRouter()
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
       </div>
 
-      {/* Minimal Header */}
-      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent">
-            Zentropy
-          </h1>
-          <button
-            onClick={() => router.push('/settings')}
-            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all"
-            title="設定"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
+      <DashboardHeader minimal userName={userName} />
 
       {/* Centered Welcome Content */}
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] px-4">

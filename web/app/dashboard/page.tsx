@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, Suspense, useRef, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +83,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { DRAWER_CONFIG } from "@/domain/constants/drawer-config"
 import { PriorityPicker } from "@/components/priority-picker"
 import { FocusBiasPanel } from "@/app/dashboard/components/focus-bias-panel";
+import { DashboardHeader } from "@/app/dashboard/components/dashboard-header";
 import type { ViewMode, ApiArea, ApiProduct } from "./context/types";
 
 // Helper function to get auth headers
@@ -176,7 +177,7 @@ function getRelativeTimeDesc(dueDate: Date): { text: string; isOverdue: boolean;
 }
 
 // 可拖曳的任務項目（支援拖曳和 Task-to-Task 合併）
-function DraggableTaskItem({
+const DraggableTaskItem = memo(function DraggableTaskItem({
   task,
   onSetDueDate,
   onComplete,
@@ -719,7 +720,7 @@ function DraggableTaskItem({
       </div>
     </div>
   );
-}
+});
 
 // 拖曳預覽 - Task
 function DragOverlayTask({ task }: { task: TaskCard }) {
@@ -754,7 +755,7 @@ function DragOverlayProduct({ productName }: { productName: string }) {
 }
 
 // 可拖放的產品區塊（同時可拖曳和可放置）
-function DroppableProduct({
+const DroppableProduct = memo(function DroppableProduct({
   productId,
   productName,
   productDescription,
@@ -1014,10 +1015,10 @@ function DroppableProduct({
       </div>
     </div>
   );
-}
+});
 
 // 可放置的 Area Header（接收 Product）
-function DroppableAreaHeader({
+const DroppableAreaHeader = memo(function DroppableAreaHeader({
   areaId,
   areaName,
   productCount,
@@ -1069,7 +1070,7 @@ function DroppableAreaHeader({
       </Button>
     </div>
   );
-}
+});
 
 function DashboardContent() {
   const router = useRouter();
@@ -3211,26 +3212,12 @@ function DashboardContent() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         {/* Background Effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
         </div>
 
-        {/* Minimal Header */}
-        <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
-          <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent">
-              Zentropy
-            </h1>
-            <button
-              onClick={() => router.push("/settings")}
-              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all"
-              title="設定"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
+        <DashboardHeader minimal userName={userName} />
 
         {/* Centered Welcome Content */}
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] px-4">
@@ -3314,8 +3301,8 @@ function DashboardContent() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         {/* Background Effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
         </div>
 
@@ -3341,7 +3328,7 @@ function DashboardContent() {
         />
 
         {/* Header */}
-        <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
+        <header className="sticky top-0 z-50 bg-slate-900 border-b border-white/10">
           <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="text-xl font-bold bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent">
@@ -3459,7 +3446,7 @@ function DashboardContent() {
           <div className="flex gap-8">
             {/* Sidebar */}
             <aside className="w-72 shrink-0 h-[calc(100vh-136px)] sticky top-24 flex flex-col overflow-y-auto">
-              <Card className="bg-white/5 border-white/10 backdrop-blur-xl shadow-xl shrink-0">
+              <Card className="bg-white/5 border-white/10 shadow-xl shrink-0">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium text-white/50 uppercase tracking-wider">

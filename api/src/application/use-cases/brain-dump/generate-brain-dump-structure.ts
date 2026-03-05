@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db"
 import { getEmbedding } from "@/lib/embedding"
 import { librarianRecall, LibrarianRule } from "@/lib/librarian-client"
 import { ValidationException } from "@/lib/api-response"
+import type { AiTokenUsage } from "@/lib/ai-rate-limit"
 
 // ============================================================================
 // Zod Schemas (moved from route)
@@ -115,6 +116,7 @@ export interface GenerateBrainDumpStructureResponse {
   milestones: Milestone[]
   existingAreas: ExistingArea[]
   timings: Record<string, number>
+  usage?: AiTokenUsage
 }
 
 // ============================================================================
@@ -570,10 +572,11 @@ export class GenerateBrainDumpStructureUseCase {
     // Step 4: 呼叫 AI（最多 3 次重試）
     const startAI = Date.now()
     let result: z.infer<typeof StructureResultSchema> | undefined
+    let aiUsage: AiTokenUsage | undefined
     let lastError: unknown
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const { object } = await generateObject({
+        const { object, usage } = await generateObject({
           model: process.env.OPENROUTER_MODEL
             ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
             : google("gemini-2.5-flash-lite"),
@@ -822,6 +825,7 @@ ${request.text}
 - 如果用戶提供了大量細節，提煉最重要的資訊`,
         })
         result = object
+        aiUsage = usage
         break
       } catch (err) {
         lastError = err
@@ -857,6 +861,7 @@ ${request.text}
       milestones,
       existingAreas,
       timings,
+      usage: aiUsage,
     }
   }
 }

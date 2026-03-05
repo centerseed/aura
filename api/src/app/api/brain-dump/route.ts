@@ -8,7 +8,7 @@ import { NextRequest } from "next/server"
 import { authenticateRequest } from "@/lib/auth-middleware"
 import { prisma } from "@/lib/db"
 import { ApiResponseBuilder, catchDomainException } from "@/lib/api-response"
-import { checkAiRateLimit, incrementAiUsage } from "@/lib/ai-rate-limit"
+import { checkAiRateLimit, incrementAiUsage, DEFAULT_AI_MODEL } from "@/lib/ai-rate-limit"
 import { ParseBrainDumpInputUseCase } from "@/application/use-cases/brain-dump/parse-brain-dump-input"
 import { GenerateBrainDumpStructureUseCase } from "@/application/use-cases/brain-dump/generate-brain-dump-structure"
 import { ExecuteBrainDumpUseCase } from "@/application/use-cases/brain-dump/execute-brain-dump"
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       imageUnderstandingResult: parsed.imageUnderstandingResult,
     })
     Object.assign(timings, result.timings)
-    await incrementAiUsage(userId)
+    await incrementAiUsage(userId, { usage: structure.usage, feature: 'brain_dump', model: DEFAULT_AI_MODEL })
 
     timings["total"] = Date.now() - startTotal
     console.log("⏱️ [brain-dump] Timings:", JSON.stringify(timings, null, 2))

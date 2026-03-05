@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // 計算 query embedding（消耗 AI quota）
     const queryEmbedding = await getEmbedding(body.query.trim());
-    await incrementAiUsage(userId);
+    await incrementAiUsage(userId, { feature: 'library_search', model: 'text-embedding' });
     const vectorStr = `[${queryEmbedding.join(",")}]`;
 
     // 搜尋 tasks（有 embedding 的）

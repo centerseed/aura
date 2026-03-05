@@ -266,7 +266,7 @@ DEPLOY_ARGS=(
 
     # Node.js 環境變數
     # NEXT_PUBLIC_API_URL 必須指向 API Backend，用於 OAuth Discovery metadata
-    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://api.zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://api.zentropy.cc,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5"
+    --set-env-vars "NODE_ENV=production,GOOGLE_OAUTH_REDIRECT_URI=https://api.zentropy.cc/api/oauth/callback,NEXT_PUBLIC_FRONTEND_URL=https://zentropy.cc,NEXT_PUBLIC_API_URL=https://api.zentropy.cc,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=zentropy-4f7a5.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=zentropy-4f7a5,ADMIN_UIDS=Tfs1Zm4cfHgYMlj7ZNc30Cx2emO2"
     --update-secrets NEXT_PUBLIC_FIREBASE_API_KEY=firebase-web-api-key:latest
 )
 

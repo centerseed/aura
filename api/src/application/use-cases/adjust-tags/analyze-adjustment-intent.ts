@@ -10,6 +10,7 @@ import { generateObject } from "ai"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { ValidationException } from "@/lib/api-response"
+import type { AiTokenUsage } from "@/lib/ai-rate-limit"
 
 // ============================================================================
 // Types
@@ -85,6 +86,7 @@ export interface AnalyzeAdjustmentIntentResponse {
   previewLog: string[]
   logId?: string
   timings: Record<string, number>
+  usage?: AiTokenUsage
 }
 
 // ============================================================================
@@ -200,7 +202,7 @@ export class AnalyzeAdjustmentIntentUseCase {
 
     // 2. 調用 AI 解析用戶意圖
     const startAI = Date.now()
-    const { object: intent } = await generateObject({
+    const { object: intent, usage: aiUsage } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: AdjustmentIntentSchema,
       prompt: `你是 Zentropy 的標籤調整助手。用戶想要調整現有任務的分類。
@@ -312,6 +314,7 @@ ${request.text}
       previewLog,
       logId,
       timings,
+      usage: aiUsage,
     }
   }
 }

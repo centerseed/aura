@@ -19,6 +19,7 @@ import { UnifiedDataTransformer } from '@/infrastructure/services/unified-data-t
 import { CoachPlanGenerator, type DailyPlanOutput } from '@/application/services/coach-plan-generator'
 import { CoachCalibration } from '@/application/services/coach-calibration'
 import { ValidationException } from '@/lib/api-response'
+import type { AiTokenUsage } from '@/lib/ai-rate-limit'
 import { prisma } from '@/lib/db'
 import { resolveTimezone, toDateOnly } from '@/lib/timezone-utils'
 
@@ -36,6 +37,7 @@ export interface GeneratePlanRequest {
 export interface GeneratePlanResponse {
   plan: DailyPlanData
   timings: Record<string, number>
+  usage?: AiTokenUsage
 }
 
 // ============================================================================
@@ -92,7 +94,7 @@ export class GeneratePlanUseCase {
 
     // 6. AI 排序
     start = Date.now()
-    const { output: aiResult, prompt: aiPrompt } = await this.planGenerator.generate(
+    const { output: aiResult, prompt: aiPrompt, usage: aiUsage } = await this.planGenerator.generate(
       collected.candidates,
       collected.availableMinutes,
       collected.meetingMinutes,
@@ -298,7 +300,7 @@ export class GeneratePlanUseCase {
     ])
     timings.save = Date.now() - start
 
-    return { plan, timings }
+    return { plan, timings, usage: aiUsage }
   }
 
   // ============================================================================

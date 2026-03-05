@@ -4,7 +4,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
-import { checkAiRateLimit, incrementAiUsage } from "@/lib/ai-rate-limit";
+import { checkAiRateLimit, incrementAiUsage, DEFAULT_AI_MODEL } from "@/lib/ai-rate-limit";
 import { UnauthorizedException, RateLimitException } from "@/lib/api-response";
 import { buildReorganizePrompt } from "@/lib/reorganize-prompt";
 
@@ -181,13 +181,13 @@ export async function POST(
     });
 
     const startAI = Date.now();
-    const { object: result } = await generateObject({
+    const { object: result, usage: aiUsage } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: ReorganizeProposalSchema,
       prompt,
     });
     timings["ai_generateObject"] = Date.now() - startAI;
-    await incrementAiUsage(userId);
+    await incrementAiUsage(userId, { usage: aiUsage, feature: 'reorganize_topics', model: DEFAULT_AI_MODEL });
 
     // 過濾無效的 merge 操作（source_names 少於 2 個不算真正的合併）
     if (result.topic_operations) {

@@ -26,6 +26,7 @@ import {
 import { CoachAIGenerator, type FocusDriftData } from '@/application/services/coach-ai-generator'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { ValidationException } from '@/lib/api-response'
+import type { AiTokenUsage } from '@/lib/ai-rate-limit'
 import { prisma } from '@/lib/db'
 import { resolveTimezone, toDateOnly, getStartOfDay } from '@/lib/timezone-utils'
 
@@ -43,6 +44,7 @@ export interface GenerateBriefingRequest {
 export interface GenerateBriefingResponse {
   briefing: CoachBriefingData
   timings: Record<string, number>
+  usage?: AiTokenUsage
 }
 
 // ============================================================================
@@ -140,7 +142,7 @@ export class GenerateBriefingUseCase {
 
       // 把 plan 結果傳給 AI generator 作為 context
       start = Date.now()
-      aiResult = await this.aiGenerator.generate({
+      const morningResult = await this.aiGenerator.generate({
         type: 'MORNING',
         calendarEvents: aggregatedData.calendarEvents,
         overdueTasks: aggregatedData.overdueTasks,
@@ -167,6 +169,7 @@ export class GenerateBriefingUseCase {
           overflowItems: [],
         } : undefined,
       })
+      aiResult = morningResult
       timings.ai = Date.now() - start
     } else {
       // 晚報：補充 plan 已完成項目（向前相容：舊的完成不會有 ARCHIVE status）
@@ -213,7 +216,7 @@ export class GenerateBriefingUseCase {
 
       // AI 生成回顧（不傳 remainingTasks）
       start = Date.now()
-      aiResult = await this.aiGenerator.generate({
+      const eveningResult = await this.aiGenerator.generate({
         type: request.type,
         calendarEvents: aggregatedData.calendarEvents,
         overdueTasks: aggregatedData.overdueTasks,
@@ -224,6 +227,7 @@ export class GenerateBriefingUseCase {
         remainingTasks: [], // 不傳 remainingTasks 給 AI，防止捏造
         tomorrowPreview: aggregatedData.tomorrowPreview,
       })
+      aiResult = eveningResult
       timings.ai = Date.now() - start
 
       // defer_suggestions 改用程式碼規則生成，不靠 AI
@@ -264,7 +268,7 @@ export class GenerateBriefingUseCase {
 
     console.log('[Briefing] timings:', JSON.stringify(timings))
 
-    return { briefing, timings }
+    return { briefing, timings, usage: aiResult.usage }
   }
 
   // ============================================================================

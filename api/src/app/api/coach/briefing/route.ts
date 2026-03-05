@@ -14,7 +14,7 @@ import { z } from 'zod'
 import { authenticateRequest } from '@/lib/auth-middleware'
 import { prisma } from '@/lib/db'
 import { ApiResponseBuilder, catchDomainException, ValidationException } from '@/lib/api-response'
-import { checkAiRateLimit, incrementAiUsage } from '@/lib/ai-rate-limit'
+import { checkAiRateLimit, incrementAiUsage, DEFAULT_AI_MODEL } from '@/lib/ai-rate-limit'
 import { GenerateBriefingUseCase } from '@/application/use-cases/coach/generate-briefing'
 import { formatBriefing } from '@/app/api/coach/briefing/_shared'
 
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       date,
       timezone,
     })
-    await incrementAiUsage(userId)
+    await incrementAiUsage(userId, { usage: result.usage, feature: 'coach_briefing', model: DEFAULT_AI_MODEL })
 
     return ApiResponseBuilder.success({
       briefing: formatBriefing(result.briefing),

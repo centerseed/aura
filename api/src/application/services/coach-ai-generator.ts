@@ -16,6 +16,7 @@ import type {
   Recommendation,
   DeferSuggestion,
 } from '@/domain/entities/coach-briefing.entity'
+import type { AiTokenUsage } from '@/lib/ai-rate-limit'
 
 // ============================================================================
 // Zod Schemas
@@ -92,6 +93,7 @@ export interface CoachAIOutput {
   summary: string
   recommendations: Recommendation[]
   deferSuggestions: DeferSuggestion[]
+  usage?: AiTokenUsage
 }
 
 // ============================================================================
@@ -104,7 +106,7 @@ export class CoachAIGenerator {
     const schema = input.type === 'MORNING' ? MorningBriefingSchema : EveningBriefingSchema
 
     const start = Date.now()
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: google('gemini-2.5-flash-lite'),
       schema,
       prompt,
@@ -120,6 +122,7 @@ export class CoachAIGenerator {
       deferSuggestions: 'defer_suggestions' in object
         ? (object.defer_suggestions as DeferSuggestion[])
         : [],
+      usage,
     }
   }
 

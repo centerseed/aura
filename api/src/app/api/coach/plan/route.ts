@@ -7,7 +7,7 @@ import { NextRequest } from 'next/server'
 import { authenticateRequest } from '@/lib/auth-middleware'
 import { prisma } from '@/lib/db'
 import { ApiResponseBuilder, catchDomainException } from '@/lib/api-response'
-import { checkAiRateLimit, incrementAiUsage } from '@/lib/ai-rate-limit'
+import { checkAiRateLimit, incrementAiUsage, DEFAULT_AI_MODEL } from '@/lib/ai-rate-limit'
 import { GeneratePlanUseCase } from '@/application/use-cases/coach/generate-plan'
 import { GetPlanUseCase } from '@/application/use-cases/coach/get-plan'
 import { formatPlan } from '@/app/api/coach/plan/_shared'
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     const useCase = new GeneratePlanUseCase()
     const result = await useCase.execute({ userId, date, timezone })
-    await incrementAiUsage(userId)
+    await incrementAiUsage(userId, { usage: result.usage, feature: 'coach_plan', model: DEFAULT_AI_MODEL })
 
     return ApiResponseBuilder.success({
       plan: formatPlan(result.plan),

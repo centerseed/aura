@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
     return ApiResponseBuilder.success({
       used: usage?.count ?? 0,
       limit: DAILY_AI_LIMIT,
+      input_tokens: usage?.input_tokens ?? 0,
+      output_tokens: usage?.output_tokens ?? 0,
+      total_tokens: usage?.total_tokens ?? 0,
     })
   })
 }

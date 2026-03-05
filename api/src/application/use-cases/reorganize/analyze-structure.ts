@@ -9,6 +9,7 @@ import { google } from "@ai-sdk/google"
 import { generateObject } from "ai"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
+import type { AiTokenUsage } from "@/lib/ai-rate-limit"
 
 // ============================================================================
 // Types
@@ -97,6 +98,7 @@ export interface AnalyzeStructureResponse {
   productByNameCache: Map<string, Array<{ id: string; areaName: string; taskCount: number }>>
   structuredOperations: StructuredOperation[]
   isEmpty: boolean
+  usage?: AiTokenUsage
 }
 
 // ============================================================================
@@ -206,7 +208,7 @@ export class AnalyzeStructureUseCase {
     structureSummary += "\n"
 
     // 3. AI 分析
-    const { object: result } = await generateObject({
+    const { object: result, usage: aiUsage } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: ReorganizeResultSchema,
       prompt: `你是 Zentropy 的圖書管理員 AI，一個資訊熵減系統。
@@ -297,6 +299,7 @@ ${structureSummary}
       productByNameCache,
       structuredOperations,
       isEmpty: false,
+      usage: aiUsage,
     }
   }
 }

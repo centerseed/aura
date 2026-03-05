@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -60,10 +60,26 @@ interface AnalyticsData {
 }
 
 // ============================================================================
-// Trend Chart (canvas-based, no extra deps)
+// LineChart (canvas-based, no extra deps)
 // ============================================================================
 
-function TrendChart({ data }: { data: { date: string; count: number }[] }) {
+function LineChart({
+  dates,
+  values,
+  lineColor,
+  fillColor,
+  dotColor,
+  leftPad = 36,
+  formatY = String,
+}: {
+  dates: string[];
+  values: number[];
+  lineColor: string;
+  fillColor: string;
+  dotColor: string;
+  leftPad?: number;
+  formatY?: (value: number) => string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -80,11 +96,11 @@ function TrendChart({ data }: { data: { date: string; count: number }[] }) {
 
     const width = rect.width;
     const height = rect.height;
-    const pad = { top: 16, right: 16, bottom: 32, left: 36 };
+    const pad = { top: 16, right: 16, bottom: 32, left: leftPad };
 
     ctx.clearRect(0, 0, width, height);
 
-    if (data.length === 0) {
+    if (dates.length === 0) {
       ctx.fillStyle = "rgba(255,255,255,0.3)";
       ctx.font = "12px sans-serif";
       ctx.textAlign = "center";
@@ -92,11 +108,10 @@ function TrendChart({ data }: { data: { date: string; count: number }[] }) {
       return;
     }
 
-    const maxCount = Math.max(...data.map((d) => d.count), 1);
+    const maxVal = Math.max(...values, 1);
     const cw = width - pad.left - pad.right;
     const ch = height - pad.top - pad.bottom;
 
-    // Axes
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -105,64 +120,59 @@ function TrendChart({ data }: { data: { date: string; count: number }[] }) {
     ctx.lineTo(pad.left + cw, pad.top + ch);
     ctx.stroke();
 
-    if (data.length < 2) return;
+    if (dates.length < 2) return;
 
-    const xStep = cw / (data.length - 1);
+    const xStep = cw / (dates.length - 1);
 
-    // Filled area under line
-    ctx.fillStyle = "rgba(99,102,241,0.15)";
+    ctx.fillStyle = fillColor;
     ctx.beginPath();
-    data.forEach((point, i) => {
+    values.forEach((v, i) => {
       const x = pad.left + i * xStep;
-      const y = pad.top + ch - (point.count / maxCount) * ch;
+      const y = pad.top + ch - (v / maxVal) * ch;
       if (i === 0) ctx.moveTo(x, pad.top + ch);
       ctx.lineTo(x, y);
     });
-    ctx.lineTo(pad.left + (data.length - 1) * xStep, pad.top + ch);
+    ctx.lineTo(pad.left + (dates.length - 1) * xStep, pad.top + ch);
     ctx.closePath();
     ctx.fill();
 
-    // Line
-    ctx.strokeStyle = "#6366f1";
+    ctx.strokeStyle = lineColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    data.forEach((point, i) => {
+    values.forEach((v, i) => {
       const x = pad.left + i * xStep;
-      const y = pad.top + ch - (point.count / maxCount) * ch;
+      const y = pad.top + ch - (v / maxVal) * ch;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
-    // Dots
-    ctx.fillStyle = "#818cf8";
-    data.forEach((point, i) => {
+    ctx.fillStyle = dotColor;
+    values.forEach((v, i) => {
       const x = pad.left + i * xStep;
-      const y = pad.top + ch - (point.count / maxCount) * ch;
+      const y = pad.top + ch - (v / maxVal) * ch;
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // X labels (every ~6 ticks)
     ctx.fillStyle = "rgba(255,255,255,0.4)";
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
-    const labelEvery = Math.max(1, Math.ceil(data.length / 6));
-    data.forEach((point, i) => {
-      if (i % labelEvery !== 0 && i !== data.length - 1) return;
+    const labelEvery = Math.max(1, Math.ceil(dates.length / 6));
+    dates.forEach((date, i) => {
+      if (i % labelEvery !== 0 && i !== dates.length - 1) return;
       const x = pad.left + i * xStep;
-      ctx.fillText(point.date.slice(5), x, height - 6);
+      ctx.fillText(date.slice(5), x, height - 6);
     });
 
-    // Y labels
     ctx.textAlign = "right";
     for (let i = 0; i <= 4; i++) {
-      const value = Math.round((maxCount * i) / 4);
+      const value = Math.round((maxVal * i) / 4);
       const y = pad.top + ch - (i / 4) * ch + 4;
-      ctx.fillText(String(value), pad.left - 4, y);
+      ctx.fillText(formatY(value), pad.left - 4, y);
     }
-  }, [data]);
+  }, [dates, values, lineColor, fillColor, dotColor, leftPad, formatY]);
 
   return (
     <canvas
@@ -191,6 +201,30 @@ function StatusBadge({ status }: { status: DistillStatus }) {
 }
 
 // ============================================================================
+// Token Usage Types
+// ============================================================================
+
+interface TokenDailyRow {
+  date: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  count: number;
+}
+
+interface TokenFeatureRow {
+  feature: string;
+  total_tokens: number;
+  count: number;
+  avg_tokens_per_call: number;
+}
+
+interface TokenUsageData {
+  daily: TokenDailyRow[];
+  byFeature: TokenFeatureRow[];
+}
+
+// ============================================================================
 // Main Page
 // ============================================================================
 
@@ -207,6 +241,11 @@ export default function AnalyticsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authed, setAuthed] = useState(false);
+  const [tokenUsageData, setTokenUsageData] = useState<TokenUsageData | null>(null);
+  const [tokenUserId, setTokenUserId] = useState("");
+  const [tokenDays, setTokenDays] = useState(30);
+  const [tokenLoading, setTokenLoading] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -231,6 +270,29 @@ export default function AnalyticsDashboard() {
     });
     return () => unsub();
   }, [router]);
+
+  const fetchTokenUsage = useCallback(async (uid: string, days: number) => {
+    if (!uid.trim()) return;
+    setTokenLoading(true);
+    setTokenError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(
+        `${API_BASE_URL}/api/admin/token-usage?userId=${encodeURIComponent(uid)}&days=${days}`,
+        { headers }
+      );
+      const json = await res.json();
+      if (json.success) {
+        setTokenUsageData(json.data);
+      } else {
+        setTokenError(json.error?.message ?? "Unknown error");
+      }
+    } catch (e) {
+      setTokenError(String(e));
+    } finally {
+      setTokenLoading(false);
+    }
+  }, []);
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
@@ -415,7 +477,121 @@ export default function AnalyticsDashboard() {
               <h2 className="text-lg font-semibold text-white mb-4">
                 每日 Brain Dump 趨勢（近 30 天）
               </h2>
-              <TrendChart data={dailyTrend} />
+              <LineChart
+                dates={dailyTrend.map((d) => d.date)}
+                values={dailyTrend.map((d) => d.count)}
+                lineColor="#6366f1"
+                fillColor="rgba(99,102,241,0.15)"
+                dotColor="#818cf8"
+              />
+            </Card>
+
+            {/* Token Usage Section */}
+            <Card className="bg-slate-900 border-white/10 p-4">
+              <h2 className="text-lg font-semibold text-white mb-4">AI Token 用量查詢</h2>
+              <div className="flex flex-wrap gap-3 mb-4">
+                <input
+                  type="text"
+                  placeholder="User ID (UUID)"
+                  value={tokenUserId}
+                  onChange={(e) => setTokenUserId(e.target.value)}
+                  className="flex-1 min-w-[200px] px-3 py-1.5 rounded bg-white/5 border border-white/10 text-white text-sm placeholder-white/30 outline-none focus:border-white/30"
+                />
+                <select
+                  value={tokenDays}
+                  onChange={(e) => setTokenDays(Number(e.target.value))}
+                  className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-white text-sm outline-none"
+                >
+                  <option value={7}>近 7 天</option>
+                  <option value={14}>近 14 天</option>
+                  <option value={30}>近 30 天</option>
+                </select>
+                <Button
+                  size="sm"
+                  onClick={() => fetchTokenUsage(tokenUserId, tokenDays)}
+                  disabled={tokenLoading || !tokenUserId.trim()}
+                  className="bg-emerald-700 hover:bg-emerald-600 text-white"
+                >
+                  {tokenLoading ? "查詢中..." : "查詢"}
+                </Button>
+              </div>
+
+              {tokenError && (
+                <p className="text-red-400 text-sm mb-3">{tokenError}</p>
+              )}
+
+              {tokenUsageData && (
+                <div className="space-y-4">
+                  {/* Summary numbers */}
+                  {tokenUsageData.daily.length > 0 && (() => {
+                    const totalTokens = tokenUsageData.daily.reduce((s, d) => s + d.total_tokens, 0);
+                    const totalCalls = tokenUsageData.daily.reduce((s, d) => s + d.count, 0);
+                    return (
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-white/5 rounded p-3">
+                          <p className="text-white/40 text-xs mb-1">Total Tokens</p>
+                          <p className="text-white font-semibold">{totalTokens.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-white/5 rounded p-3">
+                          <p className="text-white/40 text-xs mb-1">AI Calls</p>
+                          <p className="text-white font-semibold">{totalCalls}</p>
+                        </div>
+                        <div className="bg-white/5 rounded p-3">
+                          <p className="text-white/40 text-xs mb-1">Avg / Call</p>
+                          <p className="text-white font-semibold">
+                            {totalCalls > 0 ? Math.round(totalTokens / totalCalls).toLocaleString() : "—"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Daily trend chart */}
+                  <div>
+                    <p className="text-white/50 text-xs mb-2">每日 Token 趨勢</p>
+                    <LineChart
+                      dates={tokenUsageData.daily.map((d) => d.date)}
+                      values={tokenUsageData.daily.map((d) => d.total_tokens)}
+                      lineColor="#10b981"
+                      fillColor="rgba(16,185,129,0.12)"
+                      dotColor="#34d399"
+                      leftPad={56}
+                      formatY={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
+                    />
+                  </div>
+
+                  {/* Feature breakdown table */}
+                  {tokenUsageData.byFeature.length > 0 && (
+                    <div>
+                      <p className="text-white/50 text-xs mb-2">功能分布</p>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-white/40 text-left border-b border-white/10">
+                            <th className="pb-2 pr-4">Feature</th>
+                            <th className="pb-2 pr-4 text-right">Calls</th>
+                            <th className="pb-2 pr-4 text-right">Total Tokens</th>
+                            <th className="pb-2 text-right">Avg / Call</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tokenUsageData.byFeature.map((row) => (
+                            <tr key={row.feature} className="border-b border-white/5">
+                              <td className="py-1.5 pr-4 text-white font-mono text-xs">{row.feature}</td>
+                              <td className="py-1.5 pr-4 text-right text-white/70">{row.count}</td>
+                              <td className="py-1.5 pr-4 text-right text-emerald-400">{row.total_tokens.toLocaleString()}</td>
+                              <td className="py-1.5 text-right text-white/50">{row.avg_tokens_per_call.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {tokenUsageData.byFeature.length === 0 && tokenUsageData.daily.length === 0 && (
+                    <p className="text-white/30 text-sm text-center py-4">此期間無 token 記錄</p>
+                  )}
+                </div>
+              )}
             </Card>
           </>
         )}

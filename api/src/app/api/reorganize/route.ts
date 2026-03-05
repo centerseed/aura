@@ -8,7 +8,7 @@ import { NextRequest } from "next/server"
 import { prisma } from "@/lib/db"
 import { authenticateRequest } from "@/lib/auth-middleware"
 import { ApiResponseBuilder, catchDomainException } from "@/lib/api-response"
-import { checkAiRateLimit, incrementAiUsage } from "@/lib/ai-rate-limit"
+import { checkAiRateLimit, incrementAiUsage, DEFAULT_AI_MODEL } from "@/lib/ai-rate-limit"
 import { AnalyzeStructureUseCase } from "@/application/use-cases/reorganize/analyze-structure"
 import { ExecuteReorganizationUseCase, type ExecuteReorganizationRequest } from "@/application/use-cases/reorganize/execute-reorganization"
 
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const analysis = await analyzeUseCase.execute({ userId })
 
     // LLM 已被呼叫，無論結果為何都計數
-    await incrementAiUsage(userId)
+    await incrementAiUsage(userId, { usage: analysis.usage, feature: 'reorganize', model: DEFAULT_AI_MODEL })
 
     if (analysis.isEmpty) {
       return ApiResponseBuilder.success({

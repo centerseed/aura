@@ -29,6 +29,7 @@ model User {
   ai_usage_count       Int                   @default(0)
   ai_usage_reset_at    DateTime              @default(now()) @db.Timestamp(6)
   areas                Area[]
+  ai_token_logs        AiTokenLog[]
   coach_briefings      CoachBriefing[]
   daily_ai_usage       DailyAiUsage[]
   daily_plans          DailyPlan[]
@@ -406,17 +407,35 @@ model DailyPlanItem {
 }
 
 model DailyAiUsage {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String   @db.Uuid
-  usage_date DateTime @db.Date
-  count      Int      @default(0)
-  created_at DateTime @default(now()) @db.Timestamp(6)
-  updated_at DateTime @updatedAt @db.Timestamp(6)
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String   @db.Uuid
+  usage_date    DateTime @db.Date
+  count         Int      @default(0)
+  input_tokens  Int      @default(0)
+  output_tokens Int      @default(0)
+  total_tokens  Int      @default(0)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @updatedAt @db.Timestamp(6)
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, usage_date])
   @@index([user_id, usage_date])
   @@map("daily_ai_usage")
+}
+
+model AiTokenLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String   @db.Uuid
+  feature       String   @db.VarChar(50)
+  model         String   @db.VarChar(100)
+  input_tokens  Int      @default(0)
+  output_tokens Int      @default(0)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([feature, created_at])
+  @@map("ai_token_log")
 }
 
 /// Temporary authorization codes for the MCP OAuth PKCE flow.

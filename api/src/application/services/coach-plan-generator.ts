@@ -8,6 +8,7 @@ import { google } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { PlanCandidate, MilestoneContext, WeeklyDayInfo } from '@/domain/entities/plan-candidate.entity'
+import type { AiTokenUsage } from '@/lib/ai-rate-limit'
 
 // ============================================================================
 // Zod Schema
@@ -51,7 +52,7 @@ export class CoachPlanGenerator {
     weeklyOverview?: WeeklyDayInfo[],
     planDate?: Date,
     timezone?: string,
-  ): Promise<{ output: DailyPlanOutput; prompt: string }> {
+  ): Promise<{ output: DailyPlanOutput; prompt: string; usage?: AiTokenUsage }> {
     if (candidates.length === 0 && (!unscheduledTasks || unscheduledTasks.length === 0)) {
       return {
         output: {
@@ -67,7 +68,7 @@ export class CoachPlanGenerator {
     const prompt = this.buildPrompt(candidates, availableMinutes, meetingMinutes, calibrationNote, unscheduledTasks, milestones, weeklyOverview, planDate, timezone)
 
     const start = Date.now()
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: google('gemini-2.5-flash-lite'),
       schema: DailyPlanOutputSchema,
       prompt,
@@ -75,7 +76,7 @@ export class CoachPlanGenerator {
     const aiTime = Date.now() - start
     console.log('[PlanGenerator] AI call:', aiTime, 'ms, prompt length:', prompt.length, 'chars')
 
-    return { output: object, prompt }
+    return { output: object, prompt, usage }
   }
 
   // ============================================================================
