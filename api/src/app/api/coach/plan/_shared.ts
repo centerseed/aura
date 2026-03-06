@@ -29,6 +29,7 @@ export function formatPlanItem(item: DailyPlanItemData) {
     deferred: item.deferred,
     status: item.status,
     task_name: item.taskName,
+    is_recurring: item.isRecurring,
     user_adjusted: item.userAdjusted,
     adjusted_at: item.adjustedAt instanceof Date
       ? item.adjustedAt.toISOString()

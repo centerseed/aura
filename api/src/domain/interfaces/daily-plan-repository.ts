@@ -34,6 +34,7 @@ export interface DailyPlanItemData {
   userAdjusted: boolean
   adjustedAt: Date | null
   taskName: string | null
+  isRecurring: boolean
   createdAt: Date
   updatedAt: Date
 }

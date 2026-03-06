@@ -27,6 +27,7 @@ export interface DailyPlanItem {
   completed_at: string | null
   pinned: boolean
   deferred: boolean
+  is_recurring: boolean
   created_at: string
   updated_at: string
 }

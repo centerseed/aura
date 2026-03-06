@@ -73,6 +73,7 @@ class DailyPlanItem {
   final bool deferred;
   final String status;
   final bool userAdjusted;
+  final bool isRecurring;
 
   const DailyPlanItem({
     required this.id,
@@ -94,6 +95,7 @@ class DailyPlanItem {
     this.deferred = false,
     this.status = 'pending',
     this.userAdjusted = false,
+    this.isRecurring = false,
   });
 
   factory DailyPlanItem.fromJson(Map<String, dynamic> json) {
@@ -119,6 +121,7 @@ class DailyPlanItem {
       deferred: json['deferred'] as bool? ?? false,
       status: json['status'] as String? ?? 'pending',
       userAdjusted: json['user_adjusted'] as bool? ?? false,
+      isRecurring: json['is_recurring'] as bool? ?? false,
     );
   }
 }

@@ -688,6 +688,12 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                 ),
               ),
             ),
+            // 週期圖示
+            if (item.isRecurring) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.repeat, size: 14, color: AppColors.accentEmerald),
+              const SizedBox(width: 4),
+            ],
             // 預估時間
             if (item.estimatedMinutes != null)
               Text(

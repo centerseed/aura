@@ -23,7 +23,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       include: {
         items: {
           orderBy: { order: 'asc' },
-          include: { task: { select: { content: true } } },
+          include: { task: { select: { content: true, recurring_task_id: true } } },
         },
       },
     })
@@ -103,7 +103,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
         include: {
           items: {
             orderBy: { order: 'asc' },
-            include: { task: { select: { content: true } } },
+            include: { task: { select: { content: true, recurring_task_id: true } } },
           },
         },
       })
@@ -151,7 +151,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
         include: {
           items: {
             orderBy: { order: 'asc' },
-            include: { task: { select: { content: true } } },
+            include: { task: { select: { content: true, recurring_task_id: true } } },
           },
         },
       })
@@ -254,6 +254,7 @@ export class PrismaDailyPlanRepository implements IDailyPlanRepository {
       userAdjusted: row.user_adjusted ?? false,
       adjustedAt: row.adjusted_at ?? null,
       taskName: row.task?.content ?? null,
+      isRecurring: !!row.task?.recurring_task_id,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }
