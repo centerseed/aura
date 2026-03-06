@@ -10,6 +10,9 @@ export { DashboardContent, DashboardContentWrapper } from './dashboard-content'
 export { DashboardSidebar } from './dashboard-sidebar'
 export { DashboardModals } from './dashboard-modals'
 
+// Coach components
+export { MagicMomentBanner } from './magic-moment-banner'
+
 // View components
 export { StructureView } from './structure-view'
 

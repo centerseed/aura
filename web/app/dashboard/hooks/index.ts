@@ -13,3 +13,6 @@ export type { UseModalsReturn } from './use-modals'
 
 export { useDragAndDrop } from './use-drag-and-drop'
 export type { UseDragAndDropReturn } from './use-drag-and-drop'
+
+export { useMagicMoment } from './use-magic-moment'
+export type { MagicMomentData } from './use-magic-moment'

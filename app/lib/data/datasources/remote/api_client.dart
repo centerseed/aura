@@ -399,6 +399,15 @@ class ApiClient {
     await _dio.delete('/me');
   }
 
+  // ==================== Coach Magic Moment ====================
+
+  /// 偵測動能轉移：P0 停滯 + 非 P0 爆發
+  /// GET /api/coach/magic-moment
+  Future<Map<String, dynamic>?> getMagicMoment() async {
+    final response = await _dio.get('/coach/magic-moment');
+    return response.data['data'] as Map<String, dynamic>?;
+  }
+
   // ==================== Milestones ====================
 
   /// 取得所有里程碑

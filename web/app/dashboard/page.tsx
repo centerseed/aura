@@ -84,6 +84,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { DRAWER_CONFIG } from "@/domain/constants/drawer-config"
 import { PriorityPicker } from "@/components/priority-picker"
 import { FocusBiasPanel } from "@/app/dashboard/components/focus-bias-panel";
+import { MagicMomentBanner } from "@/app/dashboard/components/magic-moment-banner";
 import { DashboardHeader } from "@/app/dashboard/components/dashboard-header";
 import type { ViewMode, ApiArea, ApiProduct } from "./context/types";
 
@@ -3842,6 +3843,8 @@ function DashboardContent() {
               {/* 視圖切換 */}
               {viewMode === "structure" && (
                 <div className="space-y-8">
+                  {/* Magic Moment Banner */}
+                  <MagicMomentBanner />
                   {/* Focus Bias Panel */}
                   <FocusBiasPanel />
                   {(Array.isArray(displayAreas) ? displayAreas : []).map((area) => (

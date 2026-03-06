@@ -310,6 +310,11 @@ export const API = {
 
   // Coach Agent
   coach: {
+    getMagicMoment: () => getAPI<{
+      detected: boolean
+      stagnant_p0_products: Array<{ id: string; name: string; days_stagnant: number }>
+      momentum_products: Array<{ id: string; name: string; priority: string; completed_count: number }>
+    }>('/api/coach/magic-moment'),
     generateBriefing: (data: { type: 'MORNING' | 'EVENING'; date?: string; timezone?: string }) =>
       postAPI('/api/coach/briefing', data),
     getLatestBriefing: (params?: { type?: 'MORNING' | 'EVENING' }) => {

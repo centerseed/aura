@@ -3,12 +3,14 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/providers.dart';
 import '../../../domain/entities/task.dart';
 import '../../../application/use_cases/create_task_use_case.dart';
 import '../../../application/use_cases/update_task_details_use_case.dart';
 import '../../providers/task_provider.dart';
 import '../home/widgets/task_detail_bottom_sheet.dart';
+import '../../widgets/magic_moment_banner.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -20,6 +22,48 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // 追蹤已完成的任務 ID（樂觀更新）
   final Set<String> _completedTaskIds = {};
+
+  // Magic Moment Banner 狀態
+  Map<String, dynamic>? _magicMomentData;
+  bool _magicMomentDismissed = false;
+
+  static String get _dismissKey {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    return 'zentropy_mm_dismissed_$today';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMagicMoment();
+  }
+
+  Future<void> _loadMagicMoment() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_dismissKey) == true) return;
+
+      final apiClient = ref.read(apiClientProvider);
+      final data = await apiClient.getMagicMoment();
+      if (mounted && data != null && data['detected'] == true) {
+        setState(() => _magicMomentData = data);
+      }
+    } catch (e) {
+      debugPrint('[MagicMoment] load failed: $e');
+    }
+  }
+
+  Future<void> _dismissMagicMoment() async {
+    setState(() => _magicMomentDismissed = true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_dismissKey, true);
+  }
+
+  Future<void> _refocusPlan() async {
+    final apiClient = ref.read(apiClientProvider);
+    await apiClient.generatePlan();
+    await refreshTasks(ref);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +81,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               SliverToBoxAdapter(
                 child: _buildHeader(dailyProgress, isRefreshing: taskState.isRefreshing),
               ),
+              // Magic Moment Banner
+              if (_magicMomentData != null && !_magicMomentDismissed)
+                SliverToBoxAdapter(
+                  child: MagicMomentBanner(
+                    data: _magicMomentData!,
+                    onRefocus: _refocusPlan,
+                    onDismiss: _dismissMagicMoment,
+                  ),
+                ),
               // Task List - 使用 TaskDataState
               if (taskState.showLoading)
                 SliverToBoxAdapter(
