@@ -30,7 +30,7 @@ const RecommendationSchema = z.object({
 })
 
 const MorningBriefingSchema = z.object({
-  summary: z.string().describe('2-4 句繁體中文摘要，概述今日重點'),
+  summary: z.string().describe('2-4 句繁體中文摘要，概述今日重點。嚴禁包含 UUID 或 id 字串，只能用任務或專案名稱'),
   recommendations: z
     .array(RecommendationSchema)
     .min(1)
@@ -166,7 +166,7 @@ export class CoachAIGenerator {
     if (input.overdueTasks.length > 0) {
       sections.push('## 逾期任務（需優先處理）')
       for (const task of input.overdueTasks) {
-        sections.push(`- [${task.area_name}/${task.product_name}] ${task.content}（逾期 ${task.days_overdue} 天）[id: ${task.id}]`)
+        sections.push(`- [${task.area_name}/${task.product_name}] ${task.content}（逾期 ${task.days_overdue} 天）`)
       }
       sections.push('')
     }
@@ -175,7 +175,7 @@ export class CoachAIGenerator {
     if (input.approachingTasks.length > 0) {
       sections.push('## 即將到期（3 天內）')
       for (const task of input.approachingTasks) {
-        sections.push(`- [${task.area_name}/${task.product_name}] ${task.content}（剩 ${task.days_remaining} 天）[id: ${task.id}]`)
+        sections.push(`- [${task.area_name}/${task.product_name}] ${task.content}（剩 ${task.days_remaining} 天）`)
       }
       sections.push('')
     }
@@ -295,6 +295,7 @@ export class CoachAIGenerator {
       sections.push('   - 從即將到期或停滯的任務中挑選值得推進的項目')
       sections.push('   - 必須是具體動作，禁止「查看計畫」「整理任務」這類空話')
     }
+    sections.push('**格式限制**：summary 與 recommendations 的文字中嚴禁包含任何 UUID 或 id 字串（如 `[id: ...]`、`id=xxx`），只能使用任務名稱、專案名稱或 Area 名稱。related_task_id 欄位才能放 UUID。')
 
     return sections.join('\n')
   }

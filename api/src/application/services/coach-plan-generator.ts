@@ -22,7 +22,7 @@ const DailyPlanOutputSchema = z.object({
     estimated_minutes: z.number().describe('預估完成時間（分鐘），根據任務內容與複雜度估計'),
     reasoning: z.string().describe('排序理由（繁體中文）'),
   })).describe('排序後的每日計畫項目'),
-  coach_message: z.string().describe('晨報親切語（繁體中文），2-3 句鼓勵或提醒'),
+  coach_message: z.string().describe('晨報親切語（繁體中文），2-3 句鼓勵或提醒。嚴禁包含 UUID 或 id 字串'),
   overflow_items: z.array(z.object({
     item_id: z.string(),
     suggestion: z.string().describe('建議處理方式（繁體中文）'),
@@ -252,9 +252,9 @@ export class CoachPlanGenerator {
     sections.push('1. daily_plan: 只放今天真正適合且來得及做的項目，按建議執行順序排列')
     sections.push('2. overflow_items: 不適合今天做的項目（太遠、週末限制、容量不足），suggestion 說明建議何時做')
     if (isWeekend) {
-      sections.push('3. coach_message: 2-3 句親切的開場語。今天是週末，可以提到週末相關的話題')
+      sections.push('3. coach_message: 2-3 句親切的開場語。今天是週末，可以提到週末相關的話題。嚴禁包含 UUID 或 id 字串（如 `id=xxx`），只能用任務名稱或專案名稱')
     } else {
-      sections.push(`3. coach_message: 2-3 句親切的開場語。今天是星期${dayOfWeek}（工作日），絕對不要提到週末、休息日、假日。直接聚焦今天的工作安排`)
+      sections.push(`3. coach_message: 2-3 句親切的開場語。今天是星期${dayOfWeek}（工作日），絕對不要提到週末、休息日、假日。直接聚焦今天的工作安排。嚴禁包含 UUID 或 id 字串（如 \`id=xxx\`），只能用任務名稱或專案名稱`)
     }
     if (unscheduledTasks && unscheduledTasks.length > 0) {
       sections.push('4. scheduling: 為每個待排程任務建議 start_date 和 due_date')

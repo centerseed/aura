@@ -194,6 +194,20 @@ export class UpdateTaskUseCase {
       updateData.recurringTaskId = request.recurringTaskId
     }
 
+    // 5.6 用戶將 due_date 延後超過 3 天 → 清除 coach 設的 start_date
+    // 避免任務因 coach 設的 start_date 仍在今天之前而繼續出現在每日計畫候選中
+    if (request.dueDate !== undefined && request.startDate === undefined) {
+      const newDueDate = request.dueDate ? new Date(request.dueDate) : null
+      const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+      const coachHadSetStartDate =
+        existingTaskData.dateSource !== 'user' &&
+        existingTaskData.startDate !== null
+      if (newDueDate && newDueDate > threeDaysFromNow && coachHadSetStartDate) {
+        task.setStartDate(null)
+        updateData.startDate = null
+      }
+    }
+
     // 5.5 用戶修改日期 → 設 date_source='user'（保護不被 Coach 覆寫）
     if (request.startDate !== undefined || request.dueDate !== undefined) {
       updateData.dateSource = 'user'
