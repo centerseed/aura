@@ -565,6 +565,11 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // 週期任務圖示
+                  if (task.isRecurring) ...[
+                    Icon(Icons.repeat, size: 13, color: AppColors.accentEmerald),
+                    const SizedBox(width: 6),
+                  ],
                   // 日期標籤
                   if (task.dueDate != null)
                     Container(
@@ -747,6 +752,10 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (task.isRecurring) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.repeat, size: 12, color: AppColors.accentEmerald),
+              ],
               if (task.dueDate != null)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),

@@ -82,6 +82,7 @@ model Area {
   is_custom       Boolean
   rolling_summary Json?     @db.Json
   scope           String?   @db.VarChar
+  display_order   Int       @default(0)
   user            User      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   products        Product[]
 

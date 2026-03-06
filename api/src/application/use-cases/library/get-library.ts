@@ -60,6 +60,7 @@ export interface TaskData {
     title?: string | null
     created_at: string
   }>
+  recurring_task_id: string | null
 }
 
 export interface TopicData {
@@ -120,6 +121,7 @@ interface RawLibraryRow {
   task_inferred_from_milestone: string | null
   task_date_source: string | null
   task_created_at: Date | null
+  task_recurring_task_id: string | null
   topic_name: string | null
 }
 
@@ -154,6 +156,7 @@ export class GetLibraryUseCase {
         t.inferred_from_milestone as task_inferred_from_milestone,
         t.date_source as task_date_source,
         t.created_at as task_created_at,
+        t.recurring_task_id::text as task_recurring_task_id,
         top.name as topic_name
       FROM areas a
       LEFT JOIN products p ON p.area_id = a.id AND p.deleted_at IS NULL
@@ -331,6 +334,7 @@ export class GetLibraryUseCase {
       sub_items: subItems,
       sub_items_meta: subItemsMeta,
       references: references,
+      recurring_task_id: row.task_recurring_task_id || null,
     }
   }
 

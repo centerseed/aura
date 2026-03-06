@@ -443,6 +443,11 @@ class _LoadViewTabState extends ConsumerState<LoadViewTab> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              // 週期任務圖示
+              if (task.isRecurring) ...[
+                const SizedBox(width: 6),
+                Icon(Icons.repeat, size: 12, color: AppColors.accentEmerald),
+              ],
               // 日期
               if (task.dueDate != null) ...[
                 const SizedBox(width: 8),

@@ -1116,6 +1116,12 @@ class _TodayFocusTabState extends ConsumerState<TodayFocusTab> {
                                 ],
                               ),
                             ),
+                            // 週期任務圖示
+                            if (task.isRecurring) ...[
+                              const SizedBox(width: 4),
+                              Icon(Icons.repeat, size: 14, color: AppColors.accentEmerald),
+                              const SizedBox(width: 4),
+                            ],
                             // 日期標籤
                             task.dueDate != null
                               ? Container(

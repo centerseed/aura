@@ -353,6 +353,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ],
                   ),
                 ),
+                // 週期任務圖示
+                if (task.isRecurring)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(Icons.repeat, size: 16, color: AppColors.accentEmerald),
+                  ),
                 // Focus Button
                 IconButton(
                   icon: Icon(

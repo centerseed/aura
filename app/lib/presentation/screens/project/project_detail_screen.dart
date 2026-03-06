@@ -295,11 +295,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                     ],
                                   ),
 
-                                  // Metadata Row (Dates, Progress)
-                                  if (task.dueDate != null || (task.subItems?.isNotEmpty ?? false)) ...[
+                                  // Metadata Row (Dates, Progress, Recurring)
+                                  if (task.isRecurring || task.dueDate != null || (task.subItems?.isNotEmpty ?? false)) ...[
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
+                                        if (task.isRecurring) ...[
+                                          Icon(Icons.repeat, size: 13, color: AppColors.accentEmerald),
+                                          const SizedBox(width: 6),
+                                        ],
                                         if (task.dueDate != null) ...[
                                           _DateBadge(
                                             date: task.dueDate!,

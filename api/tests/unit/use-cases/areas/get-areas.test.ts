@@ -61,7 +61,7 @@ describe('GetAreasUseCase', () => {
       expect(result.areas.length).toBe(2)
       expect(prisma.area.findMany).toHaveBeenCalledWith({
         where: { user_id: 'user-123', deleted_at: null },
-        orderBy: { created_at: 'asc' },
+        orderBy: [{ display_order: 'asc' }, { created_at: 'asc' }],
       })
     })
 

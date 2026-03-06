@@ -19,6 +19,7 @@ export interface AreaData {
   scope: string | null
   description: string | null
   is_custom: boolean
+  display_order: number
   created_at: Date
   updated_at: Date
 }
@@ -35,7 +36,7 @@ export class GetAreasUseCase {
 
     const areas = await prisma.area.findMany({
       where: { user_id: request.userId, deleted_at: null },
-      orderBy: { created_at: 'asc' },
+      orderBy: [{ display_order: 'asc' }, { created_at: 'asc' }],
     })
 
     return { areas }

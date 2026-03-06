@@ -23,7 +23,7 @@ import {
   type DragOverEvent,
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { SortableContext, rectSortingStrategy, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Plus,
@@ -53,6 +53,7 @@ import {
   FileText,
   Trash2,
   ListOrdered,
+  Repeat,
 } from "lucide-react";
 import type {
   TaskCard,
@@ -108,6 +109,7 @@ function cleanLibraryData(areas: any[]): ApiArea[] {
       name: area.name,
       description: area.description || null,
       scope: area.scope || null,
+      display_order: area.display_order ?? 0,
       products: (Array.isArray(area.products) ? area.products : [])
         .filter((p: any) => p != null && p.id && p.name)
         .map((product: any) => ({
@@ -356,6 +358,13 @@ const DraggableTaskItem = memo(function DraggableTaskItem({
                 {task.tag.topic}
               </span>
             </div>
+
+            {/* Recurring Badge */}
+            {task.recurring_task_id && (
+              <div className="flex items-center gap-1">
+                <Repeat className="w-3 h-3 text-emerald-400" />
+              </div>
+            )}
 
             {/* Due Date Badge - Hidden when completed */}
             {!isCompleted && (
@@ -754,6 +763,111 @@ function DragOverlayProduct({ productName }: { productName: string }) {
   );
 }
 
+// 可排序的 Area Sidebar Item
+function SortableAreaSidebarItem({
+  area,
+  isExpanded,
+  isSelected,
+  taskCount,
+  showArchive,
+  onToggle,
+  onSelect,
+  onEdit,
+}: {
+  area: import("./context/types").ApiArea;
+  isExpanded: boolean;
+  isSelected: boolean;
+  taskCount: number;
+  showArchive: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+  onEdit: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: area.id,
+    data: { type: 'area', areaId: area.id },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="group">
+      <div className="relative flex items-center">
+        {/* Drag handle */}
+        <button
+          {...attributes}
+          {...listeners}
+          className="absolute left-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-white/20 text-white/40 hover:text-white/80 transition-all cursor-grab active:cursor-grabbing z-10"
+          title="拖拉排序"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => { onToggle(); onSelect(); }}
+          className={`flex-1 flex items-center gap-3 px-3 py-2.5 pl-7 rounded-lg transition-all ${
+            isSelected
+              ? "bg-blue-500/20 text-blue-300"
+              : "hover:bg-white/10 text-white/60"
+          }`}
+        >
+          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          <FolderOpen className="w-4 h-4" />
+          <span className="font-medium">{area.name}</span>
+          <span className="ml-auto text-xs bg-white/10 px-2 py-0.5 rounded-full">
+            {taskCount}
+          </span>
+        </button>
+
+        {/* Edit Button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          className="absolute right-1 opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-white/20 text-white/50 hover:text-white transition-all"
+          title="編輯身分"
+        >
+          <Edit2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {isExpanded && (
+        <div className="ml-8 mt-1 space-y-1">
+          {area.products.length > 0 ? (
+            area.products.map((product) => {
+              const productTaskCount = product.tasks.filter(
+                (t) => t && (showArchive || t.drawer !== "ARCHIVE")
+              ).length;
+              return (
+                <div
+                  key={product.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/40"
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  <span>{product.name}</span>
+                  <span className="ml-auto text-xs">{productTaskCount}</span>
+                </div>
+              );
+            })
+          ) : (
+            <div className="px-3 py-2 text-xs text-white/30 italic">
+              尚無專案，點擊右側查看此身分
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 可拖放的產品區塊（同時可拖曳和可放置）
 const DroppableProduct = memo(function DroppableProduct({
   productId,
@@ -1086,6 +1200,7 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<TaskCard | null>(null);
   const [activeProduct, setActiveProduct] = useState<{ id: string; name: string } | null>(null);
+  const [activeArea, setActiveArea] = useState<{ id: string; name: string } | null>(null);
   const [overDropId, setOverDropId] = useState<string | null>(null);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
@@ -1373,11 +1488,20 @@ function DashboardContent() {
     if (activeData?.task) {
       setActiveTask(activeData.task);
       setActiveProduct(null);
+      setActiveArea(null);
     }
     // 拖曳 Product
     else if (activeData?.type === 'product') {
       setActiveProduct({ id: activeData.productId, name: activeData.productName });
       setActiveTask(null);
+      setActiveArea(null);
+    }
+    // 拖曳 Area
+    else if (activeData?.type === 'area') {
+      const area = (Array.isArray(areas) ? areas : []).find(a => a.id === activeData.areaId);
+      setActiveArea({ id: activeData.areaId, name: area?.name ?? '' });
+      setActiveTask(null);
+      setActiveProduct(null);
     }
   };
 
@@ -1386,12 +1510,63 @@ function DashboardContent() {
     const { active, over } = event;
     setActiveTask(null);
     setActiveProduct(null);
+    setActiveArea(null);
     setOverDropId(null);
 
     if (!over) return;
 
     const activeData = active.data.current;
     const overData = over.data.current;
+
+    // 情況 0: 拖曳 Area 到 Area (重新排序)
+    if (activeData?.type === 'area' && overData?.type === 'area') {
+      const activeId = activeData.areaId;
+      const overId = overData.areaId;
+
+      if (activeId === overId) return;
+
+      const currentAreas = Array.isArray(areas) ? areas : [];
+      const oldIndex = currentAreas.findIndex(a => a.id === activeId);
+      const newIndex = currentAreas.findIndex(a => a.id === overId);
+
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reorderedAreas = arrayMove(currentAreas, oldIndex, newIndex);
+
+      // 樂觀更新 UI
+      setAreas(reorderedAreas);
+
+      // 調用 API 更新順序
+      try {
+        const updates = reorderedAreas.map((area, index) => ({
+          id: area.id,
+          display_order: index,
+        }));
+
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch(`${API_BASE_URL}/api/areas/reorder`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+          },
+          body: JSON.stringify({ updates }),
+        });
+
+        if (!res.ok) {
+          throw new Error('更新排序失敗');
+        }
+      } catch (err) {
+        console.error('Failed to reorder areas:', err);
+        // 失敗時重新載入
+        const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
+        if (libraryRes.ok) {
+          const libraryData = await libraryRes.json();
+          setAreas(cleanLibraryData(libraryData.data?.areas || []));
+        }
+      }
+      return;
+    }
 
     // 情況 1: 拖曳 Product 到 Product (重新排序)
     if (activeData?.type === 'product' && overData?.type === 'product') {
@@ -3551,83 +3726,41 @@ function DashboardContent() {
                   <div className="h-px bg-white/10 my-3" />
 
                   {/* Areas */}
-                  {(Array.isArray(areas) ? areas : []).map((area) => {
-                    const isExpanded = expandedAreas.has(area.name);
-                    const taskCount = (Array.isArray(area.products) ? area.products : []).reduce(
-                      (sum, p) => sum + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t && (showArchive || t.drawer !== "ARCHIVE")).length,
-                      0
-                    );
+                  <SortableContext
+                    items={(Array.isArray(areas) ? areas : []).map(a => a.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {(Array.isArray(areas) ? areas : []).map((area) => {
+                      const isExpanded = expandedAreas.has(area.name);
+                      const taskCount = (Array.isArray(area.products) ? area.products : []).reduce(
+                        (sum, p) => sum + (Array.isArray(p.tasks) ? p.tasks : []).filter((t) => t && (showArchive || t.drawer !== "ARCHIVE")).length,
+                        0
+                      );
 
-                    return (
-                      <div key={area.id} className="group">
-                        <div className="relative flex items-center">
-                          <button
-                            onClick={() => {
-                              toggleArea(area.name);
-                              setSelectedArea(area.name);
-                            }}
-                            className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                              selectedArea === area.name
-                                ? "bg-blue-500/20 text-blue-300"
-                                : "hover:bg-white/10 text-white/60"
-                            }`}
-                          >
-                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            <FolderOpen className="w-4 h-4" />
-                            <span className="font-medium">{area.name}</span>
-                            <span className="ml-auto text-xs bg-white/10 px-2 py-0.5 rounded-full">
-                              {taskCount}
-                            </span>
-                          </button>
-
-                          {/* Edit Button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingArea({
-                                id: area.id,
-                                name: area.name,
-                                scope: area.scope,
-                                description: area.description,
-                                productCount: area.products?.length || 0,
-                              });
-                              setIsAreaModalOpen(true);
-                            }}
-                            className="absolute right-1 opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-white/20 text-white/50 hover:text-white transition-all"
-                            title="編輯身分"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="ml-8 mt-1 space-y-1">
-                            {area.products.length > 0 ? (
-                              area.products.map((product) => {
-                                const productTaskCount = product.tasks.filter(
-                                  (t) => t && (showArchive || t.drawer !== "ARCHIVE")
-                                ).length;
-                                return (
-                                  <div
-                                    key={product.id}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/40"
-                                  >
-                                    <Package className="w-3.5 h-3.5" />
-                                    <span>{product.name}</span>
-                                    <span className="ml-auto text-xs">{productTaskCount}</span>
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <div className="px-3 py-2 text-xs text-white/30 italic">
-                                尚無專案，點擊右側查看此身分
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      return (
+                        <SortableAreaSidebarItem
+                          key={area.id}
+                          area={area}
+                          isExpanded={isExpanded}
+                          isSelected={selectedArea === area.name}
+                          taskCount={taskCount}
+                          showArchive={showArchive}
+                          onToggle={() => toggleArea(area.name)}
+                          onSelect={() => setSelectedArea(area.name)}
+                          onEdit={() => {
+                            setEditingArea({
+                              id: area.id,
+                              name: area.name,
+                              scope: area.scope,
+                              description: area.description,
+                              productCount: area.products?.length || 0,
+                            });
+                            setIsAreaModalOpen(true);
+                          }}
+                        />
+                      );
+                    })}
+                  </SortableContext>
 
                   {areas.length === 0 && (
                     <div className="text-center py-8 text-white/30">
@@ -3890,6 +4023,13 @@ function DashboardContent() {
             <DragOverlayTask task={activeTask} />
           ) : activeProduct ? (
             <DragOverlayProduct productName={activeProduct.name} />
+          ) : activeArea ? (
+            <div className="bg-slate-800 rounded-lg border-2 border-purple-500 px-3 py-2.5 shadow-xl shadow-purple-500/25 rotate-1 scale-105 min-w-[180px]">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-purple-400" />
+                <span className="font-medium text-white text-sm">{activeArea.name}</span>
+              </div>
+            </div>
           ) : null}
         </DragOverlay>
 

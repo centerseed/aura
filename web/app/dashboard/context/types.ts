@@ -25,6 +25,7 @@ export interface ApiArea {
   name: string
   description: string | null
   scope: string | null
+  display_order: number
   products: ApiProduct[]
 }
 
