@@ -65,8 +65,8 @@ const StructureResultSchema = z.object({
   items: z.array(StructuredItemSchema).optional()
     .describe("action=create_new_tasks 時必填：要建立的任務清單"),
   // append_sub_item 時填寫
-  target_task_id: z.string().optional()
-    .describe("action=append_sub_item 時必填：要追加到的任務 UUID，只能使用背景資訊中格式為 '- [uuid]' 的 UUID"),
+  target_task_ids: z.array(z.string().uuid()).min(1).optional()
+    .describe("action=append_sub_item 時必填：要追加到的任務 UUID 陣列（一或多個），只能使用背景資訊中格式為 '- [uuid]' 的 UUID。若用戶要追加到多個任務，填入所有目標的 UUID 陣列，例如 [\"uuid1\", \"uuid2\"]。"),
   sub_items: z.array(SubItemSchema).optional()
     .describe("action=append_sub_item 時必填：要追加的待辦事項清單"),
   reasoning: z.string().max(100).optional()
@@ -579,7 +579,7 @@ export class GenerateBrainDumpStructureUseCase {
         const { object, usage } = await generateObject({
           model: process.env.OPENROUTER_MODEL
             ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
-            : google("gemini-2.5-flash-lite"),
+            : google("gemini-3.1-flash-lite-preview"),
           schema: StructureResultSchema,
           prompt: `你是任務記錄專家。將用戶輸入轉成結構化的 Task。
 
@@ -654,9 +654,11 @@ export class GenerateBrainDumpStructureUseCase {
 **預設行為**：有任何疑慮，創建新任務。追加是例外，不是常態。
 
 **如果符合追加條件**：
-→ 回傳 \`action: "append_sub_item"\`，指定 \`target_task_id\` 和新的 \`sub_items\`
-⚠️ \`target_task_id\` 必須填入「用戶的 Products 與任務」清單中格式為 \`- [uuid]\` 的 UUID
-🚫 **嚴禁使用里程碑區塊的 \`milestone_id\`**（兩者外觀相似，但來源不同，任何 milestone_id 都不是有效的 target_task_id）
+→ 回傳 \`action: "append_sub_item"\`，指定 \`target_task_ids\` 和新的 \`sub_items\`
+⚠️ \`target_task_ids\` 必須填入「用戶的 Products 與任務」清單中格式為 \`- [uuid]\` 的 UUID 陣列（一或多個）
+✅ 若用戶要追加到多個任務（如「國語和數學」），\`target_task_ids\` 填入多個 UUID，\`sub_items\` 將同樣追加到每個目標任務
+🚫 **嚴禁使用里程碑區塊的 \`milestone_id\`**（兩者外觀相似，但來源不同，任何 milestone_id 都不是有效的 target_task_ids 元素）
+🚫 **嚴禁使用逗號分隔字串**，必須使用陣列格式
 
 **如果是新任務**：
 → 繼續往下，按照原有規則創建新任務
@@ -844,16 +846,20 @@ ${request.text}
     timings["ai_generateObject"] = Date.now() - startAI
     console.log("🤖 [brain-dump] AI raw result:", JSON.stringify(result, null, 2).slice(0, 1000))
 
-    // 驗證 append_sub_item 的 target_task_id 必須來自 context 中的真實 task
-    if (result.action === 'append_sub_item' && !validTaskIds.has(result.target_task_id ?? '')) {
-      console.warn(
-        `⚠️ [brain-dump] AI returned invalid target_task_id: ${result.target_task_id}. ` +
-        `Valid task IDs in context: [${Array.from(validTaskIds).join(', ')}]`
-      )
-      throw new ValidationException(
-        `AI 選擇的追加目標（${result.target_task_id}）不在當前任務清單中，請重新送出輸入`,
-        'target_task_id'
-      )
+    // 驗證 append_sub_item 的 target_task_ids 必須全部來自 context 中的真實 task
+    if (result.action === 'append_sub_item') {
+      const taskIds = result.target_task_ids ?? []
+      const invalidIds = taskIds.filter(id => !validTaskIds.has(id))
+      if (invalidIds.length > 0) {
+        console.warn(
+          `⚠️ [brain-dump] AI returned invalid target_task_ids: ${invalidIds.join(', ')}. ` +
+          `Valid task IDs in context: [${Array.from(validTaskIds).join(', ')}]`
+        )
+        throw new ValidationException(
+          `AI 選擇的追加目標（${invalidIds.join(', ')}）不在當前任務清單中，請重新送出輸入`,
+          'target_task_ids'
+        )
+      }
     }
 
     return {

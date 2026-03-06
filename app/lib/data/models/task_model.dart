@@ -29,6 +29,8 @@ class TaskModel with _$TaskModel {
     @JsonKey(name: 'reminder_enabled') @Default(false) bool reminderEnabled,
     @JsonKey(name: 'reminder_timezone') String? reminderTimezone,
     @JsonKey(name: 'notification_id') int? notificationId,
+    // Recurring task link
+    @JsonKey(name: 'recurring_task_id') String? recurringTaskId,
   }) = _TaskModel;
 
   factory TaskModel.fromJson(Map<String, dynamic> json) =>
@@ -58,6 +60,7 @@ class TaskModel with _$TaskModel {
     reminderEnabled: reminderEnabled,
     reminderTimezone: reminderTimezone,
     notificationId: notificationId,
+    recurringTaskId: recurringTaskId,
   );
 
   TaskStatus _parseStatus(String status) {

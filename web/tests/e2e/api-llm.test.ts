@@ -272,7 +272,7 @@ describe('LLM API Tests - AI 功能測試', () => {
       expect(data.success).toBe(true)
 
       console.log('✅ 重新組織成功')
-    }, 30000)
+    }, 60000)
   })
 
   // ============================================

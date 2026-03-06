@@ -102,7 +102,7 @@ export class PrismaCoachBriefingRepository implements ICoachBriefingRepository {
 
   async removeTaskFromBriefing(userId: string, taskId: string): Promise<void> {
     const today = new Date()
-    const todayDate = today.toISOString().slice(0, 10)
+    const todayDate = new Date(today.toISOString().slice(0, 10))
 
     const row = await prisma.coachBriefing.findUnique({
       where: {

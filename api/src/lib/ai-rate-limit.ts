@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import { RateLimitException } from '@/lib/api-response'
 
 export const DAILY_AI_LIMIT = 50
-export const DEFAULT_AI_MODEL = 'gemini-2.5-flash-lite'
+export const DEFAULT_AI_MODEL = 'gemini-3.1-flash-lite-preview'
 
 export interface AiTokenUsage {
   inputTokens?: number

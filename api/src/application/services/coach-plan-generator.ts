@@ -69,7 +69,7 @@ export class CoachPlanGenerator {
 
     const start = Date.now()
     const { object, usage } = await generateObject({
-      model: google('gemini-2.5-flash-lite'),
+      model: google('gemini-3.1-flash-lite-preview'),
       schema: DailyPlanOutputSchema,
       prompt,
     })

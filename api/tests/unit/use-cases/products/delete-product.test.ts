@@ -73,7 +73,7 @@ describe('DeleteProductUseCase', () => {
           productId: 'product-123',
           userId: 'user-123',
         })
-      ).rejects.toThrow('無法刪除此專案，因為還有 1 個進行中的任務')
+      ).rejects.toThrow('無法封存此專案，因為還有 1 個進行中的任務')
     })
   })
 

@@ -74,6 +74,7 @@ export class CreateTaskUseCase {
       dateSource: null,
       estimatedDurationHours: null,
       actualDurationHours: null,
+      recurringTaskId: null,
     }
 
     // 4. 業務規則驗證

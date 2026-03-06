@@ -182,7 +182,7 @@ describe('Brain Dump 追加 vs 新建判斷', () => {
 `
 
       const { object: result } = await generateObject({
-        model: google('gemini-2.5-flash-lite'),
+        model: google('gemini-3.1-flash-lite-preview'),
         schema: StructureResultSchema,
         prompt: buildPrompt(context, '今天要去刻印章'),
       })
@@ -227,7 +227,7 @@ describe('Brain Dump 追加 vs 新建判斷', () => {
 `
 
       const { object: result } = await generateObject({
-        model: google('gemini-2.5-flash-lite'),
+        model: google('gemini-3.1-flash-lite-preview'),
         schema: StructureResultSchema,
         prompt: buildPrompt(context, '明天要交週報'),
       })
@@ -266,7 +266,7 @@ describe('Brain Dump 追加 vs 新建判斷', () => {
 `
 
       const { object: result } = await generateObject({
-        model: google('gemini-2.5-flash-lite'),
+        model: google('gemini-3.1-flash-lite-preview'),
         schema: StructureResultSchema,
         prompt: buildPrompt(context, '週報還要加上客戶回饋摘要'),
       })
@@ -308,7 +308,7 @@ describe('Brain Dump 追加 vs 新建判斷', () => {
 `
 
       const { object: result } = await generateObject({
-        model: google('gemini-2.5-flash-lite'),
+        model: google('gemini-3.1-flash-lite-preview'),
         schema: StructureResultSchema,
         prompt: buildPrompt(context, '封存舊版公司網站'),
       })

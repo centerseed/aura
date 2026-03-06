@@ -337,7 +337,7 @@ async function runTest(tc: TestCase): Promise<{ pass: boolean; detail: string }>
 
   try {
     const { object: result } = await generateObject({
-      model: google("gemini-2.5-flash-lite"),
+      model: google("gemini-3.1-flash-lite-preview"),
       schema: StructureResultSchema,
       prompt,
     })

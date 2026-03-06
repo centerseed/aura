@@ -209,7 +209,7 @@ export class AnalyzeStructureUseCase {
 
     // 3. AI 分析
     const { object: result, usage: aiUsage } = await generateObject({
-      model: google("gemini-2.5-flash-lite"),
+      model: google("gemini-3.1-flash-lite-preview"),
       schema: ReorganizeResultSchema,
       prompt: `你是 Zentropy 的圖書管理員 AI，一個資訊熵減系統。
 

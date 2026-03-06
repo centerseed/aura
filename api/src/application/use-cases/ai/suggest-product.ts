@@ -74,7 +74,7 @@ export class SuggestProductUseCase {
 
     // 3. 調用 AI 推薦專案名稱
     const { object: suggestion, usage: aiUsage } = await generateObject({
-      model: google('gemini-2.5-flash-lite'),
+      model: google('gemini-3.1-flash-lite-preview'),
       schema: ProductSuggestionSchema,
       prompt: `你是 Zentropy 的專案命名助手。用戶想要將一個任務移到「${request.areaName}」身分下,但該身分下還沒有合適的專案。
 

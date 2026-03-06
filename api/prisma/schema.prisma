@@ -40,6 +40,7 @@ model User {
   oauth_tokens         OAuthToken[]
   orders               orders[]
   products             Product[]
+  recurring_tasks      RecurringTask[]
   sub_tasks            SubTask[]
   evaluation_logs      SystemEvaluationLog[]
   tasks                Task[]
@@ -135,6 +136,28 @@ model Topic {
   @@map("topics")
 }
 
+model RecurringTask {
+  id                       String              @id @default(uuid()) @db.Uuid
+  created_at               DateTime            @default(now()) @db.Timestamp(6)
+  updated_at               DateTime            @updatedAt @db.Timestamp(6)
+  deleted_at               DateTime?           @db.Timestamp(6)
+  user_id                  String              @db.Uuid
+  product_id               String?             @db.Uuid
+  topic_id                 String?             @db.Uuid
+  title                    String              @db.VarChar(500)
+  status                   recurringtaskstatus @default(ACTIVE)
+  recurrence_rule          Json                @db.Json
+  lead_days                Int                 @default(1)
+  next_occurrence_at       DateTime?           @db.Date
+  estimated_duration_hours Float?
+  user                     User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tasks                    Task[]
+
+  @@index([user_id, status])
+  @@index([next_occurrence_at, status])
+  @@map("recurring_tasks")
+}
+
 model Task {
   id                      String                 @id @default(uuid()) @db.Uuid
   created_at              DateTime               @default(now()) @db.Timestamp(6)
@@ -161,6 +184,7 @@ model Task {
   completed_at            DateTime?              @db.Timestamp(6)
   estimated_duration_hours Float?
   actual_duration_hours    Float?
+  recurring_task_id       String?                @db.Uuid
   calendar_events         CalendarEvent[]
   daily_plan_items        DailyPlanItem[]
   reminders               ReminderConfig[]
@@ -169,6 +193,7 @@ model Task {
   product                 Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   topic                   Topic?                 @relation(fields: [topic_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user                    User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recurring_task          RecurringTask?         @relation(fields: [recurring_task_id], references: [id], onDelete: SetNull)
 
   @@index([product_id, deleted_at, status])
   @@index([user_id, deleted_at, status])
@@ -177,6 +202,7 @@ model Task {
   @@index([user_id, deleted_at, updated_at])
   @@index([user_id, reminder_enabled, remind_at])
   @@index([user_id, status, completed_at])
+  @@index([recurring_task_id])
   @@map("tasks")
 }
 
@@ -657,4 +683,10 @@ enum substatusenum {
   ACTIVE
   INACTIVE
   CANCELLED
+}
+
+enum recurringtaskstatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
 }

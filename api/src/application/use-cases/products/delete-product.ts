@@ -62,7 +62,7 @@ export class DeleteProductUseCase {
     // 3. 檢查是否有關聯的未完成 Tasks
     if (existing._count.tasks > 0) {
       throw new ConflictException(
-        `無法刪除此專案，因為還有 ${existing._count.tasks} 個進行中的任務。請先完成、刪除或移動這些任務。`
+        `無法封存此專案，因為還有 ${existing._count.tasks} 個進行中的任務。請先完成、封存或移動這些任務。`
       )
     }
 

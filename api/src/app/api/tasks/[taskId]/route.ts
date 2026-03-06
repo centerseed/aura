@@ -177,6 +177,7 @@ export async function PATCH(
       user_id: task.userId,
       content: task.content,
       status: task.status,
+      recurring_task_id: task.recurringTaskId || null,
       sub_items: subItems.map((s) => ({
         id: s.id,
         content: s.content,

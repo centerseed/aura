@@ -59,7 +59,9 @@ mixin _$TaskModel {
   @JsonKey(name: 'reminder_timezone')
   String? get reminderTimezone => throw _privateConstructorUsedError;
   @JsonKey(name: 'notification_id')
-  int? get notificationId => throw _privateConstructorUsedError;
+  int? get notificationId => throw _privateConstructorUsedError; // Recurring task link
+  @JsonKey(name: 'recurring_task_id')
+  String? get recurringTaskId => throw _privateConstructorUsedError;
 
   /// Serializes this TaskModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -98,6 +100,7 @@ abstract class $TaskModelCopyWith<$Res> {
     @JsonKey(name: 'reminder_enabled') bool reminderEnabled,
     @JsonKey(name: 'reminder_timezone') String? reminderTimezone,
     @JsonKey(name: 'notification_id') int? notificationId,
+    @JsonKey(name: 'recurring_task_id') String? recurringTaskId,
   });
 }
 
@@ -137,6 +140,7 @@ class _$TaskModelCopyWithImpl<$Res, $Val extends TaskModel>
     Object? reminderEnabled = null,
     Object? reminderTimezone = freezed,
     Object? notificationId = freezed,
+    Object? recurringTaskId = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -224,6 +228,10 @@ class _$TaskModelCopyWithImpl<$Res, $Val extends TaskModel>
                 ? _value.notificationId
                 : notificationId // ignore: cast_nullable_to_non_nullable
                       as int?,
+            recurringTaskId: freezed == recurringTaskId
+                ? _value.recurringTaskId
+                : recurringTaskId // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -261,6 +269,7 @@ abstract class _$$TaskModelImplCopyWith<$Res>
     @JsonKey(name: 'reminder_enabled') bool reminderEnabled,
     @JsonKey(name: 'reminder_timezone') String? reminderTimezone,
     @JsonKey(name: 'notification_id') int? notificationId,
+    @JsonKey(name: 'recurring_task_id') String? recurringTaskId,
   });
 }
 
@@ -299,6 +308,7 @@ class __$$TaskModelImplCopyWithImpl<$Res>
     Object? reminderEnabled = null,
     Object? reminderTimezone = freezed,
     Object? notificationId = freezed,
+    Object? recurringTaskId = freezed,
   }) {
     return _then(
       _$TaskModelImpl(
@@ -386,6 +396,10 @@ class __$$TaskModelImplCopyWithImpl<$Res>
             ? _value.notificationId
             : notificationId // ignore: cast_nullable_to_non_nullable
                   as int?,
+        recurringTaskId: freezed == recurringTaskId
+            ? _value.recurringTaskId
+            : recurringTaskId // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -416,6 +430,7 @@ class _$TaskModelImpl extends _TaskModel {
     @JsonKey(name: 'reminder_enabled') this.reminderEnabled = false,
     @JsonKey(name: 'reminder_timezone') this.reminderTimezone,
     @JsonKey(name: 'notification_id') this.notificationId,
+    @JsonKey(name: 'recurring_task_id') this.recurringTaskId,
   }) : _aiAnalysis = aiAnalysis,
        _subItems = subItems,
        _tag = tag,
@@ -518,10 +533,14 @@ class _$TaskModelImpl extends _TaskModel {
   @override
   @JsonKey(name: 'notification_id')
   final int? notificationId;
+  // Recurring task link
+  @override
+  @JsonKey(name: 'recurring_task_id')
+  final String? recurringTaskId;
 
   @override
   String toString() {
-    return 'TaskModel(id: $id, userId: $userId, productId: $productId, topicId: $topicId, content: $content, status: $status, dueDate: $dueDate, startDate: $startDate, timeConfidence: $timeConfidence, inferredFromMilestone: $inferredFromMilestone, aiAnalysis: $aiAnalysis, subItems: $subItems, tag: $tag, tags: $tags, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, remindAt: $remindAt, reminderEnabled: $reminderEnabled, reminderTimezone: $reminderTimezone, notificationId: $notificationId)';
+    return 'TaskModel(id: $id, userId: $userId, productId: $productId, topicId: $topicId, content: $content, status: $status, dueDate: $dueDate, startDate: $startDate, timeConfidence: $timeConfidence, inferredFromMilestone: $inferredFromMilestone, aiAnalysis: $aiAnalysis, subItems: $subItems, tag: $tag, tags: $tags, createdAt: $createdAt, updatedAt: $updatedAt, deletedAt: $deletedAt, remindAt: $remindAt, reminderEnabled: $reminderEnabled, reminderTimezone: $reminderTimezone, notificationId: $notificationId, recurringTaskId: $recurringTaskId)';
   }
 
   @override
@@ -563,7 +582,9 @@ class _$TaskModelImpl extends _TaskModel {
             (identical(other.reminderTimezone, reminderTimezone) ||
                 other.reminderTimezone == reminderTimezone) &&
             (identical(other.notificationId, notificationId) ||
-                other.notificationId == notificationId));
+                other.notificationId == notificationId) &&
+            (identical(other.recurringTaskId, recurringTaskId) ||
+                other.recurringTaskId == recurringTaskId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -591,6 +612,7 @@ class _$TaskModelImpl extends _TaskModel {
     reminderEnabled,
     reminderTimezone,
     notificationId,
+    recurringTaskId,
   ]);
 
   /// Create a copy of TaskModel
@@ -631,6 +653,7 @@ abstract class _TaskModel extends TaskModel {
     @JsonKey(name: 'reminder_enabled') final bool reminderEnabled,
     @JsonKey(name: 'reminder_timezone') final String? reminderTimezone,
     @JsonKey(name: 'notification_id') final int? notificationId,
+    @JsonKey(name: 'recurring_task_id') final String? recurringTaskId,
   }) = _$TaskModelImpl;
   const _TaskModel._() : super._();
 
@@ -696,7 +719,10 @@ abstract class _TaskModel extends TaskModel {
   String? get reminderTimezone;
   @override
   @JsonKey(name: 'notification_id')
-  int? get notificationId;
+  int? get notificationId; // Recurring task link
+  @override
+  @JsonKey(name: 'recurring_task_id')
+  String? get recurringTaskId;
 
   /// Create a copy of TaskModel
   /// with the given fields replaced by the non-null parameter values.

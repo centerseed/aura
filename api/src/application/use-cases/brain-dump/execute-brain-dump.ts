@@ -145,51 +145,78 @@ export class ExecuteBrainDumpUseCase {
     if (request.result.action === "append_sub_item") {
       const result = request.result
 
-      const targetTask = await prisma.task.findFirst({
-        where: {
-          id: result.target_task_id,
-          deleted_at: null,
-          product: { user_id: request.userId },
-        },
-        include: { product: true },
-      })
-
-      if (!targetTask) {
+      // 防禦：sub_items 缺失時給出清楚錯誤（AI 偶爾漏填）
+      if (!result.sub_items || result.sub_items.length === 0) {
         throw new ValidationException(
-          `Target task ${result.target_task_id} not found`,
-          "target_task_id"
+          "AI 返回 append_sub_item 但未提供 sub_items，請重新送出輸入",
+          "sub_items"
         )
       }
 
-      // 取得目前最大 order
-      const maxOrderResult = await prisma.subTask.aggregate({
-        where: { task_id: result.target_task_id, deleted_at: null },
-        _max: { order: true },
-      })
-      const startOrder = (maxOrderResult._max.order ?? -1) + 1
+      // 支援多個 target task（target_task_ids 陣列）
+      const targetTaskIds = result.target_task_ids ?? []
+
+      if (targetTaskIds.length === 0) {
+        throw new ValidationException(
+          "AI 返回 append_sub_item 但未提供 target_task_ids",
+          "target_task_ids"
+        )
+      }
 
       const now = new Date()
-      const newSubItems = result.sub_items.map((sub, idx) => ({
-        id: crypto.randomUUID(),
-        content: sub.content,
-        completed: false,
-        created_at: now.toISOString(),
-        completed_at: null,
-        order: startOrder + idx,
-      }))
+      const appendedByTask: Array<{ task: { id: string; content: string; product: string }; sub_items: typeof result.sub_items }> = []
 
-      // 寫入 sub_tasks 表
-      for (const subItem of newSubItems) {
-        await prisma.subTask.create({
-          data: {
-            id: subItem.id,
-            task_id: result.target_task_id,
-            user_id: request.userId,
-            content: subItem.content,
-            completed: false,
-            order: subItem.order,
-            source: 'user',
+      for (const taskId of targetTaskIds) {
+        const targetTask = await prisma.task.findFirst({
+          where: {
+            id: taskId,
+            deleted_at: null,
+            product: { user_id: request.userId },
           },
+          include: { product: true },
+        })
+
+        if (!targetTask) {
+          throw new ValidationException(
+            `Target task ${taskId} not found`,
+            "target_task_ids"
+          )
+        }
+
+        // 取得目前最大 order
+        const maxOrderResult = await prisma.subTask.aggregate({
+          where: { task_id: taskId, deleted_at: null },
+          _max: { order: true },
+        })
+        const startOrder = (maxOrderResult._max.order ?? -1) + 1
+
+        const newSubItems = result.sub_items.map((sub, idx) => ({
+          id: crypto.randomUUID(),
+          content: sub.content,
+          completed: false,
+          created_at: now.toISOString(),
+          completed_at: null,
+          order: startOrder + idx,
+        }))
+
+        // 寫入 sub_tasks 表
+        for (const subItem of newSubItems) {
+          await prisma.subTask.create({
+            data: {
+              id: subItem.id,
+              task_id: taskId,
+              user_id: request.userId,
+              content: subItem.content,
+              completed: false,
+              order: subItem.order,
+              source: 'user',
+            },
+          })
+        }
+
+        appendedByTask.push({
+          task: { id: targetTask.id, content: targetTask.content, product: targetTask.product.name },
+          sub_items: newSubItems as any,
         })
       }
 
@@ -200,13 +227,14 @@ export class ExecuteBrainDumpUseCase {
           input_content: { text: request.text },
           output_content: {
             action: "append_sub_item",
-            target_task_id: result.target_task_id,
+            target_task_ids: targetTaskIds,
             sub_items: result.sub_items,
             reasoning: result.reasoning,
           },
           user_action: "APPLIED",
           metadata: {
-            appended_sub_items_count: newSubItems.length,
+            appended_sub_items_count: result.sub_items.length * targetTaskIds.length,
+            target_task_count: targetTaskIds.length,
             input_type: request.inputType,
           },
         },
@@ -214,15 +242,14 @@ export class ExecuteBrainDumpUseCase {
 
       timings["db_persist"] = Date.now() - startDbPersist
 
+      // 回傳：單一目標保持舊結構，多目標改為 appended_tasks 陣列
+      const firstAppended = appendedByTask[0]
       return {
         data: {
           action: "append_sub_item",
-          target_task: {
-            id: targetTask.id,
-            content: targetTask.content,
-            product: targetTask.product.name,
-          },
-          appended_sub_items: newSubItems,
+          target_task: firstAppended.task,
+          appended_tasks: appendedByTask,
+          appended_sub_items: firstAppended.sub_items,
           reasoning: result.reasoning,
         },
         timings,

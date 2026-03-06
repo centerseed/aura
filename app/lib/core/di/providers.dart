@@ -65,6 +65,7 @@ import '../../core/services/notification_service.dart';
 import '../../core/services/local_notification_service.dart';
 import '../../domain/repositories/notification_repository.dart';
 import '../../data/repositories/notification_repository_impl.dart';
+import '../../data/repositories/recurring_task_repository_impl.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // ==================== Core Providers ====================
@@ -263,6 +264,11 @@ final milestoneRepositoryProvider = Provider<MilestoneRepository>((ref) {
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return DashboardRepositoryImpl(apiClient);
+});
+
+final recurringTaskRepositoryProvider = Provider<RecurringTaskRepositoryImpl>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return RecurringTaskRepositoryImpl(apiClient);
 });
 
 // ==================== Use Case Providers ====================

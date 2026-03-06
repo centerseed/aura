@@ -53,6 +53,7 @@ export interface TaskData {
   notificationId: number | null
   estimatedDurationHours: number | null
   actualDurationHours: number | null
+  recurringTaskId: string | null
   createdAt: Date
   updatedAt: Date
 

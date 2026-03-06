@@ -3,6 +3,7 @@ import '../../models/area_model.dart';
 import '../../models/brain_dump_models.dart';
 import '../../models/milestone_model.dart';
 import '../../models/product_model.dart';
+import '../../models/recurring_task_model.dart';
 import '../../models/reference_model.dart';
 import '../../models/task_model.dart';
 
@@ -434,5 +435,46 @@ class ApiClient {
   /// 刪除里程碑
   Future<void> deleteMilestone(String milestoneId) async {
     await _dio.delete('/milestones/$milestoneId');
+  }
+
+  // ==================== Recurring Tasks ====================
+
+  /// 取得所有週期任務模板
+  Future<List<RecurringTaskModel>> getRecurringTasks() async {
+    final response = await _dio.get('/recurring-tasks');
+    final data = response.data['data'] ?? response.data;
+    final list = data['recurring_tasks'] as List? ?? [];
+    return list.map((json) => RecurringTaskModel.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// 建立週期任務模板
+  Future<RecurringTaskModel> createRecurringTask(Map<String, dynamic> body) async {
+    final response = await _dio.post('/recurring-tasks', data: body);
+    final data = response.data['data'] ?? response.data;
+    return RecurringTaskModel.fromJson(data['recurring_task'] as Map<String, dynamic>);
+  }
+
+  /// 更新週期任務模板
+  Future<RecurringTaskModel> updateRecurringTask(
+    String id,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _dio.patch('/recurring-tasks/$id', data: body);
+    final data = response.data['data'] ?? response.data;
+    return RecurringTaskModel.fromJson(data['recurring_task'] as Map<String, dynamic>);
+  }
+
+  /// 刪除（封存）週期任務模板
+  Future<void> deleteRecurringTask(String id) async {
+    await _dio.delete('/recurring-tasks/$id');
+  }
+
+  /// 客戶端觸發：生成週期任務實例
+  Future<Map<String, dynamic>> generateRecurringTaskInstances(String localDate) async {
+    final response = await _dio.post(
+      '/recurring-tasks/generate',
+      data: {'local_date': localDate},
+    );
+    return response.data['data'] as Map<String, dynamic>? ?? {};
   }
 }

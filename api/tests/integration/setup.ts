@@ -87,6 +87,11 @@ export async function cleanupIntegrationTests() {
       where: { user_id: { in: testUserIds } },
     })
 
+    // 1b. 刪除所有測試用戶的週期任務模板（task 先刪，因為 task 有 FK 指向 recurringTask）
+    await prisma.recurringTask.deleteMany({
+      where: { user_id: { in: testUserIds } },
+    })
+
     // 2. 刪除所有測試用戶的 topics
     await prisma.topic.deleteMany({
       where: { user_id: { in: testUserIds } },

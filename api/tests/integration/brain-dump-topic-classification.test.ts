@@ -217,7 +217,7 @@ ${scenario.input}
 - tag.topic：字串，**必須盡量填寫**（優先使用既有 Topic，或創建合適的新名稱）`
 
         const { object: result, usage } = await generateObject({
-          model: google('gemini-2.5-flash-lite'),
+          model: google('gemini-3.1-flash-lite-preview'),
           schema: CreateNewTasksActionSchema,
           prompt,
         })

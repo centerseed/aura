@@ -40,6 +40,7 @@ interface RawTaskRow {
   notification_id: number | null
   estimated_duration_hours: number | null
   actual_duration_hours: number | null
+  recurring_task_id: string | null
   created_at: Date
   updated_at: Date
   // JOIN 結果
@@ -80,6 +81,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.notification_id,
         t.estimated_duration_hours,
         t.actual_duration_hours,
+        t.recurring_task_id::text,
         t.created_at,
         t.updated_at,
         p.name as product_name,
@@ -129,6 +131,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.notification_id,
         t.estimated_duration_hours,
         t.actual_duration_hours,
+        t.recurring_task_id::text,
         t.created_at,
         t.updated_at,
         p.name as product_name,
@@ -175,6 +178,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.notification_id,
         t.estimated_duration_hours,
         t.actual_duration_hours,
+        t.recurring_task_id::text,
         t.created_at,
         t.updated_at,
         p.name as product_name,
@@ -213,7 +217,8 @@ export class PrismaTaskRepository implements ITaskRepository {
         user_id, product_id, topic_id, content, status,
         ai_analysis, "references", sub_items,
         start_date, due_date, time_confidence, inferred_from_milestone,
-        remind_at, reminder_enabled, reminder_timezone, notification_id
+        remind_at, reminder_enabled, reminder_timezone, notification_id,
+        recurring_task_id
       ) VALUES (
         gen_random_uuid(),
         NOW(),
@@ -232,7 +237,8 @@ export class PrismaTaskRepository implements ITaskRepository {
         ${data.remindAt ?? null},
         ${data.reminderEnabled ?? false},
         ${data.reminderTimezone ?? null},
-        ${data.notificationId ?? null}
+        ${data.notificationId ?? null},
+        ${data.recurringTaskId ? Prisma.sql`${data.recurringTaskId}::uuid` : Prisma.sql`NULL`}
       )
       RETURNING id
     `
@@ -427,6 +433,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       notificationId: row.notification_id,
       estimatedDurationHours: row.estimated_duration_hours,
       actualDurationHours: row.actual_duration_hours,
+      recurringTaskId: row.recurring_task_id,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       // Relations (from JOIN)

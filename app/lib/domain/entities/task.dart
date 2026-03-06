@@ -32,6 +32,9 @@ class Task extends Equatable {
   final String? reminderTimezone;    // IANA 時區（如 "Asia/Taipei"）
   final int? notificationId;         // 本地通知 ID
 
+  // Recurring task link
+  final String? recurringTaskId;     // 若非 null，此任務由週期任務模板生成
+
   const Task({
     required this.id,
     required this.content,
@@ -53,6 +56,7 @@ class Task extends Equatable {
     this.reminderEnabled = false,
     this.reminderTimezone,
     this.notificationId,
+    this.recurringTaskId,
   });
 
   /// 是否逾期 (截止日 < 今天)
@@ -83,6 +87,8 @@ class Task extends Equatable {
         startDateOnly.isAtSameMomentAs(today);
   }
 
+  bool get isRecurring => recurringTaskId != null;
+
   @override
   List<Object?> get props => [
     id,
@@ -97,6 +103,7 @@ class Task extends Equatable {
     reminderEnabled,
     reminderTimezone,
     notificationId,
+    recurringTaskId,
   ];
 
   Task copyWith({
@@ -116,6 +123,7 @@ class Task extends Equatable {
     bool? reminderEnabled,
     String? reminderTimezone,
     int? notificationId,
+    String? recurringTaskId,
   }) {
     return Task(
       id: this.id,
@@ -138,6 +146,7 @@ class Task extends Equatable {
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       reminderTimezone: reminderTimezone ?? this.reminderTimezone,
       notificationId: notificationId ?? this.notificationId,
+      recurringTaskId: recurringTaskId ?? this.recurringTaskId,
     );
   }
 }

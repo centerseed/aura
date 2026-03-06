@@ -1256,9 +1256,31 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   /// 標題：大字直接編輯 + 關閉按鈕
   Widget _buildTitleRow() {
     final colorScheme = Theme.of(context).colorScheme;
+    final isRecurring = widget.task.isRecurring;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isRecurring)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.repeat, size: 14, color: colorScheme.primary),
+                  const SizedBox(width: 4),
+                  Text(
+                    '週期任務',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
@@ -1292,6 +1314,8 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
               ),
               child: Icon(Icons.close, color: colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
             ),
+          ),
+        ],
           ),
         ],
       ),

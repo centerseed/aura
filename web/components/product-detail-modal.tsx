@@ -23,6 +23,9 @@ import {
   Target,
   Calendar,
   ArrowRight,
+  Repeat,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -44,6 +47,26 @@ interface Reference {
   taskContent?: string;
 }
 
+interface RecurringTask {
+  id: string;
+  title: string;
+  status: "ACTIVE" | "PAUSED" | "ARCHIVED";
+  recurrence_rule: {
+    frequency: "DAILY" | "WEEKLY" | "MONTHLY";
+    interval: number;
+    days_of_week?: number[];
+    day_of_month?: number;
+    timezone: string;
+    start_date: string;
+    end_date?: string;
+  };
+  lead_days: number;
+  next_occurrence_at: string | null;
+  product_id: string | null;
+  estimated_duration_hours: number | null;
+  created_at: string;
+}
+
 interface ProductDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -56,7 +79,7 @@ interface ProductDetailModalProps {
     lifecycle: "FINITE" | "PERPETUAL";
     status: string;
   } | null;
-  initialTab?: "edit" | "milestones" | "references";
+  initialTab?: "edit" | "milestones" | "references" | "recurring";
   milestones?: Milestone[];
   onMilestoneChange?: () => void;
 }
@@ -194,7 +217,7 @@ function processInlineFormatting(text: string, baseKey: number): React.ReactNode
   return parts.length === 1 ? parts[0] : <>{parts}</>;
 }
 
-type TabType = "edit" | "milestones" | "references";
+type TabType = "edit" | "milestones" | "references" | "recurring";
 
 export function ProductDetailModal({
   isOpen,
@@ -240,6 +263,20 @@ export function ProductDetailModal({
     .filter((m) => m.entity_type === "PRODUCT" && m.entity_id === product?.id)
     .sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime());
 
+  // 週期任務相關狀態
+  const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>([]);
+  const [isLoadingRecurring, setIsLoadingRecurring] = useState(false);
+  const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const [rtTitle, setRtTitle] = useState("");
+  const [rtFrequency, setRtFrequency] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("WEEKLY");
+  const [rtInterval, setRtInterval] = useState(1);
+  const [rtDaysOfWeek, setRtDaysOfWeek] = useState<number[]>([1]);
+  const [rtDayOfMonth, setRtDayOfMonth] = useState(1);
+  const [rtStartDate, setRtStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [isSavingRecurring, setIsSavingRecurring] = useState(false);
+  const [togglingRecurringId, setTogglingRecurringId] = useState<string | null>(null);
+  const [deletingRecurringId, setDeletingRecurringId] = useState<string | null>(null);
+
   // 筆記收折/展開狀態 (key: refId, value: true=展開)
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
 
@@ -276,6 +313,29 @@ export function ProductDetailModal({
     }
   }, [product?.id]);
 
+  // 載入週期任務
+  const loadRecurringTasks = useCallback(async () => {
+    if (!product?.id) return;
+    setIsLoadingRecurring(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/recurring-tasks`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const all = data.data?.recurring_tasks || [];
+        setRecurringTasks(all.filter((r: RecurringTask) => r.product_id === product.id));
+      }
+    } catch (err) {
+      console.error("Failed to load recurring tasks:", err);
+    } finally {
+      setIsLoadingRecurring(false);
+    }
+  }, [product?.id]);
+
   // 重置或填充表單
   useEffect(() => {
     if (isOpen && product) {
@@ -289,8 +349,9 @@ export function ProductDetailModal({
       setActiveTab(initialTab);
       setSelectedReference(null);
       loadReferences();
+      loadRecurringTasks();
     }
-  }, [isOpen, product, loadReferences, initialTab]);
+  }, [isOpen, product, loadReferences, loadRecurringTasks, initialTab]);
 
   const handleSubmit = async () => {
     if (!name.trim() || !product) {
@@ -648,11 +709,131 @@ export function ProductDetailModal({
     }
   };
 
+  // 重置週期任務表單
+  const resetRecurringForm = () => {
+    setShowRecurringForm(false);
+    setRtTitle("");
+    setRtFrequency("WEEKLY");
+    setRtInterval(1);
+    setRtDaysOfWeek([1]);
+    setRtDayOfMonth(1);
+    setRtStartDate(new Date().toISOString().slice(0, 10));
+  };
+
+  // 新增週期任務
+  const handleAddRecurringTask = async () => {
+    if (!product || !rtTitle.trim()) return;
+    setIsSavingRecurring(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const recurrenceRule: Record<string, unknown> = {
+        frequency: rtFrequency,
+        interval: rtInterval,
+        timezone: "Asia/Taipei",
+        startDate: rtStartDate,
+      };
+      if (rtFrequency === "WEEKLY") recurrenceRule.daysOfWeek = rtDaysOfWeek;
+      if (rtFrequency === "MONTHLY") recurrenceRule.dayOfMonth = rtDayOfMonth;
+
+      const res = await fetch(`${API_BASE_URL}/api/recurring-tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: rtTitle.trim(),
+          recurrence_rule: recurrenceRule,
+          product_id: product.id,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || "新增失敗");
+      }
+      resetRecurringForm();
+      await loadRecurringTasks();
+    } catch (err) {
+      console.error("Failed to add recurring task:", err);
+      setError(err instanceof Error ? err.message : "新增失敗");
+    } finally {
+      setIsSavingRecurring(false);
+    }
+  };
+
+  // 切換週期任務狀態
+  const handleToggleRecurringStatus = async (rt: RecurringTask) => {
+    setTogglingRecurringId(rt.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const newStatus = rt.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
+      const res = await fetch(`${API_BASE_URL}/api/recurring-tasks/${rt.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || "更新失敗");
+      }
+      await loadRecurringTasks();
+    } catch (err) {
+      console.error("Failed to toggle recurring task:", err);
+      setError(err instanceof Error ? err.message : "更新失敗");
+    } finally {
+      setTogglingRecurringId(null);
+    }
+  };
+
+  // 刪除週期任務
+  const handleDeleteRecurringTask = async (rtId: string) => {
+    if (!confirm("確定要刪除這個週期任務嗎？")) return;
+    setDeletingRecurringId(rtId);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/recurring-tasks/${rtId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || "刪除失敗");
+      }
+      await loadRecurringTasks();
+    } catch (err) {
+      console.error("Failed to delete recurring task:", err);
+      setError(err instanceof Error ? err.message : "刪除失敗");
+    } finally {
+      setDeletingRecurringId(null);
+    }
+  };
+
   // 計算里程碑剩餘天數
   const getDaysRemaining = (targetDate: string) => {
     return Math.ceil(
       (new Date(targetDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
     );
+  };
+
+  // 週期任務頻率標籤
+  const formatRecurrenceLabel = (rule: RecurringTask["recurrence_rule"]): string => {
+    const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
+    if (rule.frequency === "DAILY") {
+      return rule.interval === 1 ? "每天" : `每 ${rule.interval} 天`;
+    }
+    if (rule.frequency === "WEEKLY") {
+      const days = (rule.days_of_week || []).map((d) => "週" + dayNames[d]).join("、");
+      return rule.interval === 1 ? `每週 ${days}` : `每 ${rule.interval} 週 ${days}`;
+    }
+    if (rule.frequency === "MONTHLY") {
+      return rule.interval === 1
+        ? `每月 ${rule.day_of_month} 日`
+        : `每 ${rule.interval} 月 ${rule.day_of_month} 日`;
+    }
+    return "";
   };
 
   if (!isOpen || !product) return null;
@@ -680,7 +861,7 @@ export function ProductDetailModal({
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{product.name}</h2>
               <p className="text-sm text-gray-500 dark:text-white/50">
-                {activeTab === "edit" ? "編輯專案資訊" : activeTab === "milestones" ? "里程碑管理" : "相關資料"}
+                {activeTab === "edit" ? "編輯專案資訊" : activeTab === "milestones" ? "里程碑管理" : activeTab === "recurring" ? "週期任務管理" : "相關資料"}
               </p>
             </div>
           </div>
@@ -727,6 +908,22 @@ export function ProductDetailModal({
                 {references.length > 0 && (
                   <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-white/20 text-xs">
                     {references.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("recurring")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  activeTab === "recurring"
+                    ? "bg-emerald-500 text-white"
+                    : "text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                <Repeat className="w-4 h-4 inline-block mr-1.5" />
+                週期任務
+                {recurringTasks.length > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-white/20 text-xs">
+                    {recurringTasks.length}
                   </span>
                 )}
               </button>
@@ -1380,6 +1577,247 @@ export function ProductDetailModal({
                       );
                     })}
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : activeTab === "recurring" ? (
+          /* Recurring Tasks Tab */
+          <div className="flex-1 overflow-hidden flex flex-col p-6">
+            {error && (
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 mb-4">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-red-400">操作失敗</p>
+                  <p className="text-sm text-red-300/70 mt-1">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-white">週期任務</h3>
+                <p className="text-sm text-white/50 mt-1">設定會定期自動產生任務的模板</p>
+              </div>
+              <Button
+                onClick={() => setShowRecurringForm(!showRecurringForm)}
+                size="sm"
+                className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                新增週期任務
+              </Button>
+            </div>
+
+            {/* Add Form */}
+            {showRecurringForm && (
+              <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10 space-y-4">
+                <h4 className="text-sm font-medium text-white/90">新增週期任務</h4>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">
+                    標題 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={rtTitle}
+                    onChange={(e) => setRtTitle(e.target.value)}
+                    placeholder="例如：每週回顧、每日站會準備"
+                    className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Frequency */}
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">頻率</label>
+                  <div className="flex gap-2">
+                    {(["DAILY", "WEEKLY", "MONTHLY"] as const).map((freq) => (
+                      <button
+                        key={freq}
+                        onClick={() => setRtFrequency(freq)}
+                        className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
+                          rtFrequency === freq
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                            : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+                        }`}
+                      >
+                        {freq === "DAILY" ? "每天" : freq === "WEEKLY" ? "每週" : "每月"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Interval */}
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">
+                    間隔（每幾{rtFrequency === "DAILY" ? "天" : rtFrequency === "WEEKLY" ? "週" : "月"}）
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={52}
+                    value={rtInterval}
+                    onChange={(e) => setRtInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-24 px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Days of week (WEEKLY only) */}
+                {rtFrequency === "WEEKLY" && (
+                  <div>
+                    <label className="block text-xs font-medium text-white/60 mb-1.5">星期幾</label>
+                    <div className="flex gap-1.5">
+                      {["日", "一", "二", "三", "四", "五", "六"].map((day, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setRtDaysOfWeek((prev) =>
+                              prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx]
+                            );
+                          }}
+                          className={`w-9 h-9 rounded-md text-sm font-medium transition-colors ${
+                            rtDaysOfWeek.includes(idx)
+                              ? "bg-emerald-500/30 text-emerald-300 border border-emerald-500/50"
+                              : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Day of month (MONTHLY only) */}
+                {rtFrequency === "MONTHLY" && (
+                  <div>
+                    <label className="block text-xs font-medium text-white/60 mb-1.5">幾號</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={rtDayOfMonth}
+                      onChange={(e) => setRtDayOfMonth(Math.min(31, Math.max(1, parseInt(e.target.value) || 1)))}
+                      className="w-24 px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                    />
+                  </div>
+                )}
+
+                {/* Start date */}
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">開始日期</label>
+                  <input
+                    type="date"
+                    value={rtStartDate}
+                    onChange={(e) => setRtStartDate(e.target.value)}
+                    className="px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Buttons */}
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    onClick={resetRecurringForm}
+                    variant="outline"
+                    size="sm"
+                    className="border-white/10 bg-white/5 hover:bg-white/10 text-white"
+                    disabled={isSavingRecurring}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    onClick={handleAddRecurringTask}
+                    disabled={!rtTitle.trim() || (rtFrequency === "WEEKLY" && rtDaysOfWeek.length === 0) || isSavingRecurring}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    {isSavingRecurring ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "新增"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoadingRecurring ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
+                </div>
+              ) : recurringTasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Repeat className="w-16 h-16 text-white/10 mb-4" />
+                  <p className="text-white/50">尚無週期任務</p>
+                  <p className="text-white/30 text-sm mt-1">點擊「新增週期任務」來建立模板</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recurringTasks.map((rt) => (
+                    <div
+                      key={rt.id}
+                      className="group flex items-start justify-between p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-medium text-white truncate">{rt.title}</h4>
+                          <span
+                            className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              rt.status === "ACTIVE"
+                                ? "bg-emerald-500/20 text-emerald-300"
+                                : rt.status === "PAUSED"
+                                ? "bg-yellow-500/20 text-yellow-300"
+                                : "bg-white/10 text-white/40"
+                            }`}
+                          >
+                            {rt.status === "ACTIVE" ? "啟用" : rt.status === "PAUSED" ? "已暫停" : "封存"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-white/50">
+                          {formatRecurrenceLabel(rt.recurrence_rule)}
+                        </p>
+                        {rt.next_occurrence_at && (
+                          <p className="text-xs text-white/30 mt-1 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            下次：{new Date(rt.next_occurrence_at).toLocaleDateString("zh-TW")}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-3">
+                        <button
+                          onClick={() => handleToggleRecurringStatus(rt)}
+                          disabled={togglingRecurringId === rt.id || rt.status === "ARCHIVED"}
+                          className="p-1.5 rounded-md hover:bg-emerald-500/20 text-emerald-400 transition-all"
+                          title={rt.status === "ACTIVE" ? "暫停" : "恢復"}
+                        >
+                          {togglingRecurringId === rt.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : rt.status === "ACTIVE" ? (
+                            <PauseCircle className="w-3.5 h-3.5" />
+                          ) : (
+                            <PlayCircle className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecurringTask(rt.id)}
+                          disabled={deletingRecurringId === rt.id}
+                          className="p-1.5 rounded-md hover:bg-red-500/20 text-red-400 transition-all"
+                          title="刪除"
+                        >
+                          {deletingRecurringId === rt.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

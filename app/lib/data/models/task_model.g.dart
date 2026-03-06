@@ -43,6 +43,7 @@ _$TaskModelImpl _$$TaskModelImplFromJson(Map<String, dynamic> json) =>
       reminderEnabled: json['reminder_enabled'] as bool? ?? false,
       reminderTimezone: json['reminder_timezone'] as String?,
       notificationId: (json['notification_id'] as num?)?.toInt(),
+      recurringTaskId: json['recurring_task_id'] as String?,
     );
 
 Map<String, dynamic> _$$TaskModelImplToJson(
@@ -76,6 +77,7 @@ Map<String, dynamic> _$$TaskModelImplToJson(
   'reminder_enabled': instance.reminderEnabled,
   if (instance.reminderTimezone case final value?) 'reminder_timezone': value,
   if (instance.notificationId case final value?) 'notification_id': value,
+  if (instance.recurringTaskId case final value?) 'recurring_task_id': value,
 };
 
 _$SubItemModelImpl _$$SubItemModelImplFromJson(Map<String, dynamic> json) =>

@@ -1185,11 +1185,16 @@ function DashboardContent() {
     useSensor(KeyboardSensor)
   );
 
-  // 自訂碰撞偵測：拖 Product 時用 rectIntersection（排序更精準），其他用 closestCenter
+  // 自訂碰撞偵測：拖 Product 時用 rectIntersection（排序更精準）
+  // 拖 Task 時先用 pointerWithin（游標位置優先，area header 易命中），再 fallback closestCenter
   const customCollisionDetection: CollisionDetection = useCallback((...args) => {
     const [{ active }] = args;
     if (active.data.current?.type === 'product') {
       return rectIntersection(...args);
+    }
+    const pointerCollisions = pointerWithin(...args);
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
     }
     return closestCenter(...args);
   }, []);
@@ -1228,6 +1233,14 @@ function DashboardContent() {
 
         setUserId(actualUser.id);
         setUserName(actualUser.displayName || actualUser.name || actualUser.email || "User");
+
+        // 觸發週期性任務生成（確保今天的週期任務已建立，先執行才能讓後續 library 包含新任務）
+        const localDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+        await fetch(`${API_BASE_URL}/api/recurring-tasks/generate`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ local_date: localDate }),
+        }).catch(() => { /* 靜默失敗，不阻斷主流程 */ });
 
         // 3-5. 🚀 並行載入所有資料（library, milestones, completed_today）
         const [libraryRes, milestonesRes, completedTodayRes] = await Promise.all([
@@ -1646,14 +1659,16 @@ function DashboardContent() {
 
         if (res.ok) {
           const data = await res.json();
+          const suggestion = data.data?.suggestion;
+          if (!suggestion) throw new Error('建議回傳格式錯誤');
           setProductSuggestion({
             taskId: currentTask.id,
             taskContent: currentTask.title,
             areaId: targetArea.id,
             areaName: targetArea.name,
-            suggestedName: data.suggestion.suggested_name,
-            reasoning: data.suggestion.reasoning,
-            alternatives: data.suggestion.alternative_names || [],
+            suggestedName: suggestion.suggested_name,
+            reasoning: suggestion.reasoning,
+            alternatives: suggestion.alternative_names || [],
           });
           setShowProductSuggestionModal(true);
         }

@@ -91,7 +91,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       Icon(Icons.delete_outline, size: 18,
                         color: AppColors.error.withValues(alpha: 0.6)),
                       const SizedBox(width: 8),
-                      Text('刪除專案',
+                      Text('封存專案',
                         style: TextStyle(color: AppColors.error.withValues(alpha: 0.6))),
                     ],
                   ),
@@ -402,13 +402,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('刪除專案', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+        title: Text('封存專案', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '確定要刪除「${widget.product.name}」嗎？',
+              '確定要封存「${widget.product.name}」嗎？',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 15),
             ),
             const SizedBox(height: 12),
@@ -427,7 +427,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '如果專案內有進行中的任務，將無法刪除。',
+                      '如果專案內有進行中的任務，將無法封存。',
                       style: TextStyle(
                         color: AppColors.statusInbox.withOpacity(0.9),
                         fontSize: 12,
@@ -447,7 +447,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('刪除'),
+            child: const Text('封存'),
           ),
         ],
       ),
@@ -455,7 +455,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    // 2. 執行刪除
+    // 2. 執行封存
     setState(() => _isDeleting = true);
 
     final useCase = ref.read(deleteProductUseCaseProvider);
@@ -477,7 +477,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)
             ),
-            title: Text('無法刪除',
+            title: Text('無法封存',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             content: Text(
               failure.message,
@@ -502,7 +502,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('專案「${widget.product.name}」已刪除'),
+              content: Text('專案「${widget.product.name}」已封存'),
               backgroundColor: AppColors.primary,
             ),
           );

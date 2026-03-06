@@ -91,7 +91,7 @@ describe("Reorganize Topics - 分類數量約束驗證", () => {
 
     // 呼叫 AI
     const { object: result } = await generateObject({
-      model: google("gemini-2.5-flash-lite"),
+      model: google("gemini-3.1-flash-lite-preview"),
       schema: ReorganizeProposalSchema,
       prompt,
     });
@@ -195,7 +195,7 @@ describe("Reorganize Topics - 分類數量約束驗證", () => {
       });
 
       const { object: result } = await generateObject({
-        model: google("gemini-2.5-flash-lite"),
+        model: google("gemini-3.1-flash-lite-preview"),
         schema: ReorganizeProposalSchema,
         prompt,
       });

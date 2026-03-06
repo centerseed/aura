@@ -15,6 +15,8 @@ import '../../providers/first_time_tutorial_provider.dart'
         showTutorialProvider,
         tutorialStepProvider,
         TutorialStep;
+import '../../../core/di/providers.dart' show recurringTaskRepositoryProvider;
+import '../../../core/utils/date_utils.dart' as app_date_utils;
 
 /// 主頁面 - 包含三個分頁
 class HomeScreen extends ConsumerStatefulWidget {
@@ -39,7 +41,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowTutorial();
+      _generateRecurringTaskInstances();
     });
+  }
+
+  Future<void> _generateRecurringTaskInstances() async {
+    try {
+      final localDate = app_date_utils.DateUtils.formatDate(DateTime.now());
+      final repo = ref.read(recurringTaskRepositoryProvider);
+      await repo.generateInstances(localDate);
+    } catch (_) {
+      // 靜默失敗，不影響主流程
+    }
   }
 
   Future<void> _checkAndShowTutorial() async {

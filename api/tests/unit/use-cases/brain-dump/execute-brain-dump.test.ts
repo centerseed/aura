@@ -27,8 +27,10 @@ const mockTx = {
 
 vi.mock('@/lib/db', () => ({
   prisma: {
-    task: { findMany: vi.fn() },
+    task: { findMany: vi.fn(), findFirst: vi.fn() },
     product: { findMany: vi.fn() },
+    subTask: { aggregate: vi.fn(), create: vi.fn() },
+    systemEvaluationLog: { create: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
@@ -127,16 +129,111 @@ describe('ExecuteBrainDumpUseCase', () => {
     vi.clearAllMocks()
 
     vi.mocked(prisma.task.findMany).mockResolvedValue([])
+    vi.mocked(prisma.task.findFirst).mockResolvedValue(null)
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => {
       return await callback(mockTx)
     })
     vi.mocked(prisma.product.findMany).mockResolvedValue([])  // no cross-area match by default
+    vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: null } } as any)
+    vi.mocked(prisma.subTask.create).mockResolvedValue({} as any)
+    vi.mocked(prisma.systemEvaluationLog.create).mockResolvedValue({} as any)
     mockTx.product.create.mockResolvedValue(MOCK_PRODUCT)
     mockTx.task.create.mockResolvedValue(buildMockTask())
     mockTx.systemEvaluationLog.create.mockResolvedValue({})
     mockEnsureProductEmbedding.mockResolvedValue(undefined)
     mockEnsureTaskEmbedding.mockResolvedValue(undefined)
     mockMaybeRefreshBlueprint.mockResolvedValue(undefined)
+  })
+
+  describe('🔴 迴歸測試：append_sub_item 缺少 sub_items 應拋出有意義的錯誤（Bug 2026-03-06）', () => {
+    const MOCK_TASK_WITH_PRODUCT = {
+      id: TEST_UUIDS.TASK_1,
+      content: '建立 Yami 的國語學習進度',
+      product: { id: TEST_UUIDS.PRODUCT_1, name: 'Yami開學準備' },
+      user_id: TEST_UUIDS.USER_1,
+      product_id: TEST_UUIDS.PRODUCT_1,
+      status: 'INBOX',
+      deleted_at: null,
+    }
+
+    it('Bug：AI 返回 append_sub_item 但沒有 sub_items → 應拋出 ValidationException 而非 TypeError crash', async () => {
+      vi.mocked(prisma.task.findFirst).mockResolvedValue(MOCK_TASK_WITH_PRODUCT as any)
+
+      await expect(
+        useCase.execute({
+          userId: TEST_UUIDS.USER_1,
+          text: '追加學期進度',
+          inputType: 'text',
+          result: {
+            action: 'append_sub_item',
+            target_task_ids: [TEST_UUIDS.TASK_1],
+            reasoning: '用戶明確要求追加',
+            // sub_items 故意不填（AI 漏填的場景）
+          } as any,
+          milestones: [],
+          existingAreas: [],
+          imageUnderstandingResult: null,
+        })
+      ).rejects.toThrow(/sub_items/)
+    })
+
+    it('正常情況：append_sub_item 帶有 sub_items 應正確追加', async () => {
+      vi.mocked(prisma.task.findFirst).mockResolvedValue(MOCK_TASK_WITH_PRODUCT as any)
+      vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: 2 } } as any)
+
+      const result = await useCase.execute({
+        userId: TEST_UUIDS.USER_1,
+        text: '追加學期進度',
+        inputType: 'text',
+        result: {
+          action: 'append_sub_item',
+          target_task_ids: [TEST_UUIDS.TASK_1],
+          reasoning: '用戶明確要求追加',
+          sub_items: [{ content: '上學期國語進度' }, { content: '下學期國語進度' }],
+        },
+        milestones: [],
+        existingAreas: [],
+        imageUnderstandingResult: null,
+      })
+
+      expect(result.data.action).toBe('append_sub_item')
+      expect(prisma.subTask.create).toHaveBeenCalledTimes(2)
+    })
+
+    it('多個 target_task_ids：sub_items 應追加到每個目標任務', async () => {
+      const MOCK_TASK_2 = {
+        id: TEST_UUIDS.TASK_2,
+        content: '建立 Yami 的數學學習進度',
+        product: { id: TEST_UUIDS.PRODUCT_1, name: 'Yami開學準備' },
+        user_id: TEST_UUIDS.USER_1,
+        product_id: TEST_UUIDS.PRODUCT_1,
+        status: 'INBOX',
+        deleted_at: null,
+      }
+      vi.mocked(prisma.task.findFirst)
+        .mockResolvedValueOnce(MOCK_TASK_WITH_PRODUCT as any)
+        .mockResolvedValueOnce(MOCK_TASK_2 as any)
+      vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: null } } as any)
+
+      const result = await useCase.execute({
+        userId: TEST_UUIDS.USER_1,
+        text: '為國語和數學追加學期進度',
+        inputType: 'text',
+        result: {
+          action: 'append_sub_item',
+          target_task_ids: [TEST_UUIDS.TASK_1, TEST_UUIDS.TASK_2],
+          reasoning: '用戶要追加到兩個任務',
+          sub_items: [{ content: '第一學期' }, { content: '第二學期' }],
+        },
+        milestones: [],
+        existingAreas: [],
+        imageUnderstandingResult: null,
+      })
+
+      expect(result.data.action).toBe('append_sub_item')
+      // 2 sub_items × 2 tasks = 4 次寫入
+      expect(prisma.subTask.create).toHaveBeenCalledTimes(4)
+    })
   })
 
   describe('🔴 迴歸測試：Brain Dump 自動建立 Product 必須呼叫 ensureProductEmbedding', () => {
