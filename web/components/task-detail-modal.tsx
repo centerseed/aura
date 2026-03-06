@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Calendar, AlertCircle, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight, Package, FolderOpen, Tag } from "lucide-react";
+import { X, Calendar, AlertCircle, Plus, Circle, CheckCircle, Trash2, Edit2, ExternalLink, FileText, Loader2, GripVertical, ArrowUpCircle, ClipboardList, Rocket, RefreshCw, BookOpen, Archive, ChevronDown, Bell, CalendarPlus, Link2, MoveRight, Package, FolderOpen, Tag, Repeat } from "lucide-react";
 import type { DrawerStatus } from "@/types";
 import { DRAWER_CONFIG } from "@/domain/constants/drawer-config";
 import {
@@ -64,6 +64,14 @@ interface TaskDetailModalProps {
   initialEditSubItemId?: string | null;
   calendarEvent?: { eventId: string; eventLink: string } | null;
   areas?: AreaWithProducts[];
+  onSetRecurring?: (recurrenceRule: {
+    frequency: "DAILY" | "WEEKLY" | "MONTHLY";
+    interval: number;
+    timezone: string;
+    startDate: string;
+    daysOfWeek?: number[];
+    dayOfMonth?: number;
+  }) => Promise<void>;
 }
 
 // 計算相對時間描述（與 draggable-task-item 相同邏輯）
@@ -203,6 +211,7 @@ export function TaskDetailModal({
   initialEditSubItemId,
   calendarEvent,
   areas = [],
+  onSetRecurring,
 }: TaskDetailModalProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -241,6 +250,16 @@ export function TaskDetailModal({
   const [moveTargetTaskId, setMoveTargetTaskId] = useState<string>("");
   const [isMoving, setIsMoving] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
+
+  // 週期設定狀態
+  const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const [rtFrequency, setRtFrequency] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("WEEKLY");
+  const [rtInterval, setRtInterval] = useState(1);
+  const [rtDaysOfWeek, setRtDaysOfWeek] = useState<number[]>([1]);
+  const [rtDayOfMonth, setRtDayOfMonth] = useState(1);
+  const [rtStartDate, setRtStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [isSettingRecurring, setIsSettingRecurring] = useState(false);
+  const [recurringError, setRecurringError] = useState<string | null>(null);
 
   // 從外部直接打開某個 sub-item 的編輯對話框
   useEffect(() => {
@@ -941,6 +960,148 @@ export function TaskDetailModal({
                 </button>
               )}
             </div>
+
+            {/* 週期任務設定 */}
+            {onSetRecurring && (
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <h3 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+                  <Repeat className="w-4 h-4" />
+                  週期任務
+                </h3>
+                {task.recurring_task_id ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                    <Repeat className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-sm text-emerald-300">此任務為週期任務實例</span>
+                  </div>
+                ) : showRecurringForm ? (
+                  <div className="space-y-3 p-4 rounded-lg bg-white/5 border border-white/10">
+                    {/* 頻率 */}
+                    <div>
+                      <label className="block text-xs font-medium text-white/60 mb-1.5">頻率</label>
+                      <div className="flex gap-2">
+                        {(["DAILY", "WEEKLY", "MONTHLY"] as const).map((f) => (
+                          <button
+                            key={f}
+                            onClick={() => setRtFrequency(f)}
+                            className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              rtFrequency === f ? "bg-indigo-500 text-white" : "bg-white/10 text-white/70 hover:bg-white/20"
+                            }`}
+                          >
+                            {f === "DAILY" ? "每日" : f === "WEEKLY" ? "每週" : "每月"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 間隔 */}
+                    <div>
+                      <label className="block text-xs font-medium text-white/60 mb-1.5">間隔</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={rtInterval}
+                        onChange={(e) => setRtInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/20 text-white focus:outline-none focus:border-indigo-400/50"
+                      />
+                    </div>
+                    {/* 星期幾（週頻率） */}
+                    {rtFrequency === "WEEKLY" && (
+                      <div>
+                        <label className="block text-xs font-medium text-white/60 mb-1.5">星期幾</label>
+                        <div className="flex gap-1">
+                          {["日", "一", "二", "三", "四", "五", "六"].map((d, i) => (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                setRtDaysOfWeek((prev) =>
+                                  prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]
+                                );
+                              }}
+                              className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors ${
+                                rtDaysOfWeek.includes(i) ? "bg-indigo-500 text-white" : "bg-white/10 text-white/60 hover:bg-white/20"
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* 月中幾號（月頻率） */}
+                    {rtFrequency === "MONTHLY" && (
+                      <div>
+                        <label className="block text-xs font-medium text-white/60 mb-1.5">每月幾號</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={31}
+                          value={rtDayOfMonth}
+                          onChange={(e) => setRtDayOfMonth(Math.min(31, Math.max(1, parseInt(e.target.value) || 1)))}
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/20 text-white focus:outline-none focus:border-indigo-400/50"
+                        />
+                      </div>
+                    )}
+                    {/* 開始日期 */}
+                    <div>
+                      <label className="block text-xs font-medium text-white/60 mb-1.5">開始日期</label>
+                      <input
+                        type="date"
+                        value={rtStartDate}
+                        onChange={(e) => setRtStartDate(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/20 text-white focus:outline-none focus:border-indigo-400/50"
+                      />
+                    </div>
+                    {/* 操作按鈕 */}
+                    {recurringError && (
+                      <p className="text-xs text-red-400">{recurringError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setIsSettingRecurring(true);
+                          setRecurringError(null);
+                          try {
+                            const rule = {
+                              frequency: rtFrequency,
+                              interval: rtInterval,
+                              timezone: "Asia/Taipei",
+                              startDate: rtStartDate,
+                              ...(rtFrequency === "WEEKLY" && { daysOfWeek: rtDaysOfWeek }),
+                              ...(rtFrequency === "MONTHLY" && { dayOfMonth: rtDayOfMonth }),
+                            };
+                            await onSetRecurring(rule);
+                            setShowRecurringForm(false);
+                          } catch (err) {
+                            setRecurringError(err instanceof Error ? err.message : "設定失敗");
+                          } finally {
+                            setIsSettingRecurring(false);
+                          }
+                        }}
+                        disabled={isSettingRecurring}
+                        className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isSettingRecurring && <Loader2 className="w-4 h-4 animate-spin" />}
+                        設為週期任務
+                      </button>
+                      <button
+                        onClick={() => setShowRecurringForm(false)}
+                        disabled={isSettingRecurring}
+                        className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowRecurringForm(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed border-white/20 text-white/60 hover:border-indigo-400/50 hover:text-white/80 hover:bg-white/5 transition-all"
+                  >
+                    <Repeat className="w-4 h-4" />
+                    設為週期任務
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

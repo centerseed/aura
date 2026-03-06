@@ -140,6 +140,8 @@ export interface TaskCard {
     sub_items?: SubItem[]
     sub_items_meta?: SubItemsMeta
   }
+  // 週期任務關聯
+  recurring_task_id?: string | null
 }
 
 /**

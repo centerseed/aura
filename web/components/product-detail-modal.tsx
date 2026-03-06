@@ -82,6 +82,7 @@ interface ProductDetailModalProps {
   initialTab?: "edit" | "milestones" | "references" | "recurring";
   milestones?: Milestone[];
   onMilestoneChange?: () => void;
+  onRefreshTasks?: () => void;
 }
 
 // 簡單的 Markdown 渲染器
@@ -228,6 +229,7 @@ export function ProductDetailModal({
   initialTab = "edit",
   milestones = [],
   onMilestoneChange,
+  onRefreshTasks,
 }: ProductDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [name, setName] = useState("");
@@ -753,6 +755,17 @@ export function ProductDetailModal({
       }
       resetRecurringForm();
       await loadRecurringTasks();
+      // 生成今日實例並重載任務看板
+      const localDate = new Date().toLocaleDateString("en-CA");
+      await fetch(`${API_BASE_URL}/api/recurring-tasks/generate`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ local_date: localDate }),
+      }).catch(() => {});
+      onRefreshTasks?.();
     } catch (err) {
       console.error("Failed to add recurring task:", err);
       setError(err instanceof Error ? err.message : "新增失敗");

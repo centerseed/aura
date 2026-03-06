@@ -25,22 +25,29 @@ export async function POST(request: NextRequest) {
 
     // 2. 解析輸入
     const contentType = request.headers.get("content-type") || ""
+    const isMultipart = contentType.includes("multipart/form-data")
+    const jsonBody = isMultipart ? undefined : await request.json()
     const parseUseCase = new ParseBrainDumpInputUseCase()
     const parsed = await parseUseCase.execute({
       userId,
       contentType,
-      jsonBody: contentType.includes("multipart/form-data") ? undefined : await request.json(),
-      formData: contentType.includes("multipart/form-data") ? await request.formData() : undefined,
+      jsonBody,
+      formData: isMultipart ? await request.formData() : undefined,
     })
     Object.assign(timings, parsed.timings)
 
     // 3. 生成結構
+    const rawBody = jsonBody as Record<string, unknown> | undefined
+    const sessionContext: string[] | undefined = Array.isArray(rawBody?.session_context)
+      ? (rawBody!.session_context as unknown[]).filter((s): s is string => typeof s === 'string').slice(0, 3)
+      : undefined
     const generateUseCase = new GenerateBrainDumpStructureUseCase()
     const structure = await generateUseCase.execute({
       userId,
       text: parsed.text,
       cleanedText: parsed.cleanedText,
       explicitProductId: parsed.explicitProductId,
+      sessionContext,
     })
     Object.assign(timings, structure.timings)
 

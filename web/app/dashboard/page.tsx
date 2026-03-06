@@ -1941,6 +1941,57 @@ function DashboardContent() {
     }
   };
 
+  const handleSetRecurring = async (
+    taskId: string,
+    taskTitle: string,
+    productId: string | undefined,
+    recurrenceRule: {
+      frequency: "DAILY" | "WEEKLY" | "MONTHLY";
+      interval: number;
+      timezone: string;
+      startDate: string;
+      daysOfWeek?: number[];
+      dayOfMonth?: number;
+    }
+  ) => {
+    const headers = await getAuthHeaders();
+    // 1. 建立週期任務模板
+    const rtRes = await fetch(`${API_BASE_URL}/api/recurring-tasks`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: taskTitle,
+        recurrence_rule: recurrenceRule,
+        product_id: productId,
+      }),
+    });
+    if (!rtRes.ok) throw new Error("建立週期任務失敗");
+    const rtData = await rtRes.json();
+    const recurringTaskId: string = rtData.data?.recurring_task?.id;
+
+    // 2. 將此任務關聯到模板
+    await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ recurring_task_id: recurringTaskId }),
+    });
+
+    // 3. 生成今日實例（靜默失敗）
+    const localDate = new Date().toLocaleDateString("en-CA");
+    await fetch(`${API_BASE_URL}/api/recurring-tasks/generate`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ local_date: localDate }),
+    }).catch(() => {});
+
+    // 4. 重載 library
+    const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers });
+    if (libraryRes.ok) {
+      const libraryData = await libraryRes.json();
+      setAreas(cleanLibraryData(libraryData.data?.areas || []));
+    }
+  };
+
   const handleCompleteTask = async (taskId: string) => {
     try {
       // 找到任務的當前狀態（從所有可能的來源）
@@ -3904,6 +3955,15 @@ function DashboardContent() {
           initialTab={productDetailInitialTab}
           milestones={milestones}
           onMilestoneChange={reloadMilestones}
+          onRefreshTasks={async () => {
+            if (userId) {
+              const libraryRes = await fetch(`${API_BASE_URL}/api/library`, { headers: await getAuthHeaders() });
+              if (libraryRes.ok) {
+                const libraryData = await libraryRes.json();
+                setAreas(cleanLibraryData(libraryData.data?.areas || []));
+              }
+            }
+          }}
         />
 
         {/* Area Modal */}
@@ -4039,6 +4099,11 @@ function DashboardContent() {
             onAddToCalendar={handleAddToCalendar}
             isCalendarConnected={calendarConnected}
             calendarEvent={selectedTaskCalendarEvent}
+            onSetRecurring={async (recurrenceRule) => {
+              if (selectedTask) {
+                await handleSetRecurring(selectedTask.id, selectedTask.title, selectedTask.product_id, recurrenceRule);
+              }
+            }}
           />
         )}
 

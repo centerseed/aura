@@ -110,6 +110,7 @@ export interface TaskUpdateData {
   notificationId?: number | null
   dateSource?: string | null
   actualDurationHours?: number | null
+  recurringTaskId?: string | null
 }
 
 // ============================================================================

@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, MoreHorizontal, ArrowRight, Calendar, AlertCircle, CheckCircle2, Link } from "lucide-react";
+import { GripVertical, MoreHorizontal, ArrowRight, Calendar, AlertCircle, CheckCircle2, Link, Repeat } from "lucide-react";
 import type { TaskCard } from "@/types";
 
 // 計算相對時間描述
@@ -130,6 +130,14 @@ export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate
 
         {/* Badges Row */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
+          {/* Recurring Badge */}
+          {task.recurring_task_id && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+              <Repeat className="w-3 h-3" />
+              週期
+            </span>
+          )}
+
           {/* Strategy Badge */}
           {task.strategy_used && !isCompleted && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">

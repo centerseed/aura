@@ -52,10 +52,10 @@ const StructuredItemSchema = z.object({
   due_date_source: SourceAttributionSchema.optional().describe("時間來源歸因 - 區分 explicit/inferred"),
   inferred_from_milestone: z.string().optional().describe("關聯的里程碑名稱（如「成立公司」）—— 填入里程碑的名稱文字，不是 ID"),
   task_type: TaskTypeSchema.optional().describe("任務類型 - 用於計算需要提前多少天完成"),
-  estimated_days_needed: z.number().min(0.25).max(30).optional().describe("AI 估算完成此任務需要的天數（包含等待時間），最小值為 0.25（即 2 小時）"),
+  estimated_days_needed: z.number().min(0.25).max(365).optional().describe("AI 估算完成此任務需要的天數（包含等待時間），最小值為 0.25（即 2 小時）"),
   depends_on_task: z.string().max(50).optional().describe("如果此任務依賴同批次的其他任務，填入該任務的 title"),
   time_confidence: z.number().min(0).max(1).optional().describe("Confidence score for time inference (0-1)"),
-  sub_items: z.array(SubItemSchema).optional().describe("【清單模式強制填寫】當輸入格式為「主題：A、B、C」或「主題：1. A 2. B」時，必須將列表中的每個項目填入 sub_items，禁止將它們合併到 narrative。每個 sub-item 使用用戶的原話。"),
+  sub_items: z.array(SubItemSchema).max(20).optional().describe("【清單模式強制填寫】當輸入格式為「主題：A、B、C」或「主題：1. A 2. B」時，必須將列表中的每個項目填入 sub_items，禁止將它們合併到 narrative。每個 sub-item 使用用戶的原話。最多 20 個，超過時只取前 20 個最重要的。"),
 })
 
 const StructureResultSchema = z.object({
@@ -109,6 +109,7 @@ export interface GenerateBrainDumpStructureRequest {
   text: string
   cleanedText: string
   explicitProductId: string | null
+  sessionContext?: string[]
 }
 
 export interface GenerateBrainDumpStructureResponse {
@@ -799,7 +800,15 @@ ${similaritySignal}
 ${librarianHints}
 ---
 
-# 用戶輸入
+${request.sessionContext && request.sessionContext.length > 0
+  ? `### 本次會話脈絡（同一 session 中較早的輸入，僅供理解連貫性，不代表用戶要追加到這些內容）
+${request.sessionContext.map((s, i) => `- [${i + 1}] 「${s}」`).join('\n')}
+如果用戶的當前輸入明顯是接著脈絡繼續說，請納入理解，但仍以當前輸入決定動作。
+
+---
+
+`
+  : ''}# 用戶輸入
 
 ${request.text}
 

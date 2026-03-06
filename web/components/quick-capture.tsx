@@ -784,13 +784,19 @@ export function QuickCapture({ userId, onItemsCreated, areas = [], welcomeMode =
         });
       } else {
         // 文字模式：使用 JSON
+        // 取本 session 中最近 2 條用戶輸入作為脈絡（不含當前正在送的這條）
+        const prevUserMessages = messages
+          .filter(m => m.type === 'user')
+          .slice(-2)
+          .map(m => m.content.slice(0, 200))
+        const sessionContext = prevUserMessages.length > 0 ? prevUserMessages : undefined
         res = await fetch(`${API_BASE_URL}/api/brain-dump`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
           },
-          body: JSON.stringify({ text: userInput, userId }),
+          body: JSON.stringify({ text: userInput, userId, session_context: sessionContext }),
           signal: controller.signal,
         });
       }

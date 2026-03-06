@@ -42,6 +42,7 @@ export interface UpdateTaskRequest {
   reminderEnabled?: boolean
   reminderTimezone?: string | null
   notificationId?: number | null
+  recurringTaskId?: string | null
 }
 
 export interface UpdateTaskResponse {
@@ -188,6 +189,9 @@ export class UpdateTaskUseCase {
     }
     if (request.notificationId !== undefined) {
       updateData.notificationId = request.notificationId
+    }
+    if (request.recurringTaskId !== undefined) {
+      updateData.recurringTaskId = request.recurringTaskId
     }
 
     // 5.5 用戶修改日期 → 設 date_source='user'（保護不被 Coach 覆寫）
@@ -430,7 +434,8 @@ export class UpdateTaskUseCase {
       request.remindAt !== undefined ||
       request.reminderEnabled !== undefined ||
       request.reminderTimezone !== undefined ||
-      request.notificationId !== undefined
+      request.notificationId !== undefined ||
+      request.recurringTaskId !== undefined
 
     if (!hasUpdate) {
       throw new ValidationException('No update data provided', 'data')

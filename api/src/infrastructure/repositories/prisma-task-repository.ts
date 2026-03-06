@@ -315,6 +315,9 @@ export class PrismaTaskRepository implements ITaskRepository {
         ...(data.actualDurationHours !== undefined && {
           actual_duration_hours: data.actualDurationHours,
         }),
+        ...(data.recurringTaskId !== undefined && {
+          recurring_task_id: data.recurringTaskId,
+        }),
       } as any,
     })
 

@@ -50,6 +50,7 @@ export interface StructuredItem {
  */
 export interface BrainDumpDTO {
   text: string
+  session_context?: string[]
 }
 
 /**

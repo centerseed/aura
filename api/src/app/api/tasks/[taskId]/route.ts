@@ -134,6 +134,7 @@ export async function PATCH(
       reminder_enabled,
       reminder_timezone,
       notification_id,
+      recurring_task_id,
     } = body
 
     // 4. 執行 Use Case
@@ -154,6 +155,7 @@ export async function PATCH(
       reminderEnabled: reminder_enabled,
       reminderTimezone: reminder_timezone,
       notificationId: notification_id,
+      recurringTaskId: recurring_task_id,
     })
 
     // 5. 格式化任務資料
