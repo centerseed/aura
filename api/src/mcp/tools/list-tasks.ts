@@ -15,6 +15,7 @@ export interface ListTasksInput {
   product_id?: string
   topic_id?: string
   include_sub_items?: boolean
+  include_narrative?: boolean
 }
 
 interface TaskItem {
@@ -23,6 +24,7 @@ interface TaskItem {
   status?: string
   tag?: { area?: string; product?: string; topic?: string }
   due_date?: string
+  narrative?: string | null
   sub_items?: Array<{ id: string; content: string; completed: boolean }>
   [key: string]: unknown
 }
@@ -70,6 +72,7 @@ export async function handleListTasks(
       sub_items_progress: t.sub_items
         ? `${t.sub_items.filter((s) => s.completed === true).length}/${t.sub_items.length}`
         : undefined,
+      ...(params.include_narrative && { narrative: t.narrative ?? null }),
     }
 
     if (params.include_sub_items && t.sub_items) {

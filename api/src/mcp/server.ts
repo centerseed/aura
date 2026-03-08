@@ -519,6 +519,10 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .boolean()
         .optional()
         .describe("If true, include full sub_items array with id/content/completed for each task"),
+      include_narrative: z
+        .boolean()
+        .optional()
+        .describe("If true, include narrative (task description/notes) in results"),
     },
     async (input, extra) => {
       return executeToolPipeline(
@@ -561,6 +565,11 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .string()
         .optional()
         .describe("Due date in YYYY-MM-DD format"),
+      narrative: z
+        .string()
+        .max(500)
+        .optional()
+        .describe("任務說明欄位：背景、細節、結論（對應 UI 的「說明」欄位，最多 500 字元）"),
     },
     async (input, extra) => {
       return executeToolPipeline(
@@ -601,6 +610,12 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .nullable()
         .optional()
         .describe("Due date in YYYY-MM-DD format. Pass null to clear."),
+      narrative: z
+        .string()
+        .max(500)
+        .nullable()
+        .optional()
+        .describe("更新說明欄位（最多 500 字元）。傳 null 清空。"),
     },
     async (input, extra) => {
       return executeToolPipeline(

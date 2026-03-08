@@ -27,6 +27,7 @@ export interface CreateTaskRequest {
   dueDate?: string | null
   timeConfidence?: number | null
   inferredFromMilestone?: string | null
+  narrative?: string | null
 }
 
 export interface CreateTaskResponse {
@@ -60,7 +61,7 @@ export class CreateTaskUseCase {
       topicId: request.topicId || null,
       content: request.content.trim(),
       status,
-      aiAnalysis: null,
+      aiAnalysis: request.narrative ? { narrative: request.narrative } : null,
       references: [],
       subItems: [],
       startDate: request.startDate ? new Date(request.startDate) : null,

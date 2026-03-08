@@ -36,7 +36,7 @@ const TaskTypeSchema = z.enum(["waiting", "booking", "preparation", "execution"]
 
 const StructuredItemSchema = z.object({
   title: z.string().max(50).describe("簡潔的任務標題（最多 50 字元）"),
-  narrative: z.string().max(100).describe("任務的簡要背景描述（最多 100 字元）"),
+  narrative: z.string().max(500).describe("完整保留用戶記錄的背景脈絡與細節（最多 500 字元）"),
   drawer: z.enum(["INBOX", "ACTIVE", "MAINTAIN", "REFERENCE", "ARCHIVE"])
     .describe("Status drawer based on urgency"),
   lifecycle: z.enum(["FINITE", "PERPETUAL"])
@@ -818,7 +818,7 @@ ${request.text}
 
 **字元數限制：**
 - title：≤ 50 字元（動詞 + 目標，去掉冗詞）
-- narrative：≤ 100 字元（任務背景描述，精簡重點）
+- narrative：≤ 500 字元（完整保留用戶的原始描述、背景脈絡、結論與細節；禁止壓縮或省略）
 - reasoning：≤ 100 字元（1 句話說明分類依據）
 - due_date_source.reasoning：≤ 80 字元（1 句話說明時間推斷，使用 due_date_source 結構）
 - sub_item.content：≤ 100 字元（簡短的待辦事項）
@@ -830,10 +830,9 @@ ${request.text}
 - tag.topic：字串，**必須盡量填寫**（優先使用既有 Topic，或創建合適的新名稱）
 
 **寫作原則：**
-- 精簡優先：每個字都要有意義
-- reasoning 範例：「提到專案名稱，判斷為工作相關」
-- narrative 範例：「整理本週功能，準備週報給主管」（≤ 100 字）
-- 如果用戶提供了大量細節，提煉最重要的資訊`,
+- title 精簡優先：每個字都要有意義，動詞開頭，≤ 50 字元
+- narrative **保留完整**：將用戶提供的描述、結論、細節、背景完整複製到 narrative，不得省略或壓縮；如果用戶提供大量細節，全部放入 narrative（≤ 500 字元）
+- reasoning 範例：「提到專案名稱，判斷為工作相關」`,
         })
         result = object
         aiUsage = usage

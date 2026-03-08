@@ -278,6 +278,7 @@ export async function POST(request: NextRequest) {
       due_date,
       time_confidence,
       inferred_from_milestone,
+      narrative,
     } = body
 
     // 3. 基礎驗證
@@ -299,6 +300,7 @@ export async function POST(request: NextRequest) {
       dueDate: due_date,
       timeConfidence: time_confidence,
       inferredFromMilestone: inferred_from_milestone,
+      narrative,
     })
 
     // 5. 格式化任務資料
