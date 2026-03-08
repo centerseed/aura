@@ -2141,7 +2141,11 @@ function DashboardContent() {
         product_id: productId,
       }),
     });
-    if (!rtRes.ok) throw new Error("建立週期任務失敗");
+    if (!rtRes.ok) {
+      const errBody = await rtRes.json().catch(() => null);
+      const detail = errBody?.error?.message || errBody?.message || `HTTP ${rtRes.status}`;
+      throw new Error(`建立週期任務失敗：${detail}`);
+    }
     const rtData = await rtRes.json();
     const recurringTaskId: string = rtData.data?.recurring_task?.id;
 
@@ -2151,6 +2155,11 @@ function DashboardContent() {
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ recurring_task_id: recurringTaskId }),
     });
+
+    // 2b. 立即更新 selectedTask 讓 UI 馬上顯示週期圖示
+    if (selectedTask?.id === taskId) {
+      setSelectedTask({ ...selectedTask, recurring_task_id: recurringTaskId });
+    }
 
     // 3. 生成今日實例（靜默失敗）
     const localDate = new Date().toLocaleDateString("en-CA");

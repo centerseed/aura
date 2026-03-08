@@ -25,6 +25,9 @@ export async function POST(request: NextRequest) {
     if (!body.recurrence_rule) {
       throw new ValidationException('recurrence_rule is required', 'recurrence_rule')
     }
+    if (!body.product_id) {
+      throw new ValidationException('product_id is required', 'product_id')
+    }
 
     const useCase = new CreateRecurringTaskUseCase()
     const result = await useCase.execute({

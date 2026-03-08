@@ -23,6 +23,7 @@ export interface GetLibraryRequest {
 export interface TaskData {
   id: string
   title: string
+  product_id: string
   narrative: string | null
   drawer: string
   lifecycle: string
@@ -316,6 +317,7 @@ export class GetLibraryUseCase {
     return {
       id: row.task_id!,
       title: row.task_content!,
+      product_id: row.product_id!,
       narrative: (analysis?.narrative as string) || null,
       drawer: row.task_status!,
       lifecycle: (analysis?.lifecycle as string) || 'embryo',

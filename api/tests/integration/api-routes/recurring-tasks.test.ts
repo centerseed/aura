@@ -411,6 +411,57 @@ describe('Recurring Tasks API - Integration Tests', () => {
       expect(Array.isArray(data.data.details)).toBe(true)
     })
 
+    it('重複生成時應跳過已存在的 task（uuid 型別匹配驗證）', async () => {
+      const today = new Date()
+      const todayUTC = new Date(
+        Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+      )
+      const todayStr = todayUTC.toISOString().substring(0, 10)
+
+      const rt = await prisma.recurringTask.create({
+        data: {
+          user_id: TEST_USER_ID,
+          product_id: testProductId,
+          title: '重複防護測試',
+          status: 'ACTIVE',
+          recurrence_rule: DAILY_RULE,
+          lead_days: 1,
+          next_occurrence_at: todayUTC,
+        },
+      })
+
+      // 第一次生成 — 應該建立 task
+      const req1 = new NextRequest('http://localhost/api/recurring-tasks/generate', {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ local_date: todayStr }),
+      })
+      const res1 = await GENERATE(req1)
+      const data1 = await res1.json()
+
+      expect(res1.status).toBe(200)
+      expect(data1.data.generated).toBe(1)
+
+      // 重設 next_occurrence_at 回今天，模擬再次觸發
+      await prisma.recurringTask.update({
+        where: { id: rt.id },
+        data: { next_occurrence_at: todayUTC },
+      })
+
+      // 第二次生成 — 應該跳過（重複防護的 $queryRaw 用 ::uuid 比對）
+      const req2 = new NextRequest('http://localhost/api/recurring-tasks/generate', {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ local_date: todayStr }),
+      })
+      const res2 = await GENERATE(req2)
+      const data2 = await res2.json()
+
+      expect(res2.status).toBe(200)
+      expect(data2.data.generated).toBe(0)
+      expect(data2.data.skipped).toBe(1)
+    })
+
     it('local_date 格式錯誤時返回 400', async () => {
       const req = new NextRequest('http://localhost/api/recurring-tasks/generate', {
         method: 'POST',

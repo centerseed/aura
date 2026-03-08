@@ -4,14 +4,14 @@ import type { RecurringTaskData } from '@/domain/interfaces/recurring-task-repos
 import { VALID_USER_ID, VALID_PRODUCT_ID } from '../../../helpers/test-uuids'
 
 // vi.mock 會被 hoist 到頂部，需用 vi.hoisted() 確保變數在工廠函數執行前初始化
-const { mockTaskFindFirst, mockProductFindFirst } = vi.hoisted(() => ({
-  mockTaskFindFirst: vi.fn(),
+const { mockQueryRaw, mockProductFindFirst } = vi.hoisted(() => ({
+  mockQueryRaw: vi.fn(),
   mockProductFindFirst: vi.fn(),
 }))
 
 vi.mock('@/lib/db', () => ({
   prisma: {
-    task: { findFirst: mockTaskFindFirst },
+    $queryRaw: mockQueryRaw,
     product: { findFirst: mockProductFindFirst },
   },
 }))
@@ -70,7 +70,7 @@ describe('GenerateRecurringTaskInstancesUseCase', () => {
       mockTaskRepo as any
     )
     vi.clearAllMocks()
-    mockTaskFindFirst.mockResolvedValue(null)
+    mockQueryRaw.mockResolvedValue([])
     mockTaskRepo.create.mockResolvedValue({ id: 'new-task-1' })
     mockRecurringRepo.update.mockResolvedValue({})
   })
@@ -127,7 +127,7 @@ describe('GenerateRecurringTaskInstancesUseCase', () => {
 
   it('重複任務已存在時略過並推進', async () => {
     mockRecurringRepo.findPendingForUser.mockResolvedValue([makeTemplate()])
-    mockTaskFindFirst.mockResolvedValue({ id: 'existing-task-id' })
+    mockQueryRaw.mockResolvedValue([{ id: 'existing-task-id' }])
 
     const result = await useCase.execute({ userId: VALID_USER_ID, localDate: LOCAL_DATE })
 
@@ -137,30 +137,28 @@ describe('GenerateRecurringTaskInstancesUseCase', () => {
     expect(mockRecurringRepo.update).toHaveBeenCalledOnce()
   })
 
-  it('template.productId 為 null 時查詢預設 product', async () => {
+  it('template.productId 為 null 時跳過不建立任務', async () => {
     mockRecurringRepo.findPendingForUser.mockResolvedValue([
       makeTemplate({ productId: null }),
     ])
-    mockProductFindFirst.mockResolvedValue({ id: 'default-product-id' })
-
-    await useCase.execute({ userId: VALID_USER_ID, localDate: LOCAL_DATE })
-
-    expect(mockProductFindFirst).toHaveBeenCalledOnce()
-    expect(mockTaskRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ productId: 'default-product-id' })
-    )
-  })
-
-  it('多個 productId=null 的模板時 defaultProductId 只查詢一次（N+1 防護）', async () => {
-    const t1 = makeTemplate({ id: 'r1', productId: null })
-    const t2 = makeTemplate({ id: 'r2', productId: null })
-    mockRecurringRepo.findPendingForUser.mockResolvedValue([t1, t2])
-    mockProductFindFirst.mockResolvedValue({ id: 'default-product-id' })
 
     const result = await useCase.execute({ userId: VALID_USER_ID, localDate: LOCAL_DATE })
 
-    expect(mockProductFindFirst).toHaveBeenCalledOnce()
-    expect(result.generated).toBe(2)
+    expect(mockTaskRepo.create).not.toHaveBeenCalled()
+    expect(result.generated).toBe(0)
+    expect(result.skipped).toBe(1)
+  })
+
+  it('多個 productId=null 的模板時全部跳過', async () => {
+    const t1 = makeTemplate({ id: 'r1', productId: null })
+    const t2 = makeTemplate({ id: 'r2', productId: null })
+    mockRecurringRepo.findPendingForUser.mockResolvedValue([t1, t2])
+
+    const result = await useCase.execute({ userId: VALID_USER_ID, localDate: LOCAL_DATE })
+
+    expect(mockTaskRepo.create).not.toHaveBeenCalled()
+    expect(result.generated).toBe(0)
+    expect(result.skipped).toBe(2)
   })
 
   it('template.nextOccurrenceAt 為 null 時略過', async () => {

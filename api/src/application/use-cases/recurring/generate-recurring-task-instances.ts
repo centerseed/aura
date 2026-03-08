@@ -34,9 +34,6 @@ export class GenerateRecurringTaskInstancesUseCase {
 
     if (pendingTemplates.length === 0) return result
 
-    // 快取：避免 N 個 template 各自查一次預設 product
-    let defaultProductId: string | undefined
-
     for (const template of pendingTemplates) {
       const occurrence = template.nextOccurrenceAt
       if (!occurrence) continue
@@ -69,14 +66,15 @@ export class GenerateRecurringTaskInstancesUseCase {
       // 防重複：檢查同 recurring_task_id + due_date 是否已存在
       const dueDateStart = occurrenceUTC
       const dueDateEnd = new Date(occurrenceUTC.getTime() + 24 * 60 * 60 * 1000)
-      const existing = await prisma.task.findFirst({
-        where: {
-          recurring_task_id: template.id,
-          due_date: { gte: dueDateStart, lt: dueDateEnd },
-          deleted_at: null,
-        },
-        select: { id: true },
-      })
+      const existingRows = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id::text FROM tasks
+        WHERE recurring_task_id = ${template.id}::uuid
+          AND due_date >= ${dueDateStart}
+          AND due_date < ${dueDateEnd}
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      const existing = existingRows.length > 0 ? existingRows[0] : null
 
       if (existing) {
         result.skipped++
@@ -87,16 +85,24 @@ export class GenerateRecurringTaskInstancesUseCase {
           taskId: existing.id,
         })
       } else {
-        const productId = await this.resolveProductId(
-          template.userId,
-          template.productId,
-          () => defaultProductId,
-          (id) => { defaultProductId = id }
-        )
+        // product_id が null の場合はスキップ（間違ったプロジェクトに生成しない）
+        if (!template.productId) {
+          console.warn(
+            `[recurring] skipping template ${template.id} ("${template.title}"): product_id is null`
+          )
+          result.skipped++
+          result.details.push({
+            recurringTaskId: template.id,
+            title: template.title,
+            dueDate: occurrenceUTC.toISOString().substring(0, 10),
+          })
+          await this.advanceNextOccurrence(template.id, req.userId, occurrenceUTC, template.recurrenceRule)
+          continue
+        }
 
         const task = await this.taskRepo.create({
           userId: template.userId,
-          productId,
+          productId: template.productId,
           topicId: template.topicId,
           content: template.title,
           status: TaskStatus.INBOX,
@@ -142,22 +148,4 @@ export class GenerateRecurringTaskInstancesUseCase {
     await this.recurringRepo.update(id, userId, { nextOccurrenceAt: next })
   }
 
-  private async resolveProductId(
-    userId: string,
-    productId: string | null,
-    getCache: () => string | undefined,
-    setCache: (id: string) => void
-  ): Promise<string> {
-    if (productId) return productId
-    const cached = getCache()
-    if (cached) return cached
-    const product = await prisma.product.findFirst({
-      where: { user_id: userId, deleted_at: null },
-      orderBy: { created_at: 'asc' },
-      select: { id: true },
-    })
-    if (!product) throw new Error('No product found for user')
-    setCache(product.id)
-    return product.id
-  }
 }
