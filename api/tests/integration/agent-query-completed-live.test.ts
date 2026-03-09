@@ -52,14 +52,14 @@ describe("Agent live query routing (real LLM)", () => {
           product_id: product.id,
           content: "完成 API 部署",
           status: "ARCHIVE",
-          updated_at: new Date(),
+          completed_at: new Date(),
         },
         {
           user_id: userId,
           product_id: product.id,
           content: "修正 LINE 查詢邏輯",
           status: "ARCHIVE",
-          updated_at: new Date(),
+          completed_at: new Date(),
         },
         {
           user_id: userId,

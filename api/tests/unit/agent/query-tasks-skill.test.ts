@@ -1,19 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createQueryTasksSkill } from "@/application/use-cases/agent/query-tasks-skill"
 
-vi.mock("@/lib/db", () => ({
-  prisma: {
-    task: {
-      findMany: vi.fn(),
-    },
-  },
+const mockQueryCompletedToday = vi.fn()
+const mockQueryTodayFocus = vi.fn()
+
+vi.mock("@/application/use-cases/agent/agent-task-query-service", () => ({
+  AgentTaskQueryService: vi.fn().mockImplementation(() => ({
+    queryCompletedToday: mockQueryCompletedToday,
+    queryTodayFocus: mockQueryTodayFocus,
+  })),
 }))
 
-import { prisma } from "@/lib/db"
-
 describe("QueryTasksSkill scenarios", () => {
-  const mockFindMany = prisma.task.findMany as unknown as ReturnType<typeof vi.fn>
-
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -24,7 +22,7 @@ describe("QueryTasksSkill scenarios", () => {
 
     expect(result.promptInjection).toContain("今天已完成")
     expect(result.extraTools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["query_today_tasks", "query_completed_today_tasks"])
+      expect.arrayContaining(["query_today_tasks", "query_completed_today_tasks"]),
     )
   })
 
@@ -36,62 +34,32 @@ describe("QueryTasksSkill scenarios", () => {
     expect(result.promptInjection).not.toContain("今天已完成")
   })
 
-  it("query_completed_today_tasks returns completed list", async () => {
+  it("query_completed_today_tasks delegates to query service", async () => {
     const skill = createQueryTasksSkill("user-1")
     const runResult = await skill.run("今天完成了什麼", {})
     const completedTool = runResult.extraTools.find((t) => t.name === "query_completed_today_tasks")
 
-    expect(completedTool).toBeTruthy()
-    mockFindMany.mockResolvedValueOnce([
-      {
-        id: "t1",
-        content: "完成 API 部署",
-        updated_at: new Date("2026-03-09T10:00:00+08:00"),
-        product: { name: "Naruvia" },
-      },
-      {
-        id: "t2",
-        content: "修正 LINE Agent 查詢邏輯",
-        updated_at: new Date("2026-03-09T11:30:00+08:00"),
-        product: { name: "Zentropy" },
-      },
-    ])
+    mockQueryCompletedToday.mockResolvedValueOnce({
+      summary: "✅ 目前查到你今天已完成 2 項 Task：\n\n1. 完成 API 部署 [Naruvia]",
+    })
 
     const output = await completedTool!.execute({})
-    expect(output).toContain("你今天已完成")
-    expect(output).toContain("完成 API 部署 [Naruvia]")
-    expect(output).toContain("修正 LINE Agent 查詢邏輯 [Zentropy]")
+    expect(mockQueryCompletedToday).toHaveBeenCalledWith("user-1")
+    expect(output).toContain("你今天已完成 2 項 Task")
   })
 
-  it("query_completed_today_tasks returns empty-state message", async () => {
-    const skill = createQueryTasksSkill("user-1")
-    const runResult = await skill.run("今天做了什麼", {})
-    const completedTool = runResult.extraTools.find((t) => t.name === "query_completed_today_tasks")
-
-    mockFindMany.mockResolvedValueOnce([])
-    const output = await completedTool!.execute({})
-
-    expect(output).toContain("今天目前還沒有標記完成")
-  })
-
-  it("query_today_tasks returns active task list", async () => {
+  it("query_today_tasks delegates to query service", async () => {
     const skill = createQueryTasksSkill("user-1")
     const runResult = await skill.run("今天有哪些任務", {})
     const todayTool = runResult.extraTools.find((t) => t.name === "query_today_tasks")
 
-    mockFindMany
-      .mockResolvedValueOnce([
-        {
-          id: "a1",
-          content: "提交版本更新",
-          due_date: new Date(),
-          product: { name: "Naruvia" },
-        },
-      ])
-      .mockResolvedValueOnce([])
+    mockQueryTodayFocus.mockResolvedValueOnce({
+      summary: "📋 目前查到 3 項待處理 Task：\n\n1. 提交版本更新 [Naruvia] 📅 今天",
+    })
 
     const output = await todayTool!.execute({})
-    expect(output).toContain("今日任務")
+    expect(mockQueryTodayFocus).toHaveBeenCalledWith("user-1")
     expect(output).toContain("提交版本更新")
   })
 })
+
