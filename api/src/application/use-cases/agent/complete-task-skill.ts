@@ -8,11 +8,12 @@
 import { tool, skill, makeSkillResult } from "naru-agent-js"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
+import { Status } from "@prisma/client"
 import { getEmbedding, cosineSimilarity } from "@/lib/embedding"
 import { saveLineSession } from "@/lib/line-session"
 import type { CompleteTaskPayload } from "@/lib/line-session"
 
-const createCompleteTaskSearchTool = (userId: string, lineUserId: string) =>
+const createCompleteTaskSearchTool = (userId: string, lineUserId?: string) =>
   tool({
     name: "complete_task_search",
     description: "搜尋用戶想要標記為完成的任務，回傳候選清單並等待確認",
@@ -45,9 +46,20 @@ const createCompleteTaskSearchTool = (userId: string, lineUserId: string) =>
         return `找不到與「${taskName}」相關的任務，請確認任務名稱。`
       }
 
+      const best = top[0]
+
+      if (!lineUserId) {
+        // REST API 模式：直接完成，不需要 LINE session 確認
+        await prisma.task.update({
+          where: { id: best.id },
+          data: { status: Status.ARCHIVE, updated_at: new Date() },
+        })
+        return `✅ 已完成「${best.content}」，任務已封存。`
+      }
+
+      // LINE Bot 模式：存 session，等待確認
       // 單一高信心結果 → 直接存 session
       if (top.length === 1 || top[0].score > 0.8) {
-        const best = top[0]
         const payload: CompleteTaskPayload = { taskId: best.id, taskTitle: best.content }
         await saveLineSession(lineUserId, "complete_task_confirm", payload)
         return `是否完成「${best.content}」？\n\n回覆「確認」執行，或無視此訊息取消。`
@@ -61,7 +73,7 @@ const createCompleteTaskSearchTool = (userId: string, lineUserId: string) =>
     },
   })
 
-export const createCompleteTaskSkill = (userId: string, lineUserId: string) =>
+export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
   skill({
     name: "complete_task",
     description: "標記任務為完成",

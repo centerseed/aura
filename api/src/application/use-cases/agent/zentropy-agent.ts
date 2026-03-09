@@ -50,12 +50,8 @@ export function createZentropyAgent(userId: string, lineUserId?: string): NaruAg
       createReorganizeSkill(userId),
       createPlannerSkill(userId),
       createQueryTasksSkill(userId),
-      ...(lineUserId
-        ? [
-            createAdjustTagsSkill(userId, lineUserId),
-            createCompleteTaskSkill(userId, lineUserId),
-          ]
-        : []),
+      createCompleteTaskSkill(userId, lineUserId),
+      ...(lineUserId ? [createAdjustTagsSkill(userId, lineUserId)] : []),
     ],
   })
 }
