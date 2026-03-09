@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, User, Loader2, ArrowLeft, Calendar, CheckCircle2, AlertCircle, Plug, Copy, Check, Pencil, Zap } from "lucide-react";
+import { LogOut, User, Loader2, ArrowLeft, Calendar, CheckCircle2, AlertCircle, Plug, Copy, Check, Pencil, Zap, MessageSquare, ExternalLink } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { API_BASE_URL } from "@/lib/api-client";
 import {
@@ -41,6 +41,9 @@ function SettingsContent() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [oauthMessage, setOauthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [userToken, setUserToken] = useState<string>('');
+
+  type LineStatus = { status: 'loading' } | { status: 'bound' } | { status: 'unbound' } | { status: 'error' }
+  const [lineStatus, setLineStatus] = useState<LineStatus>({ status: 'loading' })
 
   const [aiUsage, setAiUsage] = useState<{ used: number; limit: number } | null>(null);
   const [mcpConfigCopied, setMcpConfigCopied] = useState(false);
@@ -75,6 +78,9 @@ function SettingsContent() {
             ...data.data.user,
             timezone: data.data.user?.timezone || 'Asia/Taipei',
           });
+          setLineStatus({ status: data.data.user.line_user_id ? 'bound' : 'unbound' });
+        } else {
+          setLineStatus({ status: 'error' });
         }
 
         // 載入 AI 使用量
@@ -94,6 +100,7 @@ function SettingsContent() {
         await loadCalendarStatus(token);
       } catch (error) {
         console.error("載入用戶資料失敗:", error);
+        setLineStatus({ status: 'error' });
       } finally {
         setIsLoading(false);
       }
@@ -186,6 +193,26 @@ function SettingsContent() {
     } catch (error) {
       console.error('Failed to copy config:', error);
       alert('複製失敗，請手動複製下方設定');
+    }
+  };
+
+  // 解除 LINE 綁定
+  const handleDisconnectLine = async () => {
+    const confirmed = confirm('確定要解除 LINE 綁定嗎？');
+    if (!confirmed) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/line/connect`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('解除綁定失敗');
+      setLineStatus({ status: 'unbound' });
+    } catch (error) {
+      console.error('解除 LINE 綁定失敗:', error);
+      alert('解除綁定失敗，請稍後再試');
+      setLineStatus({ status: 'error' });
     }
   };
 
@@ -567,6 +594,72 @@ function SettingsContent() {
               <p className="text-xs text-slate-500">
                 支援的 MCP 客戶端：Claude Code、Cursor、Cline、Continue 等
               </p>
+            </CardContent>
+          </Card>
+
+          {/* LINE 綁定 */}
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle className="flex items-center text-white">
+                <MessageSquare className="w-5 h-5 mr-2 text-green-400" />
+                LINE 整合
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                透過 LINE 與 Naru 對話，隨時記錄任務、整理計畫
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {lineStatus.status === 'loading' && (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                </div>
+              )}
+              {lineStatus.status === 'bound' && (
+                <div className="flex items-center justify-between p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <p className="text-white font-medium">✅ 已連結 LINE</p>
+                      <p className="text-sm text-slate-400 mt-0.5">Naru 已可透過 LINE 接收訊息</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDisconnectLine}
+                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  >
+                    解除綁定
+                  </Button>
+                </div>
+              )}
+              {lineStatus.status === 'unbound' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
+                    <p className="text-slate-300 text-sm leading-relaxed">
+                      在 LINE 向 Naru 發送任意訊息，即可收到綁定連結。<br />
+                      點擊連結登入後即自動完成綁定，無需複製貼上。
+                    </p>
+                  </div>
+                  <a
+                    href={`https://line.me/R/ti/p/${process.env.NEXT_PUBLIC_LINE_BOT_BASIC_ID ?? '@zentropy'}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-medium text-sm py-2.5 px-4 rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    加入 LINE 官方帳號
+                  </a>
+                </div>
+              )}
+              {lineStatus.status === 'error' && (
+                <Alert className="bg-red-950/50 border-red-500/30">
+                  <AlertCircle className="h-4 w-4 text-red-400" />
+                  <AlertDescription className="text-red-300">
+                    載入 LINE 綁定狀態失敗，請重新整理頁面。
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 

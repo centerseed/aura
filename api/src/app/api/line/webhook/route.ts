@@ -2,7 +2,7 @@
  * LINE Webhook — 接收 LINE 平台事件
  *
  * 處理：
- * 1. 綁定流程（bind:<token>）
+ * 1. 未綁定用戶 → 生成 magic link → push URL
  * 2. 一般文字訊息 → NaruAgent
  */
 
@@ -14,6 +14,7 @@ import { getLineSession, clearLineSession } from "@/lib/line-session"
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
 import { Status } from "@prisma/client"
 import type { AdjustTagsPayload, CompleteTaskPayload } from "@/lib/line-session"
+import { generateLineMagicLink } from "@/lib/line-magic-link"
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -33,48 +34,6 @@ export async function POST(req: NextRequest) {
     const text: string = event.message.text
     const replyToken: string = event.replyToken
 
-    // ── 綁定流程 ──────────────────────────────────────────────────────
-    if (text.startsWith("bind:")) {
-      const token = text.replace("bind:", "").trim()
-      const user = await prisma.user.findFirst({
-        where: { line_binding_token: token },
-        select: { id: true },
-      })
-
-      if (!user) {
-        await client.replyMessage({
-          replyToken,
-          messages: [
-            {
-              type: "text",
-              text: "綁定碼無效或已過期，請重新在 Zentropy 產生。",
-            },
-          ],
-        })
-        continue
-      }
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          line_user_id: lineUserId,
-          line_bound_at: new Date(),
-          line_binding_token: null,
-        },
-      })
-
-      await client.replyMessage({
-        replyToken,
-        messages: [
-          {
-            type: "text",
-            text: "✅ 綁定成功！明天早上 7:30 會收到晨報。\n\n隨時傳訊息記錄任務，我都會幫你整理好。",
-          },
-        ],
-      })
-      continue
-    }
-
     // ── 一般對話 → NaruAgent（背景處理，避免 reply token 5 秒過期）──────
     // 不 await — 立刻進入下一個 event，最後 return 200
     Promise.resolve().then(async () => {
@@ -84,9 +43,14 @@ export async function POST(req: NextRequest) {
       })
 
       if (!user) {
+        // 未綁定：生成 magic link 並 push
+        const { url, isReused } = await generateLineMagicLink(lineUserId)
+        const msg = isReused
+          ? "你已收過綁定連結，請使用之前的連結完成綁定，或稍後再試。"
+          : `歡迎使用 Naru！請點以下連結登入 Zentropy 完成綁定：\n\n${url}\n\n連結 15 分鐘內有效 🔐`
         await client.pushMessage({
           to: lineUserId,
-          messages: [{ type: "text", text: "請先在 Zentropy App 完成 LINE 帳號綁定。" }],
+          messages: [{ type: "text", text: msg }],
         })
         return
       }
