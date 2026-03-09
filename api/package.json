@@ -30,12 +30,17 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.37",
     "@ai-sdk/openai": "^3.0.39",
+    "@line/bot-sdk": "^10.6.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@prisma/client": "^6.0.0",
     "ai": "^6.0.111",
     "firebase-admin": "^13.6.0",
+    "mem0ai": "^2.2.4",
+    "naru-agent-js": "^0.1.0",
     "next": "^16.1.4",
     "openai": "^6.25.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "tsx": "^4.21.0",
     "zod": "^4.3.6"
   },

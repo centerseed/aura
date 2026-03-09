@@ -28,6 +28,9 @@ model User {
   trial_end_at         DateTime?             @db.Timestamp(6)
   ai_usage_count       Int                   @default(0)
   ai_usage_reset_at    DateTime              @default(now()) @db.Timestamp(6)
+  line_user_id         String?               @unique @db.VarChar
+  line_bound_at        DateTime?             @db.Timestamp(6)
+  line_binding_token   String?               @unique @db.VarChar
   areas                Area[]
   ai_token_logs        AiTokenLog[]
   coach_briefings      CoachBriefing[]
