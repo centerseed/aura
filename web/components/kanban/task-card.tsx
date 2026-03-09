@@ -83,14 +83,14 @@ export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate
       {/* Content */}
       <div className="p-4 pl-8">
         {/* Title Row */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <h4 className="font-medium text-slate-800 dark:text-slate-200 flex-1">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h4 className="font-semibold text-slate-900 dark:text-slate-100 flex-1 line-clamp-2">
             {task.title}
           </h4>
         </div>
 
         {/* Path */}
-        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-2">
+        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-3">
           <span>{task.tag.area}</span>
           <ArrowRight className="w-3 h-3" />
           <span>{task.tag.product}</span>
@@ -113,11 +113,14 @@ export function TaskCardComponent({ task, isDragging, onOpenDetail, onSetDueDate
           </div>
         )}
 
-        {/* Narrative Preview */}
+        {/* Narrative Preview - Enhanced with label & separator */}
         {task.narrative && (
-          <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">
-            {task.narrative}
-          </p>
+          <div className="border-t border-slate-200 dark:border-slate-700 mt-2 pt-2 mb-3">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">說明</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed">
+              {task.narrative}
+            </p>
+          </div>
         )}
 
         {/* Summary badges - References count */}

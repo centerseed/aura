@@ -13,7 +13,10 @@ import { createMemoryManager } from "@/lib/naru-memory"
 import { google } from "@ai-sdk/google"
 import { createBrainDumpSkill } from "./brain-dump-skill"
 import { createReorganizeSkill } from "./reorganize-skill"
-import { plannerSkill } from "./planner-skill"
+import { createPlannerSkill } from "./planner-skill"
+import { createQueryTasksSkill } from "./query-tasks-skill"
+import { createAdjustTagsSkill } from "./adjust-tags-skill"
+import { createCompleteTaskSkill } from "./complete-task-skill"
 
 // Module-level singletons — 跨 request 持久
 const sessionStore = new InMemorySessionStore()
@@ -26,7 +29,7 @@ const SYSTEM_PROMPT = `你是 Zentropy 的 AI 助理 Naru，幫助用戶管理�
 - 遇到不確定的需求：先確認再行動
 - 執行工具後，用自然的語言回報結果，不要只貼原始數據`
 
-export function createZentropyAgent(userId: string): NaruAgent {
+export function createZentropyAgent(userId: string, lineUserId?: string): NaruAgent {
   return new NaruAgent({
     model: google("gemini-3.1-flash-lite-preview"),
     name: "naru",
@@ -45,7 +48,14 @@ export function createZentropyAgent(userId: string): NaruAgent {
     skills: [
       createBrainDumpSkill(userId),
       createReorganizeSkill(userId),
-      plannerSkill,
+      createPlannerSkill(userId),
+      createQueryTasksSkill(userId),
+      ...(lineUserId
+        ? [
+            createAdjustTagsSkill(userId, lineUserId),
+            createCompleteTaskSkill(userId, lineUserId),
+          ]
+        : []),
     ],
   })
 }

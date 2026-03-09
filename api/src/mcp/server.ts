@@ -49,6 +49,7 @@ import { handleGetReference } from "./tools/get-reference";
 import { handleAddReference } from "./tools/add-reference";
 import { handleAddSubItem } from "./tools/add-sub-item";
 import { handleUpdateSubItem } from "./tools/update-sub-item";
+import { handleRunPlanner } from "@/application/use-cases/agent/planner-skill";
 
 // Resources (legacy)
 import { readKnowledgeAsset } from "./resources/knowledge-assets";
@@ -538,13 +539,13 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
   // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
   server.tool(
     "create_task",
-    "Create a task with known product_id/topic_id. The 'content' field is the task title shown in the UI — start with a verb, max 300 chars (e.g. 'Fix login bug', 'Write spec for payment'). Returns {id,title,status,message}.",
+    "Create a task with known product_id/topic_id. The 'content' field is the task title shown in the UI — keep it concise (max 300 chars, start with verb, e.g. 'Fix login bug'). Use 'narrative' for detailed description (background, details, conclusion — max 500 chars).",
     {
       content: z
         .string()
         .min(1)
         .max(300)
-        .describe("任務標題（即 UI 顯示的 title），須以動詞開頭，最多 300 字元"),
+        .describe("✅ TITLE (不是說明)：簡潔的任務標題，最多 300 字，須以動詞開頭（例：『修復登入 bug』『寫支付規格書』）。詳細內容請放在 narrative 欄位！"),
       product_id: z
         .string()
         .optional()
@@ -569,7 +570,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .string()
         .max(500)
         .optional()
-        .describe("任務說明欄位：背景、細節、結論（對應 UI 的「說明」欄位，最多 500 字元）"),
+        .describe("📝 DESCRIPTION：背景、細節、結論。這個欄位的內容會在 UI 卡片上顯示為「說明」（line-clamp-2）。最多 500 字。"),
     },
     async (input, extra) => {
       return executeToolPipeline(
@@ -585,7 +586,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
   // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
   server.tool(
     "update_task",
-    "Update task status, content, or dates. Use this to change status or reschedule. Requires task_id plus at least one of: status/content/start_date/due_date. Returns {id,title,status,message}.",
+    "Update task status, title, description, or dates. Requires task_id plus at least one of: status/content/narrative/start_date/due_date. The 'content' field updates the title, 'narrative' updates the description shown in the UI.",
     {
       task_id: z
         .string()
@@ -597,9 +598,9 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .describe("New status: INBOX=unclassified, ACTIVE=in-sprint, MAINTAIN=ongoing, REFERENCE=knowledge, ARCHIVE=done"),
       content: z
         .string()
-        .max(5000)
+        .max(300)
         .optional()
-        .describe("Updated content"),
+        .describe("✅ TITLE：更新任務標題，最多 300 字（建議保持簡潔，控制在 100 字以內）"),
       start_date: z
         .string()
         .nullable()
@@ -615,7 +616,7 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         .max(500)
         .nullable()
         .optional()
-        .describe("更新說明欄位（最多 500 字元）。傳 null 清空。"),
+        .describe("📝 DESCRIPTION：更新說明欄位（最多 500 字元），顯示在卡片上。傳 null 清空。"),
     },
     async (input, extra) => {
       return executeToolPipeline(
@@ -741,6 +742,41 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         input as Record<string, unknown>,
         ["write:inbox"],
         handleUpdateSubItem,
+        extra.authInfo,
+      );
+    },
+  );
+
+  // run_planner — 拆解大目標為任務清單
+  // @ts-expect-error — McpServer.tool() deep generic inference with Zod 3.25
+  server.tool(
+    "run_planner",
+    "拆解大目標為任務清單並寫入 Zentropy。AI 自動分類目標類型（product_dev/learning/marketing/admin），生成 3-7 個可執行任務，並自動建立。Returns {tasks_created, items, summary}.",
+    {
+      goal: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe("大目標描述（自然語言，例如：把 Zentropy Stripe 整合上線）"),
+      product_id: z
+        .string()
+        .optional()
+        .describe("指定放入哪個 Product 的 UUID（可選，不填則放未分類）"),
+      due_date: z
+        .string()
+        .optional()
+        .describe("目標完成日（YYYY-MM-DD 格式，可選）"),
+      depth: z
+        .enum(["shallow", "deep"])
+        .optional()
+        .describe("shallow=只拆第一層任務（預設）, deep=同時拆子任務"),
+    },
+    async (input, extra) => {
+      return executeToolPipeline(
+        "run_planner",
+        input as Record<string, unknown>,
+        ["write:inbox"],
+        handleRunPlanner as Parameters<typeof executeToolPipeline>[3],
         extra.authInfo,
       );
     },

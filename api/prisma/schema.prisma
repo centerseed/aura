@@ -694,3 +694,15 @@ enum recurringtaskstatus {
   PAUSED
   ARCHIVED
 }
+
+model LinePendingState {
+  id           String   @id @default(cuid())
+  line_user_id String   @unique
+  type         String
+  payload      Json
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@map("line_pending_states")
+}
