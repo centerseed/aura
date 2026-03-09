@@ -93,7 +93,7 @@ describe("Agent live query routing (real LLM)", () => {
     expect(result.toolCalls).toContain("query_completed_today_tasks")
     expect(result.content).toMatch(/完成|已完成/)
     expect(result.content).toContain("完成 API 部署")
-  }, 30_000)
+  }, 90_000)
 
   it("asks today-todo and should call today active query tool", async () => {
     const agent = createZentropyAgent(userId, `line-live-${Date.now()}-todo`)

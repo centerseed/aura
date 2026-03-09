@@ -34,11 +34,18 @@ describe("AgentTaskQueryService", () => {
       ),
     }
 
-    const service = new AgentTaskQueryService(collector, vi.fn().mockResolvedValue("Asia/Taipei"))
+    const service = new AgentTaskQueryService(
+      collector,
+      vi.fn().mockResolvedValue("Asia/Taipei"),
+      {
+        getCompletedSubTasks: vi.fn().mockResolvedValue([]),
+        getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
+    )
     const result = await service.queryCompletedToday("user-1")
 
     expect(result.totalCount).toBe(1)
-    expect(result.summary).toContain("你今天已完成 1 項 Task")
+    expect(result.summary).toContain("你今天已完成 1 項完成紀錄")
     expect(result.summary).toContain("完成 API 部署 [Naruvia]")
     expect(result.summary).toContain("查詢範圍：Task")
   })
@@ -48,12 +55,19 @@ describe("AgentTaskQueryService", () => {
       collect: vi.fn().mockResolvedValue(createRawData()),
     }
 
-    const service = new AgentTaskQueryService(collector, vi.fn().mockResolvedValue("Asia/Taipei"))
+    const service = new AgentTaskQueryService(
+      collector,
+      vi.fn().mockResolvedValue("Asia/Taipei"),
+      {
+        getCompletedSubTasks: vi.fn().mockResolvedValue([]),
+        getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
+    )
     const result = await service.queryCompletedToday("user-1")
 
     expect(result.totalCount).toBe(0)
-    expect(result.summary).toContain("還沒有完成任何 Task")
-    expect(result.summary).toContain("只覆蓋 Task 完成紀錄")
+    expect(result.summary).toContain("還沒有完成任何項目")
+    expect(result.summary).toContain("覆蓋 Task、SubTask、Daily Plan")
   })
 
   it("summarizes today-focus with total count and truncation", async () => {
@@ -78,7 +92,14 @@ describe("AgentTaskQueryService", () => {
       collect: vi.fn().mockResolvedValue(createRawData({ allTasks: tasks })),
     }
 
-    const service = new AgentTaskQueryService(collector, vi.fn().mockResolvedValue("Asia/Taipei"))
+    const service = new AgentTaskQueryService(
+      collector,
+      vi.fn().mockResolvedValue("Asia/Taipei"),
+      {
+        getCompletedSubTasks: vi.fn().mockResolvedValue([]),
+        getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
+    )
     const result = await service.queryTodayFocus("user-1")
 
     expect(result.totalCount).toBe(12)
@@ -87,5 +108,54 @@ describe("AgentTaskQueryService", () => {
     expect(result.summary).toContain("目前查到 12 項待處理 Task")
     expect(result.summary).toContain("以下列出最優先的 10 項")
   })
-})
 
+  it("includes subtask and daily plan completions without double counting archived task", async () => {
+    const collector: IDataCollector = {
+      collect: vi.fn().mockResolvedValue(
+        createRawData({
+          completedTasks: [
+            {
+              id: "task-1",
+              content: "完成 API 部署",
+              completed_at: new Date("2026-03-09T10:00:00+08:00"),
+              area_name: "工作",
+              product_name: "Naruvia",
+            },
+          ],
+        }),
+      ),
+    }
+
+    const service = new AgentTaskQueryService(
+      collector,
+      vi.fn().mockResolvedValue("Asia/Taipei"),
+      {
+        getCompletedSubTasks: vi.fn().mockResolvedValue([
+          {
+            id: "sub-1",
+            title: "整理 release checklist",
+            sourceType: "sub_task",
+            productName: "Naruvia",
+            completedAt: "2026-03-09T11:00:00+08:00",
+          },
+        ]),
+        getCompletedDailyPlanItems: vi.fn().mockResolvedValue([
+          {
+            id: "plan-1",
+            title: "下午例行回顧",
+            sourceType: "daily_plan_item",
+            productName: "Naruvia",
+            completedAt: "2026-03-09T12:00:00+08:00",
+          },
+        ]),
+      },
+    )
+
+    const result = await service.queryCompletedToday("user-1")
+
+    expect(result.totalCount).toBe(3)
+    expect(result.summary).toContain("你今天已完成 3 項完成紀錄")
+    expect(result.summary).toContain("整理 release checklist [Naruvia] [SubTask]")
+    expect(result.summary).toContain("下午例行回顧 [Naruvia] [Daily Plan]")
+  })
+})

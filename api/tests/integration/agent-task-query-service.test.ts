@@ -44,6 +44,8 @@ describe("AgentTaskQueryService integration", () => {
   }, 30_000)
 
   afterAll(async () => {
+    await prisma.dailyPlanItem.deleteMany({ where: { plan: { user_id: userId } } })
+    await prisma.dailyPlan.deleteMany({ where: { user_id: userId } })
     await prisma.subTask.deleteMany({ where: { task: { user_id: userId } } })
     await prisma.task.deleteMany({ where: { user_id: userId } })
     await prisma.topic.deleteMany({ where: { product: { user_id: userId } } })
@@ -108,8 +110,92 @@ describe("AgentTaskQueryService integration", () => {
     expect(result.totalCount).toBe(12)
     expect(result.displayCount).toBe(10)
     expect(result.truncated).toBe(true)
-    expect(result.summary).toContain("你今天已完成 12 項 Task")
+    expect(result.summary).toContain("你今天已完成 12 項完成紀錄")
     expect(result.summary).toContain("以下列出其中 10 項")
   })
-})
 
+  it("includes subtask and daily plan completions in completed-today coverage", async () => {
+    await prisma.dailyPlanItem.deleteMany({ where: { plan: { user_id: userId } } })
+    await prisma.dailyPlan.deleteMany({ where: { user_id: userId } })
+    await prisma.subTask.deleteMany({ where: { user_id: userId } })
+    await prisma.task.deleteMany({ where: { user_id: userId } })
+
+    const now = new Date()
+    const archivedTask = await prisma.task.create({
+      data: {
+        user_id: userId,
+        product_id: productId,
+        content: "完成 API 部署",
+        status: "ARCHIVE",
+        completed_at: now,
+      },
+    })
+
+    const activeTask = await prisma.task.create({
+      data: {
+        user_id: userId,
+        product_id: productId,
+        content: "處理本日例行工作",
+        status: "ACTIVE",
+      },
+    })
+
+    await prisma.subTask.create({
+      data: {
+        task_id: activeTask.id,
+        user_id: userId,
+        content: "整理 release checklist",
+        completed: true,
+        completed_at: now,
+      },
+    })
+
+    const plan = await prisma.dailyPlan.create({
+      data: {
+        user_id: userId,
+        plan_date: new Date(now.toISOString().slice(0, 10)),
+      },
+    })
+
+    await prisma.dailyPlanItem.create({
+      data: {
+        plan_id: plan.id,
+        task_id: activeTask.id,
+        sub_task_id: null,
+        content: "下午例行回顧",
+        area_name: "工作",
+        product_name: "Naruvia",
+        order: 1,
+        completed: true,
+        completed_at: now,
+        item_type: "task",
+        status: "today",
+      },
+    })
+
+    await prisma.dailyPlanItem.create({
+      data: {
+        plan_id: plan.id,
+        task_id: archivedTask.id,
+        sub_task_id: null,
+        content: "完成 API 部署",
+        area_name: "工作",
+        product_name: "Naruvia",
+        order: 2,
+        completed: true,
+        completed_at: now,
+        item_type: "task",
+        status: "today",
+      },
+    })
+
+    const service = new AgentTaskQueryService()
+    const result = await service.queryCompletedToday(userId, "Asia/Taipei")
+
+    expect(result.totalCount).toBe(3)
+    expect(result.summary).toContain("你今天已完成 3 項完成紀錄")
+    expect(result.summary).toContain("完成 API 部署 [Naruvia]")
+    expect(result.summary).toContain("整理 release checklist [Naruvia] [SubTask]")
+    expect(result.summary).toContain("下午例行回顧 [Naruvia] [Daily Plan]")
+  })
+})

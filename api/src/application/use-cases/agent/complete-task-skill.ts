@@ -13,6 +13,14 @@ import { saveLineSession } from "@/lib/line-session"
 import type { CompleteTaskPayload } from "@/lib/line-session"
 import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
 
+const MAX_TASK_SEARCH_POOL = 150
+const MAX_EMBEDDING_CANDIDATES = 40
+
+interface SearchableTask {
+  id: string
+  content: string
+}
+
 const createCompleteTaskSearchTool = (userId: string, lineUserId?: string) =>
   tool({
     name: "complete_task_search",
@@ -23,20 +31,22 @@ const createCompleteTaskSearchTool = (userId: string, lineUserId?: string) =>
     execute: async ({ taskName }) => {
       const completeTaskUseCase = new CompleteTaskUseCase()
 
-      // 取得所有 ACTIVE 任務（限制為 30 筆以避免 N+1 embedding 呼叫）
+      // 先擴大召回，再透過文字預篩縮小 embedding 候選
       const tasks = await prisma.task.findMany({
         where: { user_id: userId, status: "ACTIVE", deleted_at: null },
         select: { id: true, content: true },
-        take: 30,
+        take: MAX_TASK_SEARCH_POOL,
         orderBy: { updated_at: "desc" },
       })
 
       if (tasks.length === 0) return "目前沒有進行中的任務。"
 
+      const candidateTasks = pickSearchCandidates(taskName, tasks)
+
       // 逐個生成 embedding（避免並行 embedding API 呼叫導致 rate-limit）
       const queryEmb = await getEmbedding(taskName)
       const scored = []
-      for (const t of tasks) {
+      for (const t of candidateTasks) {
         const emb = await getEmbedding(t.content)
         scored.push({ ...t, score: cosineSimilarity(queryEmb, emb) })
       }
@@ -90,3 +100,73 @@ export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
         skillName: "complete_task",
       }),
   })
+
+export function pickSearchCandidates(taskName: string, tasks: SearchableTask[]): SearchableTask[] {
+  const ranked = tasks
+    .map((task, index) => ({
+      task,
+      score: lexicalMatchScore(taskName, task.content),
+      index,
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      return a.index - b.index
+    })
+
+  const matched = ranked.filter((item) => item.score > 0).slice(0, MAX_EMBEDDING_CANDIDATES)
+  if (matched.length > 0) {
+    return matched.map((item) => item.task)
+  }
+
+  return tasks.slice(0, MAX_EMBEDDING_CANDIDATES)
+}
+
+export function lexicalMatchScore(taskName: string, content: string): number {
+  const query = normalizeText(taskName)
+  const target = normalizeText(content)
+  if (!query || !target) return 0
+
+  let score = 0
+
+  if (target.includes(query)) {
+    score += 10
+  }
+
+  for (const token of tokenize(query)) {
+    if (target.includes(token)) {
+      score += token.length >= 2 ? 4 : 1
+    }
+  }
+
+  for (const bigram of bigrams(query)) {
+    if (target.includes(bigram)) {
+      score += 2
+    }
+  }
+
+  return score
+}
+
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, " ").trim()
+}
+
+function tokenize(text: string): string[] {
+  return Array.from(
+    new Set(
+      text
+        .split(/[\s/,_-]+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0),
+    ),
+  )
+}
+
+function bigrams(text: string): string[] {
+  const chars = Array.from(text.replace(/\s+/g, ""))
+  const grams: string[] = []
+  for (let i = 0; i < chars.length - 1; i += 1) {
+    grams.push(chars[i] + chars[i + 1])
+  }
+  return Array.from(new Set(grams))
+}
