@@ -18,6 +18,7 @@ export interface CreateTaskInput {
   status?: string
   start_date?: string
   due_date?: string
+  narrative?: string
 }
 
 export async function handleCreateTask(
@@ -36,6 +37,7 @@ export async function handleCreateTask(
     status: params.status,
     start_date: params.start_date,
     due_date: params.due_date,
+    narrative: params.narrative,
   }) as { task: { id: string; title?: string; status?: string }; message?: string }
 
   return {
@@ -105,6 +107,11 @@ function validateCreateTaskInput(
     throw new ValidationException('due_date must be in YYYY-MM-DD format', 'due_date')
   }
 
+  // 驗證 narrative（可選）
+  if (input.narrative !== undefined && typeof input.narrative !== 'string') {
+    throw new ValidationException('narrative must be a string', 'narrative')
+  }
+
   return {
     content: input.content as string,
     product_id: input.product_id ? (input.product_id as string) : undefined,
@@ -112,5 +119,6 @@ function validateCreateTaskInput(
     status: input.status ? (input.status as string) : undefined,
     start_date: input.start_date ? (input.start_date as string) : undefined,
     due_date: input.due_date ? (input.due_date as string) : undefined,
+    narrative: input.narrative ? (input.narrative as string) : undefined,
   }
 }

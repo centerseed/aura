@@ -152,6 +152,7 @@ export class BackendApiClient {
       status?: string;
       start_date?: string;
       due_date?: string;
+      narrative?: string;
     },
   ): Promise<unknown> {
     return this.post("/api/tasks", userId, params);
@@ -165,6 +166,7 @@ export class BackendApiClient {
       content?: string;
       start_date?: string | null;
       due_date?: string | null;
+      narrative?: string | null;
     },
   ): Promise<unknown> {
     const { task_id, ...body } = params;

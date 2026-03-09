@@ -17,6 +17,7 @@ export interface UpdateTaskInput {
   content?: string
   start_date?: string | null
   due_date?: string | null
+  narrative?: string | null
 }
 
 export async function handleUpdateTask(
@@ -34,6 +35,7 @@ export async function handleUpdateTask(
     content: params.content,
     start_date: params.start_date,
     due_date: params.due_date,
+    narrative: params.narrative,
   }) as { task: { id: string; title?: string; status?: string }; message?: string }
 
   return {
@@ -58,16 +60,17 @@ function validateUpdateTaskInput(
     )
   }
 
-  // 驗證至少有 status、content、start_date 或 due_date 其中之一
+  // 驗證至少有 status、content、start_date、due_date 或 narrative 其中之一
   const hasStatus = input.status && typeof input.status === 'string'
   const hasContent = input.content && typeof input.content === 'string'
   const hasStartDate = input.start_date !== undefined
   const hasDueDate = input.due_date !== undefined
+  const hasNarrative = input.narrative !== undefined
 
-  if (!hasStatus && !hasContent && !hasStartDate && !hasDueDate) {
+  if (!hasStatus && !hasContent && !hasStartDate && !hasDueDate && !hasNarrative) {
     throw new ValidationException(
-      'At least one of status, content, start_date, or due_date must be provided.',
-      'status|content|start_date|due_date',
+      'At least one of status, content, start_date, due_date, or narrative must be provided.',
+      'status|content|start_date|due_date|narrative',
     )
   }
 
@@ -97,11 +100,17 @@ function validateUpdateTaskInput(
     throw new ValidationException('due_date must be in YYYY-MM-DD format', 'due_date')
   }
 
+  // 驗證 narrative（可選，null 表示清除）
+  if (input.narrative !== null && input.narrative !== undefined && typeof input.narrative !== 'string') {
+    throw new ValidationException('narrative must be a string or null', 'narrative')
+  }
+
   return {
     task_id: input.task_id as string,
     status: hasStatus ? (input.status as string) : undefined,
     content: hasContent ? (input.content as string) : undefined,
     start_date: hasStartDate ? (input.start_date as string | null) : undefined,
     due_date: hasDueDate ? (input.due_date as string | null) : undefined,
+    narrative: hasNarrative ? (input.narrative as string | null) : undefined,
   }
 }

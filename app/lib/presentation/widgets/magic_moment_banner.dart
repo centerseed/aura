@@ -17,8 +17,6 @@ class MagicMomentBanner extends StatefulWidget {
 }
 
 class _MagicMomentBannerState extends State<MagicMomentBanner> {
-  bool _isRefocusing = false;
-
   String get _stagnantName {
     final list = widget.data['stagnant_p0_products'] as List<dynamic>? ?? [];
     if (list.isEmpty) return 'P0 Project';
@@ -35,26 +33,7 @@ class _MagicMomentBannerState extends State<MagicMomentBanner> {
   }
 
   Future<void> _handleRefocus() async {
-    setState(() => _isRefocusing = true);
-    try {
-      await widget.onRefocus();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('今日計畫已更新，已重新優先排入 P0 任務'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('更新失敗，請稍後再試')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isRefocusing = false);
-    }
+    await widget.onRefocus();
   }
 
   @override
@@ -115,9 +94,9 @@ class _MagicMomentBannerState extends State<MagicMomentBanner> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // 重新對焦按鈕
+                  // 立即查看按鈕
                   GestureDetector(
-                    onTap: _isRefocusing ? null : _handleRefocus,
+                    onTap: _handleRefocus,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -125,26 +104,10 @@ class _MagicMomentBannerState extends State<MagicMomentBanner> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
                       ),
-                      child: _isRefocusing
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.amber,
-                              ),
-                            )
-                          : const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.bolt, color: Colors.amber, size: 14),
-                                SizedBox(width: 4),
-                                Text(
-                                  '重新對焦',
-                                  style: TextStyle(color: Colors.amber, fontSize: 12),
-                                ),
-                              ],
-                            ),
+                      child: const Text(
+                        '立即查看 →',
+                        style: TextStyle(color: Colors.amber, fontSize: 12),
+                      ),
                     ),
                   ),
                 ],
