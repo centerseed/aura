@@ -41,6 +41,9 @@ class _MagicMomentBannerState extends State<MagicMomentBanner> {
     final momentum = _topMomentum;
     if (momentum == null) return const SizedBox.shrink();
 
+    final momentumName = momentum['name'] as String? ?? 'Project';
+    final completedCount = momentum['completed_count'] as int? ?? 0;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -76,21 +79,42 @@ class _MagicMomentBannerState extends State<MagicMomentBanner> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 主標題：清楚說明建議行動
                   const Text(
-                    '動能偵測：焦點已轉移',
+                    '⚠️ 焦點建議：應回到高優先級專案',
                     style: TextStyle(
                       color: Colors.amber,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '「${momentum['name']}」近 7 天完成了 ${momentum['completed_count']} 項，'
-                    '但「$_stagnantName」(P0) 已超過 5 天無進展',
-                    style: TextStyle(
-                      color: Colors.amber.withValues(alpha: 0.75),
-                      fontSize: 12,
+                  const SizedBox(height: 6),
+                  // 詳細說明：分列當前狀況
+                  RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                        color: Colors.amber.withValues(alpha: 0.75),
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: '低優先級進行中：',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber.withValues(alpha: 0.85),
+                          ),
+                        ),
+                        TextSpan(text: '「$momentumName」過去 7 天完成 $completedCount 項\n'),
+                        TextSpan(
+                          text: '高優先級停滯：',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        TextSpan(text: '「$_stagnantName」已停滯超過 5 天'),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -105,8 +129,8 @@ class _MagicMomentBannerState extends State<MagicMomentBanner> {
                         border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
                       ),
                       child: const Text(
-                        '立即查看 →',
-                        style: TextStyle(color: Colors.amber, fontSize: 12),
+                        '前往 P0 專案 →',
+                        style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),

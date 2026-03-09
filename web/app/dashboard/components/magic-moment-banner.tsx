@@ -42,32 +42,37 @@ export function MagicMomentBanner() {
 
         {/* 文字 */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-amber-200">動能偵測：焦點已轉移</p>
-          <p className="text-xs text-amber-200/70 mt-0.5 truncate">
-            <span className="font-medium text-amber-300">{topMomentum.name}</span>
-            {' '}近 7 天完成了 {topMomentum.completed_count} 項，但{' '}
-            <span className="font-medium text-white/80">{stagnantName}</span>（P0）已超過 5 天無進展
-          </p>
+          <p className="text-sm font-semibold text-amber-200">⚠️ 焦點建議：應回到高優先級專案</p>
+          <div className="text-xs text-amber-200/70 mt-1 space-y-0.5">
+            <p>
+              <span className="text-amber-100 font-medium">低優先級進行中：</span>
+              {topMomentum.name} 過去 7 天完成 {topMomentum.completed_count} 項
+            </p>
+            <p>
+              <span className="text-red-300 font-medium">高優先級停滯：</span>
+              {stagnantName}（P0）已停滯超過 5 天
+            </p>
+          </div>
         </div>
 
         {/* 重新對焦按鈕 */}
         {refocused ? (
-          <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-green-400 text-xs font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-green-400 text-xs font-medium whitespace-nowrap">
+            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
             計畫已更新
           </span>
         ) : (
           <button
             onClick={handleRefocus}
             disabled={isRefocusing}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/30 hover:bg-amber-500/50 border border-amber-500/40 text-amber-200 text-xs font-medium transition-colors disabled:opacity-60"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/30 hover:bg-amber-500/50 border border-amber-500/40 text-amber-200 text-xs font-medium transition-colors disabled:opacity-60 whitespace-nowrap"
           >
             {isRefocusing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
             ) : (
-              <Zap className="w-3.5 h-3.5" />
+              <Zap className="w-3.5 h-3.5 flex-shrink-0" />
             )}
-            重新對焦
+            前往 P0 →
           </button>
         )}
 
