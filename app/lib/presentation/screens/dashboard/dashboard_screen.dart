@@ -9,7 +9,9 @@ import '../../../domain/entities/task.dart';
 import '../../../application/use_cases/create_task_use_case.dart';
 import '../../../application/use_cases/update_task_details_use_case.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/dashboard_provider.dart';
 import '../home/widgets/task_detail_bottom_sheet.dart';
+import '../project/project_detail_screen.dart';
 import '../../widgets/magic_moment_banner.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -60,9 +62,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Future<void> _refocusPlan() async {
-    final apiClient = ref.read(apiClientProvider);
-    await apiClient.generatePlan();
-    await refreshTasks(ref);
+    final stagnantList = (_magicMomentData?['stagnant_p0_products'] as List<dynamic>?) ?? [];
+    if (stagnantList.isEmpty) {
+      _dismissMagicMoment();
+      return;
+    }
+
+    final stagnantId = (stagnantList.first as Map<String, dynamic>)['id'] as String?;
+    if (stagnantId == null) {
+      _dismissMagicMoment();
+      return;
+    }
+
+    final result = await ref.read(dashboardProductsProvider.future);
+    final product = result.fold(
+      (_) => null,
+      (products) => products.where((p) => p.id == stagnantId).firstOrNull,
+    );
+
+    if (!mounted) return;
+
+    _dismissMagicMoment();
+    if (product != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (c) => ProjectDetailScreen(product: product)),
+      );
+    }
   }
 
   @override
