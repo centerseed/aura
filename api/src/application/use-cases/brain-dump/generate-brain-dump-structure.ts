@@ -577,6 +577,7 @@ export class GenerateBrainDumpStructureUseCase {
     let lastError: unknown
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
+        console.log(`🔄 [brain-dump] AI generateObject attempt ${attempt + 1}/3...`)
         const { object, usage } = await generateObject({
           model: process.env.OPENROUTER_MODEL
             ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
@@ -845,7 +846,11 @@ ${request.text}
           err.message.includes('ECONNRESET') ||
           err.message.includes('timeout')
         )
-        if (!isTransient || attempt === 2) throw err
+        console.error(`❌ [brain-dump] AI call attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : String(err))
+        if (!isTransient || attempt === 2) {
+          console.error(`❌ [brain-dump] All 3 AI attempts failed. Final error:`, lastError instanceof Error ? lastError.message : String(lastError))
+          throw err
+        }
         console.warn(`⚠️ [brain-dump] AI call attempt ${attempt + 1} failed (transient), retrying...`, err)
         await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
       }

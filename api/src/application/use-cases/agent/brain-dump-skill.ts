@@ -44,6 +44,19 @@ const createBrainDumpTool = (userId: string) =>
         imageUnderstandingResult: null,
       })
 
+      const action = result.data?.action
+
+      if (action === "append_sub_item") {
+        // 追加 sub_items 到既有任務
+        const appendedTasks = result.data?.appended_tasks ?? []
+        if (appendedTasks.length === 0) return "已記錄，但沒有追加任何內容。"
+        const summary = appendedTasks
+          .map((at: any) => `「${at.task.content}」追加 ${at.sub_items.length} 個待辦`)
+          .join("; ")
+        return `✅ 已記錄並追加：${summary}`
+      }
+
+      // create_new_tasks 情況
       const items: any[] = result.data?.items ?? []
       if (items.length === 0) return "已記錄，但沒有新增任何項目。"
       const titles = items.map((i: any) => i.title ?? i.content ?? "（無標題）").join("、")
