@@ -99,7 +99,10 @@ export class ReportDoneUseCase {
       if (isCompleted) {
         await tx.task.update({
           where: { id: request.actionId },
-          data: { status: 'ARCHIVE' },
+          data: {
+            status: 'ARCHIVE',
+            completed_at: completedAt,
+          },
         })
       }
 

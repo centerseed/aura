@@ -8,10 +8,10 @@
 import { tool, skill, makeSkillResult } from "naru-agent-js"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
-import { Status } from "@prisma/client"
 import { getEmbedding, cosineSimilarity } from "@/lib/embedding"
 import { saveLineSession } from "@/lib/line-session"
 import type { CompleteTaskPayload } from "@/lib/line-session"
+import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
 
 const createCompleteTaskSearchTool = (userId: string, lineUserId?: string) =>
   tool({
@@ -21,6 +21,8 @@ const createCompleteTaskSearchTool = (userId: string, lineUserId?: string) =>
       taskName: z.string().describe("用戶描述的任務名稱或關鍵字"),
     }),
     execute: async ({ taskName }) => {
+      const completeTaskUseCase = new CompleteTaskUseCase()
+
       // 取得所有 ACTIVE 任務（限制為 30 筆以避免 N+1 embedding 呼叫）
       const tasks = await prisma.task.findMany({
         where: { user_id: userId, status: "ACTIVE", deleted_at: null },
@@ -50,9 +52,9 @@ const createCompleteTaskSearchTool = (userId: string, lineUserId?: string) =>
 
       if (!lineUserId) {
         // REST API 模式：直接完成，不需要 LINE session 確認
-        await prisma.task.update({
-          where: { id: best.id },
-          data: { status: Status.ARCHIVE, updated_at: new Date() },
+        await completeTaskUseCase.execute({
+          taskId: best.id,
+          userId,
         })
         return `✅ 已完成「${best.content}」，任務已封存。`
       }

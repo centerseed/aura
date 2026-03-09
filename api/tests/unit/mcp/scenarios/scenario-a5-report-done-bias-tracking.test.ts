@@ -54,6 +54,9 @@ describe('Scenario A.5: 完成任務後自動追蹤偏差', () => {
     })
 
     it('應計算偏差並返回 coach_feedback', async () => {
+      const taskUpdate = vi.fn().mockResolvedValue({})
+      const planItemUpdate = vi.fn().mockResolvedValue({})
+
       // Arrange: task exists with estimated time
       mockTaskFindFirst.mockResolvedValue({
         id: 'task-1',
@@ -74,8 +77,8 @@ describe('Scenario A.5: 完成任務後自動追蹤偏差', () => {
       // Mock transaction to execute callback with fake tx
       mockTransaction.mockImplementation(async (fn: any) => {
         const fakeTx = {
-          task: { update: vi.fn().mockResolvedValue({}) },
-          dailyPlanItem: { update: vi.fn().mockResolvedValue({}) },
+          task: { update: taskUpdate },
+          dailyPlanItem: { update: planItemUpdate },
         }
         return fn(fakeTx)
       })
@@ -106,6 +109,13 @@ describe('Scenario A.5: 完成任務後自動追蹤偏差', () => {
       expect(result.deviation!.ratio).toBeCloseTo(1.25, 1)
       expect(result.coach_feedback).toBeDefined()
       expect(result.coach_feedback.length).toBeGreaterThan(0)
+      expect(taskUpdate).toHaveBeenCalledWith({
+        where: { id: 'task-1' },
+        data: expect.objectContaining({
+          status: 'ARCHIVE',
+          completed_at: expect.any(Date),
+        }),
+      })
     })
 
     it('沒有估時資料時偏差應為 null', async () => {

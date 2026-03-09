@@ -12,9 +12,9 @@ import { createZentropyAgent } from "@/application/use-cases/agent/zentropy-agen
 import { prisma } from "@/lib/db"
 import { getLineSession, clearLineSession } from "@/lib/line-session"
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
-import { Status } from "@prisma/client"
 import type { AdjustTagsPayload, CompleteTaskPayload } from "@/lib/line-session"
 import { generateLineMagicLink } from "@/lib/line-magic-link"
+import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -110,9 +110,10 @@ export async function POST(req: NextRequest) {
 
             if (session.type === "complete_task_confirm") {
               const p = session.payload as CompleteTaskPayload
-              await prisma.task.update({
-                where: { id: p.taskId },
-                data: { status: Status.ARCHIVE },
+              const completeTaskUseCase = new CompleteTaskUseCase()
+              await completeTaskUseCase.execute({
+                taskId: p.taskId,
+                userId: user.id,
               })
               await clearLineSession(lineUserId)
               await client.pushMessage({
