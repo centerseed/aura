@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             type: "text",
-            text: "✅ 綁定成功！現在可以直接向 Naru 傳訊息記錄任務、整理計畫囉 🎉",
+            text: "✅ 綁定成功！Zentropy 助理已就位 🎉\n\n你可以直接傳訊息給我：\n\n📝 記錄任務\n「幫我記下 XXX」、「待辦：XXX」\n\n📋 查看今日任務\n「今天有哪些待辦」、「任務清單」\n\n✅ 完成任務\n「XXX 完成了」、「XXX 搞定」\n\n🗂️ 拆解目標\n「幫我規劃 XXX」\n\n📁 調整分類\n「把 XXX 移到 YYY」\n\n就這樣，直接說話就行了！",
           },
         ],
       })

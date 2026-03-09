@@ -11,21 +11,54 @@ import { ParseBrainDumpInputUseCase } from "@/application/use-cases/brain-dump/p
 import { GenerateBrainDumpStructureUseCase } from "@/application/use-cases/brain-dump/generate-brain-dump-structure"
 import { ExecuteBrainDumpUseCase } from "@/application/use-cases/brain-dump/execute-brain-dump"
 
+function shouldActivateBrainDump(message: string): boolean {
+  const text = message.trim().toLowerCase()
+  if (!text) return false
+
+  // Query/introspection style inputs should not trigger task recording.
+  const nonBrainDumpPatterns: RegExp[] = [
+    /今天.*(有哪些|有什麼|要做什麼|任務|待辦)/i,
+    /(有哪些|有什麼).*(任務|待辦)/i,
+    /(我剛才|我剛剛).*(說了什麼|問了什麼|記了什麼)/i,
+    /(你是誰|你可以做什麼|可以做什麼)/i,
+    /(完成了什麼|做了什麼)/i,
+    /(查詢|列出|顯示).*(任務|待辦)/i,
+    /(還剩什麼|剩下什麼)/i,
+  ]
+
+  if (nonBrainDumpPatterns.some((p) => p.test(message))) {
+    return false
+  }
+
+  const brainDumpHints: RegExp[] = [
+    /(記下|記一下|幫我記|新增任務|待辦|todo)/i,
+    /(再加一個|再加|補一個|另外一個)/i,
+    /(明天|今天|下週).*(要|需|得|去)/i,
+    /(要|需要|得|去).*(完成|處理|準備|回覆|提交|安排)/i,
+  ]
+
+  return brainDumpHints.some((p) => p.test(text))
+}
+
 const createBrainDumpTool = (userId: string) =>
   tool({
     name: "brain_dump",
     description: "將用戶的文字輸入分類並寫入 Zentropy 任務系統",
     parameters: z.object({ text: z.string().describe("用戶想記錄的內容") }),
     execute: async ({ text }) => {
+      const t0 = Date.now()
       const parseUC = new ParseBrainDumpInputUseCase()
       const generateUC = new GenerateBrainDumpStructureUseCase()
       const executeUC = new ExecuteBrainDumpUseCase()
 
+      const t1 = Date.now()
       const parsed = await parseUC.execute({
         userId,
         contentType: "application/json",
         jsonBody: { text },
       })
+      const t2 = Date.now()
+      console.log(JSON.stringify({ event: "brain_dump_timing", userId, phase: "parse", ms: t2 - t1 }))
 
       const generated = await generateUC.execute({
         userId,
@@ -33,6 +66,8 @@ const createBrainDumpTool = (userId: string) =>
         cleanedText: parsed.cleanedText,
         explicitProductId: parsed.explicitProductId,
       })
+      const t3 = Date.now()
+      console.log(JSON.stringify({ event: "brain_dump_timing", userId, phase: "generate", ms: t3 - t2 }))
 
       const result = await executeUC.execute({
         userId,
@@ -43,6 +78,8 @@ const createBrainDumpTool = (userId: string) =>
         existingAreas: generated.existingAreas,
         imageUnderstandingResult: null,
       })
+      const t4 = Date.now()
+      console.log(JSON.stringify({ event: "brain_dump_timing", userId, phase: "execute", ms: t4 - t3, total_tool_ms: t4 - t0 }))
 
       const action = result.data?.action
 
@@ -58,8 +95,17 @@ const createBrainDumpTool = (userId: string) =>
 
       // create_new_tasks 情況
       const items: any[] = result.data?.items ?? []
+      const skippedDuplicates: string[] = result.data?.skipped_as_duplicates ?? []
+      if (items.length === 0 && skippedDuplicates.length > 0) {
+        const titles = skippedDuplicates.join("、")
+        return `⚠️ 這些任務已存在，未重複建立：${titles}`
+      }
       if (items.length === 0) return "已記錄，但沒有新增任何項目。"
       const titles = items.map((i: any) => i.title ?? i.content ?? "（無標題）").join("、")
+      if (skippedDuplicates.length > 0) {
+        const skippedTitles = skippedDuplicates.join("、")
+        return `✅ 已記錄 ${items.length} 個項目：${titles}（另有 ${skippedDuplicates.length} 個已存在的任務未重複建立：${skippedTitles}）`
+      }
       return `✅ 已記錄 ${items.length} 個項目：${titles}`
     },
   })
@@ -68,14 +114,18 @@ export const createBrainDumpSkill = (userId: string) =>
   skill({
     name: "brain_dump",
     description: "記錄任務與想法",
-    triggers: ["記下", "記一下", "待辦", "todo", "任務", "想法", "記得", "幫我記", "幫我加", "新增任務"],
+    triggers: ["記下", "記一下", "待辦", "todo", "任務", "想法", "記得", "幫我記", "幫我加", "新增任務", "再加", "再加一個", "補一個"],
     priority: 10,
-    run: async (_message, _context) =>
-      makeSkillResult({
+    run: async (message, _context) => {
+      if (!shouldActivateBrainDump(message)) {
+        return makeSkillResult({ skillName: "brain_dump", skipped: true })
+      }
+      return makeSkillResult({
         promptInjection:
           "用戶想要記錄一件事或任務。請用 brain_dump 工具將用戶的輸入原文傳入，" +
           "工具執行後用繁體中文告知用戶已記錄哪些項目。不要修改用戶的原始文字。",
         extraTools: [createBrainDumpTool(userId)],
         skillName: "brain_dump",
-      }),
+      })
+    },
   })

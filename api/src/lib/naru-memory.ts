@@ -119,7 +119,11 @@ class PrismaVectorMemoryStore implements MemoryStore {
 // ============================================================================
 
 async function embedFn(texts: string[]): Promise<number[][]> {
-  return batchGetEmbeddings(texts)
+  // LINE chat prefetch path: fail fast to avoid long waits on embedding tail latency.
+  return batchGetEmbeddings(texts, {
+    timeoutMs: 1500,
+    cacheTtlMs: 10 * 60 * 1000,
+  })
 }
 
 // ============================================================================

@@ -24,15 +24,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
   }
 
-  const payload = JSON.parse(body)
+  const payload = JSON.parse(body || "{}")
   const client = getLineClient()
 
   for (const event of payload.events ?? []) {
+    const lineUserId: string = event.source?.userId
+    if (!lineUserId) continue
+
+    // ── 加好友事件 ────────────────────────────────────────────────────────
+    if (event.type === "follow") {
+      Promise.resolve().then(async () => {
+        const user = await prisma.user.findFirst({
+          where: { line_user_id: lineUserId, deleted_at: null },
+          select: { id: true },
+        })
+        if (!user) {
+          const { url, isReused } = await generateLineMagicLink(lineUserId)
+          const msg = isReused
+            ? "歡迎回來！你之前已收過綁定連結，請使用該連結登入完成綁定，或稍後再試。"
+            : `👋 你好！我是 Zentropy 任務助理。\n\n請先到官網登入，完成 LINE 帳號綁定：\n\n${url}\n\n連結 15 分鐘內有效 🔐\n\n綁定完成後即可透過 LINE 管理你的任務！`
+          await client.pushMessage({
+            to: lineUserId,
+            messages: [{ type: "text", text: msg }],
+          })
+        }
+        // 已綁定：不推送，避免打擾
+      }).catch((err) => {
+        console.error("[LINE Webhook] Follow event error:", err)
+      })
+      continue
+    }
+
     if (event.type !== "message" || event.message?.type !== "text") continue
 
-    const lineUserId: string = event.source.userId
     const text: string = event.message.text
-    const replyToken: string = event.replyToken
 
     // ── 一般對話 → NaruAgent（背景處理，避免 reply token 5 秒過期）──────
     // 不 await — 立刻進入下一個 event，最後 return 200
@@ -47,7 +72,7 @@ export async function POST(req: NextRequest) {
         const { url, isReused } = await generateLineMagicLink(lineUserId)
         const msg = isReused
           ? "你已收過綁定連結，請使用之前的連結完成綁定，或稍後再試。"
-          : `歡迎使用 Naru！請點以下連結登入 Zentropy 完成綁定：\n\n${url}\n\n連結 15 分鐘內有效 🔐`
+          : `請先到官網完成 LINE 帳號綁定：\n\n${url}\n\n連結 15 分鐘內有效 🔐`
         await client.pushMessage({
           to: lineUserId,
           messages: [{ type: "text", text: msg }],
@@ -101,10 +126,14 @@ export async function POST(req: NextRequest) {
 
         // ── 一般 Agent 對話 ──────────────────────────────────────────────
         const agent = createZentropyAgent(user.id, lineUserId)
+        const tAgentStart = Date.now()
+        console.log(JSON.stringify({ event: "line_agent_start", userId: user.id, lineUserId, textLen: text.length }))
         const result = await agent.chat(text, {
           userId: user.id,
           sessionId: lineUserId,
         })
+        const tAgentEnd = Date.now()
+        console.log(JSON.stringify({ event: "line_agent_end", userId: user.id, lineUserId, total_ms: tAgentEnd - tAgentStart, toolsUsed: result.toolCalls, timings: result.timings }))
 
         await client.pushMessage({
           to: lineUserId,

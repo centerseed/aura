@@ -296,6 +296,9 @@ export class ExecuteBrainDumpUseCase {
     })
     const existingTitleSet = new Set(existingTasks.map(t => t.content))
 
+    // 記錄被跳過的重複任務標題
+    const skippedDuplicateTitles: string[] = []
+
     // Transaction 批次處理
     const createdTasks = await prisma.$transaction(async (tx) => {
       const tasks: Array<{
@@ -319,6 +322,7 @@ export class ExecuteBrainDumpUseCase {
       for (const item of result.items) {
         if (existingTitleSet.has(item.title)) {
           console.warn(`⚠️ [brain-dump] Duplicate task detected, skipping: "${item.title}"`)
+          skippedDuplicateTitles.push(item.title)
           continue
         }
 
@@ -540,6 +544,7 @@ export class ExecuteBrainDumpUseCase {
       data: {
         action: "create_new_tasks",
         items: createdTasks,
+        ...(skippedDuplicateTitles.length > 0 && { skipped_as_duplicates: skippedDuplicateTitles }),
       },
       timings,
     }

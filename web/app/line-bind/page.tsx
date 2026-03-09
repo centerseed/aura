@@ -182,7 +182,7 @@ function LineBindContent() {
             <div>
               <h2 className="text-white font-bold text-lg">綁定成功！</h2>
               <p className="text-slate-400 text-sm mt-2">
-                回到 LINE 開始與 Naru 對話吧 🎉<br />
+                回到 LINE 開始與 Zentropy 對話吧 🎉<br />
                 隨時傳訊息記錄任務、整理計畫。
               </p>
             </div>

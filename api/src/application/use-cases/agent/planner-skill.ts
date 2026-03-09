@@ -117,8 +117,57 @@ async function executePlanCreation(
   const today = new Date()
   const createdItems: Array<{ task_id: string; title: string; product: string; sub_items?: string[] }> = []
 
-  // 使用傳入的 productName（避免重複查詢），或預設為 "未分類"
-  let displayProductName = productName ?? "未分類"
+  // 確保任務永遠有有效 Product（避免 schema 要求 product relation 時失敗）
+  let resolvedProductId = productId
+  let displayProductName = productName
+
+  if (!resolvedProductId) {
+    let defaultArea = await prisma.area.findFirst({
+      where: { user_id: userId, name: "一般", deleted_at: null },
+      select: { id: true },
+    })
+
+    if (!defaultArea) {
+      defaultArea = await prisma.area.create({
+        data: {
+          user_id: userId,
+          name: "一般",
+          scope: "預設任務區",
+          is_custom: false,
+        },
+        select: { id: true },
+      })
+    }
+
+    let defaultProduct = await prisma.product.findFirst({
+      where: { user_id: userId, area_id: defaultArea.id, name: "未分類", deleted_at: null },
+      select: { id: true, name: true },
+    })
+
+    if (!defaultProduct) {
+      defaultProduct = await prisma.product.create({
+        data: {
+          user_id: userId,
+          area_id: defaultArea.id,
+          name: "未分類",
+          status: Status.ACTIVE,
+          lifecycle: "FINITE",
+        },
+        select: { id: true, name: true },
+      })
+    }
+
+    resolvedProductId = defaultProduct.id
+    displayProductName = defaultProduct.name
+  }
+
+  if (!displayProductName) {
+    const resolvedProduct = await prisma.product.findUnique({
+      where: { id: resolvedProductId },
+      select: { name: true },
+    })
+    displayProductName = resolvedProduct?.name ?? "未分類"
+  }
 
   for (const taskItem of output.tasks) {
     // 計算 due_date
@@ -138,7 +187,7 @@ async function executePlanCreation(
         content: taskItem.title,
         user_id: userId,
         status: Status.ACTIVE,
-        product_id: productId || null,
+        product_id: resolvedProductId,
         due_date: taskDueDate ? new Date(taskDueDate) : null,
         ai_analysis: { narrative: narrative.slice(0, 500) },
       },

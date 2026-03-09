@@ -19,6 +19,42 @@ const EMBEDDING_DIM = 768;
 
 // API 端點
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_EMBEDDING_TIMEOUT_MS = 8000;
+
+type EmbeddingOptions = {
+  timeoutMs?: number;
+  cacheTtlMs?: number;
+};
+
+type CachedEmbedding = {
+  vector: number[];
+  expiresAt: number;
+};
+
+// Process-local cache: reduces repeated embedding calls for common short phrases.
+const embeddingCache = new Map<string, CachedEmbedding>();
+const inFlightEmbeddings = new Map<string, Promise<number[]>>();
+
+function normalizeEmbeddingInput(text: string): string {
+  return text.trim().replace(/\s+/g, " ").slice(0, 1200);
+}
+
+function getCachedEmbedding(key: string): number[] | null {
+  const hit = embeddingCache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expiresAt) {
+    embeddingCache.delete(key);
+    return null;
+  }
+  return hit.vector;
+}
+
+function setCachedEmbedding(key: string, vector: number[], ttlMs: number): void {
+  embeddingCache.set(key, {
+    vector,
+    expiresAt: Date.now() + ttlMs,
+  });
+}
 
 // ============================================================================
 // Gemini Embedding API
@@ -39,7 +75,10 @@ interface GeminiBatchEmbeddingResponse {
 /**
  * 呼叫 Gemini Embedding API
  */
-export async function callGeminiEmbedding(text: string): Promise<number[]> {
+export async function callGeminiEmbedding(
+  text: string,
+  timeoutMs: number = DEFAULT_EMBEDDING_TIMEOUT_MS
+): Promise<number[]> {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
@@ -47,19 +86,33 @@ export async function callGeminiEmbedding(text: string): Promise<number[]> {
 
   const url = `${GEMINI_API_BASE}/models/${GEMINI_EMBEDDING_MODEL}:embedContent?key=${apiKey}`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: `models/${GEMINI_EMBEDDING_MODEL}`,
-      content: {
-        parts: [{ text }],
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-      outputDimensionality: EMBEDDING_DIM,
-    }),
-  });
+      body: JSON.stringify({
+        model: `models/${GEMINI_EMBEDDING_MODEL}`,
+        content: {
+          parts: [{ text }],
+        },
+        outputDimensionality: EMBEDDING_DIM,
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Gemini Embedding API timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const error = await response.text();
@@ -73,7 +126,10 @@ export async function callGeminiEmbedding(text: string): Promise<number[]> {
 /**
  * 批次呼叫 Gemini Embedding API
  */
-export async function callGeminiBatchEmbedding(texts: string[]): Promise<number[][]> {
+export async function callGeminiBatchEmbedding(
+  texts: string[],
+  timeoutMs: number = DEFAULT_EMBEDDING_TIMEOUT_MS
+): Promise<number[][]> {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
@@ -89,13 +145,27 @@ export async function callGeminiBatchEmbedding(texts: string[]): Promise<number[
     outputDimensionality: EMBEDDING_DIM,
   }));
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ requests }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ requests }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Gemini Batch Embedding API timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const error = await response.text();
@@ -134,27 +204,91 @@ export function getEmbeddingDimension(): number {
 /**
  * 計算單一文本的 Embedding 向量
  */
-export async function getEmbedding(text: string): Promise<number[]> {
-  const startTime = Date.now();
-  const embedding = await callGeminiEmbedding(text);
-  console.log(`⏱️ [embedding] getEmbedding: ${Date.now() - startTime}ms`);
-  return embedding;
+export async function getEmbedding(
+  text: string,
+  options: EmbeddingOptions = {}
+): Promise<number[]> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_EMBEDDING_TIMEOUT_MS;
+  const cacheTtlMs = options.cacheTtlMs ?? 5 * 60 * 1000;
+  const key = normalizeEmbeddingInput(text);
+
+  const cached = getCachedEmbedding(key);
+  if (cached) {
+    return cached;
+  }
+
+  const inFlight = inFlightEmbeddings.get(key);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const task = (async () => {
+    const startTime = Date.now();
+    const embedding = await callGeminiEmbedding(text, timeoutMs);
+    setCachedEmbedding(key, embedding, cacheTtlMs);
+    console.log(`⏱️ [embedding] getEmbedding: ${Date.now() - startTime}ms`);
+    return embedding;
+  })().finally(() => {
+    inFlightEmbeddings.delete(key);
+  });
+
+  inFlightEmbeddings.set(key, task);
+  return task;
 }
 
 /**
  * 批次計算多個文本的 Embedding 向量
  */
-export async function batchGetEmbeddings(texts: string[]): Promise<number[][]> {
+export async function batchGetEmbeddings(
+  texts: string[],
+  options: EmbeddingOptions = {}
+): Promise<number[][]> {
   if (texts.length === 0) return [];
   if (texts.length === 1) {
-    const embedding = await getEmbedding(texts[0]);
+    const embedding = await getEmbedding(texts[0], options);
     return [embedding];
   }
 
+  const timeoutMs = options.timeoutMs ?? DEFAULT_EMBEDDING_TIMEOUT_MS;
+  const cacheTtlMs = options.cacheTtlMs ?? 5 * 60 * 1000;
+
+  const result = new Array<number[]>(texts.length);
+  const misses: Array<{ idx: number; text: string; key: string }> = [];
+
+  for (let i = 0; i < texts.length; i++) {
+    const key = normalizeEmbeddingInput(texts[i]);
+    const cached = getCachedEmbedding(key);
+    if (cached) {
+      result[i] = cached;
+    } else {
+      misses.push({ idx: i, text: texts[i], key });
+    }
+  }
+
+  if (misses.length === 0) {
+    return result;
+  }
+
+  if (misses.length === 1) {
+    result[misses[0].idx] = await getEmbedding(misses[0].text, options);
+    return result;
+  }
+
   const startTime = Date.now();
-  const embeddings = await callGeminiBatchEmbedding(texts);
-  console.log(`⏱️ [embedding] batchGetEmbeddings (${texts.length} texts): ${Date.now() - startTime}ms`);
-  return embeddings;
+  const embeddings = await callGeminiBatchEmbedding(
+    misses.map((m) => m.text),
+    timeoutMs
+  );
+  console.log(`⏱️ [embedding] batchGetEmbeddings (${misses.length} texts): ${Date.now() - startTime}ms`);
+
+  for (let i = 0; i < misses.length; i++) {
+    const vector = embeddings[i];
+    const miss = misses[i];
+    setCachedEmbedding(miss.key, vector, cacheTtlMs);
+    result[miss.idx] = vector;
+  }
+
+  return result;
 }
 
 /**
