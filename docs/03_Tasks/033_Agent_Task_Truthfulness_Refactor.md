@@ -1,6 +1,6 @@
 # Task 033: Agent Task Truthfulness Refactor
 
-**Status**: Planned
+**Status**: In Progress
 **Owner**: Codex / Antigravity
 **Dependencies**:
 - [`docs/01_Specification/015_Agent_Task_Truthfulness_Spec.md`](../01_Specification/015_Agent_Task_Truthfulness_Spec.md)
@@ -24,6 +24,22 @@
 - `api/tests/integration/*agent*`
 
 ## 3. 任務清單 (Atomic Tasks)
+
+## 3.1 目前進度補充 (2026-03-09)
+
+已完成：
+
+- completion write path 已收斂到 shared path，`completed_at` 成為完成查詢核心依據
+- `query_tasks` 已改走 `AgentTaskQueryService`，不再由 skill 自行拼接查詢
+- coverage 已擴到 Task / SubTask / Daily Plan Item
+- 回覆已揭露總數、截斷與查詢範圍
+
+剩餘缺口：
+
+- `today_focus` 仍偏向 task list 摘要，尚未完全成為統一的 work-facts 視圖
+- `complete_task_search` 仍以近似搜尋為主，缺少可驗證的候選/決策訊號
+- tool output 仍以文字摘要為主，尚未提供完整結構化 facts-first protocol
+- live 查詢延遲偏高，需要減少不必要的 sequential query 與重覆資料收集
 
 ### T033-1: 盤點完成語義的所有寫入入口
 **預計時間**: 20 分鐘  
