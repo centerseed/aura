@@ -1,11 +1,15 @@
 import type { ModelMessage } from "ai"
 import type { MemoryManager } from "naru-agent-js"
 import type { ChatOptions } from "naru-agent-js"
-import { createBrainDumpTool, shouldActivateBrainDump } from "./brain-dump-skill"
+import { createBrainDumpTool } from "./brain-dump-skill"
 import { createAdjustTagsTool } from "./adjust-tags-skill"
 import { createCompleteTaskSearchTool } from "./complete-task-skill"
 import { createReorganizeTool } from "./reorganize-skill"
 import { createQueryCompletedTodayTasksTool, createQueryTodayTasksTool } from "./query-tasks-skill"
+import {
+  DeterministicAgentIntentResolver,
+  type AgentIntentResolver,
+} from "./agent-intent-resolver"
 
 interface AgentChatResult {
   blocked: boolean
@@ -36,24 +40,35 @@ interface ToolFirstAgentConfig {
   delegate: AgentChatDelegate
   sessionStore: SessionStoreLike
   memoryManager?: MemoryManager | null
+  lineUserId?: string
+  intentResolver?: AgentIntentResolver
 }
 
-const QUERY_COMPLETED_TODAY_PATTERN = /今天.*完成|完成.*今天|完成了什麼|做了什麼/i
-const QUERY_TODAY_PATTERN = /今天.*(有哪些|有什麼|要做什麼|任務|待辦)|(?:有哪些|有什麼).*(?:任務|待辦)|(?:查詢|列出|顯示).*(?:任務|待辦)|還剩什麼|剩下什麼/i
-const ADJUST_TAGS_PATTERN = /移到|改到|改成|分錯了|應該在|換到|分類錯了|移進|歸到|放在|不是/i
-const COMPLETE_TASK_PATTERN = /完成|做完|搞定|done|完成了|已完成|做好了|結束了/i
-const REORGANIZE_PATTERN = /整理|重組|歸類|清理|亂掉了|太多任務|整頓|幫我整理/i
-const GREETING_PATTERN = /你好|你是誰|可以做什麼/i
-const PLANNER_PATTERN = /規劃|拆解|展開/i
-const RECALL_LAST_ITEM_PATTERN = /我剛才記了什麼/i
-const RECALL_TASK_CODE_PATTERN = /任務代號是什麼|只回答代號/i
 const SHORT_RECORD_PATTERN = /^記$/
+const CONTEXTUAL_COMPLETE_PATTERN = /這件事|這個|那個|剛剛那個|剛才那個/i
 
 function extractToolSummary(raw: string): string {
   const marker = "[/FACTS]"
   const markerIndex = raw.indexOf(marker)
   if (markerIndex === -1) return raw
   return raw.slice(markerIndex + marker.length).trim()
+}
+
+function parseFactsBlock(raw: string): unknown | null {
+  const startMarker = "[FACTS]"
+  const endMarker = "[/FACTS]"
+  const startIndex = raw.indexOf(startMarker)
+  const endIndex = raw.indexOf(endMarker)
+  if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) return null
+
+  const jsonText = raw.slice(startIndex + startMarker.length, endIndex).trim()
+  if (!jsonText) return null
+
+  try {
+    return JSON.parse(jsonText)
+  } catch {
+    return null
+  }
 }
 
 async function appendSessionHistory(
@@ -101,6 +116,94 @@ function extractLatestTaskCode(history: ModelMessage[]): string | null {
   return null
 }
 
+function extractTaskMentions(history: ModelMessage[]): string[] {
+  const items: string[] = []
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const message = history[index]
+    if (message.role !== "assistant" || typeof message.content !== "string") continue
+    const text = message.content
+    const facts = parseFactsBlock(text) as {
+      items?: Array<{ title?: string }>
+      candidates?: Array<{ title?: string }>
+      selectedTaskTitle?: string
+    } | null
+
+    if (facts?.selectedTaskTitle) {
+      items.push(facts.selectedTaskTitle)
+    }
+
+    if (Array.isArray(facts?.items)) {
+      for (const item of facts.items) {
+        if (item?.title) items.push(item.title.trim())
+      }
+    }
+
+    if (Array.isArray(facts?.candidates)) {
+      for (const candidate of facts.candidates) {
+        if (candidate?.title) items.push(candidate.title.trim())
+      }
+    }
+
+    for (const pattern of [/已記錄(?:\s+\d+\s+個項目)?：(.+)/g, /你剛才記的是：(.+)/g, /是否完成「(.+?)」/g]) {
+      for (const match of text.matchAll(pattern)) {
+        const title = match[1]?.trim()
+        if (title) items.push(title)
+      }
+    }
+
+    for (const match of text.matchAll(/(?:^|\n)\d+\.\s+(.+)/g)) {
+      const raw = match[1]?.trim()
+      if (!raw) continue
+      const title = raw
+        .replace(/\s+\[[^\]]+\].*$/, "")
+        .replace(/\s+[📅📌].*$/, "")
+        .trim()
+      if (title) items.push(title)
+    }
+  }
+
+  return Array.from(new Set(items))
+}
+
+function normalizeCompletionQuery(text: string): string {
+  return text
+    .replace(/[：:，,。！？!?]/g, " ")
+    .replace(/我以為|我已經|我剛剛|我剛才|幫我|把|將|請/g, " ")
+    .replace(/我/g, " ")
+    .replace(/今天|已經/g, " ")
+    .replace(/這件事|這個|那個|剛剛那個|剛才那個/g, " ")
+    .replace(/標記(?:成|為)?完成|標記|勾掉/g, " ")
+    .replace(/跑完/g, "跑")
+    .replace(/做完/g, "做")
+    .replace(/處理完/g, "處理")
+    .replace(/完成了|已完成|完成|弄完|搞定|done|做好了|結束了/g, " ")
+    .replace(/啊|呀|啦|了/g, " ")
+    .replace(/\s+/g, "")
+    .trim()
+}
+
+function resolveCompletionQuery(message: string, history: ModelMessage[]): string {
+  const mentions = extractTaskMentions(history)
+  const normalizedQuery = normalizeCompletionQuery(message)
+
+  if (normalizedQuery.length >= 2) {
+    const matchedMention = mentions.find((mention) => {
+      const normalizedMention = normalizeCompletionQuery(mention)
+      return normalizedMention.length > 0
+        && (normalizedQuery.includes(normalizedMention) || normalizedMention.includes(normalizedQuery))
+    })
+    if (matchedMention) return matchedMention
+    return normalizedQuery
+  }
+
+  if (CONTEXTUAL_COMPLETE_PATTERN.test(message)) {
+    return mentions[0] ?? message
+  }
+
+  return mentions[0] ?? message
+}
+
 async function appendLongTermMemory(
   memoryManager: MemoryManager | null | undefined,
   userId: string | undefined,
@@ -115,7 +218,11 @@ async function appendLongTermMemory(
 }
 
 export class ToolFirstAgent {
-  constructor(private readonly config: ToolFirstAgentConfig) {}
+  private readonly intentResolver: AgentIntentResolver
+
+  constructor(private readonly config: ToolFirstAgentConfig) {
+    this.intentResolver = config.intentResolver ?? new DeterministicAgentIntentResolver()
+  }
 
   async chat(message: string, options: ChatOptions = {}): Promise<AgentChatResult> {
     const directResult = await this.tryDirectToolRoute(message, options)
@@ -127,29 +234,41 @@ export class ToolFirstAgent {
     const sessionId = options.sessionId ?? "default"
     const userId = options.userId
     const trimmedMessage = message.trim()
-    const history = (await this.config.sessionStore.get(sessionId)) ?? []
-
-    let toolName: string | null = null
-    let toolOutput: string | null = null
 
     if (SHORT_RECORD_PATTERN.test(trimmedMessage)) {
       return this.buildDirectResult({
         sessionId,
         message: trimmedMessage,
         content: "請直接告訴我要記錄的內容，例如任務名稱、待辦事項或想法。",
+        intent: null,
+        trace: null,
       })
     }
 
-    if (RECALL_TASK_CODE_PATTERN.test(trimmedMessage)) {
+    const history = (await this.config.sessionStore.get(sessionId)) ?? []
+    const { intent, trace } = await this.intentResolver.resolve({
+      message: trimmedMessage,
+      history,
+      sessionId,
+      userId,
+    })
+
+    let toolName: string | null = null
+    let toolOutput: string | null = null
+    let toolHistoryContent: string | null = null
+
+    if (intent.object === "recall_task_code") {
       const taskCode = extractLatestTaskCode(history)
       return this.buildDirectResult({
         sessionId,
         message: trimmedMessage,
         content: taskCode ?? "目前找不到你剛剛提到的任務代號。",
+        intent,
+        trace,
       })
     }
 
-    if (RECALL_LAST_ITEM_PATTERN.test(trimmedMessage)) {
+    if (intent.object === "recall_last_item") {
       const recordedItems = extractRecordedItems(history)
       const latestItem = recordedItems.at(-1)
       return this.buildDirectResult({
@@ -158,46 +277,62 @@ export class ToolFirstAgent {
         content: latestItem
           ? `你剛才記的是：${latestItem}`
           : "目前找不到你剛才記錄的項目。",
+        intent,
+        trace,
       })
     }
 
-    if (GREETING_PATTERN.test(trimmedMessage)) {
+    if (intent.object === "greeting") {
       return this.buildDirectResult({
         sessionId,
         message: trimmedMessage,
         content: "我是 Naru，也是 Zentropy 的任務助理。目前可以幫你記錄任務、查詢待辦、標記完成、整理結構與調整分類。",
+        intent,
+        trace,
       })
     }
 
-    if (PLANNER_PATTERN.test(trimmedMessage)) {
+    if (intent.object === "planning") {
       return this.buildDirectResult({
         sessionId,
         message: trimmedMessage,
         content: "完整規劃功能還在開發中。你可以先把目標記下來，我目前能先幫你記錄，之後再協助拆解規劃。",
+        intent,
+        trace,
       })
     }
 
-    if (QUERY_COMPLETED_TODAY_PATTERN.test(trimmedMessage)) {
+    if (intent.object === "completed_today") {
       toolName = "query_completed_today_tasks"
-      toolOutput = await createQueryCompletedTodayTasksTool(userId ?? "").execute({})
-      toolOutput = extractToolSummary(toolOutput)
-    } else if (QUERY_TODAY_PATTERN.test(trimmedMessage)) {
+      toolHistoryContent = await createQueryCompletedTodayTasksTool(userId ?? "").execute({})
+      toolOutput = extractToolSummary(toolHistoryContent)
+    } else if (intent.object === "today_focus") {
       toolName = "query_today_tasks"
-      toolOutput = await createQueryTodayTasksTool(userId ?? "").execute({})
-      toolOutput = extractToolSummary(toolOutput)
-    } else if (shouldActivateBrainDump(trimmedMessage)) {
+      toolHistoryContent = await createQueryTodayTasksTool(userId ?? "").execute({})
+      toolOutput = extractToolSummary(toolHistoryContent)
+    } else if (intent.object === "task_capture") {
       toolName = "brain_dump"
       toolOutput = await createBrainDumpTool(userId ?? "", trimmedMessage).execute({})
-    } else if (ADJUST_TAGS_PATTERN.test(trimmedMessage)) {
+      toolHistoryContent = toolOutput
+    } else if (intent.object === "classification") {
       toolName = "adjust_tags_preview"
       toolOutput = await createAdjustTagsTool(userId ?? "", trimmedMessage).execute({})
-    } else if (!QUERY_COMPLETED_TODAY_PATTERN.test(trimmedMessage) && COMPLETE_TASK_PATTERN.test(trimmedMessage)) {
+      toolHistoryContent = toolOutput
+    } else if (intent.object === "task_completion") {
       toolName = "complete_task_search"
-      toolOutput = await createCompleteTaskSearchTool(userId ?? "", trimmedMessage).execute({})
-      toolOutput = extractToolSummary(toolOutput)
-    } else if (REORGANIZE_PATTERN.test(trimmedMessage)) {
+      const completionQuery = resolveCompletionQuery(trimmedMessage, history)
+      toolHistoryContent = await createCompleteTaskSearchTool(
+        userId ?? "",
+        trimmedMessage,
+        this.config.lineUserId,
+        completionQuery,
+      ).execute({})
+      toolOutput = extractToolSummary(toolHistoryContent)
+      trace.targetQuery = completionQuery
+    } else if (intent.object === "reorganize") {
       toolName = "reorganize_preview"
       toolOutput = await createReorganizeTool(userId ?? "").execute({})
+      toolHistoryContent = toolOutput
     }
 
     if (!toolName || !toolOutput) {
@@ -206,8 +341,10 @@ export class ToolFirstAgent {
 
     // Groq 的這顆模型在 function calling 參數生成上不穩定。
     // 對於可由明確 trigger 決定的 skill，直接執行工具可保留產品行為並避免 provider-specific tool schema 問題。
-    await appendSessionHistory(this.config.sessionStore, sessionId, trimmedMessage, toolOutput)
-    await appendLongTermMemory(this.config.memoryManager, userId, trimmedMessage, toolOutput)
+    trace.selectedTool = toolName
+    const historyContent = toolHistoryContent ?? toolOutput
+    await appendSessionHistory(this.config.sessionStore, sessionId, trimmedMessage, historyContent)
+    await appendLongTermMemory(this.config.memoryManager, userId, trimmedMessage, historyContent)
 
     return {
       blocked: false,
@@ -217,12 +354,12 @@ export class ToolFirstAgent {
         completionTokens: 0,
         totalTokens: 0,
       },
-      intent: null,
+      intent,
       toolCalls: [toolName],
       timings: {},
       sessionId,
       traceId: null,
-      trace: null,
+      trace,
     }
   }
 
@@ -230,10 +367,14 @@ export class ToolFirstAgent {
     sessionId,
     message,
     content,
+    intent,
+    trace,
   }: {
     sessionId: string
     message: string
     content: string
+    intent?: unknown
+    trace?: unknown
   }): Promise<AgentChatResult> {
     await appendSessionHistory(this.config.sessionStore, sessionId, message, content)
 
@@ -245,12 +386,12 @@ export class ToolFirstAgent {
         completionTokens: 0,
         totalTokens: 0,
       },
-      intent: null,
+      intent: intent ?? null,
       toolCalls: [],
       timings: {},
       sessionId,
       traceId: null,
-      trace: null,
+      trace: trace ?? null,
     }
   }
 }

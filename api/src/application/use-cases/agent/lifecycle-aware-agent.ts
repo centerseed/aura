@@ -1,5 +1,6 @@
 import type { ChatOptions } from "naru-agent-js"
 import { AgentSessionLifecycleService } from "@/application/services/agent-session-lifecycle-service"
+import { verifyAgentExecutionResult } from "./agent-execution-verifier"
 
 export interface AgentChatDelegate {
   chat(message: string, options?: ChatOptions): Promise<any>
@@ -29,11 +30,13 @@ export class LifecycleAwareAgent {
       userId,
     })
 
+    const verifiedResult = verifyAgentExecutionResult(result)
+
     await this.lifecycleService.afterMessage({
       sessionId,
       now: this.now(),
     })
 
-    return result
+    return verifiedResult
   }
 }

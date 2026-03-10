@@ -15,6 +15,9 @@ import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/ex
 import type { AdjustTagsPayload, CompleteTaskPayload } from "@/lib/line-session"
 import { generateLineMagicLink } from "@/lib/line-magic-link"
 import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
+import { isLineSessionConfirmation } from "@/lib/line-confirmation"
+import { UpdateSubItemUseCase } from "@/application/use-cases/tasks/update-sub-item"
+import { UpdatePlanItemUseCase } from "@/application/use-cases/coach/update-plan-item"
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -82,7 +85,7 @@ export async function POST(req: NextRequest) {
 
       try {
         // ── Session 攔截：多步驟確認對話 ────────────────────────────────
-        const isConfirm = /^確認$|^confirm$/i.test(text.trim())
+        const isConfirm = isLineSessionConfirmation(text)
         if (isConfirm) {
           const session = await getLineSession(lineUserId)
           if (session) {
@@ -110,11 +113,30 @@ export async function POST(req: NextRequest) {
 
             if (session.type === "complete_task_confirm") {
               const p = session.payload as CompleteTaskPayload
-              const completeTaskUseCase = new CompleteTaskUseCase()
-              await completeTaskUseCase.execute({
-                taskId: p.taskId,
-                userId: user.id,
-              })
+              if (p.sourceType === "sub_task" && p.taskId && p.subTaskId) {
+                const updateSubItemUseCase = new UpdateSubItemUseCase()
+                await updateSubItemUseCase.execute({
+                  taskId: p.taskId,
+                  subItemId: p.subTaskId,
+                  userId: user.id,
+                  completed: true,
+                })
+              } else if (p.sourceType === "daily_plan_item" && p.planItemId) {
+                const updatePlanItemUseCase = new UpdatePlanItemUseCase()
+                await updatePlanItemUseCase.execute({
+                  itemId: p.planItemId,
+                  userId: user.id,
+                  completed: true,
+                })
+              } else if (p.taskId) {
+                const completeTaskUseCase = new CompleteTaskUseCase()
+                await completeTaskUseCase.execute({
+                  taskId: p.taskId,
+                  userId: user.id,
+                })
+              } else {
+                throw new Error("Invalid complete_task_confirm payload")
+              }
               await clearLineSession(lineUserId)
               await client.pushMessage({
                 to: lineUserId,

@@ -41,7 +41,7 @@
     "ai": "^6.0.111",
     "firebase-admin": "^13.6.0",
     "mem0ai": "^2.2.4",
-    "naru-agent-js": "^0.1.1",
+    "naru-agent-js": "^0.1.2",
     "next": "^16.1.4",
     "openai": "^6.25.0",
     "react": "^19.2.4",

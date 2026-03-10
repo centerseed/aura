@@ -23,6 +23,10 @@ interface SearchableTask {
   id: string
   content: string
   productName?: string
+  sourceType: "task" | "sub_task" | "daily_plan_item"
+  taskId?: string
+  subTaskId?: string
+  planItemId?: string
 }
 
 interface RankedTaskMatch extends SearchableTask {
@@ -38,17 +42,24 @@ interface CompleteTaskSearchFacts {
   decision: "completed" | "awaiting_confirmation" | "needs_disambiguation" | "no_match"
   selectedTaskId?: string
   selectedTaskTitle?: string
+  selectedSourceType?: SearchableTask["sourceType"]
   candidates: Array<{
     id: string
     title: string
     productName?: string
+    sourceType: SearchableTask["sourceType"]
     lexicalScore: number
     semanticScore: number
     combinedScore: number
   }>
 }
 
-export const createCompleteTaskSearchTool = (userId: string, originalMessage: string, lineUserId?: string) =>
+export const createCompleteTaskSearchTool = (
+  userId: string,
+  originalMessage: string,
+  lineUserId?: string,
+  resolvedQuery?: string,
+) =>
   tool({
     name: "complete_task_search",
     description: "搜尋用戶想要標記為完成的任務，回傳候選清單並等待確認",
@@ -56,26 +67,104 @@ export const createCompleteTaskSearchTool = (userId: string, originalMessage: st
     // 這裡改成零參數工具，直接對使用者原句做任務搜尋，降低 provider 相容性風險。
     parameters: z.object({}),
     execute: async () => {
-      const taskName = originalMessage
+      const taskName = resolvedQuery ?? originalMessage
       const completeTaskUseCase = new CompleteTaskUseCase()
 
-      // 先擴大召回，再透過文字預篩縮小 embedding 候選
-      const tasks = await prisma.task.findMany({
-        where: { user_id: userId, status: "ACTIVE", deleted_at: null },
-        select: {
-          id: true,
-          content: true,
-          product: {
-            select: {
-              name: true,
+      const [tasks, subTasks, dailyPlanItems] = await Promise.all([
+        prisma.task.findMany({
+          where: { user_id: userId, status: "ACTIVE", deleted_at: null },
+          select: {
+            id: true,
+            content: true,
+            product: {
+              select: {
+                name: true,
+              },
             },
           },
-        },
-        take: MAX_TASK_SEARCH_POOL,
-        orderBy: { updated_at: "desc" },
-      })
+          take: MAX_TASK_SEARCH_POOL,
+          orderBy: { updated_at: "desc" },
+        }),
+        prisma.subTask.findMany({
+          where: {
+            user_id: userId,
+            deleted_at: null,
+            completed: false,
+            task: {
+              deleted_at: null,
+              status: "ACTIVE",
+            },
+          },
+          select: {
+            id: true,
+            content: true,
+            task_id: true,
+            task: {
+              select: {
+                product: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          take: MAX_TASK_SEARCH_POOL,
+          orderBy: { updated_at: "desc" },
+        }),
+        prisma.dailyPlanItem.findMany({
+          where: {
+            completed: false,
+            plan: {
+              user_id: userId,
+            },
+          },
+          select: {
+            id: true,
+            content: true,
+            task_id: true,
+            sub_task_id: true,
+            product_name: true,
+            plan: {
+              select: {
+                plan_date: true,
+              },
+            },
+          },
+          take: MAX_TASK_SEARCH_POOL,
+          orderBy: [{ plan: { plan_date: "desc" } }, { updated_at: "desc" }],
+        }),
+      ])
 
-      if (tasks.length === 0) {
+      const openSubTaskIds = new Set(subTasks.map((subTask) => subTask.id))
+      const searchableTasks: SearchableTask[] = [
+        ...tasks.map((task) => ({
+          id: task.id,
+          content: task.content,
+          productName: task.product?.name,
+          sourceType: "task" as const,
+          taskId: task.id,
+        })),
+        ...subTasks.map((subTask) => ({
+          id: subTask.id,
+          content: subTask.content,
+          productName: subTask.task.product?.name,
+          sourceType: "sub_task" as const,
+          taskId: subTask.task_id,
+          subTaskId: subTask.id,
+        })),
+        ...dailyPlanItems.map((item) => ({
+          id: item.id,
+          content: item.content,
+          productName: item.product_name,
+          sourceType: "daily_plan_item" as const,
+          taskId: item.task_id,
+          subTaskId: item.sub_task_id ?? undefined,
+          planItemId: item.id,
+        })).filter((item) => !item.subTaskId || !openSubTaskIds.has(item.subTaskId)),
+      ]
+
+      if (searchableTasks.length === 0) {
         return serializeCompleteTaskSearchResult({
           query: taskName,
           totalActiveTasks: 0,
@@ -85,18 +174,13 @@ export const createCompleteTaskSearchTool = (userId: string, originalMessage: st
         }, "目前沒有進行中的任務。")
       }
 
-      const normalizedTasks = tasks.map((task) => ({
-        id: task.id,
-        content: task.content,
-        productName: task.product.name,
-      }))
-      const ranked = await rankTaskMatches(taskName, normalizedTasks)
+      const ranked = await rankTaskMatches(taskName, searchableTasks)
       const top = ranked.slice(0, MAX_DISPLAY_CANDIDATES)
       const decision = decideTaskMatch(top)
 
       if (decision.type === "no_match") {
         return serializeCompleteTaskSearchResult(
-          buildSearchFacts(taskName, normalizedTasks.length, top, "no_match"),
+          buildSearchFacts(taskName, searchableTasks.length, top, "no_match"),
           `找不到與「${taskName}」相關的任務。請提供更精確的任務名稱或關鍵字，讓我判斷候選任務。`,
         )
       }
@@ -104,32 +188,42 @@ export const createCompleteTaskSearchTool = (userId: string, originalMessage: st
       if (!lineUserId) {
         if (decision.type !== "selected") {
           return serializeCompleteTaskSearchResult(
-            buildSearchFacts(taskName, normalizedTasks.length, top, "needs_disambiguation"),
+            buildSearchFacts(taskName, searchableTasks.length, top, "needs_disambiguation"),
             buildDisambiguationMessage(taskName, top),
           )
         }
 
-        await completeTaskUseCase.execute({ taskId: decision.task.id, userId })
+        if (decision.task.sourceType !== "task" || !decision.task.taskId) {
+          return serializeCompleteTaskSearchResult(
+            buildSearchFacts(taskName, searchableTasks.length, top, "needs_disambiguation"),
+            "LINE 以外目前只支援直接完成 Task。請改用 LINE 確認流程，或提供更精確的 Task 名稱。",
+          )
+        }
+
+        await completeTaskUseCase.execute({ taskId: decision.task.taskId, userId })
         return serializeCompleteTaskSearchResult(
-          buildSearchFacts(taskName, normalizedTasks.length, top, "completed", decision.task),
+          buildSearchFacts(taskName, searchableTasks.length, top, "completed", decision.task),
           `✅ 已完成「${decision.task.content}」，任務已封存。`,
         )
       }
 
       if (decision.type === "selected") {
         const payload: CompleteTaskPayload = {
-          taskId: decision.task.id,
+          sourceType: decision.task.sourceType,
           taskTitle: decision.task.content,
+          taskId: decision.task.taskId,
+          subTaskId: decision.task.subTaskId,
+          planItemId: decision.task.planItemId,
         }
         await saveLineSession(lineUserId, "complete_task_confirm", payload)
         return serializeCompleteTaskSearchResult(
-          buildSearchFacts(taskName, normalizedTasks.length, top, "awaiting_confirmation", decision.task),
+          buildSearchFacts(taskName, searchableTasks.length, top, "awaiting_confirmation", decision.task),
           `是否完成「${decision.task.content}」？\n\n回覆「確認」執行，或無視此訊息取消。`,
         )
       }
 
       return serializeCompleteTaskSearchResult(
-        buildSearchFacts(taskName, normalizedTasks.length, top, "needs_disambiguation"),
+        buildSearchFacts(taskName, searchableTasks.length, top, "needs_disambiguation"),
         buildDisambiguationMessage(taskName, top),
       )
     },
@@ -206,10 +300,12 @@ function buildSearchFacts(
     decision,
     selectedTaskId: selectedTask?.id,
     selectedTaskTitle: selectedTask?.content,
+    selectedSourceType: selectedTask?.sourceType,
     candidates: candidates.map((candidate) => ({
       id: candidate.id,
       title: candidate.content,
       productName: candidate.productName,
+      sourceType: candidate.sourceType,
       lexicalScore: roundScore(candidate.lexicalScore),
       semanticScore: roundScore(candidate.semanticScore),
       combinedScore: roundScore(candidate.combinedScore),

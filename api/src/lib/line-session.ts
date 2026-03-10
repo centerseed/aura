@@ -25,8 +25,11 @@ export interface AdjustTagsPayload {
 }
 
 export interface CompleteTaskPayload {
-  taskId: string
+  sourceType: "task" | "sub_task" | "daily_plan_item"
   taskTitle: string
+  taskId?: string
+  subTaskId?: string
+  planItemId?: string
 }
 
 export type LineSessionPayload = AdjustTagsPayload | CompleteTaskPayload

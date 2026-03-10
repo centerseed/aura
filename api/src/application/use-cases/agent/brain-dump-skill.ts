@@ -10,6 +10,7 @@ import { z } from "zod"
 import { ParseBrainDumpInputUseCase } from "@/application/use-cases/brain-dump/parse-brain-dump-input"
 import { GenerateBrainDumpStructureUseCase } from "@/application/use-cases/brain-dump/generate-brain-dump-structure"
 import { ExecuteBrainDumpUseCase } from "@/application/use-cases/brain-dump/execute-brain-dump"
+import { shouldActivateBrainDump } from "./brain-dump-matcher"
 
 function summarizeOriginalText(text: string): string {
   return text.trim().replace(/\s+/g, " ").slice(0, 60)
@@ -25,35 +26,6 @@ function buildBrainDumpFailureMessage(text: string, error: unknown): string {
   }
 
   return `抱歉，剛才記錄「${summary}」時發生錯誤。請稍後再試。`
-}
-
-export function shouldActivateBrainDump(message: string): boolean {
-  const text = message.trim().toLowerCase()
-  if (!text) return false
-
-  // Query/introspection style inputs should not trigger task recording.
-  const nonBrainDumpPatterns: RegExp[] = [
-    /今天.*(有哪些|有什麼|要做什麼|任務|待辦)/i,
-    /(有哪些|有什麼).*(任務|待辦)/i,
-    /(我剛才|我剛剛).*(說了什麼|問了什麼|記了什麼)/i,
-    /(你是誰|你可以做什麼|可以做什麼)/i,
-    /(完成了什麼|做了什麼)/i,
-    /(查詢|列出|顯示).*(任務|待辦)/i,
-    /(還剩什麼|剩下什麼)/i,
-  ]
-
-  if (nonBrainDumpPatterns.some((p) => p.test(message))) {
-    return false
-  }
-
-  const brainDumpHints: RegExp[] = [
-    /(記下|記一下|幫我記|新增任務|待辦|todo)/i,
-    /(再加一個|再加|補一個|另外一個)/i,
-    /(明天|今天|下週).*(要|需|得|去)/i,
-    /(要|需要|得|去).*(完成|處理|準備|回覆|提交|安排)/i,
-  ]
-
-  return brainDumpHints.some((p) => p.test(text))
 }
 
 export const createBrainDumpTool = (userId: string, originalMessage: string) =>

@@ -5,14 +5,17 @@
  */
 
 import {
+  LLMStructuredClassifier,
   NaruAgent,
 } from "naru-agent-js"
+import { AgentIntentSchema, type AgentIntent } from "./agent-intent"
 import { createBrainDumpSkill } from "./brain-dump-skill"
 import { createReorganizeSkill } from "./reorganize-skill"
 import { createPlannerSkill } from "./planner-skill"
 import { createQueryTasksSkill } from "./query-tasks-skill"
 import { createAdjustTagsSkill } from "./adjust-tags-skill"
 import { createCompleteTaskSkill } from "./complete-task-skill"
+import { StructuredFallbackAgentIntentResolver } from "./agent-intent-resolver"
 import { getAgentRuntime } from "./agent-runtime"
 import { LifecycleAwareAgent } from "./lifecycle-aware-agent"
 import { ToolFirstAgent } from "./tool-first-agent"
@@ -68,11 +71,24 @@ const SYSTEM_PROMPT = `你是 Zentropy 的 LINE Bot 助理，透過 LINE 訊息�
 - 無法判斷用戶意圖時：直接問「你是要記錄這件事，還是要查詢/完成/規劃什麼？」，不要自行猜測後假裝執行
 - 用戶輸入看起來像待辦事項或任務（動詞+事情，例如「去買東西」「回覆信件」「準備報告」）：直接呼叫 brain_dump 工具記錄，不需要確認`
 
+const DECISION_PROMPT = `你是 Zentropy LINE Agent 的 decision layer。
+
+你的唯一工作是判定 canonical intent。
+
+規則：
+- 輸出必須符合 schema，不要回答自然語言
+- 只判斷使用者這一句的 intent，必要時可參考 session summary 與 memory
+- 高風險 mutation 寧可保守，不要亂猜
+- 不知道時回傳 object=unknown，confidence 低於 0.5
+- reasonCodes 使用短的 machine-readable 字串`
+
 export function createZentropyAgent(userId: string, lineUserId?: string): LifecycleAwareAgent {
   const runtime = getAgentRuntime()
   const guardrails = buildExperimentalGuardrails()
+  const chatModel = getAgentChatModel()
+  const summaryModel = getAgentSummaryModel()
   const baseAgent = new NaruAgent({
-    model: getAgentChatModel(),
+    model: chatModel,
     name: "naru",
     instructions: [SYSTEM_PROMPT],
     // Session（短期對話記憶）
@@ -82,7 +98,7 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     contextCompression: true,
     summaryStore: runtime.summaryStore,
     // 摘要模型跟主對話模型共用同一個 provider 封裝，未來替換只需要改 agent-model.ts。
-    summaryModel: getAgentSummaryModel(),
+    summaryModel,
     compressionThresholdRounds: 5,
     compressionKeepLastRounds: 5,
     memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager ?? undefined : undefined,
@@ -97,11 +113,39 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     ],
   })
 
+  const decisionAgent = new NaruAgent({
+    model: chatModel,
+    name: "naru-decision",
+    instructions: [DECISION_PROMPT],
+    sessionStore: runtime.sessionStore,
+    numHistoryMessages: 10,
+    contextCompression: true,
+    summaryStore: runtime.summaryStore,
+    summaryModel,
+    compressionThresholdRounds: 5,
+    compressionKeepLastRounds: 5,
+    memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager ?? undefined : undefined,
+    guardrails,
+  })
+
+  const intentResolver = new StructuredFallbackAgentIntentResolver({
+    decisionAgent,
+    model: chatModel,
+    classifier: new LLMStructuredClassifier<AgentIntent>({
+      name: "zentropy-agent-intent-v1",
+      model: chatModel,
+      schema: AgentIntentSchema,
+      systemPrompt: DECISION_PROMPT,
+    }),
+  })
+
   const agent = getAgentRoutingMode() === "tool_first"
     ? new ToolFirstAgent({
         delegate: baseAgent,
         sessionStore: runtime.sessionStore,
         memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager : null,
+        lineUserId,
+        intentResolver,
       })
     : baseAgent
 
