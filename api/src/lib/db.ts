@@ -17,6 +17,11 @@ function buildDatabaseUrl(): string {
   return `${url}${separator}connection_limit=1&pool_timeout=20`;
 }
 
+export function isSingleConnectionPool(): boolean {
+  const url = buildDatabaseUrl()
+  return /(?:[?&])connection_limit=1(?:[&#]|$)/.test(url)
+}
+
 const prismaClient = new PrismaClient({
   log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   datasources: {

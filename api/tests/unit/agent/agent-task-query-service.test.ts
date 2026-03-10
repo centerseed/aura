@@ -41,11 +41,16 @@ describe("AgentTaskQueryService", () => {
         getCompletedSubTasks: vi.fn().mockResolvedValue([]),
         getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
       },
+      {
+        getTodayFocusDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
     )
     const result = await service.queryCompletedToday("user-1")
 
     expect(result.totalCount).toBe(1)
+    expect(result.groupedSummary).toEqual([{ label: "Task", count: 1 }])
     expect(result.summary).toContain("你今天已完成 1 項完成紀錄")
+    expect(result.summary).toContain("摘要：Task 1 項")
     expect(result.summary).toContain("完成 API 部署 [Naruvia]")
     expect(result.summary).toContain("查詢範圍：Task")
   })
@@ -61,6 +66,9 @@ describe("AgentTaskQueryService", () => {
       {
         getCompletedSubTasks: vi.fn().mockResolvedValue([]),
         getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
+      {
+        getTodayFocusDailyPlanItems: vi.fn().mockResolvedValue([]),
       },
     )
     const result = await service.queryCompletedToday("user-1")
@@ -99,14 +107,78 @@ describe("AgentTaskQueryService", () => {
         getCompletedSubTasks: vi.fn().mockResolvedValue([]),
         getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
       },
+      {
+        getTodayFocusDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
     )
     const result = await service.queryTodayFocus("user-1")
 
     expect(result.totalCount).toBe(12)
     expect(result.displayCount).toBe(10)
     expect(result.truncated).toBe(true)
-    expect(result.summary).toContain("目前查到 12 項待處理 Task")
+    expect(result.summary).toContain("目前查到 12 項待處理項目")
     expect(result.summary).toContain("以下列出最優先的 10 項")
+    expect(result.summary).toContain("摘要：今天 12 項")
+  })
+
+  it("prioritizes daily plan and subtask items in today-focus", async () => {
+    const collector: IDataCollector = {
+      collect: vi.fn().mockResolvedValue(
+        createRawData({
+          allTasks: [
+            {
+              id: "task-1",
+              content: "提交版本更新",
+              status: "ACTIVE",
+              due_date: new Date("2026-03-09T09:00:00+08:00"),
+              start_date: null,
+              updated_at: new Date("2026-03-09T08:00:00+08:00"),
+              completed_at: null,
+              area_name: "工作",
+              product_id: "product-1",
+              product_name: "Naruvia",
+              product_description: null,
+              product_priority: null,
+              inferred_from_milestone: null,
+              date_source: null,
+            },
+          ],
+        }),
+      ),
+    }
+
+    const service = new AgentTaskQueryService(
+      collector,
+      vi.fn().mockResolvedValue("Asia/Taipei"),
+      {
+        getCompletedSubTasks: vi.fn().mockResolvedValue([]),
+        getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
+      {
+        getTodayFocusDailyPlanItems: vi.fn().mockResolvedValue([
+          {
+            id: "plan-1",
+            title: "上午重點工作",
+            sourceType: "daily_plan_item",
+            productName: "Naruvia",
+            dueDate: "2026-03-09T09:00:00+08:00",
+            urgency: "today",
+            relatedTaskId: "task-1",
+          },
+        ]),
+      },
+    )
+
+    const result = await service.queryTodayFocus("user-1")
+
+    expect(result.coverage).toEqual({
+      tasks: true,
+      subTasks: true,
+      dailyPlanItems: true,
+    })
+    expect(result.items[0].sourceType).toBe("daily_plan_item")
+    expect(result.summary).toContain("摘要：今天 1 項")
+    expect(result.summary).toContain("上午重點工作 [Naruvia] [Daily Plan]")
   })
 
   it("includes subtask and daily plan completions without double counting archived task", async () => {
@@ -149,13 +221,86 @@ describe("AgentTaskQueryService", () => {
           },
         ]),
       },
+      {
+        getTodayFocusDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
     )
 
     const result = await service.queryCompletedToday("user-1")
 
     expect(result.totalCount).toBe(3)
+    expect(result.groupedSummary).toEqual(
+      expect.arrayContaining([
+        { label: "Task", count: 1 },
+        { label: "SubTask", count: 1 },
+        { label: "Daily Plan", count: 1 },
+      ]),
+    )
     expect(result.summary).toContain("你今天已完成 3 項完成紀錄")
+    expect(result.summary).toContain("摘要：Task 1 項、SubTask 1 項、Daily Plan 1 項")
     expect(result.summary).toContain("整理 release checklist [Naruvia] [SubTask]")
     expect(result.summary).toContain("下午例行回顧 [Naruvia] [Daily Plan]")
+  })
+
+  it("promotes open subtasks into today-focus work items before parent tasks", async () => {
+    const collector: IDataCollector = {
+      collect: vi.fn().mockResolvedValue(
+        createRawData({
+          allTasks: [
+            {
+              id: "task-1",
+              content: "發布 API 版本",
+              status: "ACTIVE",
+              due_date: new Date("2026-03-10T09:00:00+08:00"),
+              start_date: null,
+              updated_at: new Date("2026-03-09T08:00:00+08:00"),
+              completed_at: null,
+              area_name: "工作",
+              product_id: "product-1",
+              product_name: "Naruvia",
+              product_description: null,
+              product_priority: null,
+              inferred_from_milestone: null,
+              date_source: null,
+            },
+          ],
+          allSubTasks: [
+            {
+              id: "sub-1",
+              task_id: "task-1",
+              content: "確認 migration",
+              completed: false,
+              due_date: new Date("2026-03-09T09:00:00+08:00"),
+              start_date: null,
+              estimated_minutes: null,
+              order: 1,
+              updated_at: new Date("2026-03-09T08:00:00+08:00"),
+            },
+          ],
+        }),
+      ),
+    }
+
+    const service = new AgentTaskQueryService(
+      collector,
+      vi.fn().mockResolvedValue("Asia/Taipei"),
+      {
+        getCompletedSubTasks: vi.fn().mockResolvedValue([]),
+        getCompletedDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
+      {
+        getTodayFocusDailyPlanItems: vi.fn().mockResolvedValue([]),
+      },
+    )
+
+    const result = await service.queryTodayFocus("user-1")
+
+    expect(result.totalCount).toBe(1)
+    expect(result.items[0]).toMatchObject({
+      id: "sub-1",
+      sourceType: "sub_task",
+      relatedTaskId: "task-1",
+    })
+    expect(result.summary).toContain("確認 migration [Naruvia] [SubTask] 📅 今天")
   })
 })

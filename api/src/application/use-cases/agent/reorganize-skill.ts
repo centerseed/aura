@@ -9,13 +9,12 @@ import { tool, skill, makeSkillResult } from "naru-agent-js"
 import { z } from "zod"
 import { AnalyzeStructureUseCase } from "@/application/use-cases/reorganize/analyze-structure"
 
-const createReorganizeTool = (userId: string) =>
+export const createReorganizeTool = (userId: string) =>
   tool({
     name: "reorganize_preview",
     description: "分析用戶的任務結構並提出重組建議（預覽模式，不實際執行）",
-    parameters: z.object({
-      confirm: z.boolean().optional().describe("是否確認執行（目前僅預覽，此參數保留）"),
-    }),
+    // 預覽工具不需要模型提供額外參數，避免 Groq function calling 誤生成 schema 片段。
+    parameters: z.object({}),
     execute: async (_params) => {
       const analyzeUC = new AnalyzeStructureUseCase()
       const result = await analyzeUC.execute({ userId })

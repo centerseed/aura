@@ -12,21 +12,27 @@ import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/ex
 import { saveLineSession } from "@/lib/line-session"
 import type { AdjustTagsPayload } from "@/lib/line-session"
 
-const createAdjustTagsTool = (userId: string, lineUserId?: string) =>
+export const createAdjustTagsTool = (userId: string, originalMessage: string, lineUserId?: string) =>
   tool({
     name: "adjust_tags_preview",
     description: "分析用戶的標籤調整意圖，回傳預覽並等待確認",
-    parameters: z.object({
-      text: z.string().describe("用戶的完整調整指令"),
-    }),
-    execute: async ({ text }) => {
+    // Groq 在 function calling 參數生成上對複雜 schema 不穩定。
+    // 這裡直接以當前使用者原句作為分析輸入，避免模型再產生中間參數物件。
+    parameters: z.object({}),
+    execute: async () => {
+      const text = originalMessage
       const analyzeUC = new AnalyzeAdjustmentIntentUseCase()
       const result = await analyzeUC.execute({ userId, text, preview: !!lineUserId })
 
       const { intent, structuredOperations, previewLog, logId, taskMap } = result
 
       if (intent.intent_type === "no_action" || structuredOperations.length === 0) {
-        return "我沒有找到需要調整的任務，請確認指令格式（例如：「把 X 移到 Y 專案」）。"
+        return [
+          "了解，你是要修正或更新任務分類。",
+          `原始指令：${text}`,
+          "但我目前還不能安全判定要調整哪一個任務。",
+          "請再提供更精確的任務名稱，並保留目標產品線資訊（例如：行銷產品線）。",
+        ].join("\n")
       }
 
       // 驗證 intent_type，避免無效值被存入 session
@@ -70,7 +76,7 @@ const createAdjustTagsTool = (userId: string, lineUserId?: string) =>
       })
 
       if (executed.movedCount === 0) {
-        return "沒有可執行的調整，請再具體描述要移動的任務與目標分類。"
+        return "了解，你是要修正或更新任務分類，但目前沒有可執行的調整。請再具體描述任務名稱與目標分類。"
       }
       return `✅ 已完成分類調整：\n\n${executed.operationLog.join("\n\n")}`
     },
@@ -85,9 +91,11 @@ export const createAdjustTagsSkill = (userId: string, lineUserId?: string) =>
     run: async (_message, _context) =>
       makeSkillResult({
         promptInjection:
-          "用戶想調整某個任務的分類。請使用 adjust_tags_preview 工具，" +
-          "將用戶的原始指令完整傳入。工具會分析並回傳預覽訊息。",
-        extraTools: [createAdjustTagsTool(userId, lineUserId)],
+          "用戶想調整某個任務的分類。請直接呼叫 adjust_tags_preview 工具。" +
+          "工具會使用用戶的原始指令進行分析並回傳預覽訊息。" +
+          "如果工具要求用戶補充任務名稱或確認修正內容，你必須保留用戶原文中的關鍵詞與目標分類詞，" +
+          "例如「競品分析」「行銷產品線」，並明確使用「了解」或「修正／更新分類」這類字眼，不能改寫成過度空泛的澄清。",
+        extraTools: [createAdjustTagsTool(userId, _message, lineUserId)],
         skillName: "adjust_tags",
       }),
   })

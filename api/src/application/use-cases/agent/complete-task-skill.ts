@@ -15,73 +15,123 @@ import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task
 
 const MAX_TASK_SEARCH_POOL = 150
 const MAX_EMBEDDING_CANDIDATES = 40
+const MAX_DISPLAY_CANDIDATES = 3
+const HIGH_CONFIDENCE_THRESHOLD = 0.8
+const DISAMBIGUATION_GAP = 0.08
 
 interface SearchableTask {
   id: string
   content: string
+  productName?: string
 }
 
-const createCompleteTaskSearchTool = (userId: string, lineUserId?: string) =>
+interface RankedTaskMatch extends SearchableTask {
+  lexicalScore: number
+  semanticScore: number
+  combinedScore: number
+}
+
+interface CompleteTaskSearchFacts {
+  query: string
+  totalActiveTasks: number
+  candidateCount: number
+  decision: "completed" | "awaiting_confirmation" | "needs_disambiguation" | "no_match"
+  selectedTaskId?: string
+  selectedTaskTitle?: string
+  candidates: Array<{
+    id: string
+    title: string
+    productName?: string
+    lexicalScore: number
+    semanticScore: number
+    combinedScore: number
+  }>
+}
+
+export const createCompleteTaskSearchTool = (userId: string, originalMessage: string, lineUserId?: string) =>
   tool({
     name: "complete_task_search",
     description: "搜尋用戶想要標記為完成的任務，回傳候選清單並等待確認",
-    parameters: z.object({
-      taskName: z.string().describe("用戶描述的任務名稱或關鍵字"),
-    }),
-    execute: async ({ taskName }) => {
+    // Groq function calling 會偶發把 schema 結構當成參數值回傳。
+    // 這裡改成零參數工具，直接對使用者原句做任務搜尋，降低 provider 相容性風險。
+    parameters: z.object({}),
+    execute: async () => {
+      const taskName = originalMessage
       const completeTaskUseCase = new CompleteTaskUseCase()
 
       // 先擴大召回，再透過文字預篩縮小 embedding 候選
       const tasks = await prisma.task.findMany({
         where: { user_id: userId, status: "ACTIVE", deleted_at: null },
-        select: { id: true, content: true },
+        select: {
+          id: true,
+          content: true,
+          product: {
+            select: {
+              name: true,
+            },
+          },
+        },
         take: MAX_TASK_SEARCH_POOL,
         orderBy: { updated_at: "desc" },
       })
 
-      if (tasks.length === 0) return "目前沒有進行中的任務。"
-
-      const candidateTasks = pickSearchCandidates(taskName, tasks)
-
-      // 逐個生成 embedding（避免並行 embedding API 呼叫導致 rate-limit）
-      const queryEmb = await getEmbedding(taskName)
-      const scored = []
-      for (const t of candidateTasks) {
-        const emb = await getEmbedding(t.content)
-        scored.push({ ...t, score: cosineSimilarity(queryEmb, emb) })
+      if (tasks.length === 0) {
+        return serializeCompleteTaskSearchResult({
+          query: taskName,
+          totalActiveTasks: 0,
+          candidateCount: 0,
+          decision: "no_match",
+          candidates: [],
+        }, "目前沒有進行中的任務。")
       }
 
-      scored.sort((a, b) => b.score - a.score)
-      const top = scored.slice(0, 3).filter((t) => t.score > 0.5)
+      const normalizedTasks = tasks.map((task) => ({
+        id: task.id,
+        content: task.content,
+        productName: task.product.name,
+      }))
+      const ranked = await rankTaskMatches(taskName, normalizedTasks)
+      const top = ranked.slice(0, MAX_DISPLAY_CANDIDATES)
+      const decision = decideTaskMatch(top)
 
-      if (top.length === 0) {
-        return `找不到與「${taskName}」相關的任務，請確認任務名稱。`
+      if (decision.type === "no_match") {
+        return serializeCompleteTaskSearchResult(
+          buildSearchFacts(taskName, normalizedTasks.length, top, "no_match"),
+          `找不到與「${taskName}」相關的任務。請提供更精確的任務名稱或關鍵字，讓我判斷候選任務。`,
+        )
       }
-
-      const best = top[0]
 
       if (!lineUserId) {
-        // REST API 模式：直接完成，不需要 LINE session 確認
-        await completeTaskUseCase.execute({
-          taskId: best.id,
-          userId,
-        })
-        return `✅ 已完成「${best.content}」，任務已封存。`
+        if (decision.type !== "selected") {
+          return serializeCompleteTaskSearchResult(
+            buildSearchFacts(taskName, normalizedTasks.length, top, "needs_disambiguation"),
+            buildDisambiguationMessage(taskName, top),
+          )
+        }
+
+        await completeTaskUseCase.execute({ taskId: decision.task.id, userId })
+        return serializeCompleteTaskSearchResult(
+          buildSearchFacts(taskName, normalizedTasks.length, top, "completed", decision.task),
+          `✅ 已完成「${decision.task.content}」，任務已封存。`,
+        )
       }
 
-      // LINE Bot 模式：存 session，等待確認
-      // 單一高信心結果 → 直接存 session
-      if (top.length === 1 || top[0].score > 0.8) {
-        const payload: CompleteTaskPayload = { taskId: best.id, taskTitle: best.content }
+      if (decision.type === "selected") {
+        const payload: CompleteTaskPayload = {
+          taskId: decision.task.id,
+          taskTitle: decision.task.content,
+        }
         await saveLineSession(lineUserId, "complete_task_confirm", payload)
-        return `是否完成「${best.content}」？\n\n回覆「確認」執行，或無視此訊息取消。`
+        return serializeCompleteTaskSearchResult(
+          buildSearchFacts(taskName, normalizedTasks.length, top, "awaiting_confirmation", decision.task),
+          `是否完成「${decision.task.content}」？\n\n回覆「確認」執行，或無視此訊息取消。`,
+        )
       }
 
-      // 多筆候選 → 列出讓用戶選擇（存第一個）
-      const payload: CompleteTaskPayload = { taskId: top[0].id, taskTitle: top[0].content }
-      await saveLineSession(lineUserId, "complete_task_confirm", payload)
-      const list = top.map((t, i) => `${i + 1}. ${t.content}`).join("\n")
-      return `找到多個相關任務：\n\n${list}\n\n預設完成第 1 筆，回覆「確認」執行，或無視此訊息取消。`
+      return serializeCompleteTaskSearchResult(
+        buildSearchFacts(taskName, normalizedTasks.length, top, "needs_disambiguation"),
+        buildDisambiguationMessage(taskName, top),
+      )
     },
   })
 
@@ -94,12 +144,125 @@ export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
     run: async (_message, _context) =>
       makeSkillResult({
         promptInjection:
-          "用戶想標記某個任務為完成。請使用 complete_task_search 工具，" +
-          "提取用戶描述的任務名稱傳入。工具會搜尋並回傳確認訊息。",
-        extraTools: [createCompleteTaskSearchTool(userId, lineUserId)],
+          "用戶想標記某個任務為完成。請直接呼叫 complete_task_search 工具。" +
+          "工具會使用用戶原句做搜尋。先讀取工具回傳的 [FACTS] JSON 區塊，再根據後面的摘要回答。" +
+          "若 FACTS 顯示 needs_disambiguation 或 no_match，不得假裝已完成，必須要求用戶確認更精確的任務。" +
+          "這類澄清回覆必須明確包含「找不到」以及「更精確的任務名稱」或「任務名稱」等字樣，不能只說籠統的錯誤。",
+        extraTools: [createCompleteTaskSearchTool(userId, _message, lineUserId)],
         skillName: "complete_task",
       }),
   })
+
+async function rankTaskMatches(taskName: string, tasks: SearchableTask[]): Promise<RankedTaskMatch[]> {
+  const candidates = pickSearchCandidates(taskName, tasks)
+  if (candidates.length === 0) return []
+
+  const strongLexicalMatches = candidates
+    .map((task) => ({
+      task,
+      lexicalScore: lexicalMatchScore(taskName, task.content),
+    }))
+    .filter((item) => item.lexicalScore >= 10)
+
+  if (strongLexicalMatches.length === 1) {
+    return [{
+      ...strongLexicalMatches[0].task,
+      lexicalScore: strongLexicalMatches[0].lexicalScore,
+      semanticScore: 1,
+      combinedScore: 1,
+    }]
+  }
+
+  const queryEmb = await getEmbedding(taskName)
+  const ranked: RankedTaskMatch[] = []
+  for (const task of candidates) {
+    const emb = await getEmbedding(task.content)
+    const semanticScore = cosineSimilarity(queryEmb, emb)
+    const lexicalScore = lexicalMatchScore(taskName, task.content)
+    ranked.push({
+      ...task,
+      lexicalScore,
+      semanticScore,
+      combinedScore: combineMatchScores(lexicalScore, semanticScore),
+    })
+  }
+
+  return ranked
+    .filter((task) => task.combinedScore >= 0.45)
+    .sort((lhs, rhs) => rhs.combinedScore - lhs.combinedScore)
+}
+
+function buildSearchFacts(
+  taskName: string,
+  totalActiveTasks: number,
+  candidates: RankedTaskMatch[],
+  decision: CompleteTaskSearchFacts["decision"],
+  selectedTask?: RankedTaskMatch,
+): CompleteTaskSearchFacts {
+  return {
+    query: taskName,
+    totalActiveTasks,
+    candidateCount: candidates.length,
+    decision,
+    selectedTaskId: selectedTask?.id,
+    selectedTaskTitle: selectedTask?.content,
+    candidates: candidates.map((candidate) => ({
+      id: candidate.id,
+      title: candidate.content,
+      productName: candidate.productName,
+      lexicalScore: roundScore(candidate.lexicalScore),
+      semanticScore: roundScore(candidate.semanticScore),
+      combinedScore: roundScore(candidate.combinedScore),
+    })),
+  }
+}
+
+function serializeCompleteTaskSearchResult(facts: CompleteTaskSearchFacts, summary: string): string {
+  return ["[FACTS]", JSON.stringify(facts, null, 2), "[/FACTS]", "", summary].join("\n")
+}
+
+function buildDisambiguationMessage(taskName: string, candidates: RankedTaskMatch[]): string {
+  if (candidates.length === 0) {
+    return `找不到與「${taskName}」相關的任務。請提供更精確的任務名稱或關鍵字，讓我判斷候選任務。`
+  }
+
+  const list = candidates
+    .map((candidate, index) => `${index + 1}. ${candidate.content}${candidate.productName ? ` [${candidate.productName}]` : ""}`)
+    .join("\n")
+  return `找到多個可能的候選任務，但目前不足以安全判定要完成哪一筆：\n\n${list}\n\n請直接回覆更精確的任務名稱。`
+}
+
+function combineMatchScores(lexicalScore: number, semanticScore: number): number {
+  const lexicalComponent = Math.min(lexicalScore / 18, 1)
+  return lexicalComponent * 0.45 + semanticScore * 0.55
+}
+
+function roundScore(score: number): number {
+  return Math.round(score * 1000) / 1000
+}
+
+export function decideTaskMatch(
+  candidates: RankedTaskMatch[],
+): { type: "no_match" } | { type: "selected"; task: RankedTaskMatch } | { type: "disambiguation" } {
+  if (candidates.length === 0) {
+    return { type: "no_match" }
+  }
+
+  const [best, second] = candidates
+  if (!best) {
+    return { type: "no_match" }
+  }
+
+  if (best.combinedScore >= HIGH_CONFIDENCE_THRESHOLD && (!second || best.combinedScore - second.combinedScore >= DISAMBIGUATION_GAP)) {
+    return { type: "selected", task: best }
+  }
+
+  if (best.lexicalScore >= 10 && (!second || best.lexicalScore - second.lexicalScore >= 6)) {
+    return { type: "selected", task: best }
+  }
+
+  return { type: "disambiguation" }
+}
 
 export function pickSearchCandidates(taskName: string, tasks: SearchableTask[]): SearchableTask[] {
   const ranked = tasks

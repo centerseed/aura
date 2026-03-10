@@ -55,7 +55,7 @@ const STRATEGY_PROMPTS: Record<GoalType, string> = {
 
 async function classifyGoalType(goal: string): Promise<GoalType> {
   const { object } = await generateObject({
-    model: google("gemini-3.1-flash-lite-preview"),
+    model: google("gemini-2.5-flash-lite"),
     schema: GoalTypeSchema,
     prompt: `請判斷以下目標屬於哪種類型：
 
@@ -86,7 +86,7 @@ async function generateTaskBreakdown(
   const dueDateText = dueDate ? `\n目標完成日：${dueDate}` : ""
 
   const { object } = await generateObject({
-    model: google("gemini-3.1-flash-lite-preview"),
+    model: google("gemini-2.5-flash-lite"),
     schema: PlannerOutputSchema,
     prompt: `你是一個專業的任務規劃師。請將以下大目標拆解為可執行的任務清單。
 

@@ -123,3 +123,120 @@ The backend is structured around domain-driven services:
 - **VectorAnalyticsService**: 
     - Manages embeddings generation and vector search.
     - Providing relevance scores for context retrieval.
+
+## 7. Agent Session Lifecycle & Long-Term Memory Modes
+
+### 7.1 Long-Term Memory Mode Flag
+
+- Environment flag: `LONG_TERM_MEMORY_MODE=off|each_turn|idle_flush_30m`
+- Default: `off`
+- Purpose: control whether the LINE / REST agent writes short-term conversations into long-term memory.
+
+Mode semantics:
+
+1. `off`
+   - Do not write any agent conversation into long-term memory.
+   - Memory retrieval is also disabled for agent conversations.
+
+2. `each_turn`
+   - Preserve the existing per-turn memory pipeline.
+   - After each successful agent reply, the current user / assistant turn may be written into long-term memory.
+
+3. `idle_flush_30m`
+   - Do not write long-term memory on every turn.
+   - Only when a new message arrives and the session has been idle for at least 30 minutes, the previous session segment is flushed once into long-term memory, then the short-term session context is reset.
+
+### 7.2 Idle Flush Trigger Contract
+
+For `idle_flush_30m`, the system must evaluate idle state before processing the incoming message:
+
+- Input: `beforeMessage(sessionId, userId, now)`
+- Idle condition: `now - last_activity_at >= 30 minutes`
+- `last_activity_at` is owned by the session lifecycle layer, not by the LLM framework.
+- The first message of a new session must not trigger flush.
+
+Flush scope:
+
+- Flush only the existing short-term context of that `sessionId`
+- Includes:
+  - stored session history
+  - stored compressed summary
+- Excludes:
+  - the newly arrived user input that triggered the idle check
+
+### 7.3 Reset, Fallback, and Concurrency Semantics
+
+Reset behavior:
+
+- After a successful idle flush, the system must:
+  - clear session history
+  - clear compressed summary
+  - advance the session segment marker
+
+Failure fallback:
+
+- Flush runs as a background-capable application workflow and must not block the current user reply.
+- If flush fails:
+  - the current reply still proceeds
+  - the previous short-term context must not be reset
+  - the failure must be logged for observability
+
+Concurrency and idempotency:
+
+- Same `sessionId` flush must be protected by a process-local mutex.
+- Architecture must preserve a clean extension point for a future distributed lock.
+- Same session segment must be flushed at most once.
+- The lifecycle layer must record a flush marker / sequence id so concurrent messages do not duplicate the flush.
+
+### 7.4 Store Ownership
+
+- Session timeout judgement must not depend on LLM internals.
+- Session lifecycle metadata must be stored in a dedicated metadata-capable store.
+- Initial implementation may be in-memory.
+- The interface must remain portable to Redis or another shared store later.
+
+### 7.5 Agent Primary Model Provider Compatibility Contract
+
+- The agent primary chat model is provider-configurable through a centralized adapter layer.
+- Replacing the primary provider/model must not assume tool-calling compatibility is identical across vendors.
+- A passing agent baseline means the delivered product behavior is acceptable under the current orchestration, not that the provider is a drop-in protocol-equivalent replacement.
+
+Runtime switches:
+
+- `AGENT_PRIMARY_PROVIDER=groq|gemini`
+- `AGENT_ROUTING_MODE=provider_default|tool_first`
+
+Switch semantics:
+
+1. `AGENT_PRIMARY_PROVIDER`
+   - Selects the primary provider used by the agent chat model and summary model.
+   - The adapter layer owns provider-specific client initialization, model name defaults, and API path compatibility.
+
+2. `AGENT_ROUTING_MODE`
+   - `provider_default`: let the underlying model/tool stack handle normal tool routing.
+   - `tool_first`: run deterministic routing for high-confidence skill paths before falling back to the primary model.
+   - This flag is intentionally independent from provider choice because provider and routing strategy are separate concerns.
+
+Current production-oriented compatibility notes:
+
+1. Groq `meta-llama/llama-4-scout-17b-16e-instruct`
+   - Used as the agent primary chat model through an OpenAI-compatible adapter.
+   - Must use chat-completions style calls, not the AI SDK default OpenAI `/responses` path.
+   - In current validation, native function-calling parameter generation is not fully reliable for the Zentropy agent tool set.
+   - Therefore the agent relies on deterministic tool-first routing for high-confidence skill paths such as:
+     - brain dump
+     - task query
+     - complete task search
+     - adjust tags
+     - reorganize preview
+
+2. Gemini reversion semantics
+   - Switching the centralized model adapter back to Gemini is expected to remain compatible with the current orchestration.
+   - However, the routing mode is controlled independently.
+   - Therefore "switch back to Gemini" means restoring Gemini as the primary model provider under the current routing architecture selected by `AGENT_ROUTING_MODE`.
+
+Engineering implication:
+
+- Provider replacement must be validated at two levels:
+  - product-level behavior (baseline / gate)
+  - provider-level protocol assumptions (tool calling, message format, error modes, latency, fallback behavior)

@@ -2,7 +2,10 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 import dotenv from 'dotenv'
 
-// 先載入 .env（提供真實 API keys 等），再用 .env.test 覆蓋測試專屬設定
+// 先載入本機開發 secrets（.env.local / .env），再用 .env.test 覆蓋測試專屬設定。
+// 這樣 agent baseline 等需要真實第三方金鑰的測試可以拿到本機 secrets，
+// 同時仍保留 DATABASE_URL_TEST 之類的測試覆蓋值。
+dotenv.config({ path: '.env.local' })
 dotenv.config({ path: '.env' })
 dotenv.config({ path: '.env.test', override: true })
 

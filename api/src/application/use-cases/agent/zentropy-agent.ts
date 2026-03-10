@@ -6,22 +6,40 @@
 
 import {
   NaruAgent,
-  InMemorySessionStore,
-  InMemorySummaryStore,
 } from "naru-agent-js"
-import { createMemoryManager } from "@/lib/naru-memory"
-import { google } from "@ai-sdk/google"
 import { createBrainDumpSkill } from "./brain-dump-skill"
 import { createReorganizeSkill } from "./reorganize-skill"
 import { createPlannerSkill } from "./planner-skill"
 import { createQueryTasksSkill } from "./query-tasks-skill"
 import { createAdjustTagsSkill } from "./adjust-tags-skill"
 import { createCompleteTaskSkill } from "./complete-task-skill"
+import { getAgentRuntime } from "./agent-runtime"
+import { LifecycleAwareAgent } from "./lifecycle-aware-agent"
+import { ToolFirstAgent } from "./tool-first-agent"
+import { GroqPromptGuardrail } from "@/application/services/groq-prompt-guardrail"
+import { getAgentChatModel, getAgentRoutingMode, getAgentSummaryModel } from "@/lib/agent-model"
 
-// Module-level singletons — 跨 request 持久
-const sessionStore = new InMemorySessionStore()
-const summaryStore = new InMemorySummaryStore()
-const memoryManager = createMemoryManager()
+function buildExperimentalGuardrails() {
+  if (process.env.AGENT_PROMPT_GUARD_ENABLED !== "true") {
+    return undefined
+  }
+
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) {
+    console.warn("[agent] AGENT_PROMPT_GUARD_ENABLED=true but GROQ_API_KEY is missing")
+    return undefined
+  }
+
+  return [
+    new GroqPromptGuardrail({
+      apiKey,
+      model: process.env.AGENT_PROMPT_GUARD_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct",
+      classificationMode: (process.env.AGENT_PROMPT_GUARD_MODE as "numeric_threshold" | "safe_unsafe_label" | undefined)
+        || "safe_unsafe_label",
+      blockThreshold: Number(process.env.AGENT_PROMPT_GUARD_BLOCK_THRESHOLD || "0.5"),
+    }),
+  ]
+}
 
 const SYSTEM_PROMPT = `你是 Zentropy 的 LINE Bot 助理，透過 LINE 訊息幫助用戶管理任務。
 
@@ -45,27 +63,30 @@ const SYSTEM_PROMPT = `你是 Zentropy 的 LINE Bot 助理，透過 LINE 訊息�
 - 用戶要求超出能力範圍時：明確說「這個我還做不到，目前只能 [列出相關能做的]」
 - 執行 tool 後：用自然語言回報結果，不貼原始資料
 - ⚠️ 絕對禁止：沒有呼叫工具就宣稱已完成操作（「已記錄」「已完成」等字眼，必須是工具真的執行完才能說）
-- 查詢類問題只能根據工具結果回答；如果工具有說明查詢範圍限制、總數或只列出部分項目，你必須照實轉述
+- 查詢類問題只能根據工具結果回答；如果工具在 [FACTS] JSON 中說明查詢範圍限制、總數、群組摘要或只列出部分項目，你必須照實轉述
 - 用戶問「今天完成了什麼」時，禁止改答成待辦清單；若工具只覆蓋部分來源，也必須明說
 - 無法判斷用戶意圖時：直接問「你是要記錄這件事，還是要查詢/完成/規劃什麼？」，不要自行猜測後假裝執行
 - 用戶輸入看起來像待辦事項或任務（動詞+事情，例如「去買東西」「回覆信件」「準備報告」）：直接呼叫 brain_dump 工具記錄，不需要確認`
 
-export function createZentropyAgent(userId: string, lineUserId?: string): NaruAgent {
-  return new NaruAgent({
-    model: google("gemini-3.1-flash-lite-preview"),
+export function createZentropyAgent(userId: string, lineUserId?: string): LifecycleAwareAgent {
+  const runtime = getAgentRuntime()
+  const guardrails = buildExperimentalGuardrails()
+  const baseAgent = new NaruAgent({
+    model: getAgentChatModel(),
     name: "naru",
     instructions: [SYSTEM_PROMPT],
     // Session（短期對話記憶）
-    sessionStore,
+    sessionStore: runtime.sessionStore,
     numHistoryMessages: 10,
     // Context 壓縮（超過 10 輪時壓縮舊對話，保留最後 5 輪）
     contextCompression: true,
-    summaryStore,
-    summaryModel: google("gemma-3-12b-it"),
+    summaryStore: runtime.summaryStore,
+    // 摘要模型跟主對話模型共用同一個 provider 封裝，未來替換只需要改 agent-model.ts。
+    summaryModel: getAgentSummaryModel(),
     compressionThresholdRounds: 5,
     compressionKeepLastRounds: 5,
-    // Long-term memory（LLM 萃取事實 + pgvector）
-    memoryManager,
+    memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager ?? undefined : undefined,
+    guardrails,
     skills: [
       createBrainDumpSkill(userId),
       createReorganizeSkill(userId),
@@ -75,4 +96,14 @@ export function createZentropyAgent(userId: string, lineUserId?: string): NaruAg
       createAdjustTagsSkill(userId, lineUserId),
     ],
   })
+
+  const agent = getAgentRoutingMode() === "tool_first"
+    ? new ToolFirstAgent({
+        delegate: baseAgent,
+        sessionStore: runtime.sessionStore,
+        memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager : null,
+      })
+    : baseAgent
+
+  return new LifecycleAwareAgent(agent, runtime.lifecycleService, userId)
 }

@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "baselineScore": 60,
+  "minScore": 60,
+  "maxFallbackCount": 0,
+  "maxObviousFailures": 0
+}

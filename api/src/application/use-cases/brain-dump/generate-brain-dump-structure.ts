@@ -10,7 +10,7 @@ import { google } from "@ai-sdk/google"
 import { createOpenAI } from "@ai-sdk/openai"
 import { generateObject } from "ai"
 import { z } from "zod"
-import { prisma } from "@/lib/db"
+import { isSingleConnectionPool, prisma } from "@/lib/db"
 import { getEmbedding } from "@/lib/embedding"
 import { librarianRecall, LibrarianRule } from "@/lib/librarian-client"
 import { ValidationException } from "@/lib/api-response"
@@ -193,10 +193,17 @@ export class GenerateBrainDumpStructureUseCase {
         AND status IN ('planned', 'in_progress')
     `
 
-    // Wait for Stage 1 + milestones + librarian recall in parallel
-    const [productCandidates, milestones, librarianRules] = await Promise.all([
-      stage1Promise, milestonePromise, recallPromise,
-    ])
+    // 單連線測試/Cloud Run 模式下不能把多個 Prisma 查詢丟進 Promise.all，
+    // 否則很容易因 connection_limit=1 直接把自己塞爆。
+    const [productCandidates, milestones, librarianRules] = isSingleConnectionPool()
+      ? [
+          await stage1Promise,
+          await milestonePromise,
+          await recallPromise,
+        ]
+      : await Promise.all([
+          stage1Promise, milestonePromise, recallPromise,
+        ])
     timings["stage1_and_recall"] = Date.now() - startParallel
 
     if (librarianRules.length > 0) {
@@ -581,7 +588,7 @@ export class GenerateBrainDumpStructureUseCase {
         const { object, usage } = await generateObject({
           model: process.env.OPENROUTER_MODEL
             ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
-            : google("gemini-3.1-flash-lite-preview"),
+            : google("gemini-2.5-flash-lite"),
           schema: StructureResultSchema,
           prompt: `你是任務記錄專家。將用戶輸入轉成結構化的 Task。
 

@@ -203,7 +203,7 @@ export class AnalyzeAdjustmentIntentUseCase {
     // 2. 調用 AI 解析用戶意圖
     const startAI = Date.now()
     const { object: intent, usage: aiUsage } = await generateObject({
-      model: google("gemini-3.1-flash-lite-preview"),
+      model: google("gemini-2.5-flash-lite"),
       schema: AdjustmentIntentSchema,
       prompt: `你是 Zentropy 的標籤調整助手。用戶想要調整現有任務的分類。
 

@@ -188,6 +188,13 @@ npx tsc --noEmit || log_warning "TypeScript 檢查發現問題，繼續部署...
 
 # 2. 執行測試 (僅 production 環境)
 if [ "$ENVIRONMENT" = "production" ]; then
+    log_info "執行 Agent Baseline Gate..."
+    npm run test:agent:gate || {
+        log_error "Agent Baseline Gate 未通過，中止部署"
+        exit 1
+    }
+    log_success "Agent Baseline Gate 通過"
+
     log_info "執行單元測試..."
     npm run test:unit || {
         log_error "測試失敗，中止部署"

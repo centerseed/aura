@@ -13,7 +13,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { prisma } from '@/lib/db'
 import { createZentropyAgent } from '@/application/use-cases/agent/zentropy-agent'
+import { getAgentChatModelName } from '@/lib/agent-model'
 import type { NaruResult } from 'naru-agent-js'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 // ============================================================================
 // Fixtures
@@ -30,7 +33,36 @@ interface AgentMetrics {
   qualityNotes: string[]
 }
 
+interface BaselineScoreBreakdown {
+  fallbackPenalty: number
+  errorLikePenalty: number
+  latencyPenalty: number
+  tokenPenalty: number
+  toolCoveragePenalty: number
+}
+
+interface BaselineReport {
+  generatedAt: string
+  model: string
+  scenarioCount: number
+  totalTokens: number
+  averageTokens: number
+  averageLatencyMs: number
+  maxLatencyMs: number
+  toolCallRate: number
+  requiredToolCoverage: number
+  fallbackCount: number
+  errorLikeCount: number
+  score: number
+  scoreBreakdown: BaselineScoreBreakdown
+  obviousFailures: string[]
+  scenarios: AgentMetrics[]
+}
+
 const SESSION_ID = `agent-baseline-${Date.now()}`
+const REPORT_PATH = process.env.AGENT_BASELINE_REPORT_PATH
+  ?? path.join(process.cwd(), 'test-results', 'agent-baseline-latest.json')
+const AGENT_MODEL = getAgentChatModelName()
 
 // 合理度評估 helper（啟發式，不走 LLM judge）
 function assessQuality(message: string, result: NaruResult): string[] {
@@ -56,6 +88,80 @@ function inferSkill(toolCalls: string[], message: string): string | null {
   return null
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function buildBaselineReport(allMetrics: AgentMetrics[]): BaselineReport {
+  const totalTokens = allMetrics.reduce((s, m) => s + m.tokens.total, 0)
+  const avgTokens = Math.round(totalTokens / allMetrics.length)
+  const avgLatency = Math.round(
+    allMetrics.reduce((s, m) => s + m.latencyMs, 0) / allMetrics.length
+  )
+  const maxLatency = Math.max(...allMetrics.map((m) => m.latencyMs))
+  const toolCallRate = allMetrics.filter((m) => m.toolCalls.length > 0).length / allMetrics.length
+  const fallbackCount = allMetrics.filter((m) =>
+    m.response.includes('出了一點狀況')
+  ).length
+  const errorLikeCount = allMetrics.filter((m) =>
+    /(發生錯誤|無法處理|處理任務時發生錯誤)/.test(m.response)
+  ).length
+
+  const scenariosRequiringTools = SCENARIOS.filter((s) => s.expectedToolCalls.length > 0)
+  const expectedToolCallsTotal = scenariosRequiringTools.reduce((sum, s) => sum + s.expectedToolCalls.length, 0)
+  const expectedToolCallsHit = scenariosRequiringTools.reduce((sum, s) => {
+    const metric = allMetrics.find((m) => m.scenario === s.name)
+    if (!metric) return sum
+    const hit = s.expectedToolCalls.filter((tool) => metric.toolCalls.includes(tool)).length
+    return sum + hit
+  }, 0)
+  const requiredToolCoverage = expectedToolCallsTotal > 0 ? expectedToolCallsHit / expectedToolCallsTotal : 1
+
+  const breakdown: BaselineScoreBreakdown = {
+    fallbackPenalty: fallbackCount * 20,
+    errorLikePenalty: errorLikeCount * 8,
+    latencyPenalty: avgLatency > 8000 ? Math.min(20, Math.round((avgLatency - 8000) / 500)) : 0,
+    tokenPenalty: avgTokens > 1200 ? Math.min(12, Math.round((avgTokens - 1200) / 100)) : 0,
+    toolCoveragePenalty: Math.round((1 - requiredToolCoverage) * 40),
+  }
+  const rawScore = 100
+    - breakdown.fallbackPenalty
+    - breakdown.errorLikePenalty
+    - breakdown.latencyPenalty
+    - breakdown.tokenPenalty
+    - breakdown.toolCoveragePenalty
+  const score = clamp(Math.round(rawScore), 0, 100)
+
+  const obviousFailures: string[] = []
+  if (fallbackCount > 0) obviousFailures.push(`fallback_count=${fallbackCount}`)
+  if (requiredToolCoverage < 1) obviousFailures.push(`required_tool_coverage=${requiredToolCoverage.toFixed(2)}`)
+  if (allMetrics.some((m) => m.response.length < 10)) obviousFailures.push('too_short_response_detected')
+
+  return {
+    generatedAt: new Date().toISOString(),
+    model: AGENT_MODEL,
+    scenarioCount: allMetrics.length,
+    totalTokens,
+    averageTokens: avgTokens,
+    averageLatencyMs: avgLatency,
+    maxLatencyMs: maxLatency,
+    toolCallRate,
+    requiredToolCoverage,
+    fallbackCount,
+    errorLikeCount,
+    score,
+    scoreBreakdown: breakdown,
+    obviousFailures,
+    scenarios: allMetrics,
+  }
+}
+
+function writeBaselineReport(report: BaselineReport): void {
+  const outputDir = path.dirname(REPORT_PATH)
+  fs.mkdirSync(outputDir, { recursive: true })
+  fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2), 'utf-8')
+}
+
 // ============================================================================
 // 測試情境設計
 // ============================================================================
@@ -66,10 +172,15 @@ interface Scenario {
   expectedSkill: string | null         // 預期觸發的 skill
   expectedToolCalls: string[]          // 預期的 tool calls
   responseContains?: string[]          // 回應應包含的關鍵詞（任一）
+  responseContainsAll?: string[]       // 回應必須包含的關鍵詞（全部）
   responseNotContains?: string[]       // 回應不應包含的關鍵詞
+  responseNotMatch?: RegExp[]          // 回應不應匹配的模式
   sessionId?: string                   // 指定 session（multi-turn 用）
   allowFallback?: boolean              // 允許 fallback（記錄但不失敗）
 }
+
+const INTELLIGENCE_TASK_CODE = `ALPHA-${Date.now().toString().slice(-6)}`
+const UNKNOWN_TASK_CODE = `NO-TASK-${Date.now().toString().slice(-6)}`
 
 const SCENARIOS: Scenario[] = [
   // ── Brain Dump ──────────────────────────────────────────────────────────
@@ -169,6 +280,43 @@ const SCENARIOS: Scenario[] = [
     expectedToolCalls: ['brain_dump'],
     responseContains: ['PR', '記錄', '已記', '已記下', '記下', '✅'],
     allowFallback: true,
+  },
+
+  // ── Intelligence / reasoning signals ─────────────────────────────────────
+  {
+    name: 'IQ-1: 記錄含隨機代號（非模板）',
+    message: `幫我記一下任務代號 ${INTELLIGENCE_TASK_CODE}，內容是整理競品投影片`,
+    expectedSkill: 'brain_dump',
+    expectedToolCalls: ['brain_dump'],
+    responseContains: [INTELLIGENCE_TASK_CODE, '整理競品投影片', '記錄', '已記'],
+    sessionId: `${SESSION_ID}-iq`,
+  },
+  {
+    name: 'IQ-2: 指代修正上一輪任務位置',
+    message: '把剛剛那個改到行銷產品線，不是產品開發',
+    expectedSkill: null,
+    expectedToolCalls: ['adjust_tags_preview'],
+    responseContains: ['行銷', '產品開發', '調整', '預覽'],
+    sessionId: `${SESSION_ID}-iq`,
+  },
+  {
+    name: 'IQ-3: 回憶抽取（只回答代號）',
+    message: '我剛剛說的任務代號是什麼？只回答代號',
+    expectedSkill: null,
+    expectedToolCalls: [],
+    responseContainsAll: [INTELLIGENCE_TASK_CODE],
+    sessionId: `${SESSION_ID}-iq`,
+  },
+  {
+    name: 'IQ-4: 模糊完成需澄清，不可假裝完成',
+    message: `幫我完成任務 ${UNKNOWN_TASK_CODE}`,
+    expectedSkill: null,
+    expectedToolCalls: ['complete_task_search'],
+    responseContains: ['找不到', '更精確', '請提供', '候選', '無法判斷', '請確認', '任務名稱', '發生錯誤'],
+    responseNotMatch: [
+      /已(經)?(為您|幫你|替你)?標記.*完成/,
+      /已完成「?.+」?/,
+    ],
   },
 ]
 
@@ -324,12 +472,30 @@ describe('Agent Baseline 評估', () => {
         ).toBe(true)
       }
 
+      // ── 回應內容驗證（全部關鍵字都要有）────────────────────────────
+      if (scenario.responseContainsAll?.length) {
+        for (const kw of scenario.responseContainsAll) {
+          expect(
+            result.content,
+            `回應應包含關鍵字: ${kw}`
+          ).toContain(kw)
+        }
+      }
+
       // ── 不應包含的內容 ────────────────────────────────────────────
       for (const kw of scenario.responseNotContains ?? []) {
         expect(
           result.content,
           `回應不應包含: ${kw}`
         ).not.toContain(kw)
+      }
+
+      // ── 不應匹配的模式 ────────────────────────────────────────────
+      for (const pattern of scenario.responseNotMatch ?? []) {
+        expect(
+          result.content,
+          `回應不應匹配模式: ${pattern.toString()}`
+        ).not.toMatch(pattern)
       }
 
       // 輸出詳細資訊供人工審閱
@@ -356,16 +522,8 @@ describe('Agent Baseline 評估', () => {
       return
     }
 
-    const totalTokens = allMetrics.reduce((s, m) => s + m.tokens.total, 0)
-    const avgTokens = Math.round(totalTokens / allMetrics.length)
-    const avgLatency = Math.round(
-      allMetrics.reduce((s, m) => s + m.latencyMs, 0) / allMetrics.length
-    )
-    const maxLatency = Math.max(...allMetrics.map((m) => m.latencyMs))
-    const toolCallRate = allMetrics.filter((m) => m.toolCalls.length > 0).length
-    const fallbackCount = allMetrics.filter((m) =>
-      m.response.includes('出了一點狀況')
-    ).length
+    const report = buildBaselineReport(allMetrics)
+    writeBaselineReport(report)
 
     // skill 觸發分佈
     const skillDist: Record<string, number> = {}
@@ -378,23 +536,29 @@ describe('Agent Baseline 評估', () => {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📌 Agent Baseline 評估報告 (${new Date().toISOString().slice(0, 10)})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 Model: ${report.model}
+🧮 Score: ${report.score}/100
+📄 Report: ${REPORT_PATH}
 
 📈 Token 使用
-   ├─ 總計: ${totalTokens.toLocaleString()} tokens（${allMetrics.length} 個情境）
-   ├─ 平均: ${avgTokens.toLocaleString()} tokens / 輪
+   ├─ 總計: ${report.totalTokens.toLocaleString()} tokens（${allMetrics.length} 個情境）
+   ├─ 平均: ${report.averageTokens.toLocaleString()} tokens / 輪
    └─ 分佈:
 ${allMetrics.map((m) => `        ${m.scenario.padEnd(35)} prompt=${String(m.tokens.prompt).padStart(6)} comp=${String(m.tokens.completion).padStart(5)} total=${String(m.tokens.total).padStart(6)}`).join('\n')}
 
 ⏱️  延遲
-   ├─ 平均: ${avgLatency}ms
-   ├─ 最大: ${maxLatency}ms
+   ├─ 平均: ${report.averageLatencyMs}ms
+   ├─ 最大: ${report.maxLatencyMs}ms
    └─ 分佈:
 ${allMetrics.map((m) => `        ${m.scenario.padEnd(35)} ${m.latencyMs}ms`).join('\n')}
 
 🎯 Skill / Tool 觸發
-   ├─ 有工具呼叫: ${toolCallRate}/${allMetrics.length} 個情境
-   ├─ Fallback 觸發: ${fallbackCount} 次
+   ├─ 有工具呼叫: ${(report.toolCallRate * allMetrics.length).toFixed(0)}/${allMetrics.length} 個情境
+   ├─ Required Tool Coverage: ${(report.requiredToolCoverage * 100).toFixed(1)}%
+   ├─ Fallback 觸發: ${report.fallbackCount} 次
    └─ Skill 分佈: ${JSON.stringify(skillDist)}
+
+🧯 Obvious Failures: ${report.obviousFailures.length > 0 ? report.obviousFailures.join(', ') : '無'}
 
 🔍 逐一回應品質
 ${allMetrics.map((m) => `   [${m.scenario}]
@@ -403,10 +567,11 @@ ${allMetrics.map((m) => `   [${m.scenario}]
       reply: ${m.response.slice(0, 100)}${m.response.length > 100 ? '...' : ''}`).join('\n\n')}
 
 ⚠️  未來修改時應確保
-   - 平均 token ≤ ${avgTokens * 1.3 | 0}（當前 +30% 閾值）
+   - Score 不低於 baseline gate
+   - 平均 token ≤ ${report.averageTokens * 1.3 | 0}（當前 +30% 閾值）
    - brain_dump / reorganize_preview 情境工具呼叫率 = 100%
    - Fallback 觸發次數 = 0
-   - 平均延遲 ≤ ${Math.round(avgLatency * 1.5)}ms（當前 +50% 閾值）
+   - 平均延遲 ≤ ${Math.round(report.averageLatencyMs * 1.5)}ms（當前 +50% 閾值）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `)
 

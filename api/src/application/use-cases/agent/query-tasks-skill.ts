@@ -4,29 +4,29 @@
 
 import { tool, skill, makeSkillResult } from "naru-agent-js"
 import { z } from "zod"
-import { AgentTaskQueryService } from "./agent-task-query-service"
+import { AgentTaskQueryService, serializeQueryToolResult } from "./agent-task-query-service"
 
-const createQueryTodayTasksTool = (userId: string) =>
+export const createQueryTodayTasksTool = (userId: string) =>
   tool({
     name: "query_today_tasks",
-    description: "查詢今日與近期需要處理的任務摘要",
+    description: "查詢今天與近期需要處理的任務。當用戶詢問今天要做什麼、待辦、有哪些任務時必須使用。",
     parameters: z.object({}),
     execute: async () => {
       const queryService = new AgentTaskQueryService()
       const result = await queryService.queryTodayFocus(userId)
-      return result.summary
+      return serializeQueryToolResult(result)
     },
   })
 
-const createQueryCompletedTodayTasksTool = (userId: string) =>
+export const createQueryCompletedTodayTasksTool = (userId: string) =>
   tool({
     name: "query_completed_today_tasks",
-    description: "查詢今日已完成的任務摘要",
+    description: "查詢今天已完成的任務。當用戶詢問今天完成了什麼、今天做了什麼時必須使用。",
     parameters: z.object({}),
     execute: async () => {
       const queryService = new AgentTaskQueryService()
       const result = await queryService.queryCompletedToday(userId)
-      return result.summary
+      return serializeQueryToolResult(result)
     },
   })
 
@@ -40,9 +40,11 @@ export const createQueryTasksSkill = (userId: string) =>
       makeSkillResult({
         promptInjection: /今天.*完成|完成.*今天|完成了什麼|做了什麼/i.test(message)
           ? "用戶想查詢今天已完成的任務。請優先使用 query_completed_today_tasks 工具，" +
-            "回覆時只能根據工具結果，不要改成待辦清單；如果工具明確標示查詢範圍或只列出部分項目，你必須照實說明。"
+            "先讀取工具回傳的 [FACTS] JSON 區塊，再根據後面的摘要回答。" +
+            "回覆時只能根據工具結果，不要改成待辦清單；如果 FACTS 顯示查詢範圍限制、總數、群組摘要或只列出部分項目，你必須照實說明。"
           : "用戶想查詢今日或近期需要處理的任務。請使用 query_today_tasks 工具查詢，" +
-            "回覆時只能根據工具結果；如果工具明確標示查詢範圍或只列出部分項目，你必須照實說明。",
+            "先讀取工具回傳的 [FACTS] JSON 區塊，再根據後面的摘要回答。" +
+            "回覆時只能根據工具結果；如果 FACTS 顯示查詢範圍限制、總數、群組摘要或只列出部分項目，你必須照實說明。",
         extraTools: [
           createQueryTodayTasksTool(userId),
           createQueryCompletedTodayTasksTool(userId),
@@ -50,4 +52,3 @@ export const createQueryTasksSkill = (userId: string) =>
         skillName: "query_tasks",
       }),
   })
-
