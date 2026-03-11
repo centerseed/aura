@@ -5,7 +5,7 @@
  */
 
 import { google } from '@ai-sdk/google'
-import { generateObject } from 'ai'
+import { resilientGenerateObject } from '@/lib/ai-resilient'
 import { z } from 'zod'
 import type {
   BriefingType,
@@ -106,8 +106,8 @@ export class CoachAIGenerator {
     const schema = input.type === 'MORNING' ? MorningBriefingSchema : EveningBriefingSchema
 
     const start = Date.now()
-    const { object, usage } = await generateObject({
-      model: google('gemini-3.1-flash-lite-preview'),
+    const { object, usage } = await resilientGenerateObject({
+      model: google('gemini-2.5-flash-lite'),
       schema,
       prompt,
     })

@@ -12,6 +12,7 @@ import { getEmbedding, cosineSimilarity } from "@/lib/embedding"
 import { saveLineSession } from "@/lib/line-session"
 import type { CompleteTaskPayload } from "@/lib/line-session"
 import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
+import { serializeFactsSummary } from "./tool-result-protocol"
 
 const MAX_TASK_SEARCH_POOL = 150
 const MAX_EMBEDDING_CANDIDATES = 40
@@ -39,7 +40,7 @@ interface CompleteTaskSearchFacts {
   query: string
   totalActiveTasks: number
   candidateCount: number
-  decision: "completed" | "awaiting_confirmation" | "needs_disambiguation" | "no_match"
+  decision: "completed" | "awaiting_confirmation" | "needs_confirmation" | "needs_disambiguation" | "no_match"
   selectedTaskId?: string
   selectedTaskTitle?: string
   selectedSourceType?: SearchableTask["sourceType"]
@@ -52,23 +53,23 @@ interface CompleteTaskSearchFacts {
     semanticScore: number
     combinedScore: number
   }>
+  presentedEntities: Array<{
+    position: number
+    title: string
+    entityId: string
+    entityType: SearchableTask["sourceType"]
+    taskId?: string
+    subTaskId?: string
+    planItemId?: string
+  }>
 }
 
-export const createCompleteTaskSearchTool = (
+async function executeCompleteTaskSearch(
   userId: string,
-  originalMessage: string,
+  taskName: string,
   lineUserId?: string,
-  resolvedQuery?: string,
-) =>
-  tool({
-    name: "complete_task_search",
-    description: "搜尋用戶想要標記為完成的任務，回傳候選清單並等待確認",
-    // Groq function calling 會偶發把 schema 結構當成參數值回傳。
-    // 這裡改成零參數工具，直接對使用者原句做任務搜尋，降低 provider 相容性風險。
-    parameters: z.object({}),
-    execute: async () => {
-      const taskName = resolvedQuery ?? originalMessage
-      const completeTaskUseCase = new CompleteTaskUseCase()
+): Promise<string> {
+  const completeTaskUseCase = new CompleteTaskUseCase()
 
       const [tasks, subTasks, dailyPlanItems] = await Promise.all([
         prisma.task.findMany({
@@ -171,6 +172,7 @@ export const createCompleteTaskSearchTool = (
           candidateCount: 0,
           decision: "no_match",
           candidates: [],
+          presentedEntities: [],
         }, "目前沒有進行中的任務。")
       }
 
@@ -185,37 +187,17 @@ export const createCompleteTaskSearchTool = (
         )
       }
 
-      if (!lineUserId) {
-        if (decision.type !== "selected") {
-          return serializeCompleteTaskSearchResult(
-            buildSearchFacts(taskName, searchableTasks.length, top, "needs_disambiguation"),
-            buildDisambiguationMessage(taskName, top),
-          )
-        }
-
-        if (decision.task.sourceType !== "task" || !decision.task.taskId) {
-          return serializeCompleteTaskSearchResult(
-            buildSearchFacts(taskName, searchableTasks.length, top, "needs_disambiguation"),
-            "LINE 以外目前只支援直接完成 Task。請改用 LINE 確認流程，或提供更精確的 Task 名稱。",
-          )
-        }
-
-        await completeTaskUseCase.execute({ taskId: decision.task.taskId, userId })
-        return serializeCompleteTaskSearchResult(
-          buildSearchFacts(taskName, searchableTasks.length, top, "completed", decision.task),
-          `✅ 已完成「${decision.task.content}」，任務已封存。`,
-        )
-      }
-
       if (decision.type === "selected") {
-        const payload: CompleteTaskPayload = {
-          sourceType: decision.task.sourceType,
-          taskTitle: decision.task.content,
-          taskId: decision.task.taskId,
-          subTaskId: decision.task.subTaskId,
-          planItemId: decision.task.planItemId,
+        if (lineUserId) {
+          const payload: CompleteTaskPayload = {
+            sourceType: decision.task.sourceType,
+            taskTitle: decision.task.content,
+            taskId: decision.task.taskId,
+            subTaskId: decision.task.subTaskId,
+            planItemId: decision.task.planItemId,
+          }
+          await saveLineSession(lineUserId, "complete_task_confirm", payload)
         }
-        await saveLineSession(lineUserId, "complete_task_confirm", payload)
         return serializeCompleteTaskSearchResult(
           buildSearchFacts(taskName, searchableTasks.length, top, "awaiting_confirmation", decision.task),
           `是否完成「${decision.task.content}」？\n\n回覆「確認」執行，或無視此訊息取消。`,
@@ -226,7 +208,34 @@ export const createCompleteTaskSearchTool = (
         buildSearchFacts(taskName, searchableTasks.length, top, "needs_disambiguation"),
         buildDisambiguationMessage(taskName, top),
       )
-    },
+}
+
+export const createCompleteTaskSearchTool = (
+  userId: string,
+  originalMessage: string,
+  lineUserId?: string,
+  resolvedQuery?: string,
+) =>
+  tool({
+    name: "complete_task_search",
+    description: "搜尋用戶想要標記為完成的任務，回傳候選清單並等待確認",
+    // Groq function calling 會偶發把 schema 結構當成參數值回傳。
+    // 這裡改成零參數工具，直接對使用者原句做任務搜尋，降低 provider 相容性風險。
+    parameters: z.object({}),
+    execute: async () => executeCompleteTaskSearch(userId, resolvedQuery ?? originalMessage, lineUserId),
+  })
+
+export const createParameterizedCompleteTaskSearchTool = (
+  userId: string,
+  lineUserId?: string,
+) =>
+  tool({
+    name: "complete_task_search",
+    description: "搜尋用戶想要標記為完成的任務。傳入任務名稱或關鍵字進行搜尋。",
+    parameters: z.object({
+      query: z.string().describe("要完成的任務名稱或關鍵字"),
+    }),
+    execute: async ({ query }) => executeCompleteTaskSearch(userId, query, lineUserId),
   })
 
 export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
@@ -238,11 +247,13 @@ export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
     run: async (_message, _context) =>
       makeSkillResult({
         promptInjection:
-          "用戶想標記某個任務為完成。請直接呼叫 complete_task_search 工具。" +
-          "工具會使用用戶原句做搜尋。先讀取工具回傳的 [FACTS] JSON 區塊，再根據後面的摘要回答。" +
+          "用戶想標記某個任務為完成。請呼叫 complete_task_search 工具，" +
+          "從用戶訊息中提取任務名稱關鍵字傳入 query 參數。" +
+          "範例：用戶說「跑步完成了」→ query = \"跑步\"。" +
+          "先讀取工具回傳的 [FACTS] JSON 區塊，再根據後面的摘要回答。" +
           "若 FACTS 顯示 needs_disambiguation 或 no_match，不得假裝已完成，必須要求用戶確認更精確的任務。" +
           "這類澄清回覆必須明確包含「找不到」以及「更精確的任務名稱」或「任務名稱」等字樣，不能只說籠統的錯誤。",
-        extraTools: [createCompleteTaskSearchTool(userId, _message, lineUserId)],
+        extraTools: [createParameterizedCompleteTaskSearchTool(userId, lineUserId)],
         skillName: "complete_task",
       }),
   })
@@ -310,11 +321,22 @@ function buildSearchFacts(
       semanticScore: roundScore(candidate.semanticScore),
       combinedScore: roundScore(candidate.combinedScore),
     })),
+    presentedEntities: decision === "needs_disambiguation"
+      ? candidates.map((candidate, index) => ({
+          position: index + 1,
+          title: candidate.content,
+          entityId: candidate.id,
+          entityType: candidate.sourceType,
+          taskId: candidate.taskId,
+          subTaskId: candidate.subTaskId,
+          planItemId: candidate.planItemId,
+        }))
+      : [],
   }
 }
 
 function serializeCompleteTaskSearchResult(facts: CompleteTaskSearchFacts, summary: string): string {
-  return ["[FACTS]", JSON.stringify(facts, null, 2), "[/FACTS]", "", summary].join("\n")
+  return serializeFactsSummary(facts as unknown as Record<string, unknown>, summary)
 }
 
 function buildDisambiguationMessage(taskName: string, candidates: RankedTaskMatch[]): string {

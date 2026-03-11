@@ -6,7 +6,7 @@
  */
 
 import { google } from "@ai-sdk/google"
-import { generateObject } from "ai"
+import { resilientGenerateObject } from "@/lib/ai-resilient"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { ValidationException } from "@/lib/api-response"
@@ -202,7 +202,7 @@ export class AnalyzeAdjustmentIntentUseCase {
 
     // 2. 調用 AI 解析用戶意圖
     const startAI = Date.now()
-    const { object: intent, usage: aiUsage } = await generateObject({
+    const { object: intent, usage: aiUsage } = await resilientGenerateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: AdjustmentIntentSchema,
       prompt: `你是 Zentropy 的標籤調整助手。用戶想要調整現有任務的分類。

@@ -2,6 +2,7 @@ import type { IDataCollector } from "@/domain/interfaces/data-collector"
 import { UnifiedDataCollector } from "@/infrastructure/services/unified-data-collector"
 import { prisma } from "@/lib/db"
 import { resolveTimezone, getEndOfDay, getStartOfDay } from "@/lib/timezone-utils"
+import { serializeFactsSummary } from "./tool-result-protocol"
 
 const MAX_DISPLAY_ITEMS = 10
 
@@ -647,15 +648,17 @@ export function serializeQueryFacts(result: AgentTaskQueryResult) {
     truncated: result.truncated,
     groupedSummary: result.groupedSummary,
     items: result.items,
+    presentedEntities: result.items.map((item, index) => ({
+      position: index + 1,
+      title: item.title,
+      entityId: item.id,
+      entityType: item.sourceType,
+      taskId: item.relatedTaskId,
+      subTaskId: item.relatedSubTaskId,
+    })),
   }
 }
 
 export function serializeQueryToolResult(result: AgentTaskQueryResult): string {
-  return [
-    "[FACTS]",
-    JSON.stringify(serializeQueryFacts(result), null, 2),
-    "[/FACTS]",
-    "",
-    result.summary,
-  ].join("\n")
+  return serializeFactsSummary(serializeQueryFacts(result), result.summary)
 }

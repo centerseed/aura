@@ -15,7 +15,7 @@ import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/ex
 import type { AdjustTagsPayload, CompleteTaskPayload } from "@/lib/line-session"
 import { generateLineMagicLink } from "@/lib/line-magic-link"
 import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
-import { isLineSessionConfirmation } from "@/lib/line-confirmation"
+import { classifyConfirmationDisposition } from "@/lib/line-confirmation"
 import { UpdateSubItemUseCase } from "@/application/use-cases/tasks/update-sub-item"
 import { UpdatePlanItemUseCase } from "@/application/use-cases/coach/update-plan-item"
 
@@ -84,11 +84,26 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        // ── Session 攔截：多步驟確認對話 ────────────────────────────────
-        const isConfirm = isLineSessionConfirmation(text)
-        if (isConfirm) {
-          const session = await getLineSession(lineUserId)
-          if (session) {
+        // ── Session 攔截：先查 session，再判斷 disposition ───────────────
+        const session = await getLineSession(lineUserId)
+        if (session) {
+          const disposition = classifyConfirmationDisposition(text)
+
+          if (disposition === "reject") {
+            await clearLineSession(lineUserId)
+            await client.pushMessage({
+              to: lineUserId,
+              messages: [{ type: "text", text: "好的，已取消。" }],
+            })
+            return
+          }
+
+          if (disposition === "override") {
+            // 用戶有新意圖，清除 pending session，進入正常 agent 流程
+            await clearLineSession(lineUserId)
+            // fall through to agent
+          } else {
+            // disposition === "confirm" → 執行 pending operation
             if (session.type === "adjust_tags_preview") {
               const p = session.payload as AdjustTagsPayload
               const executeUC = new ExecuteAdjustmentUseCase()

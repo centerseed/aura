@@ -1,7 +1,7 @@
 # Agent Task Truthfulness Implementation Plan
 
-**版本**: v1.0
-**更新日期**: 2026-03-09
+**版本**: v1.1
+**更新日期**: 2026-03-11
 **對應 Spec**: [`015_Agent_Task_Truthfulness_Spec.md`](../01_Specification/015_Agent_Task_Truthfulness_Spec.md)
 **目標**: 讓 LINE Agent 在「今天完成了什麼 / 今天要做什麼 / 標記完成」場景中，使用與主系統一致的事實來源，避免因資料口徑錯誤而輸出誤導性回覆。
 
@@ -42,6 +42,12 @@
 3. 重構 tool 輸出 contract 為「結構化事實 + 可讀摘要」
 4. 強化 prompt 只做表達控制，不再代替資料邏輯
 5. 建立可回歸的真實場景測試集
+
+補充修正軸線（2026-03-11）：
+
+6. 建立 canonical tool response protocol，阻止 `[FACTS]` 洩漏到 user-facing reply
+7. 把多輪指代解析改成「最近一次結構化實體集合」而不是回掃所有 assistant 摘要句
+8. 把 planner `goal` 參數 ownership 收回 application 層，避免 provider function-calling 漏參
 
 ---
 
@@ -179,6 +185,45 @@ prompt 不再承擔資料修補責任。
 
 - 滿足 LINE 回覆長度限制
 - 保留事實完整性
+
+### 4.6 Canonical tool response 必須由 orchestration 層決定
+
+決策：
+
+- tool output 若包含 `[FACTS]` 區塊，只能寫入 history / trace
+- 最終回覆一律使用 orchestration 層抽出的 human summary
+- 對 side-effect intents，tool 已成功時，優先回傳 tool summary，不接受 LLM 自由改寫覆蓋
+
+理由：
+
+- `FACTS` 洩漏不是 prompt 細節，而是 final response assembly 把 raw tool output / step text 直接暴露給使用者
+- truthfulness 需要把最終回覆所有權收回 orchestration
+
+### 4.7 多輪指代只綁最近一次實體集合
+
+決策：
+
+- ordinal reference 只讀取最近一次真正列出的 items（query list 或 disambiguation list）
+- 單一確認 preview 不得被當成新的 ordinal list
+- brain dump / append 需寫入結構化 recorded items，供 recall 與 completion 共用
+
+理由：
+
+- 目前把所有 assistant mentions 混成同一個 pool，會讓「第二個」漂移到不相關候選
+- append 類摘要句若沒有結構化 facts，後續 completion 會拿到整段說明文字而不是 task title
+
+### 4.8 Planner goal extraction 不能交給 provider 猜
+
+決策：
+
+- `createRunPlannerTool()` 支援以原始 user message 作為 canonical input
+- planning route 預設採 zero-arg tool，application 層自行正規化 goal
+- planner 內層 `generateObject` schema 放寬為「最小可用欄位」，再由 post-processing 補預設值
+
+理由：
+
+- `goal=undefined` 與 schema mismatch 屬於兩層不同失真：外層 tool args 失真、內層 structured output 過脆
+- 需要同時修 tool input ownership 與 planner output normalization
 
 ---
 

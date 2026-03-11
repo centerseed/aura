@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "@ai-sdk/google";
-import { generateObject } from "ai";
+import { resilientGenerateObject } from "@/lib/ai-resilient";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth-middleware";
@@ -181,8 +181,8 @@ export async function POST(
     });
 
     const startAI = Date.now();
-    const { object: result, usage: aiUsage } = await generateObject({
-      model: google("gemini-3.1-flash-lite-preview"),
+    const { object: result, usage: aiUsage } = await resilientGenerateObject({
+      model: google("gemini-2.5-flash-lite"),
       schema: ReorganizeProposalSchema,
       prompt,
     });

@@ -6,9 +6,29 @@ const EFFECT_CLAIM_PATTERNS: RegExp[] = [
   /任務已封存/u,
 ]
 
+// P0 safety: only these tools actually perform mutations
+export const MUTATION_TOOL_NAMES = new Set([
+  "brain_dump",
+  "complete_task_search",
+  "adjust_tags_preview",
+  "reorganize_preview",
+  "run_planner",
+])
+
+// Tool output patterns that indicate the mutation did NOT succeed
+const SOFT_FAILURE_PATTERNS: RegExp[] = [
+  /找不到/u,
+  /無法/u,
+  /失敗/u,
+  /不存在/u,
+  /沒有.*任務/u,
+  /錯誤/u,
+]
+
 export interface AgentExecutionResultLike {
   content?: unknown
   toolCalls?: unknown
+  toolOutputs?: unknown
   trace?: unknown
 }
 
@@ -31,12 +51,39 @@ export function hasEffectClaim(content: string): boolean {
   return EFFECT_CLAIM_PATTERNS.some((pattern) => pattern.test(text))
 }
 
+export function hasToolOutputSoftFailure(toolOutputs: unknown): boolean {
+  if (!Array.isArray(toolOutputs)) return false
+  return toolOutputs.some((output) => {
+    if (typeof output !== "string") return false
+    return SOFT_FAILURE_PATTERNS.some((pattern) => pattern.test(output))
+  })
+}
+
 export function verifyAgentExecutionResult<T extends AgentExecutionResultLike>(result: T): T {
   const toolCalls = Array.isArray(result.toolCalls)
     ? result.toolCalls.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     : []
 
-  if (toolCalls.length > 0 || hasSelectedToolTrace(result.trace)) {
+  if (toolCalls.length > 0) {
+    // Has tool calls — but if claiming side effect, verify at least one is a mutation tool
+    if (typeof result.content === "string" && hasEffectClaim(result.content)) {
+      if (!toolCalls.some((name) => MUTATION_TOOL_NAMES.has(name))) {
+        throw new AgentExecutionVerificationError(
+          "Agent claimed side effect but only query tools were called",
+        )
+      }
+
+      // Mutation tool was called, but did it actually succeed?
+      if (hasToolOutputSoftFailure(result.toolOutputs)) {
+        throw new AgentExecutionVerificationError(
+          "Agent claimed side effect but tool output indicates failure",
+        )
+      }
+    }
+    return result
+  }
+
+  if (hasSelectedToolTrace(result.trace)) {
     return result
   }
 

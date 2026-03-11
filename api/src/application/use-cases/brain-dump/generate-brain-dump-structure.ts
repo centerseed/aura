@@ -8,7 +8,7 @@
 
 import { google } from "@ai-sdk/google"
 import { createOpenAI } from "@ai-sdk/openai"
-import { generateObject } from "ai"
+import { resilientGenerateObject } from "@/lib/ai-resilient"
 import { z } from "zod"
 import { isSingleConnectionPool, prisma } from "@/lib/db"
 import { getEmbedding } from "@/lib/embedding"
@@ -585,7 +585,7 @@ export class GenerateBrainDumpStructureUseCase {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         console.log(`🔄 [brain-dump] AI generateObject attempt ${attempt + 1}/3...`)
-        const { object, usage } = await generateObject({
+        const { object, usage } = await resilientGenerateObject({
           model: process.env.OPENROUTER_MODEL
             ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
             : google("gemini-2.5-flash-lite"),

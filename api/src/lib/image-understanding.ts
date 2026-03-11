@@ -6,7 +6,7 @@
  */
 
 import { google } from "@ai-sdk/google";
-import { generateObject } from "ai";
+import { resilientGenerateObject } from "@/lib/ai-resilient";
 import { z } from "zod";
 
 // ============================================================================
@@ -79,7 +79,7 @@ export async function understandImage(
     ? `\n\n用戶補充說明：「${supplementaryText}」\n請結合用戶說明來理解圖片內容。`
     : "";
 
-  const { object: result } = await generateObject({
+  const { object: result } = await resilientGenerateObject({
     model: google("gemini-2.5-flash"),
     schema: ImageUnderstandingResultSchema,
     messages: [

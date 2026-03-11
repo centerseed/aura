@@ -1,7 +1,7 @@
 # Agent Task Truthfulness Specification
 
-**版本**: v1.0
-**更新日期**: 2026-03-09
+**版本**: v1.1
+**更新日期**: 2026-03-11
 **定位**: 修正 LINE Agent 在「今天做了什麼 / 今天要做什麼 / 完成任務」場景中的事實失真問題，建立可支撐真實使用的任務事實查詢規格。
 
 ---
@@ -227,6 +227,39 @@ Agent tool 的責任是提供「事實資料」，不是讓模型自行補完。
 4. 亞洲時區跨日邊界
 5. 完成後立即查詢場景
 6. 空結果與部分結果的回覆區分
+
+### FR-9 Canonical tool response protocol
+
+任何會先執行 tool、再回覆使用者的 agent 路徑，必須把 tool output 視為 canonical response source。
+
+具體要求：
+
+1. tool 可回傳 machine-readable facts 與 human summary，但 user-facing reply 只可使用 human summary
+2. `[FACTS] ... [/FACTS]` 區塊只能存在於內部 history / trace，不得直接回傳給最終使用者
+3. 一旦 tool 已成功執行，LLM 不得用自由生成文字覆蓋 tool 的關鍵決策結果
+4. 對完成、規劃、分類等 side-effect 路徑，回覆內容必須以 tool 真實結果為準
+
+### FR-10 Context entity extraction 必須依賴結構化事實
+
+多輪對話中的「第一個 / 第二個 / 剛才記的那個」等指代，必須優先解析到結構化的上一輪實體，而不是回掃整段自然語言摘要。
+
+具體要求：
+
+1. ordinal reference 只可對應到最近一次真正列出的項目集合
+2. completion preview 的候選或單一確認項目，不可污染原始 query list 的序號語意
+3. brain dump / append 路徑必須在 history 中留下可抽取的結構化實體名稱
+4. recall / completion 不得把整段 assistant 摘要句當成 task title 傳回搜尋
+
+### FR-11 Planner parameter ownership
+
+規劃路徑的 `goal` 參數必須由 application 層掌握，不可完全依賴 provider 的 function-calling 參數生成。
+
+具體要求：
+
+1. planning intent 一旦成立，原始 user message 必須可被 application 層還原成 planner goal
+2. tool calling provider 若未可靠填入 `goal`，系統仍必須能以原始訊息完成規劃
+3. planner 內層 structured generation schema 必須容忍 provider 的輕微欄位缺失，並由 application 層補齊 defaults
+4. 系統不得把 `undefined` 或空字串帶入 planner prompt 或建立出的任務內容
 
 ---
 

@@ -8,7 +8,6 @@
 import { tool, skill, makeSkillResult } from "naru-agent-js"
 import { z } from "zod"
 import { AnalyzeAdjustmentIntentUseCase } from "@/application/use-cases/adjust-tags/analyze-adjustment-intent"
-import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
 import { saveLineSession } from "@/lib/line-session"
 import type { AdjustTagsPayload } from "@/lib/line-session"
 
@@ -41,12 +40,12 @@ export const createAdjustTagsTool = (userId: string, originalMessage: string, li
         return "無法識別操作類型，請重新描述。"
       }
 
-      if (lineUserId) {
-        if (!logId) {
-          return "發生錯誤：無法建立預覽記錄。"
-        }
+      if (!logId) {
+        return "發生錯誤：無法建立預覽記錄。"
+      }
 
-        // LINE 模式：存 session，等待用戶確認
+      // 存 session，等待用戶確認（LINE 和 API 統一流程）
+      if (lineUserId) {
         const payload: AdjustTagsPayload = {
           logId,
           intentType,
@@ -57,28 +56,10 @@ export const createAdjustTagsTool = (userId: string, originalMessage: string, li
           taskMap: taskMap as Record<string, unknown>,
         }
         await saveLineSession(lineUserId, "adjust_tags_preview", payload)
-
-        const preview = previewLog.join("\n\n")
-        return `📋 調整預覽：\n\n${preview}\n\n回覆「確認」執行，或無視此訊息取消。`
       }
 
-      // 非 LINE 模式：直接執行（避免無 session 時 fallback）
-      const executeUC = new ExecuteAdjustmentUseCase()
-      const executed = await executeUC.execute({
-        userId,
-        intentType,
-        taskMatches: intent.task_matches,
-        targetArea: intent.target_area,
-        targetProduct: intent.target_product,
-        targetTopic: intent.target_topic,
-        taskMap: taskMap as Record<string, any>,
-        logId: null,
-      })
-
-      if (executed.movedCount === 0) {
-        return "了解，你是要修正或更新任務分類，但目前沒有可執行的調整。請再具體描述任務名稱與目標分類。"
-      }
-      return `✅ 已完成分類調整：\n\n${executed.operationLog.join("\n\n")}`
+      const preview = previewLog.join("\n\n")
+      return `📋 調整預覽：\n\n${preview}\n\n回覆「確認」執行，或無視此訊息取消。`
     },
   })
 

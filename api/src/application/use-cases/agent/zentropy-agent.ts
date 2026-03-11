@@ -6,7 +6,6 @@
 
 import {
   LLMStructuredClassifier,
-  NaruAgent,
 } from "naru-agent-js"
 import { AgentIntentSchema, type AgentIntent } from "./agent-intent"
 import { createBrainDumpSkill } from "./brain-dump-skill"
@@ -19,8 +18,10 @@ import { StructuredFallbackAgentIntentResolver } from "./agent-intent-resolver"
 import { getAgentRuntime } from "./agent-runtime"
 import { LifecycleAwareAgent } from "./lifecycle-aware-agent"
 import { ToolFirstAgent } from "./tool-first-agent"
+import { IntentAwareExecutor } from "./intent-aware-executor"
 import { GroqPromptGuardrail } from "@/application/services/groq-prompt-guardrail"
 import { getAgentChatModel, getAgentRoutingMode, getAgentSummaryModel } from "@/lib/agent-model"
+import { createDecisionFallbackAgent, createResponseAgent, type AgentRuntimeParts } from "./agent-factories"
 
 function buildExperimentalGuardrails() {
   if (process.env.AGENT_PROMPT_GUARD_ENABLED !== "true") {
@@ -44,89 +45,81 @@ function buildExperimentalGuardrails() {
   ]
 }
 
-const SYSTEM_PROMPT = `你是 Zentropy 的 LINE Bot 助理，透過 LINE 訊息幫助用戶管理任務。
+const DECISION_PROMPT = `你是 Zentropy LINE Agent 的 decision layer。你的唯一工作是判定用戶這一句話的 canonical intent。
 
-你能做的事（只能做這些，不能做其他）：
-1. 記錄任務與想法（brain_dump）— 接收用戶描述，自動分類建立任務
-2. 查詢今日任務（query_tasks）— 列出今天的待辦清單
-3. 標記任務完成（complete_task）— 語意搜尋匹配，封存任務
-4. 拆解目標為任務（planner）— 將大目標拆解成可執行的任務清單
-5. 調整任務分類（adjust_tags）— 將任務移到不同 Product 或改變 Topic
-6. 重整任務結構（reorganize）— 分析並提出任務合併/移動建議
+## Intent 清單
 
-你不能做的事（必須明確告知用戶）：
-- 不能修改任務的標題或內容
-- 不能刪除任務
-- 不能設定或修改截止日期
-- 不能查詢任務以外的 Zentropy 資料
+query（查詢，不改變任何資料）：
+- today_focus：查今天待辦（「今天要做什麼」「有什麼任務」）
+- completed_today：查今天完成項目（「今天完成了什麼」）
+- recall_last_item：查剛才記了什麼（「我剛才記了什麼」）
+- recall_task_code：查任務代號（「任務代號是什麼」）
 
-規則：
-- 語言：繁體中文
-- 風格：簡潔直接，不廢話，像高效特助
-- 用戶要求超出能力範圍時：明確說「這個我還做不到，目前只能 [列出相關能做的]」
-- 執行 tool 後：用自然語言回報結果，不貼原始資料
-- ⚠️ 絕對禁止：沒有呼叫工具就宣稱已完成操作（「已記錄」「已完成」等字眼，必須是工具真的執行完才能說）
-- 查詢類問題只能根據工具結果回答；如果工具在 [FACTS] JSON 中說明查詢範圍限制、總數、群組摘要或只列出部分項目，你必須照實轉述
-- 用戶問「今天完成了什麼」時，禁止改答成待辦清單；若工具只覆蓋部分來源，也必須明說
-- 無法判斷用戶意圖時：直接問「你是要記錄這件事，還是要查詢/完成/規劃什麼？」，不要自行猜測後假裝執行
-- 用戶輸入看起來像待辦事項或任務（動詞+事情，例如「去買東西」「回覆信件」「準備報告」）：直接呼叫 brain_dump 工具記錄，不需要確認`
+mutate（會改變資料，需要謹慎）：
+- task_capture：記錄新任務。✅「記錄：繳電費」「幫我記一下開會」「待辦：買牛奶」❌ 不是 task_capture：「記得繳電費」「還要買牛奶」「明天要開會」「對了還要繳電費」— 沒有「記錄」「幫我記」「待辦」等明確指令
+- task_completion：標記完成（「跑步完成了」「第一個做完了」「幫我標記完成」）
+- classification：調整分類（「把 XXX 移到 OOO」）
+- reorganize：整理結構（「幫我整理任務」）
 
-const DECISION_PROMPT = `你是 Zentropy LINE Agent 的 decision layer。
+meta：
+- planning：拆解規劃（「幫我規劃 XXX」）
+- greeting：打招呼（「你好」「嗨」「你是誰」）
+- unknown：不屬於以上任何 intent
 
-你的唯一工作是判定 canonical intent。
+## speechAct 使用指引
 
-規則：
-- 輸出必須符合 schema，不要回答自然語言
-- 只判斷使用者這一句的 intent，必要時可參考 session summary 與 memory
-- 高風險 mutation 寧可保守，不要亂猜
-- 不知道時回傳 object=unknown，confidence 低於 0.5
-- reasonCodes 使用短的 machine-readable 字串`
+- query：用戶在查資料
+- mutate：用戶要改資料
+- clarify：用戶在否定、澄清、補充（「不是」「只是跟你說一下」「我是說那個」）
+- confirm：用戶在確認（「對」「確認」「好的，執行」）
+- meta：其他（打招呼、閒聊、問能力）
+
+## Confidence 校準
+
+- 0.95-1.0：完全明確，語意零歧義（「記錄：繳電費」→ task_capture 0.96）
+- 0.80-0.94：高度可能，但有微小歧義（「跑步完成了」→ task_completion 0.85）
+- 0.50-0.79：可能，但需要確認（「記得繳電費」→ 可能是 task_capture 也可能是提醒 → unknown 0.60）
+- <0.50：不確定（「嗯」→ unknown 0.20）
+
+## 核心原則
+
+1. task_capture 是高風險 mutation — 一旦判錯就會建立垃圾任務。必須有明確記錄框架（「記錄」「幫我記」「待辦」「todo」）才能判 task_capture。缺少框架的陳述句一律 unknown。
+2. 高風險 mutation（task_capture、task_completion）寧可保守。不確定就 unknown + 低 confidence。
+3. 多輪上下文：session summary 和 memory 可用於理解指代（「那個」「第一個」），但不能改變這一句本身的語意。用戶在前一輪記了東西，不代表這一輪也要記。
+4. reasonCodes 使用短的 machine-readable 字串。`
 
 export function createZentropyAgent(userId: string, lineUserId?: string): LifecycleAwareAgent {
-  const runtime = getAgentRuntime()
+  const rawRuntime = getAgentRuntime()
   const guardrails = buildExperimentalGuardrails()
   const chatModel = getAgentChatModel()
   const summaryModel = getAgentSummaryModel()
-  const baseAgent = new NaruAgent({
-    model: chatModel,
-    name: "naru",
-    instructions: [SYSTEM_PROMPT],
-    // Session（短期對話記憶）
-    sessionStore: runtime.sessionStore,
-    numHistoryMessages: 10,
-    // Context 壓縮（超過 10 輪時壓縮舊對話，保留最後 5 輪）
-    contextCompression: true,
-    summaryStore: runtime.summaryStore,
-    // 摘要模型跟主對話模型共用同一個 provider 封裝，未來替換只需要改 agent-model.ts。
-    summaryModel,
-    compressionThresholdRounds: 5,
-    compressionKeepLastRounds: 5,
-    memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager ?? undefined : undefined,
-    guardrails,
-    skills: [
-      createBrainDumpSkill(userId),
-      createReorganizeSkill(userId),
-      createPlannerSkill(userId),
-      createQueryTasksSkill(userId),
-      createCompleteTaskSkill(userId, lineUserId),
-      createAdjustTagsSkill(userId, lineUserId),
-    ],
-  })
 
-  const decisionAgent = new NaruAgent({
-    model: chatModel,
-    name: "naru-decision",
-    instructions: [DECISION_PROMPT],
-    sessionStore: runtime.sessionStore,
-    numHistoryMessages: 10,
-    contextCompression: true,
-    summaryStore: runtime.summaryStore,
+  // confirmationKey: LINE 用 lineUserId，API 用 api:{userId}
+  // 確保所有路徑都有 session-based confirm 流程
+  const confirmationKey = lineUserId ?? `api:${userId}`
+
+  const runtime: AgentRuntimeParts = {
+    sessionStore: rawRuntime.sessionStore,
+    summaryStore: rawRuntime.summaryStore,
+    memoryManager: rawRuntime.memoryManager,
+    longTermMemoryMode: rawRuntime.longTermMemoryMode,
+    chatModel,
     summaryModel,
-    compressionThresholdRounds: 5,
-    compressionKeepLastRounds: 5,
-    memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager ?? undefined : undefined,
     guardrails,
-  })
+  }
+
+  const skills = [
+    createBrainDumpSkill(userId),
+    createReorganizeSkill(userId),
+    createPlannerSkill(userId),
+    createQueryTasksSkill(userId),
+    createCompleteTaskSkill(userId, confirmationKey),
+    createAdjustTagsSkill(userId, confirmationKey),
+  ]
+
+  const baseAgent = createResponseAgent(runtime, skills)
+
+  const decisionAgent = createDecisionFallbackAgent(runtime)
 
   const intentResolver = new StructuredFallbackAgentIntentResolver({
     decisionAgent,
@@ -139,15 +132,23 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     }),
   })
 
+  const executor = new IntentAwareExecutor({
+    model: chatModel,
+    userId,
+    lineUserId: confirmationKey,
+  })
+
   const agent = getAgentRoutingMode() === "tool_first"
     ? new ToolFirstAgent({
+        executor,
         delegate: baseAgent,
-        sessionStore: runtime.sessionStore,
-        memoryManager: runtime.longTermMemoryMode === "each_turn" ? runtime.memoryManager : null,
-        lineUserId,
+        sessionStore: rawRuntime.sessionStore,
+        metaStore: rawRuntime.metaStore,
+        memoryManager: rawRuntime.longTermMemoryMode === "each_turn" ? rawRuntime.memoryManager : null,
+        lineUserId: confirmationKey,
         intentResolver,
       })
     : baseAgent
 
-  return new LifecycleAwareAgent(agent, runtime.lifecycleService, userId)
+  return new LifecycleAwareAgent(agent, rawRuntime.lifecycleService, userId)
 }

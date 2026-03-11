@@ -6,7 +6,7 @@
  */
 
 import { google } from "@ai-sdk/google"
-import { generateObject } from "ai"
+import { resilientGenerateObject } from "@/lib/ai-resilient"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 import type { AiTokenUsage } from "@/lib/ai-rate-limit"
@@ -162,10 +162,12 @@ export class AnalyzeStructureUseCase {
     }
     tasksProcessed.clear()
 
-    // 構建結構摘要
+    // 構建結構摘要（限制 prompt 大小，每個 Product 最多顯示 10 個 task）
+    const MAX_TASKS_PER_PRODUCT = 10
     let structureSummary = "### Current Structure:\n\n"
     const areasProcessed = new Set<string>()
     const productsProcessed = new Set<string>()
+    const productTasksShown = new Map<string, number>()
 
     for (const row of rawRows) {
       if (!areasProcessed.has(row.area_id)) {
@@ -190,25 +192,37 @@ export class AnalyzeStructureUseCase {
         existingByName.push({ id: row.product_id, areaName: row.area_name, taskCount })
         productByNameCache.set(row.product_name!, existingByName)
 
-        structureSummary += `  - Product: ${row.product_name}\n`
+        structureSummary += `  - Product: ${row.product_name} (${taskCount} tasks)\n`
+        productTasksShown.set(row.product_id, 0)
       }
 
       if (row.task_id && row.product_id && !tasksProcessed.has(row.task_id)) {
         tasksProcessed.add(row.task_id)
-        const aiAnalysis = row.task_ai_analysis as { narrative?: string } || {}
-        structureSummary += `    - Task [${row.task_id}]: ${row.task_content} (${aiAnalysis.narrative || "no context"})\n`
         taskMap[row.task_id] = {
           areaName: row.area_name,
           productName: row.product_name!,
           content: row.task_content!,
           aiAnalysis: row.task_ai_analysis as object | null,
         }
+
+        // Prompt 大小控制：每個 Product 只列出前 N 個 task
+        const shown = productTasksShown.get(row.product_id) ?? 0
+        if (shown < MAX_TASKS_PER_PRODUCT) {
+          const narrative = (row.task_ai_analysis as { narrative?: string })?.narrative
+          const truncatedNarrative = narrative ? narrative.slice(0, 80) : "no context"
+          structureSummary += `    - Task [${row.task_id}]: ${row.task_content?.slice(0, 100)} (${truncatedNarrative})\n`
+          productTasksShown.set(row.product_id, shown + 1)
+        } else if (shown === MAX_TASKS_PER_PRODUCT) {
+          const totalCount = productTaskCounts.get(row.product_id) || 0
+          structureSummary += `    - ... and ${totalCount - MAX_TASKS_PER_PRODUCT} more tasks\n`
+          productTasksShown.set(row.product_id, shown + 1)
+        }
       }
     }
     structureSummary += "\n"
 
     // 3. AI 分析
-    const { object: result, usage: aiUsage } = await generateObject({
+    const { object: result, usage: aiUsage } = await resilientGenerateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: ReorganizeResultSchema,
       prompt: `你是 Zentropy 的圖書管理員 AI，一個資訊熵減系統。

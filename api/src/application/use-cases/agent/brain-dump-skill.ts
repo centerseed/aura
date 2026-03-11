@@ -11,6 +11,18 @@ import { ParseBrainDumpInputUseCase } from "@/application/use-cases/brain-dump/p
 import { GenerateBrainDumpStructureUseCase } from "@/application/use-cases/brain-dump/generate-brain-dump-structure"
 import { ExecuteBrainDumpUseCase } from "@/application/use-cases/brain-dump/execute-brain-dump"
 import { shouldActivateBrainDump } from "./brain-dump-matcher"
+import { serializeFactsSummary } from "./tool-result-protocol"
+
+interface BrainDumpFacts {
+  action: "append_sub_item" | "create_new_tasks" | "duplicates_only" | "no_items"
+  recordedItems: Array<{
+    title: string
+    source: "created" | "appended" | "duplicate"
+    sourceType?: "task" | "sub_task"
+    taskId?: string
+    subTaskId?: string
+  }>
+}
 
 function summarizeOriginalText(text: string): string {
   return text.trim().replace(/\s+/g, " ").slice(0, 60)
@@ -26,6 +38,10 @@ function buildBrainDumpFailureMessage(text: string, error: unknown): string {
   }
 
   return `抱歉，剛才記錄「${summary}」時發生錯誤。請稍後再試。`
+}
+
+function serializeBrainDumpResult(facts: BrainDumpFacts, summary: string): string {
+  return serializeFactsSummary(facts as unknown as Record<string, unknown>, summary)
 }
 
 export const createBrainDumpTool = (userId: string, originalMessage: string) =>
@@ -81,11 +97,29 @@ export const createBrainDumpTool = (userId: string, originalMessage: string) =>
         if (action === "append_sub_item") {
           // 追加 sub_items 到既有任務
           const appendedTasks = result.data?.appended_tasks ?? []
-          if (appendedTasks.length === 0) return "已記錄，但沒有追加任何內容。"
+          const appendedSubItems = result.data?.appended_sub_items ?? []
+          if (appendedTasks.length === 0) {
+            return serializeBrainDumpResult(
+              { action: "append_sub_item", recordedItems: [] },
+              "已記錄，但沒有追加任何內容。",
+            )
+          }
           const summary = appendedTasks
             .map((at: any) => `「${at.task.content}」追加 ${at.sub_items.length} 個待辦`)
             .join("; ")
-          return `✅ 已記錄並追加：${summary}`
+          return serializeBrainDumpResult(
+            {
+              action: "append_sub_item",
+              recordedItems: appendedSubItems.map((sub: any) => ({
+                title: sub.content,
+                source: "appended" as const,
+                sourceType: "sub_task" as const,
+                taskId: result.data?.target_task?.id,
+                subTaskId: sub.id,
+              })),
+            },
+            `✅ 已記錄並追加：${summary}`,
+          )
         }
 
         // create_new_tasks 情況
@@ -93,15 +127,57 @@ export const createBrainDumpTool = (userId: string, originalMessage: string) =>
         const skippedDuplicates: string[] = result.data?.skipped_as_duplicates ?? []
         if (items.length === 0 && skippedDuplicates.length > 0) {
           const titles = skippedDuplicates.join("、")
-          return `⚠️ 這些任務已存在，未重複建立：${titles}`
+          return serializeBrainDumpResult(
+            {
+              action: "duplicates_only",
+              recordedItems: skippedDuplicates.map((title) => ({
+                title,
+                source: "duplicate" as const,
+              })),
+            },
+            `⚠️ 這些任務已存在，未重複建立：${titles}`,
+          )
         }
-        if (items.length === 0) return "已記錄，但沒有新增任何項目。"
+        if (items.length === 0) {
+          return serializeBrainDumpResult(
+            { action: "no_items", recordedItems: [] },
+            "已記錄，但沒有新增任何項目。",
+          )
+        }
         const titles = items.map((i: any) => i.title ?? i.content ?? "（無標題）").join("、")
         if (skippedDuplicates.length > 0) {
           const skippedTitles = skippedDuplicates.join("、")
-          return `✅ 已記錄 ${items.length} 個項目：${titles}（另有 ${skippedDuplicates.length} 個已存在的任務未重複建立：${skippedTitles}）`
+          return serializeBrainDumpResult(
+            {
+              action: "create_new_tasks",
+              recordedItems: [
+                ...items.map((i: any) => ({
+                  title: i.title ?? i.content ?? "（無標題）",
+                  source: "created" as const,
+                  sourceType: "task" as const,
+                  taskId: i.id,
+                })),
+                ...skippedDuplicates.map((title) => ({
+                  title,
+                  source: "duplicate" as const,
+                })),
+              ],
+            },
+            `✅ 已記錄 ${items.length} 個項目：${titles}（另有 ${skippedDuplicates.length} 個已存在的任務未重複建立：${skippedTitles}）`,
+          )
         }
-        return `✅ 已記錄 ${items.length} 個項目：${titles}`
+        return serializeBrainDumpResult(
+          {
+            action: "create_new_tasks",
+            recordedItems: items.map((i: any) => ({
+              title: i.title ?? i.content ?? "（無標題）",
+              source: "created" as const,
+              sourceType: "task" as const,
+              taskId: i.id,
+            })),
+          },
+          `✅ 已記錄 ${items.length} 個項目：${titles}`,
+        )
       } catch (error) {
         console.error("[brain-dump] tool failed:", error)
         return buildBrainDumpFailureMessage(text, error)

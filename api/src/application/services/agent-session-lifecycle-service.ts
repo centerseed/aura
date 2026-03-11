@@ -26,6 +26,7 @@ export interface SessionMeta {
   currentSegmentId: number
   lastFlushedSegmentId: number | null
   lastFlushAt: string | null
+  agentState?: Record<string, unknown>
 }
 
 export interface SessionMetaStore {
@@ -79,6 +80,7 @@ function defaultMeta(meta?: SessionMeta | null): SessionMeta {
     currentSegmentId: meta?.currentSegmentId ?? 1,
     lastFlushedSegmentId: meta?.lastFlushedSegmentId ?? null,
     lastFlushAt: meta?.lastFlushAt ?? null,
+    ...(meta?.agentState ? { agentState: meta.agentState } : {}),
   }
 }
 

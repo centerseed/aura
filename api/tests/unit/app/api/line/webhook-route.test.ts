@@ -81,6 +81,7 @@ vi.mock("@/application/use-cases/agent/query-tasks-skill", () => ({
 
 vi.mock("@/application/use-cases/agent/complete-task-skill", () => ({
   createCompleteTaskSearchTool: mockCreateCompleteTaskSearchTool,
+  createParameterizedCompleteTaskSearchTool: mockCreateCompleteTaskSearchTool,
 }))
 
 const { ToolFirstAgent } = await import("@/application/use-cases/agent/tool-first-agent")
@@ -105,10 +106,25 @@ function buildRequest(text: string, lineUserId = "line-user-1"): NextRequest {
   })
 }
 
+const mockExecutorExecute = vi.fn()
+
 function installToolFirstAgentMock(lineUserId = "line-user-1"): void {
   const historyBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
 
+  mockExecutorExecute.mockResolvedValue({
+    blocked: false,
+    content: "executor fallback",
+    usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    intent: null,
+    toolCalls: [],
+    timings: {},
+    sessionId: lineUserId,
+    traceId: null,
+    trace: {},
+  })
+
   mockCreateZentropyAgent.mockImplementation(() => new ToolFirstAgent({
+    executor: { execute: mockExecutorExecute } as any,
     delegate: {
       chat: vi.fn().mockResolvedValue({
         blocked: false,
@@ -279,24 +295,38 @@ describe("POST /api/line/webhook", () => {
 
   it("completes a contextual subtask through webhook conversation flow", async () => {
     installToolFirstAgentMock()
-    mockCreateCompleteTaskSearchTool.mockImplementation((
-      _userId: string,
-      _message: string,
-      currentLineUserId?: string,
-      resolvedQuery?: string,
-    ) => ({
-      execute: vi.fn(async () => {
-        if (currentLineUserId) {
-          await mockSaveLineSession(currentLineUserId, "complete_task_confirm", {
-            sourceType: "sub_task",
-            taskId: "task-1",
-            subTaskId: "sub-1",
-            taskTitle: resolvedQuery ?? "晨跑",
-          })
+    mockExecutorExecute.mockImplementation(async (input: any) => {
+      if (input.intent?.object === "task_completion") {
+        await mockSaveLineSession("line-user-1", "complete_task_confirm", {
+          sourceType: "sub_task",
+          taskId: "task-1",
+          subTaskId: "sub-1",
+          taskTitle: "晨跑",
+        })
+        return {
+          blocked: false,
+          content: "是否完成「晨跑」？\n\n回覆「確認」執行，或無視此訊息取消。",
+          usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          intent: input.intent,
+          toolCalls: ["complete_task_search"],
+          timings: {},
+          sessionId: input.sessionId,
+          traceId: null,
+          trace: {},
         }
-        return `[FACTS]\n{}\n[/FACTS]\n\n是否完成「${resolvedQuery ?? "晨跑"}」？`
-      }),
-    }))
+      }
+      return {
+        blocked: false,
+        content: "executor fallback",
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        intent: input.intent,
+        toolCalls: [],
+        timings: {},
+        sessionId: input.sessionId,
+        traceId: null,
+        trace: {},
+      }
+    })
 
     await POST(buildRequest("今天要做什麼？"))
     await flushAsyncWork()
@@ -308,11 +338,10 @@ describe("POST /api/line/webhook", () => {
     await flushAsyncWork()
 
     expect(mockQueryTodayExecute).toHaveBeenCalledWith({})
-    expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
-      "user-1",
-      "這件事跑完了",
-      "line-user-1",
-      "晨跑",
+    expect(mockExecutorExecute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: expect.objectContaining({ object: "task_completion" }),
+      }),
     )
     expect(mockUpdateSubItemExecute).toHaveBeenCalledWith({
       taskId: "task-1",
@@ -321,6 +350,177 @@ describe("POST /api/line/webhook", () => {
       completed: true,
     })
     expect(mockCreateZentropyAgent).toHaveBeenCalledTimes(2)
+  })
+
+  // ── Sprint 2: Regression Cases A-E ──────────────────────────────────────
+
+  it("Case A: pending session + reject phrase → session cleared, use case not called", async () => {
+    pendingLineSessions.set("line-user-1", {
+      type: "complete_task_confirm",
+      payload: {
+        sourceType: "task",
+        taskId: "task-1",
+        taskTitle: "整理報告",
+      },
+    })
+
+    const request = buildRequest("算了")
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    await flushAsyncWork()
+
+    expect(mockClearLineSession).toHaveBeenCalledWith("line-user-1")
+    expect(mockCompleteTaskExecute).not.toHaveBeenCalled()
+    expect(mockUpdateSubItemExecute).not.toHaveBeenCalled()
+    expect(mockUpdatePlanItemExecute).not.toHaveBeenCalled()
+    expect(mockCreateZentropyAgent).not.toHaveBeenCalled()
+    expect(mockPushMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [{ type: "text", text: "好的，已取消。" }],
+      }),
+    )
+  })
+
+  it("Case A2: pending session + '取消' → session cleared, cancel message pushed", async () => {
+    pendingLineSessions.set("line-user-1", {
+      type: "adjust_tags_preview",
+      payload: { intentType: "move", taskMatches: [], logId: "log-1" },
+    })
+
+    const request = buildRequest("取消")
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    await flushAsyncWork()
+
+    expect(mockClearLineSession).toHaveBeenCalledWith("line-user-1")
+    expect(mockCreateZentropyAgent).not.toHaveBeenCalled()
+    expect(mockPushMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [{ type: "text", text: "好的，已取消。" }],
+      }),
+    )
+  })
+
+  it("Case B: pending session + override new intent → session cleared, agent called", async () => {
+    pendingLineSessions.set("line-user-1", {
+      type: "complete_task_confirm",
+      payload: {
+        sourceType: "task",
+        taskId: "task-1",
+        taskTitle: "整理報告",
+      },
+    })
+
+    mockAgentChat.mockResolvedValue({
+      blocked: false,
+      content: "已記錄：改成跑步",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: ["brain_dump"],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    const request = buildRequest("改成跑步")
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    await flushAsyncWork()
+
+    expect(mockClearLineSession).toHaveBeenCalledWith("line-user-1")
+    expect(mockCompleteTaskExecute).not.toHaveBeenCalled()
+    expect(mockCreateZentropyAgent).toHaveBeenCalled()
+    expect(mockAgentChat).toHaveBeenCalledWith("改成跑步", expect.any(Object))
+  })
+
+  it("Case C: no pending session + '沒錯' → agent flow, no use case called", async () => {
+    expect(pendingLineSessions.size).toBe(0)
+
+    mockAgentChat.mockResolvedValue({
+      blocked: false,
+      content: "你好，有什麼可以幫你的嗎？",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: [],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    const request = buildRequest("沒錯")
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    await flushAsyncWork()
+
+    expect(mockCompleteTaskExecute).not.toHaveBeenCalled()
+    expect(mockUpdateSubItemExecute).not.toHaveBeenCalled()
+    expect(mockUpdatePlanItemExecute).not.toHaveBeenCalled()
+    expect(mockCreateZentropyAgent).toHaveBeenCalled()
+  })
+
+  it("Case D: capture input '幫我記一下要跑步' → agent called, complete_task_search not called", async () => {
+    mockAgentChat.mockResolvedValue({
+      blocked: false,
+      content: "已記錄：跑步",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: ["brain_dump"],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    const request = buildRequest("幫我記一下要跑步")
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    await flushAsyncWork()
+
+    expect(mockCompleteTaskExecute).not.toHaveBeenCalled()
+    expect(mockCreateZentropyAgent).toHaveBeenCalled()
+    expect(pendingLineSessions.size).toBe(0)
+  })
+
+  it("Case E: query then capture input → no pending session created for capture", async () => {
+    mockAgentChat.mockResolvedValueOnce({
+      blocked: false,
+      content: "今天有 2 件事要做",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: ["query_tasks"],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    await POST(buildRequest("今天要做什麼？"))
+    await flushAsyncWork()
+
+    mockAgentChat.mockResolvedValueOnce({
+      blocked: false,
+      content: "已記錄：準備報告",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: ["brain_dump"],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    await POST(buildRequest("幫我記準備報告"))
+    await flushAsyncWork()
+
+    expect(mockCompleteTaskExecute).not.toHaveBeenCalled()
+    expect(pendingLineSessions.size).toBe(0)
   })
 
   it("completes a contextual daily plan item through webhook conversation flow", async () => {
@@ -335,23 +535,37 @@ describe("POST /api/line/webhook", () => {
       "1. 晨間回顧 [工作]",
       "2. 晚間回顧 [工作]",
     ].join("\n"))
-    mockCreateCompleteTaskSearchTool.mockImplementation((
-      _userId: string,
-      _message: string,
-      currentLineUserId?: string,
-      resolvedQuery?: string,
-    ) => ({
-      execute: vi.fn(async () => {
-        if (currentLineUserId) {
-          await mockSaveLineSession(currentLineUserId, "complete_task_confirm", {
-            sourceType: "daily_plan_item",
-            planItemId: "plan-1",
-            taskTitle: resolvedQuery ?? "晨間回顧",
-          })
+    mockExecutorExecute.mockImplementation(async (input: any) => {
+      if (input.intent?.object === "task_completion") {
+        await mockSaveLineSession("line-user-1", "complete_task_confirm", {
+          sourceType: "daily_plan_item",
+          planItemId: "plan-1",
+          taskTitle: "晨間回顧",
+        })
+        return {
+          blocked: false,
+          content: "是否完成「晨間回顧」？\n\n回覆「確認」執行，或無視此訊息取消。",
+          usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          intent: input.intent,
+          toolCalls: ["complete_task_search"],
+          timings: {},
+          sessionId: input.sessionId,
+          traceId: null,
+          trace: {},
         }
-        return `[FACTS]\n{}\n[/FACTS]\n\n是否完成「${resolvedQuery ?? "晨間回顧"}」？`
-      }),
-    }))
+      }
+      return {
+        blocked: false,
+        content: "executor fallback",
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        intent: input.intent,
+        toolCalls: [],
+        timings: {},
+        sessionId: input.sessionId,
+        traceId: null,
+        trace: {},
+      }
+    })
 
     await POST(buildRequest("今天要做什麼？"))
     await flushAsyncWork()
@@ -362,11 +576,10 @@ describe("POST /api/line/webhook", () => {
     await POST(buildRequest("確認"))
     await flushAsyncWork()
 
-    expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
-      "user-1",
-      "這件事跑完了",
-      "line-user-1",
-      "晨間回顧",
+    expect(mockExecutorExecute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: expect.objectContaining({ object: "task_completion" }),
+      }),
     )
     expect(mockUpdatePlanItemExecute).toHaveBeenCalledWith({
       itemId: "plan-1",

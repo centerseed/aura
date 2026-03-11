@@ -41,6 +41,22 @@
 - tool output 仍以文字摘要為主，尚未提供完整結構化 facts-first protocol
 - live 查詢延遲偏高，需要減少不必要的 sequential query 與重覆資料收集
 
+## 3.2 失敗報告對應缺口 (2026-03-11)
+
+根因補充：
+
+- `FACTS` 洩漏不是單一 prompt 失誤，而是 orchestration 仍把 raw tool output / step text 當 final reply source
+- 多輪指代錯位不是「LLM 不夠聰明」，而是 history entity extraction 把 preview、候選、摘要句混成同一個 mention pool
+- `幫我把剛才記的那個標記完成` 失真來自 brain dump append 回覆缺少結構化 recorded items，導致整段摘要被當成 task title
+- `run_planner` 失敗同時有兩層：provider tool args 對 `goal` 漏填，以及 planner 內層 structured output schema 過脆
+
+新增待補任務：
+
+- [ ] 將 tool final response 收斂為 canonical summary，禁止 raw `[FACTS]` 回傳給使用者
+- [ ] 將 history entity extraction 改為最近一次結構化 list / recorded items
+- [ ] 為 brain dump append/create 路徑補上結構化 facts
+- [ ] 將 planner `goal` ownership 收回 application 層，並補 planner normalization tests
+
 ### T033-1: 盤點完成語義的所有寫入入口
 **預計時間**: 20 分鐘  
 **目的**: 確認所有會把 Task 標記完成的程式路徑，避免只修一半。

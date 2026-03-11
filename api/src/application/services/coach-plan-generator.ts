@@ -5,7 +5,7 @@
  */
 
 import { google } from '@ai-sdk/google'
-import { generateObject } from 'ai'
+import { resilientGenerateObject } from '@/lib/ai-resilient'
 import { z } from 'zod'
 import type { PlanCandidate, MilestoneContext, WeeklyDayInfo } from '@/domain/entities/plan-candidate.entity'
 import type { AiTokenUsage } from '@/lib/ai-rate-limit'
@@ -68,8 +68,8 @@ export class CoachPlanGenerator {
     const prompt = this.buildPrompt(candidates, availableMinutes, meetingMinutes, calibrationNote, unscheduledTasks, milestones, weeklyOverview, planDate, timezone)
 
     const start = Date.now()
-    const { object, usage } = await generateObject({
-      model: google('gemini-3.1-flash-lite-preview'),
+    const { object, usage } = await resilientGenerateObject({
+      model: google('gemini-2.5-flash-lite'),
       schema: DailyPlanOutputSchema,
       prompt,
     })
