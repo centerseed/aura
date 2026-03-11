@@ -11,6 +11,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { ValidationException } from "@/lib/api-response"
 import type { AiTokenUsage } from "@/lib/ai-rate-limit"
+import { logAgentLlmCall, normalizeAiSdkUsage } from "@/application/use-cases/agent/llm-logging"
 
 // ============================================================================
 // Types
@@ -77,6 +78,10 @@ export interface AnalyzeAdjustmentIntentRequest {
   userId: string
   text: string
   preview: boolean
+  resolvedTask?: {
+    taskId: string
+    taskTitle: string
+  }
 }
 
 export interface AnalyzeAdjustmentIntentResponse {
@@ -202,6 +207,18 @@ export class AnalyzeAdjustmentIntentUseCase {
 
     // 2. 調用 AI 解析用戶意圖
     const startAI = Date.now()
+    const authoritativeTask = request.resolvedTask
+      ? taskMap[request.resolvedTask.taskId]
+      : null
+    const authoritativeTaskPrompt = authoritativeTask && request.resolvedTask
+      ? `
+## 已解析的上下文任務（authoritative）
+如果用戶這句話使用了「這個任務」「剛剛那個」等指代詞，以下任務就是已確定的目標。不要改匹配到其他任務，也不要擴大成多筆。
+- task_id: ${request.resolvedTask.taskId}
+- task_title: ${request.resolvedTask.taskTitle}
+- current_location: ${authoritativeTask.areaName}/${authoritativeTask.productName}${authoritativeTask.topicName ? `/${authoritativeTask.topicName}` : ""}
+`
+      : ""
     const { object: intent, usage: aiUsage } = await resilientGenerateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: AdjustmentIntentSchema,
@@ -225,6 +242,7 @@ export class AnalyzeAdjustmentIntentUseCase {
 - 目標 Area/Product/Topic 必須使用**現有結構中完全相同**的名稱
 
 ${contextSummary}
+${authoritativeTaskPrompt}
 
 ## 用戶輸入:
 ${request.text}
@@ -232,8 +250,31 @@ ${request.text}
 請分析用戶意圖並找出需要調整的任務。reasoning 請用繁體中文說明。`,
     })
     timings["ai_generateObject"] = Date.now() - startAI
+    logAgentLlmCall({
+      event: "agent_llm_call",
+      feature: "adjust_tags_analyze_intent",
+      userId: request.userId,
+      latencyMs: timings["ai_generateObject"],
+      usage: normalizeAiSdkUsage(aiUsage),
+      model: "gemini-2.5-flash-lite",
+      metadata: {
+        preview: request.preview,
+        textLen: request.text.length,
+        intentType: intent.intent_type,
+        matchedTasks: intent.task_matches.length,
+      },
+    })
 
     console.log("Adjustment Intent:", intent)
+
+    if (authoritativeTask && request.resolvedTask) {
+      intent.task_matches = [{
+        task_id: request.resolvedTask.taskId,
+        task_title: request.resolvedTask.taskTitle,
+        current_location: `${authoritativeTask.areaName}/${authoritativeTask.productName}`,
+        match_reason: "resolved_from_canonical_context",
+      }]
+    }
 
     // 3. 構建結構化操作預覽
     const structuredOperations: StructuredOperation[] = []

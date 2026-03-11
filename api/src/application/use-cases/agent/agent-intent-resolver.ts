@@ -2,34 +2,19 @@ import type { LanguageModel, ModelMessage } from "ai"
 import { LLMStructuredClassifier, type DecisionAgentResult, type StructuredClassifier, type DecisionOptions } from "naru-agent-js"
 import type { AgentDecisionTrace, AgentIntent } from "./agent-intent"
 import { AgentIntentSchema } from "./agent-intent"
+import { hasExplicitCaptureFrame } from "./explicit-capture-frame"
+import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
 // ── Deterministic Fast-Path Patterns ─────────────────────────────────────────
 // 只保留語意 100% 明確、不可能碰撞的 pattern。
 // 其餘全部交給 LLM structured classifier。
 
-// — 排除清單：這些看似像 brain dump 但其實是查詢/meta —
-const NON_CAPTURE_PATTERNS: RegExp[] = [
-  /今天.*(有哪些|有什麼|要做什麼|任務|待辦|代辦)/i,
-  /(有哪些|有什麼).*(任務|待辦|代辦)/i,
-  /(我剛才|我剛剛).*(說了什麼|問了什麼|記了什麼)/i,
-  /(你是誰|你可以做什麼|可以做什麼)/i,
-  /(完成了什麼|做了什麼)/i,
-  /(查詢|列出|顯示).*(任務|待辦|代辦)/i,
-  /(還剩什麼|剩下什麼)/i,
-]
-
-// — 明確記錄意圖（brain dump / task capture）—
-const EXPLICIT_CAPTURE_PATTERNS: RegExp[] = [
-  /(記錄|記下|記一下|幫我記|幫我加|新增任務|待辦|todo)/i,
-  /(再加一個|補一個|另外一個)/i,
-]
-
 const GREETING_PATTERN = /^(?:你好|嗨|hi|hello|hey)$|你是誰|可以做什麼/i
-const RECALL_LAST_ITEM_PATTERN = /我剛才記了什麼/i
+const RECALL_LAST_ITEM_PATTERN = /(?:((?:我|你)(?:剛才|剛剛)|剛才|剛剛).*(?:記了什麼|記的是什麼)|你幫我記了什麼)/i
 const RECALL_TASK_CODE_PATTERN = /任務代號是什麼|只回答代號/i
 const SHORT_UNDERSPECIFIED_PATTERN = /^(記|好|嗯|喔|哦|欸|？|\?)$/
 
 // — 制式回應引導的 fast-path（用戶照著提示說的話，必須穩定接住）—
-const TODAY_FOCUS_PATTERN = /^今天(要做什麼|有什麼|有哪些)|(今天|明天).*(待辦|代辦|任務|要做|待辦事項|代辦事項)/i
+const TODAY_FOCUS_PATTERN = /^今天(要做什麼|有什麼|有哪些|還有什麼(?:事)?沒做|還沒完成哪些)|(?:今天|明天).*(待辦|代辦|任務|要做|待辦事項|代辦事項)|(?:今天|還有|還沒).*(沒做|沒做完|還沒做|未完成)/i
 const COMPLETED_TODAY_PATTERN = /今天.*(?:完成了什麼|做了什麼|完成哪些|做了哪些|已完成(?:什麼|哪些)?)|(?:完成了什麼|做了什麼|已完成哪些)/i
 const COMPLETE_TASK_PATTERN = /完成|做完|跑完|弄完|處理完|搞定|done|完成了|已完成|做好了|結束了|標記(?:成|為)?完成|勾掉/i
 const CONTEXTUAL_COMPLETE_PATTERN_INTENT = /這件事|這個|那個|剛剛那個|剛才那個|上一個|上個/i
@@ -38,13 +23,11 @@ const QUERY_WORD_PATTERN = /嗎|？|\?|請問|查詢|列出|顯示|哪些|什麼
 const REORGANIZE_PATTERN = /^幫我整理|^整理(一下)?(任務|待辦)/i
 const PLANNING_PATTERN = /^幫我(規劃|拆解)|^(規劃|拆解)(一下)?[^？?]*$/i
 
-function hasExplicitCaptureFrame(message: string): boolean {
-  if (!message) return false
-  if (NON_CAPTURE_PATTERNS.some((p) => p.test(message))) return false
-  return EXPLICIT_CAPTURE_PATTERNS.some((p) => p.test(message))
-}
+type TraceSpeechAct = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["speechAct"]>
+type TraceTargetReferenceMode = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["targetReferenceMode"]>
+type TraceTemporalScope = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["temporalScope"]>
 
-function resolveTemporalScope(message: string): AgentIntent["temporalScope"] {
+function resolveTemporalScope(message: string): TraceTemporalScope {
   if (/今天/.test(message)) return "today"
   if (/明天|下週|下周|之後|稍後|週五前|周五前|月底前/.test(message)) return "future"
   return "none"
@@ -66,7 +49,24 @@ export interface AgentIntentResolver {
   resolve(input: ResolveAgentIntentInput): Promise<ResolveAgentIntentResult> | ResolveAgentIntentResult
 }
 
-function buildIntent(intent: AgentIntent, message: string): ResolveAgentIntentResult {
+function buildResult(
+  input: {
+    object: AgentIntent["object"]
+    requiresConfirmation: boolean
+    confidence: number
+    speechAct: TraceSpeechAct
+    targetReferenceMode: TraceTargetReferenceMode
+    temporalScope: TraceTemporalScope
+    reasonCodes: string[]
+  },
+  message: string,
+): ResolveAgentIntentResult {
+  const intent: AgentIntent = {
+    object: input.object,
+    requiresConfirmation: input.requiresConfirmation,
+    confidence: input.confidence,
+  }
+
   return {
     intent,
     trace: {
@@ -74,6 +74,12 @@ function buildIntent(intent: AgentIntent, message: string): ResolveAgentIntentRe
       resolver: "deterministic-v1",
       rawMessage: message,
       resolvedIntent: intent,
+      metadata: {
+        speechAct: input.speechAct,
+        targetReferenceMode: input.targetReferenceMode,
+        temporalScope: input.temporalScope,
+        reasonCodes: input.reasonCodes,
+      },
       selectedTool: null,
       targetQuery: null,
     },
@@ -91,11 +97,10 @@ export interface DecisionAgentLike {
 const STRUCTURED_INTENT_SYSTEM_PROMPT = [
   "You are the decision layer for Zentropy's LINE task agent.",
   "Return a structured intent that matches the provided schema.",
-  "Classify the user's immediate speech act and object.",
+  "Return only the minimal canonical intent fields: object, requiresConfirmation, confidence.",
   "Use conversation summary and memory only as supporting context.",
   "Do not invent targets or actions that are not grounded in the message/context.",
-  "If intent is unclear, return object='unknown', targetReferenceMode='none', requiresConfirmation=false, confidence below 0.5.",
-  "reasonCodes must be short machine-readable strings.",
+  "If intent is unclear, return object='unknown', requiresConfirmation=false, confidence below 0.5.",
 ].join("\n")
 
 function shouldBypassFallbackClassifier(message: string): boolean {
@@ -111,97 +116,97 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
     // ── Fast-path: 只攔截語意 100% 明確的 pattern ──
 
     if (GREETING_PATTERN.test(message)) {
-      return buildIntent({
-        speechAct: "meta",
+      return buildResult({
         object: "greeting",
-        targetReferenceMode: "none",
-        temporalScope: "none",
         requiresConfirmation: false,
         confidence: 0.99,
+        speechAct: "meta",
+        targetReferenceMode: "none",
+        temporalScope: "none",
         reasonCodes: ["meta_greeting"],
       }, message)
     }
 
     if (TODAY_FOCUS_PATTERN.test(message)) {
-      return buildIntent({
-        speechAct: "query",
+      return buildResult({
         object: "today_focus",
-        targetReferenceMode: "none",
-        temporalScope: "today",
         requiresConfirmation: false,
         confidence: 0.98,
+        speechAct: "query",
+        targetReferenceMode: "none",
+        temporalScope: resolveTemporalScope(message),
         reasonCodes: ["fast_path_today_focus"],
       }, message)
     }
 
     if (COMPLETED_TODAY_PATTERN.test(message)) {
-      return buildIntent({
-        speechAct: "query",
+      return buildResult({
         object: "completed_today",
-        targetReferenceMode: "none",
-        temporalScope: "today",
         requiresConfirmation: false,
         confidence: 0.98,
+        speechAct: "query",
+        targetReferenceMode: "none",
+        temporalScope: "today",
         reasonCodes: ["fast_path_completed_today"],
       }, message)
     }
 
     if (REORGANIZE_PATTERN.test(message)) {
-      return buildIntent({
-        speechAct: "mutate",
+      return buildResult({
         object: "reorganize",
-        targetReferenceMode: "none",
-        temporalScope: "none",
         requiresConfirmation: false,
         confidence: 0.97,
+        speechAct: "mutate",
+        targetReferenceMode: "none",
+        temporalScope: "none",
         reasonCodes: ["fast_path_reorganize"],
       }, message)
     }
 
     if (PLANNING_PATTERN.test(message)) {
-      return buildIntent({
-        speechAct: "mutate",
+      return buildResult({
         object: "planning",
-        targetReferenceMode: "contextual",
-        temporalScope: "none",
         requiresConfirmation: false,
         confidence: 0.97,
+        speechAct: "mutate",
+        targetReferenceMode: "contextual",
+        temporalScope: "none",
         reasonCodes: ["fast_path_planning"],
       }, message)
     }
 
     if (RECALL_TASK_CODE_PATTERN.test(message)) {
-      return buildIntent({
-        speechAct: "query",
+      return buildResult({
         object: "recall_task_code",
-        targetReferenceMode: "none",
-        temporalScope: "none",
         requiresConfirmation: false,
         confidence: 0.99,
+        speechAct: "query",
+        targetReferenceMode: "none",
+        temporalScope: "none",
         reasonCodes: ["meta_recall_task_code"],
       }, message)
     }
 
     if (RECALL_LAST_ITEM_PATTERN.test(message)) {
-      return buildIntent({
-        speechAct: "query",
+      return buildResult({
         object: "recall_last_item",
-        targetReferenceMode: "none",
-        temporalScope: "past",
         requiresConfirmation: false,
         confidence: 0.99,
+        speechAct: "query",
+        targetReferenceMode: "none",
+        temporalScope: "past",
         reasonCodes: ["meta_recall_last_item"],
       }, message)
     }
 
     if (explicitCaptureFrame) {
-      return buildIntent({
-        speechAct: "mutate",
+      return buildResult({
         object: "task_capture",
-        targetReferenceMode: "none",
-        temporalScope: resolveTemporalScope(message),
         requiresConfirmation: false,
         confidence: 0.96,
+        speechAct: "mutate",
+        targetReferenceMode: "none",
+        temporalScope: resolveTemporalScope(message),
         reasonCodes: ["explicit_capture_frame_priority"],
       }, message)
     }
@@ -212,13 +217,13 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       const queryWord = QUERY_WORD_PATTERN.test(message)
 
       if (contextualReference || mutationRequest || !queryWord) {
-        return buildIntent({
-          speechAct: "mutate",
+        return buildResult({
           object: "task_completion",
-          targetReferenceMode: contextualReference ? "contextual" : "explicit",
-          temporalScope: /今天/.test(message) ? "today" : "none",
           requiresConfirmation: true,
           confidence: contextualReference || mutationRequest ? 0.94 : 0.82,
+          speechAct: "mutate",
+          targetReferenceMode: contextualReference ? "contextual" : "explicit",
+          temporalScope: /今天/.test(message) ? "today" : "none",
           reasonCodes: [
             contextualReference ? "contextual_completion_reference" : "explicit_completion_reference",
             mutationRequest ? "completion_mutation_request" : "completion_statement",
@@ -229,13 +234,13 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
 
     // ── 其餘全部交給 LLM classifier ──
 
-    return buildIntent({
-      speechAct: "meta",
+    return buildResult({
       object: "unknown",
-      targetReferenceMode: "none",
-      temporalScope: "none",
       requiresConfirmation: false,
       confidence: 0.1,
+      speechAct: "meta",
+      targetReferenceMode: "none",
+      temporalScope: "none",
       reasonCodes: ["no_direct_route_match"],
     }, message)
   }
@@ -275,6 +280,7 @@ export class StructuredFallbackAgentIntentResolver implements AgentIntentResolve
     }
 
     let decision
+    const classifierStartedAt = Date.now()
     try {
       decision = await this.decisionAgent.decide(input.message, this.classifier, {
         userId: input.userId,
@@ -285,13 +291,24 @@ export class StructuredFallbackAgentIntentResolver implements AgentIntentResolve
       return deterministicResult
     }
 
-    const reasonCodes = decision.decision.reasonCodes.length > 0
-      ? decision.decision.reasonCodes
-      : ["structured_classifier_fallback"]
-    const intent: AgentIntent = {
-      ...decision.decision,
-      reasonCodes,
-    }
+    const intent: AgentIntent = decision.decision
+    const classifierLatencyMs = Date.now() - classifierStartedAt
+    const classifierUsage = normalizeAgentUsage(decision.usage)
+
+    logAgentLlmCall({
+      event: "agent_llm_call",
+      feature: "intent_classifier",
+      userId: input.userId,
+      sessionId: input.sessionId,
+      model: decision.trace?.classifier ?? "unknown",
+      latencyMs: classifierLatencyMs,
+      usage: classifierUsage,
+      metadata: {
+        intentObject: intent.object,
+        resolver: decision.trace?.classifier ?? "unknown",
+        messageLen: input.message.length,
+      },
+    })
 
     return {
       intent,
@@ -300,6 +317,11 @@ export class StructuredFallbackAgentIntentResolver implements AgentIntentResolve
         resolver: `naru-structured-v0.1.2:${decision.trace?.classifier ?? "unknown"}`,
         rawMessage: input.message,
         resolvedIntent: intent,
+        metadata: {
+          reasonCodes: ["structured_classifier_fallback"],
+          classifierUsage,
+          classifierLatencyMs,
+        },
         selectedTool: null,
         targetQuery: null,
       },

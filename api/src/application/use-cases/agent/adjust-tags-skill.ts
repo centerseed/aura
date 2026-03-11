@@ -10,8 +10,14 @@ import { z } from "zod"
 import { AnalyzeAdjustmentIntentUseCase } from "@/application/use-cases/adjust-tags/analyze-adjustment-intent"
 import { saveLineSession } from "@/lib/line-session"
 import type { AdjustTagsPayload } from "@/lib/line-session"
+import type { PresentedEntity } from "./tool-result-protocol"
 
-export const createAdjustTagsTool = (userId: string, originalMessage: string, lineUserId?: string) =>
+export const createAdjustTagsTool = (
+  userId: string,
+  originalMessage: string,
+  lineUserId?: string,
+  resolvedTask?: PresentedEntity,
+) =>
   tool({
     name: "adjust_tags_preview",
     description: "分析用戶的標籤調整意圖，回傳預覽並等待確認",
@@ -21,7 +27,17 @@ export const createAdjustTagsTool = (userId: string, originalMessage: string, li
     execute: async () => {
       const text = originalMessage
       const analyzeUC = new AnalyzeAdjustmentIntentUseCase()
-      const result = await analyzeUC.execute({ userId, text, preview: !!lineUserId })
+      const result = await analyzeUC.execute({
+        userId,
+        text,
+        preview: !!lineUserId,
+        resolvedTask: resolvedTask?.taskId
+          ? {
+              taskId: resolvedTask.taskId,
+              taskTitle: resolvedTask.title,
+            }
+          : undefined,
+      })
 
       const { intent, structuredOperations, previewLog, logId, taskMap } = result
 

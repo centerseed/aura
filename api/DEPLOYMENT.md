@@ -220,5 +220,29 @@ npm run lint --fix  # 自動修復（如果支持）
 
 ---
 
+## ⏰ Cloud Scheduler 備註
+
+### LINE 晨報推播 Cron
+
+`POST /api/line/cron/morning-briefing`
+
+用途：
+- 在台灣時間 `05:00-11:00` 每小時觸發一次
+- 只為命中 `settings.briefingSchedule.morning.windowStart` 的 LINE 綁定用戶推播晨報
+
+必要條件：
+- Header 必須帶 `Authorization: Bearer ${CRON_SECRET}`
+- `CRON_SECRET` 必須與 API 環境變數一致
+
+建議排程：
+- 時區：`Asia/Taipei`
+- 時間：`0 5-11 * * *`
+
+注意：
+- route 內已做同日 delivery 去重，不需要在 scheduler 層重複實作
+- 本版服務範圍以台灣與泛華語 UTC+8 為主，不做全球時區掃描
+
+---
+
 **最後更新**: 2026-02-06
 **維護者**: Zentropy Team

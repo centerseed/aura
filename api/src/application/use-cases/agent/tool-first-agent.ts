@@ -6,21 +6,22 @@ import { createBrainDumpTool } from "./brain-dump-skill"
 import { createAdjustTagsTool } from "./adjust-tags-skill"
 import { createReorganizeTool } from "./reorganize-skill"
 import { createQueryCompletedTodayTasksTool, createQueryTodayTasksTool } from "./query-tasks-skill"
+import { shouldUseStrictTodayFocus } from "./today-focus-scope"
 import {
   DeterministicAgentIntentResolver,
   type AgentIntentResolver,
 } from "./agent-intent-resolver"
-import type { IntentAwareExecutor } from "./intent-aware-executor"
 import { createCompleteTaskSearchTool } from "./complete-task-skill"
 import { extractPresentedEntities, parseToolResult, type PresentedEntity } from "./tool-result-protocol"
 import { AgentSessionStateStore, type AgentSessionState } from "./agent-session-state"
 import { getLineSession, clearLineSession, saveLineSession } from "@/lib/line-session"
-import type { AdjustTagsPayload, CompleteTaskPayload } from "@/lib/line-session"
-import { classifyConfirmationDisposition } from "@/lib/line-confirmation"
+import type { AdjustTagsPayload, BrainDumpPendingPayload, CompleteTaskPayload } from "@/lib/line-session"
+import { classifyConfirmationDisposition, extractBrainDumpConfirmationTarget } from "@/lib/line-confirmation"
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
-import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
-import { UpdateSubItemUseCase } from "@/application/use-cases/tasks/update-sub-item"
-import { UpdatePlanItemUseCase } from "@/application/use-cases/coach/update-plan-item"
+import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
+import { createRunPlannerTool } from "./planner-skill"
+import { resolveCompletionQuery } from "./completion-query-normalizer"
+import { normalizeAgentUsage } from "./llm-logging"
 
 interface AgentChatResult {
   blocked: boolean
@@ -49,7 +50,6 @@ interface AgentChatDelegate {
 }
 
 interface ToolFirstAgentConfig {
-  executor?: IntentAwareExecutor
   delegate: AgentChatDelegate
   sessionStore: SessionStoreLike
   metaStore?: SessionMetaStore
@@ -58,10 +58,31 @@ interface ToolFirstAgentConfig {
   intentResolver?: AgentIntentResolver
 }
 
+interface ToolFirstAgentPhaseTimings {
+  pending_confirmation_ms?: number
+  session_history_load_ms?: number
+  intent_resolve_ms?: number
+  direct_route_ms?: number
+  delegate_chat_ms?: number
+  delegate_history_check_ms?: number
+  delegate_history_fallback_persist_ms?: number
+  total_ms?: number
+}
+
+interface ToolFirstAgentUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  classifierInputTokens?: number
+  classifierOutputTokens?: number
+  classifierTotalTokens?: number
+}
+
 const SHORT_RECORD_PATTERN = /^記$/
 
 // 序號引用模式：第一個、第二個、第三個...
 const ORDINAL_REFERENCE_PATTERN = /第([一二三四五六七八九十\d]+)個/
+const BARE_ORDINAL_PATTERN = /^([一二三四五六七八九十\d]+)$/
 const ORDINAL_MAP: Record<string, number> = {
   "一": 0, "二": 1, "三": 2, "四": 3, "五": 4,
   "六": 5, "七": 6, "八": 7, "九": 8, "十": 9,
@@ -69,12 +90,16 @@ const ORDINAL_MAP: Record<string, number> = {
 
 // 上下文引用模式：剛才記的、那個、這個
 const CONTEXTUAL_REFERENCE_PATTERN = /(?:剛才|剛剛|上一個|上次|之前)(?:記的|那個|的)?|那個|這個/
-
+const CONTEXTUAL_ADJUST_REFERENCE_PATTERN = /(?:這個任務|那個任務|這件事|這個|那個|剛剛那個|剛才那個|上一個|上個)/
+const LIST_CONTEXTUAL_REFERENCE_PATTERN = /(?:第[一二三四五六七八九十\d]+個|最後一個|最後那個|那個|這個|剛剛那個|剛才那個|上一個|上個)/
+const BARE_COMPLETION_REFERENCE_PATTERN = /^(?:完成了?|做完了?|搞定了?|done|好了?|處理完了?|結束了?)$/i
 function resolveOrdinalIndex(message: string): number | null {
   const match = message.match(ORDINAL_REFERENCE_PATTERN)
-  if (!match?.[1]) return null
+  const bareMatch = message.trim().match(BARE_ORDINAL_PATTERN)
+  const ordinalToken = match?.[1] ?? bareMatch?.[1]
+  if (!ordinalToken) return null
 
-  const ordinal = match[1]
+  const ordinal = ordinalToken
   // 數字
   const num = Number(ordinal)
   if (!Number.isNaN(num)) return num - 1
@@ -116,6 +141,19 @@ function resolveContextualQuery(
   }
 
   return null
+}
+
+function extractLatestPresentedEntities(history: ModelMessage[]): PresentedEntity[] {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const message = history[index]
+    if (message?.role !== "assistant" || typeof message.content !== "string") continue
+    const facts = parseFactsBlock(message.content) as Record<string, unknown> | null
+    const presentedEntities = extractPresentedEntities(facts)
+    if (presentedEntities.length > 0) {
+      return presentedEntities.sort((lhs, rhs) => lhs.position - rhs.position)
+    }
+  }
+  return []
 }
 
 function parseFactsBlock(raw: string): unknown | null {
@@ -184,6 +222,112 @@ interface RecordedEntityReference {
 
 function isRecordedEntityReference(value: PresentedEntity | RecordedEntityReference): value is RecordedEntityReference {
   return "sourceType" in value
+}
+
+function toCompleteTaskPayload(entity: PresentedEntity | RecordedEntityReference): CompleteTaskPayload | null {
+  const sourceType = isRecordedEntityReference(entity)
+    ? entity.sourceType
+    : entity.entityType
+
+  if (sourceType !== "task" && sourceType !== "sub_task" && sourceType !== "daily_plan_item") {
+    return null
+  }
+
+  const taskId = entity.taskId
+  if (!taskId && sourceType !== "daily_plan_item") {
+    return null
+  }
+
+  return {
+    sourceType,
+    taskTitle: entity.title,
+    taskId,
+    subTaskId: entity.subTaskId,
+    planItemId: entity.planItemId,
+  }
+}
+
+function resolveContextualEntity(
+  message: string,
+  sessionState: AgentSessionState,
+  history: ModelMessage[],
+): PresentedEntity | RecordedEntityReference | null {
+  const ordinalIndex = resolveOrdinalIndex(message)
+  if (ordinalIndex !== null) {
+    const presentedEntities = sessionState.lastPresentedEntities.length > 0
+      ? sessionState.lastPresentedEntities
+      : extractLatestPresentedEntities(history)
+    if (ordinalIndex >= 0 && ordinalIndex < presentedEntities.length) {
+      return presentedEntities[ordinalIndex] ?? null
+    }
+  }
+
+  if (CONTEXTUAL_REFERENCE_PATTERN.test(message)) {
+    if (sessionState.lastRecordedEntities.length > 0) {
+      return sessionState.lastRecordedEntities.at(-1) ?? null
+    }
+
+    const latestRecordedEntity = extractLatestRecordedEntity(history)
+    if (latestRecordedEntity) return latestRecordedEntity
+
+    const presentedEntities = sessionState.lastPresentedEntities.length > 0
+      ? sessionState.lastPresentedEntities
+      : extractLatestPresentedEntities(history)
+    if (presentedEntities.length > 0) {
+      return presentedEntities.at(-1) ?? null
+    }
+  }
+
+  if (BARE_COMPLETION_REFERENCE_PATTERN.test(message.trim())) {
+    if (sessionState.lastRecordedEntities.length === 1) {
+      return sessionState.lastRecordedEntities[0] ?? null
+    }
+
+    const latestRecordedEntity = extractLatestRecordedEntity(history)
+    if (latestRecordedEntity) {
+      return latestRecordedEntity
+    }
+  }
+
+  return null
+}
+
+function hasRecentPresentedList(
+  sessionState: AgentSessionState,
+  history: ModelMessage[],
+): boolean {
+  if (sessionState.lastPresentedEntities.length > 0) return true
+  return extractLatestPresentedEntities(history).length > 0
+}
+
+function shouldClarifyAgainstRecentList(
+  message: string,
+  sessionState: AgentSessionState,
+  history: ModelMessage[],
+): boolean {
+  if (!LIST_CONTEXTUAL_REFERENCE_PATTERN.test(message)) return false
+  return hasRecentPresentedList(sessionState, history)
+}
+
+function buildListClarificationMessage(): string {
+  return "我知道你是在指剛剛那份清單，但還不能確定是哪一項。你是指清單中的哪一個？請直接回覆序號或完整名稱。"
+}
+
+function resolveQueryDayOffset(
+  message: string,
+  trace: import("./agent-intent").AgentDecisionTrace,
+): number | undefined {
+  if (trace.metadata?.temporalScope !== "future") return undefined
+  if (/明天/.test(message)) return 1
+  return undefined
+}
+
+function toTaskPresentedEntity(
+  entity: PresentedEntity | RecordedEntityReference | null,
+): PresentedEntity | null {
+  if (!entity || isRecordedEntityReference(entity)) return null
+  if (entity.entityType !== "task" || !entity.taskId) return null
+  return entity
 }
 
 function extractLatestRecordedEntity(history: ModelMessage[]): RecordedEntityReference | null {
@@ -313,61 +457,151 @@ export class ToolFirstAgent {
     const sessionId = options.sessionId ?? "default"
     const userId = options.userId
     const trimmedMessage = message.trim()
-
-    // Ultra-short pattern: no intent resolution needed
-    if (SHORT_RECORD_PATTERN.test(trimmedMessage)) {
-      return this.buildDirectResult({
+    const startedAt = Date.now()
+    const phaseTimings: ToolFirstAgentPhaseTimings = {}
+    const finish = (
+      result: AgentChatResult,
+      route: "short_circuit" | "pending_confirmation" | "direct_tool" | "delegate",
+    ): AgentChatResult => {
+      const classifierUsage = extractClassifierUsage(result.trace)
+      const usage = {
+        ...normalizeAgentUsage(result.usage),
+        ...(classifierUsage
+          ? {
+              classifierInputTokens: classifierUsage.inputTokens,
+              classifierOutputTokens: classifierUsage.outputTokens,
+              classifierTotalTokens: classifierUsage.totalTokens,
+            }
+          : {}),
+      } satisfies ToolFirstAgentUsage
+      const timings = {
+        ...phaseTimings,
+        ...result.timings,
+        total_ms: Date.now() - startedAt,
+      }
+      const intentObject = extractIntentObject(result.intent)
+      console.log(JSON.stringify({
+        event: "tool_first_agent_chat_complete",
         sessionId,
-        message: trimmedMessage,
-        content: "請直接告訴我要記錄的內容，例如任務名稱、待辦事項或想法。",
-        intent: null,
-        trace: null,
-      })
+        userId,
+        route,
+        message_len: trimmedMessage.length,
+        intent_object: intentObject,
+        toolCalls: result.toolCalls,
+        timings,
+        usage,
+      }))
+
+      return {
+        ...result,
+        timings,
+      }
     }
 
-    // Pending confirmation: check if user is responding to a preview
-    if (this.config.lineUserId) {
-      const pendingResult = await this.handlePendingConfirmation(
-        trimmedMessage, sessionId, userId,
-      )
-      if (pendingResult) return pendingResult
-    }
+    try {
+      // Ultra-short pattern: no intent resolution needed
+      if (SHORT_RECORD_PATTERN.test(trimmedMessage)) {
+        return finish(await this.buildDirectResult({
+          sessionId,
+          message: trimmedMessage,
+          content: "請直接告訴我要記錄的內容，例如任務名稱、待辦事項或想法。",
+          intent: null,
+          trace: null,
+        }), "short_circuit")
+      }
 
-    // Resolve intent once
-    const history = (await this.config.sessionStore.get(sessionId)) ?? []
-    const sessionState = this.agentSessionStateStore
-      ? await this.agentSessionStateStore.get(sessionId)
-      : { lastPresentedEntities: [], lastRecordedEntities: [] }
-    const { intent, trace } = await this.intentResolver.resolve({
-      message: trimmedMessage,
-      history,
-      sessionId,
-      userId,
-    })
+      // Pending confirmation: check if user is responding to a preview
+      if (this.config.lineUserId) {
+        const pendingStartedAt = Date.now()
+        const pendingResult = await this.handlePendingConfirmation(
+          trimmedMessage, sessionId, userId,
+        )
+        phaseTimings.pending_confirmation_ms = Date.now() - pendingStartedAt
+        if (pendingResult) return finish(pendingResult, "pending_confirmation")
+      }
 
-    // Try deterministic fast-path (only for self-contained intents)
-    const directResult = await this.tryDirectToolRoute(
-      trimmedMessage, sessionId, userId, intent, trace, history, sessionState,
-    )
-    if (directResult) return directResult
+      const historyStartedAt = Date.now()
+      const history = (await this.config.sessionStore.get(sessionId)) ?? []
+      phaseTimings.session_history_load_ms = Date.now() - historyStartedAt
 
-    // Executor fallback: LLM tool calling with full context
-    if (this.config.executor) {
-      const result = await this.config.executor.execute({
+      // Resolve intent once
+      const sessionState = this.agentSessionStateStore
+        ? await this.agentSessionStateStore.get(sessionId)
+        : { lastPresentedEntities: [], lastRecordedEntities: [] }
+      const resolveStartedAt = Date.now()
+      const { intent, trace } = await this.intentResolver.resolve({
         message: trimmedMessage,
-        intent,
-        trace,
         history,
         sessionId,
+        userId,
       })
+      phaseTimings.intent_resolve_ms = Date.now() - resolveStartedAt
 
-      await appendSessionHistory(this.config.sessionStore, sessionId, trimmedMessage, result.content)
-      await appendLongTermMemory(this.config.memoryManager, userId, trimmedMessage, result.content)
-      return result
+      const routedIntent = intent.object === "unknown" &&
+        resolveOrdinalIndex(trimmedMessage) !== null &&
+        hasRecentPresentedList(sessionState, history)
+        ? {
+            ...intent,
+            object: "task_completion" as const,
+            requiresConfirmation: true,
+            confidence: 0.9,
+          }
+        : intent
+
+      // Try deterministic fast-path (only for self-contained intents)
+      const directStartedAt = Date.now()
+      const directResult = await this.tryDirectToolRoute(
+        trimmedMessage, sessionId, userId, routedIntent, trace, history, sessionState,
+      )
+      phaseTimings.direct_route_ms = Date.now() - directStartedAt
+      if (directResult) return finish(directResult, "direct_tool")
+
+      // Last resort: delegate
+      const delegateStartedAt = Date.now()
+      const delegateResult = await this.config.delegate.chat(message, options)
+      phaseTimings.delegate_chat_ms = Date.now() - delegateStartedAt
+
+      // Ensure the delegate's response is persisted so that follow-up messages
+      // (e.g. "是的" confirming a brain-dump prompt) can read it from history.
+      // The real NaruAgent saves its own history; if session was not updated by
+      // the delegate (e.g. mock in tests), save it here.
+      const historyCheckStartedAt = Date.now()
+      const historyAfterDelegate = (await this.config.sessionStore.get(sessionId)) ?? []
+      const delegateUpdatedSession = historyAfterDelegate.length > history.length
+      phaseTimings.delegate_history_check_ms = Date.now() - historyCheckStartedAt
+      if (!delegateUpdatedSession) {
+        const fallbackPersistStartedAt = Date.now()
+        await appendSessionHistory(
+          this.config.sessionStore, sessionId, trimmedMessage, delegateResult.content,
+        )
+        phaseTimings.delegate_history_fallback_persist_ms = Date.now() - fallbackPersistStartedAt
+      }
+
+      if (this.config.lineUserId) {
+        const pendingBrainDumpTarget = extractBrainDumpConfirmationTarget(delegateResult.content)
+        if (pendingBrainDumpTarget) {
+          await saveLineSession(this.config.lineUserId, "brain_dump_pending", {
+            originalText: pendingBrainDumpTarget,
+            taskTitle: pendingBrainDumpTarget,
+          })
+        }
+      }
+
+      return finish(delegateResult, "delegate")
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: "tool_first_agent_chat_error",
+        sessionId,
+        userId,
+        message_len: trimmedMessage.length,
+        timings: {
+          ...phaseTimings,
+          total_ms: Date.now() - startedAt,
+        },
+        error: error instanceof Error ? error.message : String(error),
+      }))
+      throw error
     }
-
-    // Last resort: delegate
-    return this.config.delegate.chat(message, options)
   }
 
   private async tryDirectToolRoute(
@@ -427,44 +661,68 @@ export class ToolFirstAgent {
       toolOutput = parseToolResult(toolHistoryContent).summary
     } else if (intent.object === "today_focus") {
       toolName = "query_today_tasks"
-      toolHistoryContent = await createQueryTodayTasksTool(userId ?? "").execute({})
+      toolHistoryContent = await createQueryTodayTasksTool(userId ?? "", {
+        strictToday: shouldUseStrictTodayFocus(trimmedMessage),
+        dayOffset: resolveQueryDayOffset(trimmedMessage, trace),
+      }).execute({})
       toolOutput = parseToolResult(toolHistoryContent).summary
     } else if (intent.object === "task_capture" && intent.confidence >= 0.95) {
       toolName = "brain_dump"
       toolOutput = await createBrainDumpTool(userId ?? "", trimmedMessage).execute({})
       toolHistoryContent = toolOutput
     } else if (intent.object === "classification") {
+      const hasContextualReference = CONTEXTUAL_ADJUST_REFERENCE_PATTERN.test(trimmedMessage)
+      const resolvedTaskContext = hasContextualReference
+        ? toTaskPresentedEntity(resolveContextualEntity(trimmedMessage, sessionState, history))
+        : null
+      const hasEntityContext = Boolean(resolvedTaskContext)
+      if (hasContextualReference && !hasEntityContext) {
+        return this.buildDirectResult({
+          sessionId,
+          message: trimmedMessage,
+          content: "我還不知道你指的是哪個任務。請直接告訴我任務名稱，再說要移到哪個分類。",
+          intent,
+          trace,
+        })
+      }
       toolName = "adjust_tags_preview"
-      toolOutput = await createAdjustTagsTool(userId ?? "", trimmedMessage, this.config.lineUserId).execute({})
+      toolOutput = await createAdjustTagsTool(
+        userId ?? "",
+        trimmedMessage,
+        this.config.lineUserId,
+        resolvedTaskContext ?? undefined,
+      ).execute({})
       toolHistoryContent = toolOutput
     } else if (intent.object === "reorganize") {
       toolName = "reorganize_preview"
       toolOutput = await createReorganizeTool(userId ?? "").execute({})
       toolHistoryContent = toolOutput
     } else if (intent.object === "task_completion") {
-      const latestRecordedEntity = CONTEXTUAL_REFERENCE_PATTERN.test(trimmedMessage)
-        ? sessionState.lastRecordedEntities.at(-1) ?? extractLatestRecordedEntity(history)
-        : null
+      const contextualEntity = resolveContextualEntity(trimmedMessage, sessionState, history)
+      const contextualPayload = contextualEntity ? toCompleteTaskPayload(contextualEntity) : null
 
-      if (latestRecordedEntity && isRecordedEntityReference(latestRecordedEntity) && latestRecordedEntity.sourceType && latestRecordedEntity.taskId && this.config.lineUserId) {
-        const payload: CompleteTaskPayload = {
-          sourceType: latestRecordedEntity.sourceType,
-          taskTitle: latestRecordedEntity.title,
-          taskId: latestRecordedEntity.taskId,
-          subTaskId: latestRecordedEntity.subTaskId,
-          planItemId: latestRecordedEntity.planItemId,
-        }
-        await saveLineSession(this.config.lineUserId, "complete_task_confirm", payload)
+      if (contextualPayload) {
+        await executeCompleteTaskPayload(userId ?? "", contextualPayload)
         toolName = "complete_task_search"
-        toolOutput = `是否完成「${latestRecordedEntity.title}」？\n\n回覆「確認」執行，或無視此訊息取消。`
+        toolOutput = buildCompleteTaskSuccessMessage(contextualPayload.taskTitle)
         toolHistoryContent = toolOutput
       }
 
       if (toolOutput) {
         // 已用 canonical entity 建立確認，不需再走語意搜尋
       } else {
-      // 嘗試確定性解析序號/上下文引用，成功則直接呼叫 tool
-        const resolvedQuery = resolveContextualQuery(trimmedMessage, sessionState, history)
+        if (shouldClarifyAgainstRecentList(trimmedMessage, sessionState, history)) {
+          return this.buildDirectResult({
+            sessionId,
+            message: trimmedMessage,
+            content: buildListClarificationMessage(),
+            intent,
+            trace,
+          })
+        }
+
+        // 嘗試確定性解析序號/上下文引用，成功則直接呼叫 tool
+        const resolvedQuery = contextualEntity?.title ?? resolveContextualQuery(trimmedMessage, sessionState, history)
         if (resolvedQuery) {
           toolName = "complete_task_search"
           toolOutput = await createCompleteTaskSearchTool(
@@ -472,8 +730,20 @@ export class ToolFirstAgent {
           ).execute({})
           toolHistoryContent = toolOutput
         }
+
+        if (!toolOutput) {
+          const normalizedQuery = await resolveCompletionQuery(trimmedMessage)
+          toolName = "complete_task_search"
+          toolOutput = await createCompleteTaskSearchTool(
+            userId ?? "", normalizedQuery || trimmedMessage, this.config.lineUserId,
+          ).execute({})
+          toolHistoryContent = toolOutput
+        }
       }
-      // 無法解析 → toolName 仍為 null → 下面 return null → 交給 executor
+    } else if (intent.object === "planning") {
+      toolName = "run_planner"
+      toolOutput = await createRunPlannerTool(userId ?? "", trimmedMessage).execute({})
+      toolHistoryContent = toolOutput
     }
 
     if (!toolName || !toolOutput) {
@@ -481,30 +751,16 @@ export class ToolFirstAgent {
     }
 
     trace.selectedTool = toolName
-    const historyContent = toolHistoryContent ?? toolOutput
-    await appendSessionHistory(this.config.sessionStore, sessionId, trimmedMessage, historyContent)
-    await this.persistCanonicalSessionState(sessionId, historyContent)
-    await appendLongTermMemory(this.config.memoryManager, userId, trimmedMessage, historyContent)
-
-    // 統一 strip FACTS — 無論哪個分支，最終給用戶看的 content 一定不含 [FACTS] JSON
-    const safeContent = parseToolResult(toolOutput).summary
-
-    return {
-      blocked: false,
-      content: safeContent,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      },
-      intent,
-      toolCalls: [toolName],
-      toolOutputs: [toolOutput],
-      timings: {},
+    return this.finalizeToolRoute({
       sessionId,
-      traceId: null,
+      userId,
+      message: trimmedMessage,
+      toolName,
+      toolOutput,
+      toolHistoryContent,
+      intent,
       trace,
-    }
+    })
   }
 
   private async persistCanonicalSessionState(sessionId: string, rawToolOutput: string): Promise<void> {
@@ -583,30 +839,20 @@ export class ToolFirstAgent {
         sessionId,
         message,
         content: `✅ 已完成分類調整：\n\n${summary}`,
+        toolName: "adjust_tags_preview",
+        toolOutput: `✅ 已完成分類調整：\n\n${summary}`,
+        trace: {
+          selectedTool: "adjust_tags_preview",
+          routeSource: "pending_confirmation",
+        },
       })
     }
 
     if (session.type === "complete_task_confirm") {
       const p = session.payload as CompleteTaskPayload
-      if (p.sourceType === "sub_task" && p.taskId && p.subTaskId) {
-        await new UpdateSubItemUseCase().execute({
-          taskId: p.taskId,
-          subItemId: p.subTaskId,
-          userId: userId ?? "",
-          completed: true,
-        })
-      } else if (p.sourceType === "daily_plan_item" && p.planItemId) {
-        await new UpdatePlanItemUseCase().execute({
-          itemId: p.planItemId,
-          userId: userId ?? "",
-          completed: true,
-        })
-      } else if (p.taskId) {
-        await new CompleteTaskUseCase().execute({
-          taskId: p.taskId,
-          userId: userId ?? "",
-        })
-      } else {
+      try {
+        await executeCompleteTaskPayload(userId ?? "", p)
+      } catch {
         await clearLineSession(key)
         return this.buildDirectResult({
           sessionId,
@@ -615,10 +861,54 @@ export class ToolFirstAgent {
         })
       }
       await clearLineSession(key)
+      const successMessage = buildCompleteTaskSuccessMessage(p.taskTitle)
       return this.buildDirectResult({
         sessionId,
         message,
-        content: `✅ 已完成「${p.taskTitle}」`,
+        content: successMessage,
+        toolName: "complete_task_search",
+        toolOutput: successMessage,
+        trace: {
+          selectedTool: "complete_task_search",
+          routeSource: "pending_confirmation",
+        },
+      })
+    }
+
+    if (session.type === "brain_dump_pending") {
+      const p = session.payload as BrainDumpPendingPayload
+      const toolOutput = await createBrainDumpTool(userId ?? "", p.originalText).execute({})
+      await clearLineSession(key)
+      return this.finalizeToolRoute({
+        sessionId,
+        userId,
+        message,
+        toolName: "brain_dump",
+        toolOutput,
+        toolHistoryContent: toolOutput,
+        intent: {
+          object: "task_capture",
+          requiresConfirmation: false,
+          confidence: 1,
+        },
+        trace: {
+          routeSource: "intent_resolver",
+          resolver: "line_pending_session",
+          rawMessage: message,
+          resolvedIntent: {
+            object: "task_capture",
+            requiresConfirmation: false,
+            confidence: 1,
+          },
+          metadata: {
+            speechAct: "confirm",
+            targetReferenceMode: "contextual",
+            temporalScope: "past",
+            reasonCodes: ["pending_brain_dump_confirmation"],
+          },
+          selectedTool: "brain_dump",
+          targetQuery: p.originalText,
+        },
       })
     }
 
@@ -627,18 +917,64 @@ export class ToolFirstAgent {
     return null
   }
 
+  private async finalizeToolRoute({
+    sessionId,
+    userId,
+    message,
+    toolName,
+    toolOutput,
+    toolHistoryContent,
+    intent,
+    trace,
+  }: {
+    sessionId: string
+    userId: string | undefined
+    message: string
+    toolName: string
+    toolOutput: string
+    toolHistoryContent?: string
+    intent: unknown
+    trace: unknown
+  }): Promise<AgentChatResult> {
+    const historyContent = toolHistoryContent ?? toolOutput
+    await appendSessionHistory(this.config.sessionStore, sessionId, message, historyContent)
+    await this.persistCanonicalSessionState(sessionId, historyContent)
+    await appendLongTermMemory(this.config.memoryManager, userId, message, historyContent)
+
+    return {
+      blocked: false,
+      content: parseToolResult(toolOutput).summary,
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      },
+      intent,
+      toolCalls: [toolName],
+      toolOutputs: [toolOutput],
+      timings: {},
+      sessionId,
+      traceId: null,
+      trace,
+    }
+  }
+
   private async buildDirectResult({
     sessionId,
     message,
     content,
     intent,
     trace,
+    toolName,
+    toolOutput,
   }: {
     sessionId: string
     message: string
     content: string
     intent?: unknown
     trace?: unknown
+    toolName?: string
+    toolOutput?: string
   }): Promise<AgentChatResult> {
     await appendSessionHistory(this.config.sessionStore, sessionId, message, content)
 
@@ -651,12 +987,43 @@ export class ToolFirstAgent {
         totalTokens: 0,
       },
       intent: intent ?? null,
-      toolCalls: [],
-      toolOutputs: [],
+      toolCalls: toolName ? [toolName] : [],
+      toolOutputs: toolOutput ? [toolOutput] : [],
       timings: {},
       sessionId,
       traceId: null,
       trace: trace ?? null,
     }
+  }
+}
+
+function extractIntentObject(intent: unknown): string | null {
+  if (!intent || typeof intent !== "object") return null
+  const value = (intent as { object?: unknown }).object
+  return typeof value === "string" ? value : null
+}
+
+function extractClassifierUsage(trace: unknown): {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+} | null {
+  if (!trace || typeof trace !== "object") return null
+  const classifierUsage = (trace as {
+    metadata?: {
+      classifierUsage?: {
+        inputTokens?: unknown
+        outputTokens?: unknown
+        totalTokens?: unknown
+      }
+    }
+  }).metadata?.classifierUsage
+
+  if (!classifierUsage) return null
+
+  return {
+    inputTokens: typeof classifierUsage.inputTokens === "number" ? classifierUsage.inputTokens : 0,
+    outputTokens: typeof classifierUsage.outputTokens === "number" ? classifierUsage.outputTokens : 0,
+    totalTokens: typeof classifierUsage.totalTokens === "number" ? classifierUsage.totalTokens : 0,
   }
 }

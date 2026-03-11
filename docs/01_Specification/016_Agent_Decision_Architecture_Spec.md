@@ -58,13 +58,16 @@
 
 每次解析至少輸出：
 
-- `speech_act`: `query | mutate | clarify | confirm | meta`
 - `object`: `task_capture | task_completion | today_focus | completed_today | classification | planning | unknown`
-- `target_reference_mode`: `explicit | contextual | ambiguous | none`
-- `temporal_scope`: `today | future | past | none`
 - `requires_confirmation`: boolean
 - `confidence`: 0-1
-- `reason_codes`: string[]
+
+以下資訊若需要保留，應放在 `decision trace`，而不是膨脹主 schema：
+
+- speech act
+- target reference mode
+- temporal scope
+- reason codes
 
 ### 5.3 Canonical Conversation State
 
@@ -85,6 +88,12 @@ regex / keyword 只能作為：
 - 低風險 shortcut
 - 候選意圖提示
 - obvious meta query fast path
+
+補充規則：
+
+- 同一類 fast-path（例如 explicit capture frame / non-capture guard）只能有 **單一 shared implementation**
+- skill prompt / skill runtime 不得再各自維護第二份 query-vs-capture、query-vs-completion 的 regex 分流
+- keyword / regex 不得直接覆寫 append-vs-create 這類 mutation semantics；若需要判斷，必須透過單一 shared resolver 或結構化 decision
 
 以下不得由 regex 直接裁決：
 
@@ -107,6 +116,36 @@ regex / keyword 只能作為：
 
 像 `沒錯`、`對`、`好的`、`不是這個`、`是上一個`，不得當成一般文字送進 agent。
 
+### FR-4 Recall phrasing variation 不得退化成 capture
+
+像 `我剛才記了什麼`、`你幫我記了什麼`、`剛剛記的是什麼` 這類問句，本質是 query / recall。
+
+規則：
+
+- 不得因為出現 `記`、`幫我記` 片段就退化成 `task_capture`
+- recall fast-path 與 non-capture guard 必須覆蓋第二人稱、口語與時態變體
+- 若找不到最近一次 recorded item，只能回覆查無紀錄，不能幻想建立新任務
+
+### FR-5 清單指代未解開時要回到 list clarification
+
+### FR-6 Query fast-path 必須覆蓋 negative pending phrasing
+
+像 `今天還有什麼事沒做`、`今天還沒完成哪些`、`還有哪些沒做完` 這類句子，本質是 `today_focus`，不是 `completed_today`。
+
+規則：
+
+- `today_focus` fast-path 不得只覆蓋 `今天要做什麼` 這種正向問法
+- 只要語意是在問剩餘 / 未完成 / 還沒做的項目，就必須路由到 `today_focus`
+- `completed_today` 只接受明確詢問已完成內容的 phrasing，不得靠模糊的 `今天.*做了什麼` 類比去吞掉 negative pending query
+
+像 `第一個`、`第三個`、`最後一個`、`剛剛那個` 這類完成語句，若明確承接最近一次 canonical list，Target Resolver 必須優先用該 list 做解析。
+
+規則：
+
+- 可安全解析時，直接綁定該 list item
+- 無法安全解析時，必須明說「你是指清單中的哪一個」並要求回覆序號或完整名稱
+- 不得把 `最後一個` 原句直接丟進 semantic search 後再回 `請確認名稱`
+
 ## 7. 第一批實作範圍
 
 本輪先落地：
@@ -123,6 +162,7 @@ regex / keyword 只能作為：
 - 對 deterministic 無法安全判定的輸入，可使用 `naru-agent-js@0.1.2` 的 `agent.decide + LLMStructuredClassifier` 作為 fallback decision runtime
 - structured classifier 只能輸出 canonical intent，不得直接執行 tool 或產生最終回覆
 - target resolution 與 execution 仍維持 deterministic service / use case
+- 已知 intent 的執行權必須收斂在單一 control plane；不得在 executor 再做第二輪 prompt switching 與 tool gating
 
 ### 8.1 `naru_agent` 的定位
 
@@ -131,7 +171,6 @@ regex / keyword 只能作為：
 它適合承擔：
 
 - fallback decision runtime
-- skill / tool orchestration
 - response generation
 - memory-aware dialogue assistance
 
@@ -211,10 +250,7 @@ regex / keyword 只能作為：
 2. `Dialogue / Response Agent`
    - 用途：將已知結果轉成自然語言
    - 禁止：改寫 execution truth、補 invent facts
-3. `Low-risk Tool Orchestration Agent`
-   - 用途：在低風險 query / meta 場景協助選 skill
-   - 禁止：裁決高風險 mutation
-4. `Memory-Aware Assistant`
+3. `Memory-Aware Assistant`
    - 用途：需要 summary / memory 時提供補充對話能力
    - 禁止：覆寫 canonical state
 

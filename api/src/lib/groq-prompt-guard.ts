@@ -1,3 +1,5 @@
+import { logAgentLlmCall, normalizeAgentUsage } from "@/application/use-cases/agent/llm-logging"
+
 type GroqPromptGuardVerdict = "allow" | "block" | "error"
 
 export interface GroqPromptGuardResult {
@@ -34,6 +36,7 @@ export class GroqPromptGuardClient {
   async classify(message: string): Promise<GroqPromptGuardResult> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    const startedAt = Date.now()
 
     try {
       const response = await fetch(GROQ_API_URL, {
@@ -61,7 +64,17 @@ export class GroqPromptGuardClient {
 
       const json = await response.json() as {
         choices?: Array<{ message?: { content?: string } }>
+        usage?: {
+          prompt_tokens?: number
+          completion_tokens?: number
+          total_tokens?: number
+        }
       }
+      const usage = normalizeAgentUsage({
+        promptTokens: json.usage?.prompt_tokens,
+        completionTokens: json.usage?.completion_tokens,
+        totalTokens: json.usage?.total_tokens,
+      })
       const raw = json.choices?.[0]?.message?.content ?? null
       if (!raw) {
         return {
@@ -81,6 +94,18 @@ export class GroqPromptGuardClient {
           reason: "groq_unparseable_response",
         }
       }
+
+      logAgentLlmCall({
+        event: "agent_llm_call",
+        feature: "groq_prompt_guard",
+        latencyMs: Date.now() - startedAt,
+        usage,
+        model: this.config.model,
+        metadata: {
+          classificationMode: this.config.classificationMode ?? "numeric_threshold",
+          verdict: parsed.verdict,
+        },
+      })
 
       return {
         verdict: parsed.verdict,

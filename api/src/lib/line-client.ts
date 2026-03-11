@@ -7,6 +7,7 @@
 import { messagingApi } from "@line/bot-sdk"
 import crypto from "crypto"
 import type { CoachBriefingData } from "@/domain/interfaces/coach-briefing-repository"
+import type { DailyPlanData } from "@/domain/interfaces/daily-plan-repository"
 
 // ============================================================================
 // Client Singleton
@@ -75,5 +76,49 @@ export function formatMorningBriefing(briefing: CoachBriefingData): string {
 
   const result = lines.join("\n")
   // LINE 單訊息上限 5000 chars
+  return result.length > 4900 ? result.slice(0, 4900) + "…" : result
+}
+
+export function formatMorningBriefingPush(
+  briefing: CoachBriefingData,
+  plan: DailyPlanData | null,
+): string {
+  const dateStr = briefing.briefingDate.toLocaleDateString("zh-TW", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    timeZone: "Asia/Taipei",
+  })
+
+  const lines: string[] = [`☀️ 早安！今天 ${dateStr}`]
+
+  if (briefing.summary) {
+    lines.push("", briefing.summary.trim())
+  }
+
+  const firstRecommendation = briefing.recommendations?.[0]?.action?.trim()
+  if (firstRecommendation) {
+    lines.push("", `💡 建議先做：${firstRecommendation}`)
+  }
+
+  lines.push("", "📋 今日任務")
+
+  const todayItems = (plan?.items ?? [])
+    .filter((item) => item.status === "today")
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 5)
+
+  if (todayItems.length === 0) {
+    lines.push("今天沒有排定任務")
+  } else {
+    for (const item of todayItems) {
+      const duration = item.estimatedMinutes ? `（${item.estimatedMinutes} 分鐘）` : ""
+      lines.push(`${item.order}. ${item.content}${duration}`)
+    }
+  }
+
+  lines.push("", "—", "在 Zentropy App 查看完整晨報與計畫")
+
+  const result = lines.join("\n")
   return result.length > 4900 ? result.slice(0, 4900) + "…" : result
 }

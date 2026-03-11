@@ -16,6 +16,9 @@ import { UpdateTaskUseCase } from '@/application/use-cases/tasks/update-task'
 import { CreateTaskUseCase } from '@/application/use-cases/tasks/create-task'
 import { syncPlanOnTaskChange } from '@/application/services/plan-sync'
 
+const FALLBACK_AREA_NAME = '收件匣'
+const FALLBACK_PRODUCT_NAME = '待整理'
+
 // ============================================================================
 // GET /api/tasks - 查詢任務列表
 // ============================================================================
@@ -55,8 +58,8 @@ export async function GET(request: NextRequest) {
       drawer: task.status,
       lifecycle: task.aiAnalysis?.lifecycle || 'embryo',
       tag: {
-        area: task.product?.area.name || 'Unknown',
-        product: task.product?.name || 'Unknown',
+        area: task.product?.area.name || FALLBACK_AREA_NAME,
+        product: task.product?.name || FALLBACK_PRODUCT_NAME,
         topic: task.topic?.name || '未分類',
       },
       // Raw fields for Mobile App / Sync
@@ -187,8 +190,8 @@ export async function PATCH(request: NextRequest) {
       drawer: task.status,
       lifecycle: analysis.lifecycle || 'embryo',
       tag: {
-        area: task.product?.area.name || 'Unknown',
-        product: task.product?.name || 'Unknown',
+        area: task.product?.area.name || FALLBACK_AREA_NAME,
+        product: task.product?.name || FALLBACK_PRODUCT_NAME,
         topic: task.topic?.name || '未分類',
       },
       product_id: task.productId,
@@ -315,8 +318,8 @@ export async function POST(request: NextRequest) {
       drawer: task.status,
       lifecycle: analysis.lifecycle || 'embryo',
       tag: {
-        area: task.product?.area.name || 'Unknown',
-        product: task.product?.name || 'Unknown',
+        area: task.product?.area.name || FALLBACK_AREA_NAME,
+        product: task.product?.name || FALLBACK_PRODUCT_NAME,
         topic: task.topic?.name || '未分類',
       },
       product_id: task.productId,

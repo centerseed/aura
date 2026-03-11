@@ -8,11 +8,18 @@ const AFFIRMATIVE_CONFIRMATIONS = new Set([
   "y",
   "好",
   "好的",
+  "好啊",
   "是",
+  "是的",
+  "是啊",
   "對",
   "對啊",
   "對的",
   "沒錯",
+  "可以",
+  "行",
+  "嗯",
+  "嗯嗯",
 ])
 
 const REJECTION_PHRASES = new Set([
@@ -33,6 +40,11 @@ const REJECTION_PHRASES = new Set([
   "不做了",
 ])
 
+const BRAIN_DUMP_CONFIRMATION_PATTERNS = [
+  /你想要我記錄[「『"]([^」』"\n]+)[」』"]嗎？請確認是否要建立新的任務/u,
+  /你想要我記錄[「『"]([^」』"\n]+)[」』"]嗎？請說[「『"]?記錄[:：]/u,
+] as const
+
 export function isLineSessionConfirmation(text: string): boolean {
   return AFFIRMATIVE_CONFIRMATIONS.has(text.trim().toLowerCase())
 }
@@ -48,4 +60,13 @@ export function classifyConfirmationDisposition(text: string): "confirm" | "reje
   if (AFFIRMATIVE_CONFIRMATIONS.has(normalized)) return "confirm"
   if (REJECTION_PHRASES.has(normalized)) return "reject"
   return "override"
+}
+
+export function extractBrainDumpConfirmationTarget(text: string): string | null {
+  for (const pattern of BRAIN_DUMP_CONFIRMATION_PATTERNS) {
+    const match = text.match(pattern)
+    const candidate = match?.[1]?.trim()
+    if (candidate) return candidate
+  }
+  return null
 }

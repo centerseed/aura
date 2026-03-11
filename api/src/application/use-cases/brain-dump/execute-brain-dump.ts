@@ -111,6 +111,131 @@ function getDefaultDays(taskType: string | undefined): number {
   }
 }
 
+function normalizeAppendTargetText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/^(記錄|新增|追加|補充)\s*[:：]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function compactAppendTargetText(text: string): string {
+  return normalizeAppendTargetText(text)
+    .replace(/1\s*on\s*1/gi, "1on1")
+    .replace(/[\s/,_\-.()[\]{}:：，、。!?！？'"]/g, "")
+    .trim()
+}
+
+function bigrams(text: string): string[] {
+  const chars = Array.from(text.replace(/\s+/g, ""))
+  const grams: string[] = []
+  for (let i = 0; i < chars.length - 1; i += 1) {
+    grams.push(chars[i] + chars[i + 1])
+  }
+  return Array.from(new Set(grams))
+}
+
+function diceCoefficient(lhs: string, rhs: string): number {
+  if (!lhs || !rhs) return 0
+  if (lhs === rhs) return 1
+
+  const lhsBigrams = bigrams(lhs)
+  const rhsBigrams = bigrams(rhs)
+  if (lhsBigrams.length === 0 || rhsBigrams.length === 0) {
+    return lhs === rhs ? 1 : 0
+  }
+
+  const rhsCounts = new Map<string, number>()
+  for (const gram of rhsBigrams) {
+    rhsCounts.set(gram, (rhsCounts.get(gram) ?? 0) + 1)
+  }
+
+  let overlap = 0
+  for (const gram of lhsBigrams) {
+    const count = rhsCounts.get(gram) ?? 0
+    if (count > 0) {
+      overlap += 1
+      rhsCounts.set(gram, count - 1)
+    }
+  }
+
+  return (2 * overlap) / (lhsBigrams.length + rhsBigrams.length)
+}
+
+function normalizedLevenshteinSimilarity(lhs: string, rhs: string): number {
+  if (!lhs || !rhs) return 0
+  if (lhs === rhs) return 1
+
+  const lhsChars = Array.from(lhs)
+  const rhsChars = Array.from(rhs)
+  const rows = lhsChars.length + 1
+  const cols = rhsChars.length + 1
+  const dp = Array.from({ length: rows }, () => Array<number>(cols).fill(0))
+
+  for (let i = 0; i < rows; i += 1) dp[i][0] = i
+  for (let j = 0; j < cols; j += 1) dp[0][j] = j
+
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = lhsChars[i - 1] === rhsChars[j - 1] ? 0 : 1
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      )
+    }
+  }
+
+  const distance = dp[rows - 1][cols - 1]
+  const maxLength = Math.max(lhsChars.length, rhsChars.length)
+  return maxLength === 0 ? 1 : 1 - distance / maxLength
+}
+
+function appendTargetScore(inputText: string, taskTitle: string): number {
+  const query = compactAppendTargetText(inputText)
+  const title = compactAppendTargetText(taskTitle)
+  if (!query || !title) return 0
+  if (query === title) return 100
+
+  const dice = diceCoefficient(query, title)
+  const levenshtein = normalizedLevenshteinSimilarity(query, title)
+  const substringBonus = title.includes(query) ? 1 : query.includes(title) ? 0.9 : 0
+
+  return (dice * 0.55 + levenshtein * 0.3 + substringBonus * 0.15) * 100
+}
+
+function hasExplicitMultiTargetCue(text: string): boolean {
+  return /(和|跟|以及|還有|與|及|分別|各自|一起|都|、)/.test(text)
+}
+
+function resolveAppendTargetTasks<
+  T extends { id: string; content: string }
+>(inputText: string, tasks: T[]): T[] {
+  if (tasks.length <= 1) return tasks
+
+  const ranked = tasks
+    .map((task) => ({
+      task,
+      score: appendTargetScore(inputText, task.content),
+    }))
+    .sort((lhs, rhs) => rhs.score - lhs.score)
+
+  if (hasExplicitMultiTargetCue(inputText)) {
+    return ranked.map((item) => item.task)
+  }
+
+  const [best, second] = ranked
+  if (!best) return []
+  if (!second) return [best.task]
+  if (best.score - second.score >= 15) return [best.task]
+  if (best.score >= 85 && second.score < 60) return [best.task]
+
+  throw new ValidationException(
+    "偵測到多個可能的追加目標，但輸入未明確指出要追加到哪些任務，請指定更精確的目標任務",
+    "target_task_ids"
+  )
+}
+
 // ============================================================================
 // DTOs
 // ============================================================================
@@ -163,9 +288,7 @@ export class ExecuteBrainDumpUseCase {
         )
       }
 
-      const now = new Date()
-      const appendedByTask: Array<{ task: { id: string; content: string; product: string }; sub_items: typeof result.sub_items }> = []
-
+      const fetchedTargets = []
       for (const taskId of targetTaskIds) {
         const targetTask = await prisma.task.findFirst({
           where: {
@@ -182,6 +305,15 @@ export class ExecuteBrainDumpUseCase {
             "target_task_ids"
           )
         }
+        fetchedTargets.push(targetTask)
+      }
+
+      const resolvedTargets = resolveAppendTargetTasks(request.text, fetchedTargets)
+      const now = new Date()
+      const appendedByTask: Array<{ task: { id: string; content: string; product: string }; sub_items: typeof result.sub_items }> = []
+
+      for (const targetTask of resolvedTargets) {
+        const taskId = targetTask.id
 
         // 取得目前最大 order
         const maxOrderResult = await prisma.subTask.aggregate({
@@ -227,14 +359,14 @@ export class ExecuteBrainDumpUseCase {
           input_content: { text: request.text },
           output_content: {
             action: "append_sub_item",
-            target_task_ids: targetTaskIds,
+            target_task_ids: resolvedTargets.map((task) => task.id),
             sub_items: result.sub_items,
             reasoning: result.reasoning,
           },
           user_action: "APPLIED",
           metadata: {
-            appended_sub_items_count: result.sub_items.length * targetTaskIds.length,
-            target_task_count: targetTaskIds.length,
+            appended_sub_items_count: result.sub_items.length * resolvedTargets.length,
+            target_task_count: resolvedTargets.length,
             input_type: request.inputType,
           },
         },

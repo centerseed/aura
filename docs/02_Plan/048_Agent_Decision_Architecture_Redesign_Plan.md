@@ -20,6 +20,7 @@
 1. 明確決策層
 2. 明確狀態層
 3. 壓縮 prompt 職責
+4. 消除重複 control plane
 
 ## 3. 目標架構
 
@@ -52,12 +53,15 @@ deterministic 組裝：
 
 輸出：
 
-- speech act
 - object
-- target reference mode
-- temporal scope
 - requires confirmation
 - confidence
+
+以下資訊改放 trace / debug metadata，不進主 schema：
+
+- speech act
+- target reference mode
+- temporal scope
 - reason codes
 
 runtime 原則：
@@ -78,6 +82,11 @@ runtime 原則：
 - query completed -> task query service
 - complete -> task / subtask / plan item use cases
 - adjust -> adjustment use case
+
+原則：
+
+- 已知 intent 的執行權收斂在單一 deterministic control plane
+- 不再在第二層 executor 重新做 prompt switching 或 tool gating
 
 ### Layer 5: Response Generator
 
@@ -143,6 +152,7 @@ deterministic 檢查：
 - system prompt 收斂
 - skill prompt 收斂
 - brain dump prompt 分階段
+- 移除 duplicated executor prompt variants
 
 ### Phase 5: Evaluation
 
@@ -175,6 +185,12 @@ deterministic 檢查：
 3. LINE `confirm` / `沒錯` / `對` 等確認語句攔截
 4. subtask / daily plan item completion confirm path
 5. 對應 unit 與 webhook-level regression tests
+
+本輪收斂補充：
+
+6. 移除 `IntentAwareExecutor` 這層 duplicated control plane
+7. `AgentIntent` 瘦身為 `object + requiresConfirmation + confidence`
+8. `[FACTS]` 先保留為 string-session 過渡協議，不在本輪一起抽換
 
 ## 6. 下一切片
 

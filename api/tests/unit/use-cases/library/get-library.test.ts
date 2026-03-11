@@ -66,7 +66,9 @@ describe('GetLibraryUseCase', () => {
         },
       ]
 
-      vi.mocked(prisma.$queryRaw).mockResolvedValue(mockRawRows)
+      vi.mocked(prisma.$queryRaw)
+        .mockResolvedValueOnce(mockRawRows)
+        .mockResolvedValueOnce([])
 
       const result = await useCase.execute({ userId: 'user-123' })
 
@@ -76,11 +78,44 @@ describe('GetLibraryUseCase', () => {
     })
 
     it('應該返回空結構當沒有資料', async () => {
-      vi.mocked(prisma.$queryRaw).mockResolvedValue([])
+      vi.mocked(prisma.$queryRaw)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
 
       const result = await useCase.execute({ userId: 'user-123' })
 
       expect(result.areas).toEqual([])
+    })
+
+    it('應該把沒有 product 的任務放進虛擬收件匣', async () => {
+      vi.mocked(prisma.$queryRaw)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            task_id: 'task-inbox-1',
+            task_content: '未指定專案的規劃任務',
+            task_status: 'ACTIVE',
+            task_ai_analysis: { narrative: 'test' },
+            task_references: [],
+            task_start_date: null,
+            task_due_date: new Date('2026-03-12T00:00:00.000Z'),
+            task_time_confidence: null,
+            task_inferred_from_milestone: null,
+            task_date_source: null,
+            task_created_at: new Date('2026-03-11T00:00:00.000Z'),
+            task_recurring_task_id: null,
+            topic_name: null,
+          },
+        ])
+
+      const result = await useCase.execute({ userId: 'user-123' })
+
+      expect(result.areas).toHaveLength(1)
+      expect(result.areas[0].name).toBe('收件匣')
+      expect(result.areas[0].products[0].name).toBe('待整理')
+      expect(result.areas[0].products[0].tasks[0].product_id).toBeNull()
+      expect(result.areas[0].products[0].tasks[0].tag.area).toBe('收件匣')
+      expect(result.areas[0].products[0].tasks[0].tag.product).toBe('待整理')
     })
   })
 })

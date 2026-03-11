@@ -16,6 +16,9 @@ interface SyncParams {
   timezone?: string
 }
 
+const FALLBACK_AREA_NAME = '收件匣'
+const FALLBACK_PRODUCT_NAME = '待整理'
+
 /**
  * 根據 dueDate 決定 plan item 的 status
  */
@@ -136,8 +139,8 @@ export async function syncPlanOnTaskChange(params: SyncParams): Promise<void> {
     taskId,
     subTaskId: subTaskId ?? null,
     content: itemContent,
-    areaName: task.product?.area.name ?? 'Unknown',
-    productName: task.product?.name ?? 'Unknown',
+    areaName: task.product?.area.name ?? FALLBACK_AREA_NAME,
+    productName: task.product?.name ?? FALLBACK_PRODUCT_NAME,
     estimatedMinutes: estimatedMinutes,
     dueDate: itemDueDate,
     order: maxOrder + 1,

@@ -10,6 +10,7 @@ import { resilientGenerateObject } from "@/lib/ai-resilient"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 import type { AiTokenUsage } from "@/lib/ai-rate-limit"
+import { logAgentLlmCall, normalizeAiSdkUsage } from "@/application/use-cases/agent/llm-logging"
 
 // ============================================================================
 // Types
@@ -222,6 +223,7 @@ export class AnalyzeStructureUseCase {
     structureSummary += "\n"
 
     // 3. AI 分析
+    const startAI = Date.now()
     const { object: result, usage: aiUsage } = await resilientGenerateObject({
       model: google("gemini-2.5-flash-lite"),
       schema: ReorganizeResultSchema,
@@ -253,6 +255,19 @@ ${structureSummary}
 - 只建議有語義意義的變更，不要為了整理而整理
 - 在 reclassifications 中，請填入 task_title 欄位（從 Task 內容中提取）
 - **保守原則**：如果不確定是否該合併，就不要合併`,
+    })
+    logAgentLlmCall({
+      event: "agent_llm_call",
+      feature: "reorganize_analyze_structure",
+      userId: request.userId,
+      latencyMs: Date.now() - startAI,
+      usage: normalizeAiSdkUsage(aiUsage),
+      model: "gemini-2.5-flash-lite",
+      metadata: {
+        rawRowCount: rawRows.length,
+        mergeCount: result.merges.length,
+        reclassificationCount: result.reclassifications.length,
+      },
     })
 
     console.log("AI Reorganize Analysis:", result.analysis)

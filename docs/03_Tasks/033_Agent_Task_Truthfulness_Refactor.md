@@ -57,6 +57,39 @@
 - [ ] 為 brain dump append/create 路徑補上結構化 facts
 - [ ] 將 planner `goal` ownership 收回 application 層，並補 planner normalization tests
 
+## 3.3 LINE / Agent Latency Instrumentation (2026-03-11)
+
+根因句：
+
+- 這個失敗是因為 `today_focus` fast-path 沒接住某些 query phrasing 後，請求會退回完整 agent orchestration；不是因為 task query service 本身查 DB 需要 30 秒。
+- 在沒有 phase-level timing 的情況下，無法分辨延遲到底來自 intent resolve、delegate LLM、session persistence，還是 LINE push。
+
+本輪最小交付：
+
+- [ ] 在 `api/src/application/use-cases/agent/tool-first-agent.ts` 為 `session_history_load / intent_resolve / direct_route / delegate_chat / delegate_persist / total` 補 timing
+- [ ] 在 `api/src/app/api/line/webhook/route.ts` 為 `user_lookup / session_lookup / pending_execute / agent_chat / push / total` 補 timing
+- [ ] 每次 LINE message flow 結束時輸出單一 structured log，帶 `outcome`、`toolCalls` 與 phase timings
+- [ ] 每次 ToolFirstAgent chat 結束時輸出單一 structured log，帶 `route`、`intentObject`、`toolCalls` 與 phase timings
+
+驗證方式：
+
+- [ ] 跑 webhook / tool-first-agent 單元測試，確認 instrumentation 不破壞既有流程
+- [ ] 新增 log regression tests，確認 structured timing log 會在 direct route 與 LINE route 出現
+
+## 3.4 Temporal Query Scope Fix (2026-03-11)
+
+根因句：
+
+- 這個失敗是因為 `明天有什麼待辦` 雖然被 resolve 成 query intent，但 direct tool route 仍固定呼叫 `query_today_tasks` 的 today-focus 寬口徑查詢；不是因為資料庫沒有明天任務。
+- 現況缺的是 query intent 的時間範圍 contract，不是更多 regex。
+
+本輪最小交付：
+
+- [ ] 讓 intent trace 對 `今天 / 明天` 保留正確 temporal scope
+- [ ] 讓 `query_today_tasks` 支援最小可驗證的 `dayOffset` contract
+- [ ] 讓 `AgentTaskQueryService` 可查指定日（至少 today / tomorrow）而非永遠查 today bucket
+- [ ] 補 unit tests，證明今天與明天查詢不會回同一份結果
+
 ### T033-1: 盤點完成語義的所有寫入入口
 **預計時間**: 20 分鐘  
 **目的**: 確認所有會把 Task 標記完成的程式路徑，避免只修一半。
@@ -186,6 +219,7 @@
   - 顯示前 N 筆
   - 若截斷，明示是摘要
   - 若 coverage 不完整，明示範圍
+  - LINE 版面需手機友善，避免過度括號、過長標題說明與後台報表語氣
 
 **交付物**:
 - [ ] `completed_today` formatter
@@ -213,11 +247,17 @@
 
 **執行內容**:
 - `complete-task-skill.ts` 的完成執行改走 shared completion path
+- completion target resolution 改為 `normalized exact -> fuzzy lexical -> clarification`
+- 對 `完成了`、`做完了`、`好了`、`跑完了` 等完成詞先做 deterministic normalization
+- completion normalizer 需拆為 shared core + locale-specific rules；對 deterministic 無法穩定處理的變體，可掛 bounded LLM fallback 做 query normalization
+- 對 deterministic single-candidate completion，必須單輪直接執行 shared completion path，不可一律退回 confirm-first
+- 若 lexical top1 / top2 過近，直接列候選要求澄清，不進單一候選確認
 - `api/src/app/api/line/webhook/route.ts` 的確認流程同樣改走 shared use case
 - 確保完成後可立即查詢到 `completed_at`
 
 **交付物**:
 - [ ] complete skill 不再直接手寫 `task.update({ status: ARCHIVE })`
+- [ ] completion search 只用 lexical 與 normalization，且 decision path 可被 facts 驗證
 - [ ] webhook confirm flow 不再繞過 domain semantics
 
 ---

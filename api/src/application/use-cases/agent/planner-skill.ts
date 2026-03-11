@@ -12,6 +12,7 @@ import { google } from "@ai-sdk/google"
 import { resilientGenerateObject } from "@/lib/ai-resilient"
 import { prisma } from "@/lib/db"
 import { Status } from "@prisma/client"
+import { logAgentLlmCall, normalizeAiSdkUsage } from "./llm-logging"
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ const PlannerTaskModelSchema = z.object({
   title: z.string().describe("任務標題（繁體中文，簡潔明確，≤ 100 字）"),
   rationale: z.string().optional().describe("為何需要此任務（AI 解釋，≤ 200 字）"),
   sub_items: z.array(z.string()).optional().describe("子任務清單（每項 ≤ 80 字）"),
-  estimated_days: z.number().optional().describe("預計天數（從今天起算）"),
+  estimated_days: z.number().optional().describe("預估工期天數（此任務自身所需時間）"),
   priority: z.enum(["P0", "P1", "P2", "P3"]).optional().describe("優先級，預設 P1"),
 })
 
@@ -42,6 +43,29 @@ const PlannerOutputSchema = z.object({
 })
 
 type PlannerOutput = z.infer<typeof PlannerOutputSchema>
+const DEFAULT_PLANNER_DURATION_DAYS = 1
+const GENERIC_PLANNER_PRODUCT_NAMES = new Set(["待整理", "未分類", "一般"])
+const GENERIC_PLANNER_AREA_NAMES = new Set(["收件匣", "一般"])
+
+const PlannerPlacementDecisionSchema = z.object({
+  area_id: z.string().describe("從既有結構中選出的 area id"),
+  product_id: z.string().describe("從既有結構中選出的 product id"),
+  reasoning: z.string().describe("為何選擇這個既有 project（繁體中文）"),
+})
+
+type ExistingPlannerArea = {
+  id: string
+  name: string
+  scope: string | null
+  products: Array<{
+    id: string
+    name: string
+  }>
+}
+
+function formatDateOnly(date: Date): string {
+  return date.toLocaleDateString("en-CA")
+}
 
 function sanitizeGoalText(goal: string): string {
   return goal.trim().replace(/\s+/g, " ")
@@ -89,6 +113,246 @@ function normalizePlannerOutput(
   }
 }
 
+export function buildPlannerDueDates(
+  tasks: Array<Pick<z.infer<typeof PlannerTaskSchema>, "estimated_days">>,
+  dueDate?: string,
+  baseDate: Date = new Date(),
+): Array<string | undefined> {
+  if (dueDate) {
+    return tasks.map(() => dueDate)
+  }
+
+  const cursor = new Date(baseDate)
+  cursor.setHours(0, 0, 0, 0)
+
+  return tasks.map((task) => {
+    const durationDays = Math.max(
+      DEFAULT_PLANNER_DURATION_DAYS,
+      Math.floor(task.estimated_days ?? DEFAULT_PLANNER_DURATION_DAYS),
+    )
+    cursor.setDate(cursor.getDate() + durationDays)
+    return formatDateOnly(cursor)
+  })
+}
+
+type PlannerPlacement = {
+  areaId: string
+  areaName: string
+  productId: string
+  productName: string
+  displayProductName: string
+}
+
+type PlannerCreationResult = {
+  placement: PlannerPlacement
+  items: Array<{ task_id: string; title: string; product: string; sub_items?: string[] }>
+}
+
+function normalizePlannerProductNameForDisplay(productName: string): string {
+  return GENERIC_PLANNER_PRODUCT_NAMES.has(productName) ? "待整理" : productName
+}
+
+export function formatPlannerPlacementPath(placement: Pick<PlannerPlacement, "areaName" | "displayProductName" | "productName" | "productId">): string {
+  const productLabel = placement.displayProductName || placement.productName || placement.productId
+  return placement.areaName ? `${placement.areaName} / ${productLabel}` : productLabel
+}
+
+export function buildPlannerPlacementNotice(placement: Pick<PlannerPlacement, "areaName" | "displayProductName" | "productName" | "productId">): string {
+  const path = formatPlannerPlacementPath(placement)
+  return `📍選到的 Area / Project：${path}\n🧠 Brain dump 落點：${path}`
+}
+
+export function pickPlannerFallbackProduct(areas: ExistingPlannerArea[]): PlannerPlacement {
+  for (const area of areas) {
+    const genericProduct = area.products.find((product) => GENERIC_PLANNER_PRODUCT_NAMES.has(product.name))
+    if (genericProduct) {
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        productId: genericProduct.id,
+        productName: genericProduct.name,
+        displayProductName: normalizePlannerProductNameForDisplay(genericProduct.name),
+      }
+    }
+  }
+
+  for (const area of areas) {
+    if (GENERIC_PLANNER_AREA_NAMES.has(area.name) && area.products[0]) {
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        productId: area.products[0].id,
+        productName: area.products[0].name,
+        displayProductName: normalizePlannerProductNameForDisplay(area.products[0].name),
+      }
+    }
+  }
+
+  const firstProduct = areas.flatMap((area) =>
+    area.products.map((product) => ({ area, product })),
+  )[0]
+
+  if (!firstProduct) {
+    throw new Error("目前沒有可用的 Project 可承接這份規劃，請先建立至少一個 Project。")
+  }
+
+  return {
+    areaId: firstProduct.area.id,
+    areaName: firstProduct.area.name,
+    productId: firstProduct.product.id,
+    productName: firstProduct.product.name,
+    displayProductName: normalizePlannerProductNameForDisplay(firstProduct.product.name),
+  }
+}
+
+async function classifyPlannerPlacement(
+  goal: string,
+  areas: ExistingPlannerArea[],
+): Promise<PlannerPlacement> {
+  if (areas.length === 0 || areas.every((area) => area.products.length === 0)) {
+    throw new Error("目前沒有可用的 Project 可承接這份規劃，請先建立至少一個 Project。")
+  }
+
+  const context = areas
+    .map((area) => {
+      const scopeLine = area.scope ? `（範圍：${area.scope}）` : ""
+      const products = area.products.map((product) => `  - ${product.name} [${product.id}]`).join("\n")
+      return `Area: ${area.name} [${area.id}] ${scopeLine}\n${products}`
+    })
+    .join("\n\n")
+
+  const startedAt = Date.now()
+  const { object, usage } = await resilientGenerateObject({
+    model: google("gemini-2.5-flash-lite"),
+    schema: PlannerPlacementDecisionSchema,
+    prompt: `你是 Zentropy 的規劃分類助手。你的工作只有一件事：根據用戶目標，從既有的 Area / Project 結構中選出**最適合承接這份規劃**的既有 Project。
+
+目標：
+${goal}
+
+現有結構：
+${context}
+
+規則：
+- 只能選擇上面已存在的 area_id / product_id
+- 禁止建議新建 Area
+- 禁止建議新建 Product
+- 優先選擇語意最接近、未來也能持續承接相關任務的 Project
+- 若多個都可接受，選最不令人意外的一個
+
+請回傳最適合的 area_id、product_id 與 reasoning。`,
+  })
+
+  logAgentLlmCall({
+    event: "agent_llm_call",
+    feature: "planner_select_placement",
+    latencyMs: Date.now() - startedAt,
+    usage: normalizeAiSdkUsage(usage),
+    model: "gemini-2.5-flash-lite",
+    metadata: {
+      goalLen: goal.length,
+      areaCount: areas.length,
+      productCount: areas.reduce((sum, area) => sum + area.products.length, 0),
+    },
+  })
+
+  const matchedArea = areas.find((area) => area.id === object.area_id)
+  const matchedProduct = matchedArea?.products.find((product) => product.id === object.product_id)
+
+  if (!matchedArea || !matchedProduct) {
+    return pickPlannerFallbackProduct(areas)
+  }
+
+  return {
+    areaId: matchedArea.id,
+    areaName: matchedArea.name,
+    productId: matchedProduct.id,
+    productName: matchedProduct.name,
+    displayProductName: normalizePlannerProductNameForDisplay(matchedProduct.name),
+  }
+}
+
+export async function resolvePlannerPlacement(
+  tx: {
+    area: {
+      findMany: typeof prisma.area.findMany
+    }
+    product: {
+      findUnique: typeof prisma.product.findUnique
+    }
+  },
+  userId: string,
+  goal: string,
+  productId?: string,
+  productName?: string,
+): Promise<PlannerPlacement> {
+  if (!productId) {
+    const areas = await tx.area.findMany({
+      where: { user_id: userId, deleted_at: null },
+      orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        scope: true,
+        products: {
+          where: { deleted_at: null },
+          orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
+
+    return classifyPlannerPlacement(goal, areas)
+  }
+
+  if (productName) {
+    const resolvedProduct = await tx.product.findUnique({
+      where: { id: productId },
+      select: {
+        name: true,
+        area: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
+
+    return {
+      areaId: resolvedProduct?.area.id ?? "",
+      areaName: resolvedProduct?.area.name ?? "",
+      productId,
+      productName,
+      displayProductName: normalizePlannerProductNameForDisplay(productName),
+    }
+  }
+
+  const resolvedProduct = await tx.product.findUnique({
+    where: { id: productId },
+    select: {
+      name: true,
+      area: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  })
+
+  return {
+    areaId: resolvedProduct?.area.id ?? "",
+    areaName: resolvedProduct?.area.name ?? "",
+    productId,
+    productName: resolvedProduct?.name ?? "",
+    displayProductName: normalizePlannerProductNameForDisplay(resolvedProduct?.name ?? ""),
+  }
+}
+
 // ─── Core Functions ────────────────────────────────────────────────────────────
 
 async function generateTaskBreakdown(
@@ -127,105 +391,64 @@ ${depthGuide}
 - 任務數量：3-7 個（不超過 10 個）
 - 每個任務標題簡潔明確（繁體中文）
 - rationale 說明為何需要此任務
-- 如有 estimated_days，從今天起算天數
+- 如有 estimated_days，代表該任務自身的預估工期天數
 - priority 預設 P1，P0 只用於最緊急的 1-2 個任務
 - summary 用繁體中文說明整體規劃邏輯`
 
-  const { object } = await resilientGenerateObject({
+  const startedAt = Date.now()
+  const { object, usage } = await resilientGenerateObject({
     model: google("gemini-2.5-flash-lite"),
     schema: PlannerModelOutputSchema,
     prompt: plannerPrompt,
+  })
+  logAgentLlmCall({
+    event: "agent_llm_call",
+    feature: "planner_generate_task_breakdown",
+    latencyMs: Date.now() - startedAt,
+    usage: normalizeAiSdkUsage(usage),
+    model: "gemini-2.5-flash-lite",
+    metadata: {
+      goalLen: normalizedGoal.length,
+      depth,
+      taskCount: object.tasks.length,
+    },
   })
   return normalizePlannerOutput(normalizedGoal, object)
 }
 
 async function executePlanCreation(
   userId: string,
+  goal: string,
   output: z.infer<typeof PlannerOutputSchema>,
   productId?: string,
   dueDate?: string,
   productName?: string,
-): Promise<Array<{ task_id: string; title: string; product: string; sub_items?: string[] }>> {
+): Promise<PlannerCreationResult> {
   // P1 safety: 整個建立流程包在 $transaction 中，失敗時整體 rollback，不留半套資料
   return prisma.$transaction(async (tx) => {
-    const today = new Date()
     const createdItems: Array<{ task_id: string; title: string; product: string; sub_items?: string[] }> = []
+    const dueDates = buildPlannerDueDates(output.tasks, dueDate)
+    const placement = await resolvePlannerPlacement(tx, userId, goal, productId, productName)
 
-    // 確保任務永遠有有效 Product（避免 schema 要求 product relation 時失敗）
-    let resolvedProductId = productId
-    let displayProductName = productName
-
-    if (!resolvedProductId) {
-      let defaultArea = await tx.area.findFirst({
-        where: { user_id: userId, name: "一般", deleted_at: null },
-        select: { id: true },
-      })
-
-      if (!defaultArea) {
-        defaultArea = await tx.area.create({
-          data: {
-            user_id: userId,
-            name: "一般",
-            scope: "預設任務區",
-            is_custom: false,
-          },
-          select: { id: true },
-        })
-      }
-
-      let defaultProduct = await tx.product.findFirst({
-        where: { user_id: userId, area_id: defaultArea.id, name: "未分類", deleted_at: null },
-        select: { id: true, name: true },
-      })
-
-      if (!defaultProduct) {
-        defaultProduct = await tx.product.create({
-          data: {
-            user_id: userId,
-            area_id: defaultArea.id,
-            name: "未分類",
-            status: Status.ACTIVE,
-            lifecycle: "FINITE",
-          },
-          select: { id: true, name: true },
-        })
-      }
-
-      resolvedProductId = defaultProduct.id
-      displayProductName = defaultProduct.name
-    }
-
-    if (!displayProductName) {
-      const resolvedProduct = await tx.product.findUnique({
-        where: { id: resolvedProductId },
-        select: { name: true },
-      })
-      displayProductName = resolvedProduct?.name ?? "未分類"
-    }
-
-    for (const taskItem of output.tasks) {
-      // 計算 due_date
-      let taskDueDate: string | undefined = dueDate
-      if (!taskDueDate && taskItem.estimated_days) {
-        const d = new Date(today)
-        d.setDate(d.getDate() + taskItem.estimated_days)
-        taskDueDate = d.toISOString().split("T")[0]
-      }
+    for (const [index, taskItem] of output.tasks.entries()) {
+      const taskDueDate = dueDates[index]
 
       // 建立 narrative（包含 rationale + priority）
       const narrative = `${taskItem.rationale}${taskItem.priority ? ` [${taskItem.priority}]` : ""}`
+      const taskStatus = taskDueDate ? Status.ACTIVE : Status.INBOX
 
-      // 建立任務
       const task = await tx.task.create({
         data: {
           content: taskItem.title,
           user_id: userId,
-          status: Status.ACTIVE,
-          product_id: resolvedProductId,
+          status: taskStatus,
+          product_id: placement.productId,
           due_date: taskDueDate ? new Date(taskDueDate) : null,
           ai_analysis: { narrative: narrative.slice(0, 500) },
         },
+        select: { id: true },
       })
+      const taskId = task.id
 
       const createdSubItems: string[] = []
 
@@ -235,7 +458,7 @@ async function executePlanCreation(
           await tx.subTask.create({
             data: {
               content: subContent.slice(0, 200),
-              task_id: task.id,
+              task_id: taskId,
               user_id: userId,
               completed: false,
             },
@@ -245,14 +468,20 @@ async function executePlanCreation(
       }
 
       createdItems.push({
-        task_id: task.id,
-        title: task.content,
-        product: displayProductName,
+        task_id: taskId,
+        title: taskItem.title,
+        product: placement.displayProductName,
         sub_items: createdSubItems.length > 0 ? createdSubItems : undefined,
       })
     }
 
-    return createdItems
+    return {
+      placement,
+      items: createdItems,
+    }
+  }, {
+    maxWait: 10_000,
+    timeout: 20_000,
   })
 }
 
@@ -303,18 +532,28 @@ export const createRunPlannerTool = (userId: string, originalMessage?: string) =
         const planOutput = await generateTaskBreakdown(goal, productHint, due_date, depth)
 
         // Step 3: 建立任務
-        const createdItems = await executePlanCreation(userId, planOutput, product_id, due_date, productHint)
+        const { placement, items: createdItems } = await executePlanCreation(
+          userId,
+          goal,
+          planOutput,
+          product_id,
+          due_date,
+          productHint,
+        )
 
         const lines = createdItems.map((item, i) => {
+          const productSuffix = item.product ? ` [${item.product}]` : ""
           const subLine =
             item.sub_items && item.sub_items.length > 0
               ? `\n   子任務：${item.sub_items.map((s) => `・${s}`).join("、")}`
               : ""
-          return `${i + 1}. ${item.title} [${item.product}]${subLine}`
+          return `${i + 1}. ${item.title}${productSuffix}${subLine}`
         })
 
         return (
-          `✅ 規劃完成！共建立 ${createdItems.length} 個任務：\n\n${lines.join("\n")}\n\n` +
+          `✅ 規劃完成！共建立 ${createdItems.length} 個任務：\n` +
+          `${buildPlannerPlacementNotice(placement)}\n\n` +
+          `${lines.join("\n")}\n\n` +
           `📝 規劃說明：${planOutput.summary}`
         )
       } catch (err) {
@@ -361,6 +600,11 @@ export async function handleRunPlanner(
   tasks_created: number
   items: Array<{ task_id: string; title: string; product: string; sub_items?: string[] }>
   summary: string
+  placement: {
+    area: string
+    project: string
+    path: string
+  }
 }> {
   const params = input as unknown as RunPlannerInput
   const goal = sanitizeGoalText(params.goal ?? "")
@@ -385,8 +629,9 @@ export async function handleRunPlanner(
     params.depth ?? "shallow",
   )
 
-  const items = await executePlanCreation(
+  const { placement, items } = await executePlanCreation(
     authContext.userId,
+    goal,
     planOutput,
     params.product_id,
     params.due_date,
@@ -397,6 +642,11 @@ export async function handleRunPlanner(
     tasks_created: items.length,
     items,
     summary: planOutput.summary,
+    placement: {
+      area: placement.areaName,
+      project: placement.displayProductName || placement.productName,
+      path: formatPlannerPlacementPath(placement),
+    },
   }
 }
 

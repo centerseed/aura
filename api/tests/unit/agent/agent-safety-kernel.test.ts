@@ -11,7 +11,7 @@ describe("Agent Safety Kernel", () => {
     })
 
     expect(result.intent.object).toBe("task_capture")
-    expect(result.intent.reasonCodes).toContain("explicit_capture_frame_priority")
+    expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
   })
 
   it("identifier-heavy record payload does not leak into reorganize routing", () => {
@@ -22,7 +22,7 @@ describe("Agent Safety Kernel", () => {
     })
 
     expect(result.intent.object).toBe("task_capture")
-    expect(result.intent.reasonCodes).toContain("explicit_capture_frame_priority")
+    expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
   })
 
   it("underspecified short input is handled locally without remote classifier", async () => {

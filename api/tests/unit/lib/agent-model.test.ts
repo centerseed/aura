@@ -1,6 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 describe("agent-model", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    delete process.env.AGENT_PRIMARY_PROVIDER
+    delete process.env.AGENT_ROUTING_MODE
+    delete process.env.AGENT_GEMINI_MODEL
+    delete process.env.AGENT_GROQ_MODEL
+  })
+
   afterEach(() => {
     vi.resetModules()
     delete process.env.AGENT_PRIMARY_PROVIDER

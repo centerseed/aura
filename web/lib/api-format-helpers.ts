@@ -6,7 +6,9 @@
  */
 
 import type { TaskData } from '@/domain/interfaces/task-repository'
-import { TaskStatus } from '@/domain/value-objects/task-status'
+
+const FALLBACK_AREA_NAME = '收件匣'
+const FALLBACK_PRODUCT_NAME = '待整理'
 
 /**
  * 將 TaskData 格式化為前端格式
@@ -22,8 +24,8 @@ export function formatTaskForFrontend(task: TaskData) {
     drawer: task.status,
     lifecycle: analysis.lifecycle || 'embryo',
     tag: {
-      area: task.product?.area.name || 'Unknown',
-      product: task.product?.name || 'Unknown',
+      area: task.product?.area.name || FALLBACK_AREA_NAME,
+      product: task.product?.name || FALLBACK_PRODUCT_NAME,
       topic: task.topic?.name || '未分類',
     },
     // Raw fields for Mobile App / Sync

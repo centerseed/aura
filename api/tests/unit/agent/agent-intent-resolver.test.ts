@@ -11,7 +11,6 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '你好' to greeting", () => {
       const result = resolver.resolve({ message: "你好" })
       expect(result.intent).toMatchObject({
-        speechAct: "meta",
         object: "greeting",
         confidence: 0.99,
       })
@@ -29,18 +28,17 @@ describe("DeterministicAgentIntentResolver", () => {
         message: "幫我記一下明天下午要跟客戶開產品 review 會議",
       })
       expect(result.intent).toMatchObject({
-        speechAct: "mutate",
         object: "task_capture",
-        temporalScope: "future",
         requiresConfirmation: false,
       })
-      expect(result.intent.reasonCodes).toContain("explicit_capture_frame_priority")
+      expect(result.trace.metadata?.temporalScope).toBe("future")
+      expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
     })
 
     it("classifies '待辦：買牛奶' as task capture", () => {
       const result = resolver.resolve({ message: "待辦：買牛奶" })
       expect(result.intent.object).toBe("task_capture")
-      expect(result.intent.reasonCodes).toContain("explicit_capture_frame_priority")
+      expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
     })
 
     it("keeps explicit capture framing over completion wording in mixed inputs", () => {
@@ -48,11 +46,10 @@ describe("DeterministicAgentIntentResolver", () => {
         message: "待辦：準備 Q2 OKR 報告初稿，這週五前完成",
       })
       expect(result.intent).toMatchObject({
-        speechAct: "mutate",
         object: "task_capture",
         requiresConfirmation: false,
       })
-      expect(result.intent.reasonCodes).toContain("explicit_capture_frame_priority")
+      expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
     })
 
     it("treats identifier-heavy record payloads as capture", () => {
@@ -60,7 +57,7 @@ describe("DeterministicAgentIntentResolver", () => {
         message: "幫我記一下任務代號 ALPHA-123456，內容是整理競品投影片",
       })
       expect(result.intent.object).toBe("task_capture")
-      expect(result.intent.reasonCodes).toContain("explicit_capture_frame_priority")
+      expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
     })
   })
 
@@ -68,6 +65,12 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '我剛才記了什麼' to recall_last_item", () => {
       const result = resolver.resolve({ message: "我剛才記了什麼" })
       expect(result.intent.object).toBe("recall_last_item")
+    })
+
+    it("routes '你幫我記了什麼？' to recall_last_item instead of capture", () => {
+      const result = resolver.resolve({ message: "你幫我記了什麼？" })
+      expect(result.intent.object).toBe("recall_last_item")
+      expect(result.trace.metadata?.reasonCodes).toContain("meta_recall_last_item")
     })
 
     it("routes '任務代號是什麼' to recall_task_code", () => {
@@ -80,12 +83,11 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '今天要做什麼' to today_focus", () => {
       const result = resolver.resolve({ message: "今天要做什麼？" })
       expect(result.intent).toMatchObject({
-        speechAct: "query",
         object: "today_focus",
-        temporalScope: "today",
         confidence: 0.98,
       })
-      expect(result.intent.reasonCodes).toContain("fast_path_today_focus")
+      expect(result.trace.metadata?.temporalScope).toBe("today")
+      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_today_focus")
     })
 
     it("routes '今天有哪些任務' to today_focus", () => {
@@ -96,6 +98,18 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '明天有什麼待辦' to today_focus", () => {
       const result = resolver.resolve({ message: "明天有什麼待辦" })
       expect(result.intent.object).toBe("today_focus")
+      expect(result.trace.metadata?.temporalScope).toBe("future")
+    })
+
+    it("routes '今天還有什麼事沒做' to today_focus", () => {
+      const result = resolver.resolve({ message: "今天還有什麼事沒做？" })
+      expect(result.intent.object).toBe("today_focus")
+      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_today_focus")
+    })
+
+    it("routes '今天還沒完成哪些' to today_focus", () => {
+      const result = resolver.resolve({ message: "今天還沒完成哪些" })
+      expect(result.intent.object).toBe("today_focus")
     })
   })
 
@@ -103,12 +117,11 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '今天完成了什麼' to completed_today", () => {
       const result = resolver.resolve({ message: "今天完成了什麼？" })
       expect(result.intent).toMatchObject({
-        speechAct: "query",
         object: "completed_today",
-        temporalScope: "today",
         confidence: 0.98,
       })
-      expect(result.intent.reasonCodes).toContain("fast_path_completed_today")
+      expect(result.trace.metadata?.temporalScope).toBe("today")
+      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_completed_today")
     })
 
     it("routes '今天做了什麼' to completed_today", () => {
@@ -121,11 +134,10 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '幫我整理任務' to reorganize", () => {
       const result = resolver.resolve({ message: "幫我整理任務" })
       expect(result.intent).toMatchObject({
-        speechAct: "mutate",
         object: "reorganize",
         confidence: 0.97,
       })
-      expect(result.intent.reasonCodes).toContain("fast_path_reorganize")
+      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_reorganize")
     })
 
     it("routes '整理一下待辦' to reorganize", () => {
@@ -138,11 +150,10 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '幫我規劃減肥計畫' to planning", () => {
       const result = resolver.resolve({ message: "幫我規劃減肥計畫" })
       expect(result.intent).toMatchObject({
-        speechAct: "mutate",
         object: "planning",
         confidence: 0.97,
       })
-      expect(result.intent.reasonCodes).toContain("fast_path_planning")
+      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_planning")
     })
 
     it("routes '幫我拆解這個專案' to planning", () => {
@@ -177,13 +188,9 @@ describe("DeterministicAgentIntentResolver", () => {
     const decisionAgent = {
       decide: vi.fn().mockResolvedValue({
         decision: {
-          speechAct: "mutate",
           object: "task_capture",
-          targetReferenceMode: "none",
-          temporalScope: "future",
           requiresConfirmation: false,
           confidence: 0.72,
-          reasonCodes: ["structured_task_capture"],
         },
         rawText: "{}",
         usage: {
@@ -216,10 +223,9 @@ describe("DeterministicAgentIntentResolver", () => {
 
     expect(decisionAgent.decide).toHaveBeenCalledTimes(1)
     expect(result.intent).toMatchObject({
-      speechAct: "mutate",
       object: "task_capture",
-      temporalScope: "future",
     })
     expect(result.trace.resolver).toContain("naru-structured-v0.1.2")
+    expect(result.trace.metadata?.reasonCodes).toContain("structured_classifier_fallback")
   })
 })

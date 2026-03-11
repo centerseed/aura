@@ -37,6 +37,7 @@ model User {
   daily_ai_usage       DailyAiUsage[]
   daily_plans          DailyPlan[]
   governance_proposals GovernanceProposal[]
+  line_message_deliveries LineMessageDelivery[]
   mcp_access_tokens    McpAccessToken[]
   mcp_refresh_tokens   McpRefreshToken[]
   milestones           Milestone[]
@@ -376,6 +377,7 @@ model CoachBriefing {
   summary           String
   recommendations   Json         @default("[]") @db.Json
   defer_suggestions Json         @default("[]") @db.Json
+  line_message_deliveries LineMessageDelivery[]
   user              User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, type, briefing_date])
@@ -397,6 +399,7 @@ model DailyPlan {
   planned_minutes   Int?
   overflow_items    Json?
   items             DailyPlanItem[]
+  line_message_deliveries LineMessageDelivery[]
   user              User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, plan_date])
@@ -451,6 +454,30 @@ model DailyAiUsage {
   @@unique([user_id, usage_date])
   @@index([user_id, usage_date])
   @@map("daily_ai_usage")
+}
+
+model LineMessageDelivery {
+  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at    DateTime              @default(now()) @db.Timestamp(6)
+  updated_at    DateTime              @updatedAt @db.Timestamp(6)
+  user_id       String                @db.Uuid
+  channel       LineMessageChannel
+  delivery_type LineDeliveryType
+  delivery_date DateTime              @db.Date
+  briefing_id   String?               @db.Uuid
+  daily_plan_id String?               @db.Uuid
+  line_user_id  String                @db.VarChar
+  status        LineDeliveryStatus
+  error_message String?
+  sent_at       DateTime?             @db.Timestamp(6)
+  user          User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  briefing      CoachBriefing?        @relation(fields: [briefing_id], references: [id], onDelete: SetNull)
+  daily_plan    DailyPlan?            @relation(fields: [daily_plan_id], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, channel, delivery_type, delivery_date])
+  @@index([delivery_date, channel, delivery_type])
+  @@index([line_user_id, delivery_date])
+  @@map("line_message_deliveries")
 }
 
 model AiTokenLog {
@@ -664,6 +691,25 @@ enum BriefingType {
   EVENING
 
   @@map("briefingtypeenum")
+}
+
+enum LineMessageChannel {
+  LINE
+
+  @@map("linemessagechannelenum")
+}
+
+enum LineDeliveryType {
+  MORNING_BRIEFING
+
+  @@map("linedeliverytypeenum")
+}
+
+enum LineDeliveryStatus {
+  SENT   @map("sent")
+  FAILED @map("failed")
+
+  @@map("linedeliverystatusenum")
 }
 
 enum orderstatusenum {

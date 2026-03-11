@@ -2,23 +2,29 @@
  * CompleteTaskSkill — 完成任務 check-off
  *
  * 觸發詞：完成、做完、搞定、done、完成了、已完成
- * 語意搜尋最相似任務 → 確認訊息 → 存 session → 等用戶確認
+ * 正規化 + lexical matching 找候選 → deterministic 單輪完成或要求澄清
  */
 
 import { tool, skill, makeSkillResult } from "naru-agent-js"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
-import { getEmbedding, cosineSimilarity } from "@/lib/embedding"
-import { saveLineSession } from "@/lib/line-session"
 import type { CompleteTaskPayload } from "@/lib/line-session"
-import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
 import { serializeFactsSummary } from "./tool-result-protocol"
+import { normalizeCompletionQuery, resolveCompletionQuery } from "./completion-query-normalizer"
+import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
 
 const MAX_TASK_SEARCH_POOL = 150
-const MAX_EMBEDDING_CANDIDATES = 40
+const MAX_LEXICAL_CANDIDATES = 5
 const MAX_DISPLAY_CANDIDATES = 3
-const HIGH_CONFIDENCE_THRESHOLD = 0.8
-const DISAMBIGUATION_GAP = 0.08
+const HIGH_CONFIDENCE_THRESHOLD = 0.78
+const DISAMBIGUATION_GAP = 0.12
+const EXACT_MATCH_SCORE = 100
+const STRONG_LEXICAL_SCORE = 78
+const MIN_CANDIDATE_SCORE = 20
+
+const DICE_WEIGHT = 0.55
+const LEVENSHTEIN_WEIGHT = 0.3
+const CONTAINMENT_WEIGHT = 0.15
 
 interface SearchableTask {
   id: string
@@ -32,7 +38,6 @@ interface SearchableTask {
 
 interface RankedTaskMatch extends SearchableTask {
   lexicalScore: number
-  semanticScore: number
   combinedScore: number
 }
 
@@ -50,7 +55,6 @@ interface CompleteTaskSearchFacts {
     productName?: string
     sourceType: SearchableTask["sourceType"]
     lexicalScore: number
-    semanticScore: number
     combinedScore: number
   }>
   presentedEntities: Array<{
@@ -67,10 +71,10 @@ interface CompleteTaskSearchFacts {
 async function executeCompleteTaskSearch(
   userId: string,
   taskName: string,
-  lineUserId?: string,
+  _lineUserId?: string,
 ): Promise<string> {
-  const completeTaskUseCase = new CompleteTaskUseCase()
-
+      const resolvedTaskName = await resolveCompletionQuery(taskName)
+      const searchQuery = resolvedTaskName || taskName
       const [tasks, subTasks, dailyPlanItems] = await Promise.all([
         prisma.task.findMany({
           where: { user_id: userId, status: "ACTIVE", deleted_at: null },
@@ -176,37 +180,42 @@ async function executeCompleteTaskSearch(
         }, "目前沒有進行中的任務。")
       }
 
-      const ranked = await rankTaskMatches(taskName, searchableTasks)
+      const ranked = await rankTaskMatches(searchQuery, searchableTasks)
       const top = ranked.slice(0, MAX_DISPLAY_CANDIDATES)
       const decision = decideTaskMatch(top)
 
       if (decision.type === "no_match") {
         return serializeCompleteTaskSearchResult(
-          buildSearchFacts(taskName, searchableTasks.length, top, "no_match"),
-          `找不到與「${taskName}」相關的任務。請提供更精確的任務名稱或關鍵字，讓我判斷候選任務。`,
+          buildSearchFacts(searchQuery, searchableTasks.length, top, "no_match"),
+          `找不到任何名為「${searchQuery}」的任務。請確認名稱，或直接告訴我是清單中的哪一個。`,
         )
       }
 
       if (decision.type === "selected") {
-        if (lineUserId) {
-          const payload: CompleteTaskPayload = {
-            sourceType: decision.task.sourceType,
-            taskTitle: decision.task.content,
-            taskId: decision.task.taskId,
-            subTaskId: decision.task.subTaskId,
-            planItemId: decision.task.planItemId,
-          }
-          await saveLineSession(lineUserId, "complete_task_confirm", payload)
-        }
+        const payload = toCompleteTaskPayload(decision.task)
+        await executeCompleteTaskPayload(userId, payload)
         return serializeCompleteTaskSearchResult(
-          buildSearchFacts(taskName, searchableTasks.length, top, "awaiting_confirmation", decision.task),
-          `是否完成「${decision.task.content}」？\n\n回覆「確認」執行，或無視此訊息取消。`,
+          buildSearchFacts(searchQuery, searchableTasks.length, top, "completed", decision.task),
+          buildCompleteTaskSuccessMessage(decision.task.content),
         )
       }
 
+      if (top.length === 1) {
+        const [candidate] = top
+        if (candidate) {
+          const payload = toCompleteTaskPayload(candidate)
+          await executeCompleteTaskPayload(userId, payload)
+
+          return serializeCompleteTaskSearchResult(
+            buildSearchFacts(searchQuery, searchableTasks.length, top, "completed", candidate),
+            buildCompleteTaskSuccessMessage(candidate.content),
+          )
+        }
+      }
+
       return serializeCompleteTaskSearchResult(
-        buildSearchFacts(taskName, searchableTasks.length, top, "needs_disambiguation"),
-        buildDisambiguationMessage(taskName, top),
+        buildSearchFacts(searchQuery, searchableTasks.length, top, "needs_disambiguation"),
+        buildDisambiguationMessage(searchQuery, top),
       )
 }
 
@@ -259,38 +268,33 @@ export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
   })
 
 async function rankTaskMatches(taskName: string, tasks: SearchableTask[]): Promise<RankedTaskMatch[]> {
-  const candidates = pickSearchCandidates(taskName, tasks)
+  const normalizedQuery = normalizeCompletionQuery(taskName)
+  const candidates = pickSearchCandidates(normalizedQuery, tasks)
   if (candidates.length === 0) return []
 
-  const strongLexicalMatches = candidates
+  const lexicalRanked = candidates
     .map((task) => ({
       task,
-      lexicalScore: lexicalMatchScore(taskName, task.content),
+      lexicalScore: lexicalMatchScore(normalizedQuery, task.content),
     }))
-    .filter((item) => item.lexicalScore >= 10)
+    .sort((lhs, rhs) => rhs.lexicalScore - lhs.lexicalScore)
+
+  const strongLexicalMatches = lexicalRanked
+    .filter((item) => item.lexicalScore >= EXACT_MATCH_SCORE)
 
   if (strongLexicalMatches.length === 1) {
     return [{
       ...strongLexicalMatches[0].task,
       lexicalScore: strongLexicalMatches[0].lexicalScore,
-      semanticScore: 1,
       combinedScore: 1,
     }]
   }
 
-  const queryEmb = await getEmbedding(taskName)
-  const ranked: RankedTaskMatch[] = []
-  for (const task of candidates) {
-    const emb = await getEmbedding(task.content)
-    const semanticScore = cosineSimilarity(queryEmb, emb)
-    const lexicalScore = lexicalMatchScore(taskName, task.content)
-    ranked.push({
+  const ranked = lexicalRanked.map(({ task, lexicalScore }) => ({
       ...task,
       lexicalScore,
-      semanticScore,
-      combinedScore: combineMatchScores(lexicalScore, semanticScore),
-    })
-  }
+      combinedScore: combineMatchScores(lexicalScore),
+    }))
 
   return ranked
     .filter((task) => task.combinedScore >= 0.45)
@@ -318,7 +322,6 @@ function buildSearchFacts(
       productName: candidate.productName,
       sourceType: candidate.sourceType,
       lexicalScore: roundScore(candidate.lexicalScore),
-      semanticScore: roundScore(candidate.semanticScore),
       combinedScore: roundScore(candidate.combinedScore),
     })),
     presentedEntities: decision === "needs_disambiguation"
@@ -339,20 +342,36 @@ function serializeCompleteTaskSearchResult(facts: CompleteTaskSearchFacts, summa
   return serializeFactsSummary(facts as unknown as Record<string, unknown>, summary)
 }
 
-function buildDisambiguationMessage(taskName: string, candidates: RankedTaskMatch[]): string {
+export function buildDisambiguationMessage(taskName: string, candidates: RankedTaskMatch[]): string {
   if (candidates.length === 0) {
-    return `找不到與「${taskName}」相關的任務。請提供更精確的任務名稱或關鍵字，讓我判斷候選任務。`
+    return `找不到任何名為「${taskName}」的任務。請確認名稱，或直接告訴我是清單中的哪一個。`
+  }
+
+  if (candidates.length === 1) {
+    const [candidate] = candidates
+    const label = `${candidate.content}${candidate.productName ? ` [${candidate.productName}]` : ""}`
+    return `我只找到一個可能的任務，但還不能完全確定是這個：\n\n1. ${label}\n\n你可以直接回覆 1，或回覆更完整的任務名稱。`
   }
 
   const list = candidates
     .map((candidate, index) => `${index + 1}. ${candidate.content}${candidate.productName ? ` [${candidate.productName}]` : ""}`)
     .join("\n")
-  return `找到多個可能的候選任務，但目前不足以安全判定要完成哪一筆：\n\n${list}\n\n請直接回覆更精確的任務名稱。`
+  return `我找到多個可能的任務，請告訴我是下面哪一個：\n\n${list}\n\n你可以直接回覆序號，或回覆完整任務名稱。`
 }
 
-function combineMatchScores(lexicalScore: number, semanticScore: number): number {
-  const lexicalComponent = Math.min(lexicalScore / 18, 1)
-  return lexicalComponent * 0.45 + semanticScore * 0.55
+function combineMatchScores(lexicalScore: number): number {
+  if (lexicalScore >= EXACT_MATCH_SCORE) return 1
+  return Math.min(lexicalScore / 100, 1)
+}
+
+function toCompleteTaskPayload(task: RankedTaskMatch): CompleteTaskPayload {
+  return {
+    sourceType: task.sourceType,
+    taskTitle: task.content,
+    taskId: task.taskId,
+    subTaskId: task.subTaskId,
+    planItemId: task.planItemId,
+  }
 }
 
 function roundScore(score: number): number {
@@ -375,7 +394,11 @@ export function decideTaskMatch(
     return { type: "selected", task: best }
   }
 
-  if (best.lexicalScore >= 10 && (!second || best.lexicalScore - second.lexicalScore >= 6)) {
+  if (best.lexicalScore >= EXACT_MATCH_SCORE) {
+    return { type: "selected", task: best }
+  }
+
+  if (best.lexicalScore >= STRONG_LEXICAL_SCORE && (!second || best.lexicalScore - second.lexicalScore >= 12)) {
     return { type: "selected", task: best }
   }
 
@@ -383,10 +406,12 @@ export function decideTaskMatch(
 }
 
 export function pickSearchCandidates(taskName: string, tasks: SearchableTask[]): SearchableTask[] {
-  const ranked = tasks
+  const normalizedQuery = normalizeCompletionQuery(taskName)
+  const dedupedTasks = dedupeSearchableTasks(tasks)
+  const ranked = dedupedTasks
     .map((task, index) => ({
       task,
-      score: lexicalMatchScore(taskName, task.content),
+      score: lexicalMatchScore(normalizedQuery, task.content),
       index,
     }))
     .sort((a, b) => {
@@ -394,53 +419,50 @@ export function pickSearchCandidates(taskName: string, tasks: SearchableTask[]):
       return a.index - b.index
     })
 
-  const matched = ranked.filter((item) => item.score > 0).slice(0, MAX_EMBEDDING_CANDIDATES)
+  const matched = ranked.filter((item) => item.score >= MIN_CANDIDATE_SCORE).slice(0, MAX_LEXICAL_CANDIDATES)
   if (matched.length > 0) {
     return matched.map((item) => item.task)
   }
 
-  return tasks.slice(0, MAX_EMBEDDING_CANDIDATES)
+  return []
 }
 
 export function lexicalMatchScore(taskName: string, content: string): number {
-  const query = normalizeText(taskName)
+  const query = normalizeCompletionQuery(taskName)
   const target = normalizeText(content)
+  const compactQuery = compactNormalizeText(query)
+  const compactTarget = compactNormalizeText(content)
   if (!query || !target) return 0
 
-  let score = 0
-
-  if (target.includes(query)) {
-    score += 10
+  if (query === target || (compactQuery && compactQuery === compactTarget)) {
+    return EXACT_MATCH_SCORE
   }
 
-  for (const token of tokenize(query)) {
-    if (target.includes(token)) {
-      score += token.length >= 2 ? 4 : 1
-    }
-  }
+  const dice = diceCoefficient(compactQuery, compactTarget)
+  const levenshtein = normalizedLevenshteinSimilarity(compactQuery, compactTarget)
+  const containmentScore = containmentSimilarity(compactQuery, compactTarget)
+  const unorderedTokenScore = unorderedTokenSimilarity(compactQuery, compactTarget)
 
-  for (const bigram of bigrams(query)) {
-    if (target.includes(bigram)) {
-      score += 2
-    }
-  }
+  const weightedScore = (
+    dice * DICE_WEIGHT +
+    levenshtein * LEVENSHTEIN_WEIGHT +
+    containmentScore * CONTAINMENT_WEIGHT
+  ) * 100
 
-  return score
+  const boostedScore = Math.max(weightedScore, unorderedTokenScore * 100)
+  return Math.round(boostedScore * 1000) / 1000
 }
 
 function normalizeText(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ").trim()
 }
 
-function tokenize(text: string): string[] {
-  return Array.from(
-    new Set(
-      text
-        .split(/[\s/,_-]+/)
-        .map((token) => token.trim())
-        .filter((token) => token.length > 0),
-    ),
-  )
+function compactNormalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/1\s*on\s*1/gi, "1on1")
+    .replace(/[\s/,_\-.()[\]{}:：，、。!?！？'"]/g, "")
+    .trim()
 }
 
 function bigrams(text: string): string[] {
@@ -450,4 +472,158 @@ function bigrams(text: string): string[] {
     grams.push(chars[i] + chars[i + 1])
   }
   return Array.from(new Set(grams))
+}
+
+function diceCoefficient(lhs: string, rhs: string): number {
+  if (!lhs || !rhs) return 0
+  if (lhs === rhs) return 1
+
+  const lhsBigrams = bigrams(lhs)
+  const rhsBigrams = bigrams(rhs)
+  if (lhsBigrams.length === 0 || rhsBigrams.length === 0) {
+    return lhs === rhs ? 1 : 0
+  }
+
+  const rhsCounts = new Map<string, number>()
+  for (const gram of rhsBigrams) {
+    rhsCounts.set(gram, (rhsCounts.get(gram) ?? 0) + 1)
+  }
+
+  let overlap = 0
+  for (const gram of lhsBigrams) {
+    const count = rhsCounts.get(gram) ?? 0
+    if (count > 0) {
+      overlap += 1
+      rhsCounts.set(gram, count - 1)
+    }
+  }
+
+  return (2 * overlap) / (lhsBigrams.length + rhsBigrams.length)
+}
+
+function normalizedLevenshteinSimilarity(lhs: string, rhs: string): number {
+  if (!lhs || !rhs) return 0
+  if (lhs === rhs) return 1
+
+  const lhsChars = Array.from(lhs)
+  const rhsChars = Array.from(rhs)
+  const rows = lhsChars.length + 1
+  const cols = rhsChars.length + 1
+  const dp = Array.from({ length: rows }, () => Array<number>(cols).fill(0))
+
+  for (let i = 0; i < rows; i += 1) dp[i][0] = i
+  for (let j = 0; j < cols; j += 1) dp[0][j] = j
+
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = lhsChars[i - 1] === rhsChars[j - 1] ? 0 : 1
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      )
+    }
+  }
+
+  const distance = dp[rows - 1][cols - 1]
+  const maxLength = Math.max(lhsChars.length, rhsChars.length)
+  return maxLength === 0 ? 1 : 1 - distance / maxLength
+}
+
+function containmentSimilarity(query: string, target: string): number {
+  if (!query || !target) return 0
+  if (target.includes(query)) return 1
+  if (query.includes(target)) return 0.9
+
+  const subsequenceRatio = orderedSubsequenceRatio(query, target)
+  const reverseSubsequenceRatio = orderedSubsequenceRatio(target, query)
+  return Math.max(subsequenceRatio, reverseSubsequenceRatio * 0.9)
+}
+
+function orderedSubsequenceRatio(needle: string, haystack: string): number {
+  if (!needle || !haystack) return 0
+
+  const needleChars = Array.from(needle)
+  const haystackChars = Array.from(haystack)
+  let matched = 0
+  let haystackIndex = 0
+
+  for (const char of needleChars) {
+    while (haystackIndex < haystackChars.length && haystackChars[haystackIndex] !== char) {
+      haystackIndex += 1
+    }
+
+    if (haystackIndex >= haystackChars.length) break
+
+    matched += 1
+    haystackIndex += 1
+  }
+
+  if (matched === 0) return 0
+  return matched / Math.max(needleChars.length, haystackChars.length)
+}
+
+function unorderedTokenSimilarity(lhs: string, rhs: string): number {
+  if (!lhs || !rhs) return 0
+  if (lhs === rhs) return 1
+
+  const lhsCounts = charCounts(lhs)
+  const rhsCounts = charCounts(rhs)
+  const keys = new Set([...lhsCounts.keys(), ...rhsCounts.keys()])
+
+  let overlap = 0
+  let total = 0
+
+  for (const key of keys) {
+    const lhsCount = lhsCounts.get(key) ?? 0
+    const rhsCount = rhsCounts.get(key) ?? 0
+    overlap += Math.min(lhsCount, rhsCount)
+    total += Math.max(lhsCount, rhsCount)
+  }
+
+  return total === 0 ? 0 : overlap / total
+}
+
+function charCounts(text: string): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const char of Array.from(text)) {
+    counts.set(char, (counts.get(char) ?? 0) + 1)
+  }
+  return counts
+}
+
+function candidateKey(task: SearchableTask): string {
+  if (task.subTaskId) return `sub_task:${task.subTaskId}`
+  if (task.taskId) return `task:${task.taskId}`
+  if (task.planItemId) return `daily_plan_item:${task.planItemId}`
+  return `${task.sourceType}:${compactNormalizeText(task.content)}`
+}
+
+function sourcePriority(task: SearchableTask): number {
+  switch (task.sourceType) {
+    case "sub_task":
+      return 0
+    case "task":
+      return 1
+    case "daily_plan_item":
+      return 2
+    default:
+      return 3
+  }
+}
+
+function dedupeSearchableTasks(tasks: SearchableTask[]): SearchableTask[] {
+  const seen = new Set<string>()
+  const deduped: SearchableTask[] = []
+
+  const prioritized = [...tasks].sort((lhs, rhs) => sourcePriority(lhs) - sourcePriority(rhs))
+
+  for (const task of prioritized) {
+    const key = candidateKey(task)
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(task)
+  }
+
+  return deduped
 }

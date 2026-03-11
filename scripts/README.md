@@ -72,7 +72,8 @@ Naruvia/
     ├── dev-local.sh        # 🟢 本地開發
     ├── deploy-api.sh       # 🔵 部署 API
     ├── deploy-web.sh       # 🔵 部署 Web
-    └── deploy-all.sh       # 🔵 統一部署
+    ├── deploy-all.sh       # 🔵 統一部署
+    └── create-line-morning-briefing-scheduler.sh  # ⏰ 建立/更新 LINE 晨報 Cloud Scheduler
 ```
 
 ---
@@ -187,6 +188,26 @@ Naruvia/
 ```bash
 ./scripts/deploy-all.sh staging
 ```
+
+### 建立 LINE 晨報 Cloud Scheduler
+
+在 API 部署完成後，建立或更新 LINE 晨報推播排程：
+
+```bash
+./scripts/create-line-morning-briefing-scheduler.sh production
+```
+
+或指定 staging：
+
+```bash
+./scripts/create-line-morning-briefing-scheduler.sh staging
+```
+
+此腳本會：
+- 固定使用 GCP project `zentropy-4f7a5`
+- 自動讀取 `api/.env` 或 shell env 中的 `CRON_SECRET`
+- 自動抓取 Cloud Run service URL
+- 建立 `Asia/Taipei` 時區、`0 5-11 * * *` 的 Cloud Scheduler job
 
 ---
 

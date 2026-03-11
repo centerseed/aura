@@ -139,6 +139,12 @@ Task 的完成時間真相欄位為：
 - 包含逾期、今天到期、近期到期、未排程但高相關項目
 - 應由統一資料視圖計算，而非由單一 skill 任意拼接 SQL 規則
 
+補充口徑：
+
+- 若使用者明確詢問「今天還沒完成哪些」「今天還有什麼沒做」這類 strict-today 未完成查詢，回覆不得混入明天、近期或未排程項目
+- strict-today 未完成查詢只允許包含逾期與今天範圍內仍未完成的項目
+- 「今天要做什麼」這類較寬鬆的焦點查詢，才可以使用今日決策口徑納入近期與未排程項目
+
 ---
 
 ## 6. 功能需求
@@ -174,6 +180,7 @@ Agent 查詢「今天要做什麼」時，必須基於統一優先規則，而�
 1. 排序需考慮逾期、到期、近期與未排程
 2. 與主系統 dashboard / coaching / reporting 的待辦口徑需一致
 3. 不得只依最近更新時間任意截取少量任務作為「今日任務」
+4. 若原句是在問「今天還沒完成 / 今天還有哪些沒做」，查詢必須切換為 strict-today 未完成口徑，不得沿用較寬的 focus bucket
 
 ### FR-4 大量結果摘要
 
@@ -211,6 +218,10 @@ Agent tool 的責任是提供「事實資料」，不是讓模型自行補完。
 系統 prompt 與 skill prompt 必須明示：
 
 1. 查詢類回答不得超出 tool 證據
+2. LINE user-facing 回覆必須優先追求手機可讀性，不得把內部能力、coverage、摘要直接堆成後台報表語氣
+3. 能力介紹需改寫為短句式聊天文案，不使用過長工具名或括號解說
+4. 任務清單需優先呈現「現在該知道的事」，例如總數、最重要的幾項、是否還有更多；coverage 說明僅能作為補充一句
+5. 任務項目格式需降低括號密度，避免每一行同時堆疊 Product、SourceType 與 urgency 標記造成閱讀負擔
 2. 當 tool 表示 partial / truncated 時，回答必須揭露
 3. 當使用者問的是「完成了什麼」，不得改答成「待辦清單」
 4. 當工具回空結果時，先判斷是 zero results 還是 limited coverage
@@ -316,6 +327,23 @@ Prompt 只能約束表達方式，不能彌補資料語義錯誤。
 
 摘要的責任是壓縮資訊，不是改寫事實。
 
+### 8.5 Lexical-First Completion Resolution
+
+completion search 屬於高風險 mutation 前置決策，不得在 skill 內使用 semantic / embedding 檢索。
+
+必須依序採用以下分層：
+
+1. `normalized exact`
+   - 清除完成詞、語氣詞、助詞與空白變體後，比對 canonical task title
+2. `fuzzy lexical`
+   - 以可解釋的字串近似與 token/bigram overlap 進行候選排序
+3. `clarification`
+   - 若 top1 / top2 分數接近，必須要求使用者明確指定，不能自動完成或自動詢問單一候選
+4. `single-turn execution`
+   - 若 deterministic resolution 已收斂成單一候選，必須直接走 shared completion use case；不得一律退回 pending confirmation 等第二輪
+5. `hybrid normalization fallback`
+   - completion query normalization 應採 shared deterministic core + locale rules 為主；當輸出明顯可疑或 locale 規則無法穩定收斂時，可使用小型 structured LLM fallback 做 query normalization，但 fallback 不得取代 shared canonical path
+
 ---
 
 ## 9. 驗收標準
@@ -344,6 +372,14 @@ Prompt 只能約束表達方式，不能彌補資料語義錯誤。
 
 所有 query/completion 相關測試需能在 CI 中穩定驗證，不依賴偶然的 prompt 表現。
 
+### AC-7
+
+當使用者輸入 `跑步跑完了`、`這個 done 了`、`週一跑步我做完了` 這類帶完成語氣的短句時，系統必須先做 normalization 與 lexical ranking，不能在 skill 中把原句送進 embedding query。
+
+### AC-8
+
+當 lexical top1 與 top2 過近時，系統必須回覆澄清清單，不得直接進入單一候選確認。
+
 ---
 
 ## 10. 實作約束
@@ -352,6 +388,8 @@ Prompt 只能約束表達方式，不能彌補資料語義錯誤。
 2. 完成流程不得繞過 repository / use case 所定義的完成語義
 3. Agent tool 的輸出結構必須可被測試直接驗證
 4. 不得以增加 prompt 文案取代資料層修正
+5. completion target resolution 必須優先使用 deterministic normalization 與 lexical matcher；skill 內不得計算或查詢 embedding
+6. locale-specific completion phrasing 不得直接散落在多個 skill / agent；必須集中在 shared normalizer，並可選擇接一層 bounded LLM fallback
 
 ---
 

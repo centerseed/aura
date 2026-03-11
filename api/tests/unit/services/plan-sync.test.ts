@@ -251,8 +251,8 @@ describe('syncPlanOnTaskChange', () => {
 
     expect(mockAddItem).toHaveBeenCalledWith('plan-1', expect.objectContaining({
       order: 0,
-      areaName: 'Unknown',
-      productName: 'Unknown',
+      areaName: '收件匣',
+      productName: '待整理',
     }))
   })
 

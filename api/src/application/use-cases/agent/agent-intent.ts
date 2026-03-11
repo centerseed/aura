@@ -1,6 +1,5 @@
 import { z } from "zod"
 
-export const AGENT_SPEECH_ACT_VALUES = ["query", "mutate", "clarify", "confirm", "meta"] as const
 export const AGENT_INTENT_OBJECT_VALUES = [
   "task_capture",
   "task_completion",
@@ -14,32 +13,19 @@ export const AGENT_INTENT_OBJECT_VALUES = [
   "recall_task_code",
   "unknown",
 ] as const
-export const AGENT_TARGET_REFERENCE_MODE_VALUES = ["explicit", "contextual", "ambiguous", "none"] as const
-export const AGENT_TEMPORAL_SCOPE_VALUES = ["today", "future", "past", "none"] as const
 
-export type AgentSpeechAct = (typeof AGENT_SPEECH_ACT_VALUES)[number]
 export type AgentIntentObject = (typeof AGENT_INTENT_OBJECT_VALUES)[number]
-export type AgentTargetReferenceMode = (typeof AGENT_TARGET_REFERENCE_MODE_VALUES)[number]
-export type AgentTemporalScope = (typeof AGENT_TEMPORAL_SCOPE_VALUES)[number]
 
 export interface AgentIntent {
-  speechAct: AgentSpeechAct
   object: AgentIntentObject
-  targetReferenceMode: AgentTargetReferenceMode
-  temporalScope: AgentTemporalScope
   requiresConfirmation: boolean
   confidence: number
-  reasonCodes: string[]
 }
 
 export const AgentIntentSchema = z.object({
-  speechAct: z.enum(AGENT_SPEECH_ACT_VALUES),
   object: z.enum(AGENT_INTENT_OBJECT_VALUES),
-  targetReferenceMode: z.enum(AGENT_TARGET_REFERENCE_MODE_VALUES),
-  temporalScope: z.enum(AGENT_TEMPORAL_SCOPE_VALUES),
   requiresConfirmation: z.boolean(),
   confidence: z.number().min(0).max(1),
-  reasonCodes: z.array(z.string()),
 })
 
 export interface AgentConversationState {
@@ -61,6 +47,18 @@ export interface AgentDecisionTrace {
   resolver: string
   rawMessage: string
   resolvedIntent: AgentIntent
+  metadata?: {
+    speechAct?: "query" | "mutate" | "clarify" | "confirm" | "meta"
+    targetReferenceMode?: "explicit" | "contextual" | "ambiguous" | "none"
+    temporalScope?: "today" | "future" | "past" | "none"
+    reasonCodes?: string[]
+    classifierUsage?: {
+      inputTokens: number
+      outputTokens: number
+      totalTokens: number
+    }
+    classifierLatencyMs?: number
+  }
   selectedTool: string | null
   targetQuery: string | null
 }

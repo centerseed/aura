@@ -15,6 +15,9 @@ import { GetTaskByIdUseCase } from '@/application/use-cases/tasks/get-task-by-id
 import { DeleteTaskUseCase } from '@/application/use-cases/tasks/delete-task'
 import { UpdateTaskUseCase } from '@/application/use-cases/tasks/update-task'
 
+const FALLBACK_AREA_NAME = '收件匣'
+const FALLBACK_PRODUCT_NAME = '待整理'
+
 // ============================================================================
 // GET /api/tasks/[taskId] - 取得單一任務詳情
 // ============================================================================
@@ -53,8 +56,8 @@ export async function GET(
       drawer: task.status,
       lifecycle: analysis.lifecycle || 'embryo',
       tag: {
-        area: task.product?.area.name || 'Unknown',
-        product: task.product?.name || 'Unknown',
+        area: task.product?.area.name || FALLBACK_AREA_NAME,
+        product: task.product?.name || FALLBACK_PRODUCT_NAME,
         topic: task.topic?.name || '未分類',
       },
       product_id: task.productId,
@@ -170,8 +173,8 @@ export async function PATCH(
       drawer: task.status,
       lifecycle: analysis.lifecycle || 'embryo',
       tag: {
-        area: task.product?.area.name || 'Unknown',
-        product: task.product?.name || 'Unknown',
+        area: task.product?.area.name || FALLBACK_AREA_NAME,
+        product: task.product?.name || FALLBACK_PRODUCT_NAME,
         topic: task.topic?.name || '未分類',
       },
       product_id: task.productId,

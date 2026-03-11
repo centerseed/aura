@@ -31,6 +31,7 @@ export interface QueryGroupSummary {
 
 export interface AgentTaskQueryResult {
   queryType: "completed_today" | "today_focus"
+  scopeLabel: string
   timezone: string
   coverage: QueryCoverage
   totalCount: number
@@ -51,8 +52,13 @@ interface CompletionExtraSource {
 interface TodayFocusExtraSource {
   getTodayFocusDailyPlanItems(
     userId: string,
-    todayStart: Date,
+    focusDate: Date,
   ): Promise<AgentTaskQueryItem[]>
+}
+
+export interface TodayFocusQueryOptions {
+  strictToday?: boolean
+  dayOffset?: number
 }
 
 export class AgentTaskQueryService {
@@ -87,38 +93,69 @@ export class AgentTaskQueryService {
     })
 
     return this.formatResult("completed_today", resolvedTimezone, items, {
+      scopeLabel: "今天",
       tasks: true,
       subTasks: true,
       dailyPlanItems: true,
     })
   }
 
-  async queryTodayFocus(userId: string, timezone?: string): Promise<AgentTaskQueryResult> {
+  async queryTodayFocus(
+    userId: string,
+    timezone?: string,
+    options?: TodayFocusQueryOptions,
+  ): Promise<AgentTaskQueryResult> {
     const resolvedTimezone = await this.timezoneResolver(userId, timezone)
-    const todayStart = getStartOfDay(new Date(), resolvedTimezone)
+    const now = new Date()
+    const todayStart = getStartOfDay(now, resolvedTimezone)
+    const dayOffset = options?.dayOffset ?? 0
+    const focusStart = new Date(todayStart.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+    const focusEnd = new Date(focusStart.getTime() + 24 * 60 * 60 * 1000)
     const tomorrowEnd = new Date(todayStart.getTime() + 2 * 24 * 60 * 60 * 1000)
     const upcomingEnd = new Date(todayStart.getTime() + 4 * 24 * 60 * 60 * 1000)
 
-    const [rawData, dailyPlanItems] = await Promise.all([
-      this.collector.collect(userId, new Date(), resolvedTimezone),
-      this.todayFocusExtraSource.getTodayFocusDailyPlanItems(userId, todayStart),
+    const [rawData, rawDailyPlanItems] = await Promise.all([
+      this.collector.collect(userId, now, resolvedTimezone),
+      this.todayFocusExtraSource.getTodayFocusDailyPlanItems(userId, focusStart),
     ])
+    const dailyPlanItems = rawDailyPlanItems.map((item) => ({
+      ...item,
+      urgency: inferUrgency(item.dueDate ? new Date(item.dueDate) : null, todayStart),
+    }))
     const blockedTaskIds = new Set(
       dailyPlanItems
         .map((item) => item.relatedTaskId)
         .filter((id): id is string => Boolean(id)),
     )
-    const subTaskItems = buildTodayFocusSubTaskItems(rawData, todayStart, upcomingEnd, blockedTaskIds)
+    const subTaskItems = buildTodayFocusSubTaskItems(
+      rawData,
+      todayStart,
+      focusStart,
+      focusEnd,
+      upcomingEnd,
+      blockedTaskIds,
+      options,
+    )
     for (const item of subTaskItems) {
       if (item.relatedTaskId) {
         blockedTaskIds.add(item.relatedTaskId)
       }
     }
-    const taskItems = buildTodayFocusTaskItems(rawData, todayStart, tomorrowEnd, upcomingEnd, blockedTaskIds)
+    const taskItems = buildTodayFocusTaskItems(
+      rawData,
+      todayStart,
+      focusStart,
+      focusEnd,
+      tomorrowEnd,
+      upcomingEnd,
+      blockedTaskIds,
+      options,
+    )
 
     const items = [...dailyPlanItems, ...subTaskItems, ...taskItems].sort(compareTodayFocusItems)
 
     return this.formatResult("today_focus", resolvedTimezone, items, {
+      scopeLabel: formatScopeLabel(dayOffset, focusStart),
       tasks: true,
       subTasks: true,
       dailyPlanItems: true,
@@ -129,15 +166,22 @@ export class AgentTaskQueryService {
     queryType: AgentTaskQueryResult["queryType"],
     timezone: string,
     items: AgentTaskQueryItem[],
-    coverage: QueryCoverage,
+    meta: QueryCoverage & { scopeLabel: string },
   ): AgentTaskQueryResult {
     const totalCount = items.length
     const displayItems = items.slice(0, MAX_DISPLAY_ITEMS)
     const truncated = totalCount > MAX_DISPLAY_ITEMS
     const groupedSummary = buildGroupedSummary(queryType, items)
 
+    const coverage: QueryCoverage = {
+      tasks: meta.tasks,
+      subTasks: meta.subTasks,
+      dailyPlanItems: meta.dailyPlanItems,
+    }
+
     return {
       queryType,
+      scopeLabel: meta.scopeLabel,
       timezone,
       coverage,
       totalCount,
@@ -147,6 +191,7 @@ export class AgentTaskQueryService {
       groupedSummary,
       summary: formatSummary({
         queryType,
+        scopeLabel: meta.scopeLabel,
         totalCount,
         displayItems,
         truncated,
@@ -177,6 +222,7 @@ function inferUrgency(
 
 function formatSummary({
   queryType,
+  scopeLabel,
   totalCount,
   displayItems,
   truncated,
@@ -184,6 +230,7 @@ function formatSummary({
   groupedSummary,
 }: {
   queryType: AgentTaskQueryResult["queryType"]
+  scopeLabel: string
   totalCount: number
   displayItems: AgentTaskQueryItem[]
   truncated: boolean
@@ -192,12 +239,12 @@ function formatSummary({
 }): string {
   if (queryType === "completed_today") {
     if (totalCount === 0) {
-      return `目前查到你今天還沒有完成任何項目。${coverageDescription(coverage, true)}`
+      return `今天還沒有查到完成項目。\n${coverageDescription(coverage, true)}`
     }
 
     const header = truncated
-      ? `✅ 目前查到你今天已完成 ${totalCount} 項完成紀錄。以下列出其中 ${displayItems.length} 項：`
-      : `✅ 目前查到你今天已完成 ${totalCount} 項完成紀錄：`
+      ? `✅ 今天你已完成 ${totalCount} 項，我先列出 ${displayItems.length} 項重點：`
+      : `✅ 今天你已完成 ${totalCount} 項：`
 
     return [
       header,
@@ -208,12 +255,12 @@ function formatSummary({
   }
 
   if (totalCount === 0) {
-    return `目前查到你沒有待處理項目。${coverageDescription(coverage, false)}`
+    return `你${scopeLabel}目前沒有待處理項目。\n${coverageDescription(coverage, false)}`
   }
 
   const header = truncated
-    ? `📋 目前查到 ${totalCount} 項待處理項目。以下列出最優先的 ${displayItems.length} 項：`
-    : `📋 目前查到 ${totalCount} 項待處理項目：`
+    ? `📋 你${scopeLabel}手上還有 ${totalCount} 項，我先列最需要注意的 ${displayItems.length} 項：`
+    : `📋 你${scopeLabel}手上還有 ${totalCount} 項：`
 
   return [
     header,
@@ -223,6 +270,12 @@ function formatSummary({
   ].join("\n\n")
 }
 
+function formatScopeLabel(dayOffset: number, focusStart: Date): string {
+  if (dayOffset === 0) return "今天"
+  if (dayOffset === 1) return "明天"
+  return `${focusStart.getFullYear()}-${String(focusStart.getMonth() + 1).padStart(2, "0")}-${String(focusStart.getDate()).padStart(2, "0")}`
+}
+
 function formatItems(
   items: AgentTaskQueryItem[],
   queryType: AgentTaskQueryResult["queryType"],
@@ -230,7 +283,7 @@ function formatItems(
   return items
     .map((item, index) => {
       const title = item.title.length > 40 ? item.title.slice(0, 40) + "…" : item.title
-      const product = item.productName ? ` [${item.productName}]` : ""
+      const product = item.productName ? `｜${item.productName}` : ""
       const urgency = queryType === "today_focus" ? formatUrgency(item.urgency) : ""
       const source = queryType === "completed_today" || item.sourceType !== "task"
         ? formatSourceType(item.sourceType)
@@ -243,9 +296,9 @@ function formatItems(
 function formatSourceType(sourceType: AgentTaskQueryItem["sourceType"]): string {
   switch (sourceType) {
     case "sub_task":
-      return " [SubTask]"
+      return "・子項"
     case "daily_plan_item":
-      return " [Daily Plan]"
+      return "・日計畫"
     default:
       return ""
   }
@@ -271,19 +324,19 @@ function coverageLine(coverage: QueryCoverage): string {
   if (coverage.tasks) covered.push("Task")
   if (coverage.subTasks) covered.push("SubTask")
   if (coverage.dailyPlanItems) covered.push("Daily Plan")
-  return `查詢範圍：${covered.join("、") || "無"}`
+  return `補充：這次查詢涵蓋 ${covered.join("、") || "無"}`
 }
 
 function coverageDescription(coverage: QueryCoverage, completedQuery: boolean): string {
   if (completedQuery) {
-    return `這個查詢目前覆蓋 ${coverageLine(coverage).replace("查詢範圍：", "")}。`
+    return coverageLine(coverage)
   }
-  return `這個查詢目前覆蓋 ${coverageLine(coverage).replace("查詢範圍：", "")}。`
+  return coverageLine(coverage)
 }
 
 function groupedSummaryLine(groups: QueryGroupSummary[]): string {
-  if (groups.length === 0) return "摘要：無"
-  return `摘要：${groups.map((group) => `${group.label} ${group.count} 項`).join("、")}`
+  if (groups.length === 0) return "先看重點：目前沒有可補充的分組摘要"
+  return `先看重點：${groups.map((group) => `${group.label} ${group.count} 項`).join("、")}`
 }
 
 function buildDedupKey(sourceType: AgentTaskQueryItem["sourceType"], id: string): string {
@@ -327,8 +380,11 @@ function dedupeCompletedItems(items: AgentTaskQueryItem[]): AgentTaskQueryItem[]
 function buildTodayFocusSubTaskItems(
   rawData: Awaited<ReturnType<IDataCollector["collect"]>>,
   todayStart: Date,
+  focusStart: Date,
+  focusEnd: Date,
   upcomingEnd: Date,
   blockedTaskIds: Set<string>,
+  options?: TodayFocusQueryOptions,
 ): AgentTaskQueryItem[] {
   const taskMap = new Map(rawData.allTasks.map((task) => [task.id, task]))
 
@@ -337,7 +393,17 @@ function buildTodayFocusSubTaskItems(
     .map((subTask): AgentTaskQueryItem | null => {
       const parentTask = taskMap.get(subTask.task_id)
       if (!parentTask) return null
-      if (!isTodayFocusCandidate(subTask.due_date ?? parentTask.due_date, todayStart, upcomingEnd, subTask.start_date ?? parentTask.start_date, subTask.updated_at)) {
+      const effectiveDueDate = subTask.due_date ?? parentTask.due_date
+      if (!isTodayFocusCandidate(
+        effectiveDueDate,
+        todayStart,
+        focusStart,
+        focusEnd,
+        upcomingEnd,
+        subTask.start_date ?? parentTask.start_date,
+        subTask.updated_at,
+        options,
+      )) {
         return null
       }
 
@@ -346,8 +412,8 @@ function buildTodayFocusSubTaskItems(
         title: subTask.content,
         sourceType: "sub_task" as const,
         productName: parentTask.product_name,
-        dueDate: (subTask.due_date ?? parentTask.due_date)?.toISOString(),
-        urgency: inferUrgency(subTask.due_date ?? parentTask.due_date, todayStart),
+        dueDate: effectiveDueDate?.toISOString(),
+        urgency: inferUrgency(effectiveDueDate, todayStart),
         relatedTaskId: parentTask.id,
         relatedSubTaskId: subTask.id,
       }
@@ -358,9 +424,12 @@ function buildTodayFocusSubTaskItems(
 function buildTodayFocusTaskItems(
   rawData: Awaited<ReturnType<IDataCollector["collect"]>>,
   todayStart: Date,
+  focusStart: Date,
+  focusEnd: Date,
   tomorrowEnd: Date,
   upcomingEnd: Date,
   blockedTaskIds: Set<string>,
+  options?: TodayFocusQueryOptions,
 ): AgentTaskQueryItem[] {
   const taskIdsWithOpenSubTasks = new Set(
     rawData.allSubTasks.filter((subTask) => !subTask.completed).map((subTask) => subTask.task_id),
@@ -370,11 +439,37 @@ function buildTodayFocusTaskItems(
     .filter((task) => task.status === "ACTIVE" || task.status === "INBOX")
     .filter((task) => !blockedTaskIds.has(task.id))
     .filter((task) => !taskIdsWithOpenSubTasks.has(task.id))
-    .filter((task) =>
-      isTodayFocusCandidate(task.due_date, todayStart, upcomingEnd, task.start_date, task.updated_at)
-      || (!task.due_date && rawData.unscheduledTasks.some((unscheduledTask) => unscheduledTask.id === task.id))
-      || (task.due_date !== null && task.due_date < tomorrowEnd),
-    )
+    .filter((task) => {
+      if (options?.strictToday) {
+        return isTodayFocusCandidate(
+          task.due_date,
+          todayStart,
+          focusStart,
+          focusEnd,
+          upcomingEnd,
+          task.start_date,
+          task.updated_at,
+          options,
+        )
+      }
+
+      if ((options?.dayOffset ?? 0) > 0) {
+        return isTodayFocusCandidate(
+          task.due_date,
+          todayStart,
+          focusStart,
+          focusEnd,
+          upcomingEnd,
+          task.start_date,
+          task.updated_at,
+          options,
+        )
+      }
+
+      return isTodayFocusCandidate(task.due_date, todayStart, focusStart, focusEnd, upcomingEnd, task.start_date, task.updated_at)
+        || (!task.due_date && rawData.unscheduledTasks.some((unscheduledTask) => unscheduledTask.id === task.id))
+        || (task.due_date !== null && task.due_date < tomorrowEnd)
+    })
     .map((task) => ({
       id: task.id,
       title: task.content,
@@ -389,10 +484,23 @@ function buildTodayFocusTaskItems(
 function isTodayFocusCandidate(
   dueDate: Date | null,
   todayStart: Date,
+  focusStart: Date,
+  focusEnd: Date,
   upcomingEnd: Date,
   startDate: Date | null,
   updatedAt: Date,
+  options?: TodayFocusQueryOptions,
 ): boolean {
+  if ((options?.dayOffset ?? 0) > 0) {
+    if (!dueDate) return false
+    return dueDate >= focusStart && dueDate < focusEnd
+  }
+
+  if (options?.strictToday) {
+    if (!dueDate) return false
+    return dueDate < new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+  }
+
   if (dueDate && dueDate < upcomingEnd) return true
   if (startDate && startDate <= todayStart) return true
   return dueDate === null && updatedAt >= todayStart
@@ -563,14 +671,14 @@ class PrismaCompletionExtraSource implements CompletionExtraSource {
 }
 
 class PrismaTodayFocusExtraSource implements TodayFocusExtraSource {
-  async getTodayFocusDailyPlanItems(userId: string, todayStart: Date): Promise<AgentTaskQueryItem[]> {
+  async getTodayFocusDailyPlanItems(userId: string, focusDate: Date): Promise<AgentTaskQueryItem[]> {
     const rows = await prisma.dailyPlanItem.findMany({
       where: {
         completed: false,
         deferred: false,
         plan: {
           user_id: userId,
-          plan_date: todayStart,
+          plan_date: focusDate,
         },
       },
       orderBy: [
@@ -593,7 +701,7 @@ class PrismaTodayFocusExtraSource implements TodayFocusExtraSource {
       sourceType: "daily_plan_item",
       productName: row.product_name,
       dueDate: row.due_date?.toISOString(),
-      urgency: inferUrgency(row.due_date, todayStart),
+      urgency: inferUrgency(row.due_date, focusDate),
       relatedTaskId: row.task_id,
       relatedSubTaskId: row.sub_task_id ?? undefined,
     }))
@@ -641,6 +749,7 @@ function urgencyPriorityForTodayFocus(urgency?: AgentTaskQueryItem["urgency"]): 
 export function serializeQueryFacts(result: AgentTaskQueryResult) {
   return {
     queryType: result.queryType,
+    scopeLabel: result.scopeLabel,
     timezone: result.timezone,
     coverage: result.coverage,
     totalCount: result.totalCount,

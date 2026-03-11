@@ -186,6 +186,21 @@ prompt 不再承擔資料修補責任。
 - 滿足 LINE 回覆長度限制
 - 保留事實完整性
 
+### 4.9 LINE 文案與排版必須手機優先
+
+決策：
+
+- capability reply 改成 4-6 行短句，避免「工具名 + 括號 + 英文代號」式說明
+- query summary header 改成口語化句型，例如「你今天手上還有 X 件事，我先列最需要注意的 Y 件」
+- grouped summary 改成單行「先看重點：...」
+- coverage 改成補充句，不再使用獨立的「查詢範圍：...」報表欄位
+- item line 保留 title 與必要 context；source type 改成較短中文標記，task 預設不顯示型別
+
+理由：
+
+- 真實使用場景在 LINE 手機介面，閱讀成本比後台完整欄位更重要
+- truthfulness 不是把所有 metadata 原樣貼給使用者，而是用友善格式忠實表達
+
 ### 4.6 Canonical tool response 必須由 orchestration 層決定
 
 決策：
@@ -458,13 +473,17 @@ interface AgentTaskQueryResult {
 目標：
 
 - 讓 query / complete skill 變成薄層
+- 讓 completion target resolution 採 lexical-first 的保守分層
 
 工作項目：
 
 1. 重構 `query-tasks-skill.ts`
 2. 重構 `complete-task-skill.ts`
-3. 修改 LINE webhook confirm flow
-4. 更新 promptInjection 文案
+3. completion search 加入 deterministic normalization
+4. completion search 加入 fuzzy lexical ranking 與明確閾值
+5. 移除 skill 內任何 embedding 依賴；top 候選接近時直接澄清
+6. 修改 LINE webhook confirm flow
+7. 更新 promptInjection 文案
 
 ### Phase 4: Truthful Response Formatting
 

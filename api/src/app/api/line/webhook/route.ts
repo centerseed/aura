@@ -10,14 +10,35 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyLineSignature, getLineClient } from "@/lib/line-client"
 import { createZentropyAgent } from "@/application/use-cases/agent/zentropy-agent"
 import { prisma } from "@/lib/db"
-import { getLineSession, clearLineSession } from "@/lib/line-session"
+import { getLineSession, clearLineSession, saveLineSession } from "@/lib/line-session"
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
-import type { AdjustTagsPayload, CompleteTaskPayload } from "@/lib/line-session"
+import type { AdjustTagsPayload, BrainDumpPendingPayload, CompleteTaskPayload } from "@/lib/line-session"
 import { generateLineMagicLink } from "@/lib/line-magic-link"
 import { CompleteTaskUseCase } from "@/application/use-cases/tasks/complete-task"
-import { classifyConfirmationDisposition } from "@/lib/line-confirmation"
+import { classifyConfirmationDisposition, extractBrainDumpConfirmationTarget } from "@/lib/line-confirmation"
 import { UpdateSubItemUseCase } from "@/application/use-cases/tasks/update-sub-item"
 import { UpdatePlanItemUseCase } from "@/application/use-cases/coach/update-plan-item"
+import { createBrainDumpTool } from "@/application/use-cases/agent/brain-dump-skill"
+import { parseToolResult } from "@/application/use-cases/agent/tool-result-protocol"
+import { normalizeAgentUsage } from "@/application/use-cases/agent/llm-logging"
+
+interface LineMessagePhaseTimings {
+  user_lookup_ms?: number
+  session_lookup_ms?: number
+  pending_execute_ms?: number
+  agent_chat_ms?: number
+  push_ms?: number
+  total_ms?: number
+}
+
+interface LineMessageUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  classifierInputTokens?: number
+  classifierOutputTokens?: number
+  classifierTotalTokens?: number
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -62,39 +83,64 @@ export async function POST(req: NextRequest) {
 
     const text: string = event.message.text
 
-    // ── 一般對話 → NaruAgent（背景處理，避免 reply token 5 秒過期）──────
-    // 不 await — 立刻進入下一個 event，最後 return 200
-    Promise.resolve().then(async () => {
-      const user = await prisma.user.findFirst({
-        where: { line_user_id: lineUserId, deleted_at: null },
-        select: { id: true },
-      })
-
-      if (!user) {
-        // 未綁定：生成 magic link 並 push
-        const { url, isReused } = await generateLineMagicLink(lineUserId)
-        const msg = isReused
-          ? "你已收過綁定連結，請使用之前的連結完成綁定，或稍後再試。"
-          : `請先到官網完成 LINE 帳號綁定：\n\n${url}\n\n連結 15 分鐘內有效 🔐`
-        await client.pushMessage({
-          to: lineUserId,
-          messages: [{ type: "text", text: msg }],
-        })
-        return
+    // ── 一般對話 → NaruAgent ────────────────────────────────────────────
+    // 直接 await：Cloud Run 回應後會節流 CPU，fire-and-forget 會導致 30 秒延遲。
+    // 使用 pushMessage（非 replyMessage），無 5 秒 reply token 限制。
+    // 正常處理 5-10 秒，在 LINE webhook 30 秒 timeout 之內。
+    await (async () => {
+      const startedAt = Date.now()
+      const timings: LineMessagePhaseTimings = {}
+      let usage: LineMessageUsage = {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
       }
-
+      let userId: string | null = null
+      let outcome = "unknown"
+      let sessionType: string | null = null
+      let toolCalls: string[] = []
       try {
+        const userLookupStartedAt = Date.now()
+        const user = await prisma.user.findFirst({
+          where: { line_user_id: lineUserId, deleted_at: null },
+          select: { id: true },
+        })
+        timings.user_lookup_ms = Date.now() - userLookupStartedAt
+        userId = user?.id ?? null
+
+        if (!user) {
+          // 未綁定：生成 magic link 並 push
+          const { url, isReused } = await generateLineMagicLink(lineUserId)
+          const msg = isReused
+            ? "你已收過綁定連結，請使用之前的連結完成綁定，或稍後再試。"
+            : `請先到官網完成 LINE 帳號綁定：\n\n${url}\n\n連結 15 分鐘內有效 🔐`
+          const pushStartedAt = Date.now()
+          await client.pushMessage({
+            to: lineUserId,
+            messages: [{ type: "text", text: msg }],
+          })
+          timings.push_ms = Date.now() - pushStartedAt
+          outcome = "unbound_magic_link"
+          return
+        }
+
         // ── Session 攔截：先查 session，再判斷 disposition ───────────────
+        const sessionLookupStartedAt = Date.now()
         const session = await getLineSession(lineUserId)
+        timings.session_lookup_ms = Date.now() - sessionLookupStartedAt
+        sessionType = session?.type ?? null
         if (session) {
           const disposition = classifyConfirmationDisposition(text)
 
           if (disposition === "reject") {
             await clearLineSession(lineUserId)
+            const pushStartedAt = Date.now()
             await client.pushMessage({
               to: lineUserId,
               messages: [{ type: "text", text: "好的，已取消。" }],
             })
+            timings.push_ms = Date.now() - pushStartedAt
+            outcome = "pending_reject"
             return
           }
 
@@ -104,6 +150,7 @@ export async function POST(req: NextRequest) {
             // fall through to agent
           } else {
             // disposition === "confirm" → 執行 pending operation
+            const pendingExecuteStartedAt = Date.now()
             if (session.type === "adjust_tags_preview") {
               const p = session.payload as AdjustTagsPayload
               const executeUC = new ExecuteAdjustmentUseCase()
@@ -117,12 +164,16 @@ export async function POST(req: NextRequest) {
                 taskMap: p.taskMap as Parameters<typeof executeUC.execute>[0]["taskMap"],
                 logId: p.logId,
               })
+              timings.pending_execute_ms = Date.now() - pendingExecuteStartedAt
               await clearLineSession(lineUserId)
               const summary = result.operationLog.join("\n")
+              const pushStartedAt = Date.now()
               await client.pushMessage({
                 to: lineUserId,
                 messages: [{ type: "text", text: `✅ 已完成分類調整：\n\n${summary}` }],
               })
+              timings.push_ms = Date.now() - pushStartedAt
+              outcome = "adjust_tags_confirmed"
               return
             }
 
@@ -152,11 +203,30 @@ export async function POST(req: NextRequest) {
               } else {
                 throw new Error("Invalid complete_task_confirm payload")
               }
+              timings.pending_execute_ms = Date.now() - pendingExecuteStartedAt
               await clearLineSession(lineUserId)
+              const pushStartedAt = Date.now()
               await client.pushMessage({
                 to: lineUserId,
                 messages: [{ type: "text", text: `✅ 已完成「${p.taskTitle}」` }],
               })
+              timings.push_ms = Date.now() - pushStartedAt
+              outcome = "complete_task_confirmed"
+              return
+            }
+
+            if (session.type === "brain_dump_pending") {
+              const p = session.payload as BrainDumpPendingPayload
+              const toolOutput = await createBrainDumpTool(user.id, p.originalText).execute({})
+              timings.pending_execute_ms = Date.now() - pendingExecuteStartedAt
+              await clearLineSession(lineUserId)
+              const pushStartedAt = Date.now()
+              await client.pushMessage({
+                to: lineUserId,
+                messages: [{ type: "text", text: parseToolResult(toolOutput).summary }],
+              })
+              timings.push_ms = Date.now() - pushStartedAt
+              outcome = "brain_dump_confirmed"
               return
             }
           }
@@ -170,24 +240,78 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           sessionId: lineUserId,
         })
-        const tAgentEnd = Date.now()
-        console.log(JSON.stringify({ event: "line_agent_end", userId: user.id, lineUserId, total_ms: tAgentEnd - tAgentStart, toolsUsed: result.toolCalls, timings: result.timings }))
+        timings.agent_chat_ms = Date.now() - tAgentStart
+        toolCalls = result.toolCalls
+        usage = {
+          ...normalizeAgentUsage(result.usage),
+          ...extractClassifierUsageForLine(result.trace),
+        }
+        console.log(JSON.stringify({ event: "line_agent_end", userId: user.id, lineUserId, total_ms: timings.agent_chat_ms, toolsUsed: result.toolCalls, timings: result.timings, usage }))
 
+        const pendingBrainDumpTarget = extractBrainDumpConfirmationTarget(result.content)
+        if (pendingBrainDumpTarget) {
+          await saveLineSession(lineUserId, "brain_dump_pending", {
+            originalText: pendingBrainDumpTarget,
+            taskTitle: pendingBrainDumpTarget,
+          })
+        }
+
+        const pushStartedAt = Date.now()
         await client.pushMessage({
           to: lineUserId,
           messages: [{ type: "text", text: result.content }],
         })
+        timings.push_ms = Date.now() - pushStartedAt
+        outcome = "agent_reply"
       } catch (err) {
         console.error("[LINE Webhook] Agent error:", err)
+        const pushStartedAt = Date.now()
         await client.pushMessage({
           to: lineUserId,
           messages: [{ type: "text", text: "抱歉，處理過程中發生錯誤，請稍後再試。" }],
         })
+        timings.push_ms = Date.now() - pushStartedAt
+        outcome = "error"
+      } finally {
+        timings.total_ms = Date.now() - startedAt
+        console.log(JSON.stringify({
+          event: "line_message_complete",
+          userId,
+          lineUserId,
+          textLen: text.length,
+          outcome,
+          sessionType,
+          toolCalls,
+          timings,
+          usage,
+        }))
       }
-    }).catch((err) => {
-      console.error("[LINE Webhook] Background task error:", err)
+    })().catch((err) => {
+      console.error("[LINE Webhook] Processing error:", err)
     })
   }
 
   return NextResponse.json({ ok: true })
+}
+
+function extractClassifierUsageForLine(trace: unknown): Partial<LineMessageUsage> {
+  if (!trace || typeof trace !== "object") return {}
+
+  const classifierUsage = (trace as {
+    metadata?: {
+      classifierUsage?: {
+        inputTokens?: unknown
+        outputTokens?: unknown
+        totalTokens?: unknown
+      }
+    }
+  }).metadata?.classifierUsage
+
+  if (!classifierUsage) return {}
+
+  return {
+    classifierInputTokens: typeof classifierUsage.inputTokens === "number" ? classifierUsage.inputTokens : 0,
+    classifierOutputTokens: typeof classifierUsage.outputTokens === "number" ? classifierUsage.outputTokens : 0,
+    classifierTotalTokens: typeof classifierUsage.totalTokens === "number" ? classifierUsage.totalTokens : 0,
+  }
 }

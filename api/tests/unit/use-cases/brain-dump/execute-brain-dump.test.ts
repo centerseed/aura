@@ -234,6 +234,52 @@ describe('ExecuteBrainDumpUseCase', () => {
       // 2 sub_items × 2 tasks = 4 次寫入
       expect(prisma.subTask.create).toHaveBeenCalledTimes(4)
     })
+
+    it('單數輸入誤命中多個 target_task_ids 時，應只保留 lexical 最強的目標', async () => {
+      const RESTAURANT_TASK = {
+        id: TEST_UUIDS.TASK_1,
+        content: '訂餐廳',
+        product: { id: TEST_UUIDS.PRODUCT_1, name: '生活' },
+        user_id: TEST_UUIDS.USER_1,
+        product_id: TEST_UUIDS.PRODUCT_1,
+        status: 'INBOX',
+        deleted_at: null,
+      }
+      const MILK_TASK = {
+        id: TEST_UUIDS.TASK_2,
+        content: '購買牛奶',
+        product: { id: TEST_UUIDS.PRODUCT_1, name: '生活' },
+        user_id: TEST_UUIDS.USER_1,
+        product_id: TEST_UUIDS.PRODUCT_1,
+        status: 'INBOX',
+        deleted_at: null,
+      }
+
+      vi.mocked(prisma.task.findFirst)
+        .mockResolvedValueOnce(RESTAURANT_TASK as any)
+        .mockResolvedValueOnce(MILK_TASK as any)
+      vi.mocked(prisma.subTask.aggregate).mockResolvedValue({ _max: { order: null } } as any)
+
+      const result = await useCase.execute({
+        userId: TEST_UUIDS.USER_1,
+        text: '記錄：訂餐廳',
+        inputType: 'text',
+        result: {
+          action: 'append_sub_item',
+          target_task_ids: [TEST_UUIDS.TASK_1, TEST_UUIDS.TASK_2],
+          reasoning: 'AI 誤判成兩個目標',
+          sub_items: [{ content: '訂餐廳' }],
+        },
+        milestones: [],
+        existingAreas: [],
+        imageUnderstandingResult: null,
+      })
+
+      expect(result.data.action).toBe('append_sub_item')
+      expect(result.data.appended_tasks).toHaveLength(1)
+      expect(result.data.target_task.id).toBe(TEST_UUIDS.TASK_1)
+      expect(prisma.subTask.create).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('🔴 迴歸測試：Brain Dump 自動建立 Product 必須呼叫 ensureProductEmbedding', () => {

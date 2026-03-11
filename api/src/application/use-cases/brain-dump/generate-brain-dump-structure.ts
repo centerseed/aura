@@ -15,6 +15,7 @@ import { getEmbedding } from "@/lib/embedding"
 import { librarianRecall, LibrarianRule } from "@/lib/librarian-client"
 import { ValidationException } from "@/lib/api-response"
 import type { AiTokenUsage } from "@/lib/ai-rate-limit"
+import { logAgentLlmCall, normalizeAiSdkUsage } from "@/application/use-cases/agent/llm-logging"
 
 // ============================================================================
 // Zod Schemas (moved from route)
@@ -73,8 +74,54 @@ const StructureResultSchema = z.object({
     .describe("action=append_sub_item 時必填：簡要說明為什麼判斷這是追加而非新任務"),
 })
 
+const AppendTargetResolutionSchema = z.object({
+  outcome: z.enum(["single", "multiple", "ambiguous"])
+    .describe("single=只應追加到一個任務, multiple=明確要追加到多個任務, ambiguous=無法安全判定"),
+  resolved_target_task_ids: z.array(z.string().uuid()).min(1).optional()
+    .describe("若 outcome 為 single 或 multiple，填入最終應保留的 task UUID"),
+  reasoning: z.string().max(120).describe("簡短說明判斷依據"),
+})
+
 export type StructuredItem = z.infer<typeof StructuredItemSchema>
 export type StructureResult = z.infer<typeof StructureResultSchema>
+
+export function validateBrainDumpStructureResult(result: StructureResult): StructureResult {
+  if (result.action === "append_sub_item") {
+    if (!result.sub_items || result.sub_items.length === 0) {
+      throw new ValidationException(
+        "AI returned append_sub_item without sub_items",
+        "sub_items",
+      )
+    }
+
+    if (!result.target_task_ids || result.target_task_ids.length === 0) {
+      throw new ValidationException(
+        "AI returned append_sub_item without target_task_ids",
+        "target_task_ids",
+      )
+    }
+  }
+
+  if (result.action === "create_new_tasks" && (!result.items || result.items.length === 0)) {
+    throw new ValidationException(
+      "AI returned create_new_tasks without items",
+      "items",
+    )
+  }
+
+  return result
+}
+
+function mergeAiUsage(
+  base: AiTokenUsage | undefined,
+  next: AiTokenUsage | undefined,
+): AiTokenUsage | undefined {
+  if (!base && !next) return undefined
+  return {
+    inputTokens: (base?.inputTokens ?? 0) + (next?.inputTokens ?? 0),
+    outputTokens: (base?.outputTokens ?? 0) + (next?.outputTokens ?? 0),
+  }
+}
 
 // ============================================================================
 // Types
@@ -545,23 +592,9 @@ export class GenerateBrainDumpStructureUseCase {
       }
     }
 
-    // 偵測時間指示詞 / 緊急程度詞（在 similarity signal 之前，出現則強制 create）
-    const urgencyTimeKeywords = [
-      '今天', '明天', '後天', '大後天',
-      '週一', '週二', '週三', '週四', '週五', '週六', '週日',
-      '下週', '本週', '這週', '上週',
-      '月底', '月初', '本月底', '年底', '年初',
-      '馬上', '立刻', '現在', '趕快', '盡快', '緊急', '趕緊',
-    ]
-    const inputText = request.text || request.cleanedText || ''
-    const hasUrgencyOrTime = urgencyTimeKeywords.some(kw => inputText.includes(kw))
-
     // Similarity signal for append vs new task
     let similaritySignal = ""
-    if (hasUrgencyOrTime) {
-      // 有時間/緊急詞：直接壓制 similarity signal，強制指向 create
-      similaritySignal = `\n### 🔍 語意分析信號\n⚠️ 偵測到時間指示詞或緊急程度詞（「馬上」「月底」「今天」等）→ **必須 create_new_tasks，禁止 append_sub_item**（即使語意高度相似）\n`
-    } else if (topSimilarTask && topTaskSimilarity > 0.85) {
+    if (topSimilarTask && topTaskSimilarity > 0.85) {
       similaritySignal = `\n### 🔍 語意分析信號\n語意分析發現高度相似的既有任務：\n  任務: "${topSimilarTask.content}" (相似度: ${(topSimilarTask.similarity * 100).toFixed(0)}%)\n  Product: ${topSimilarTask.productName}\n  → 請優先考慮是否追加為此任務的 sub-item\n`
     } else if (topTaskSimilarity < 0.6) {
       similaritySignal = `\n### 🔍 語意分析信號\n語意分析未發現高度相似的既有任務（最高相似度: ${(topTaskSimilarity * 100).toFixed(0)}%）→ 建議創建新任務\n`
@@ -585,6 +618,7 @@ export class GenerateBrainDumpStructureUseCase {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         console.log(`🔄 [brain-dump] AI generateObject attempt ${attempt + 1}/3...`)
+        const attemptStartedAt = Date.now()
         const { object, usage } = await resilientGenerateObject({
           model: process.env.OPENROUTER_MODEL
             ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
@@ -611,21 +645,7 @@ export class GenerateBrainDumpStructureUseCase {
 
 ---
 
-# 🔥🔥 第二優先：時間指示詞 / 緊急程度強制規則
-
-**在做追加判斷之前**，先掃描輸入是否含有以下詞語：
-
-- **時間指示詞**：今天、明天、後天、大後天、週一、週二、週三、週四、週五、週六、週日、下週、本週、這週、上週、月底、月初、本月底、年底、年初、X日前、X號前、X月前、幾天內、幾週內
-- **緊急程度詞**：馬上、立刻、現在、ASAP、趕快、盡快、緊急、急、趕緊
-
-**只要出現以上任一詞** → **必須 create_new_tasks，禁止 append_sub_item**
-- 理由：時間指示詞代表用戶在為**這件事**設定截止日期；sub-item 無法攜帶截止日期
-- 緊急程度詞代表用戶要**立刻執行這件新事**，不是補充現有任務的細節
-- **此規則優先級高於語意相似度**，無論現有任務多相似，只要有時間/緊急詞就創建新任務
-
----
-
-# 🔥 是追加還是新任務？（僅當上面兩項都不適用時）
+# 🔥 是追加還是新任務？
 
 ## 核心判斷原則：因果關係測試
 
@@ -657,7 +677,6 @@ export class GenerateBrainDumpStructureUseCase {
 ### 追加的絕對禁止（出現任一條即為新任務）
 
 - 輸入含有「動詞 + 獨立目標」結構（如「修復X」「處理Y」「完成Z」「開發A」「設計B」）→ 這是獨立任務，不追加
-- 輸入含有時間指示詞或緊急程度詞（已在上方「第二優先」規則中定義）→ 必須創建新任務，此處再次確認
 - 既有任務是「大傘任務」（名稱寬泛如「開發 XX 功能」「推進 XX 專案」）→ 不追加。大傘任務會吸引所有相關輸入，但「相關」不等於「子步驟」
 
 **預設行為**：有任何疑慮，創建新任務。追加是例外，不是常態。
@@ -665,7 +684,9 @@ export class GenerateBrainDumpStructureUseCase {
 **如果符合追加條件**：
 → 回傳 \`action: "append_sub_item"\`，指定 \`target_task_ids\` 和新的 \`sub_items\`
 ⚠️ \`target_task_ids\` 必須填入「用戶的 Products 與任務」清單中格式為 \`- [uuid]\` 的 UUID 陣列（一或多個）
-✅ 若用戶要追加到多個任務（如「國語和數學」），\`target_task_ids\` 填入多個 UUID，\`sub_items\` 將同樣追加到每個目標任務
+✅ 若用戶要追加到多個任務（如「國語和數學」），\`target_task_ids\` 才能填入多個 UUID，\`sub_items\` 將同樣追加到每個目標任務
+🚨 若用戶輸入只是在記錄單一事項，或沒有**明確指出多個目標任務**，\`target_task_ids\` 必須只包含 1 個 UUID
+🚨 不可因為多個任務「看起來都相關」就回傳多個 \`target_task_ids\`；多目標 append 必須是用戶明確表達，而不是模型自行延伸
 🚫 **嚴禁使用里程碑區塊的 \`milestone_id\`**（兩者外觀相似，但來源不同，任何 milestone_id 都不是有效的 target_task_ids 元素）
 🚫 **嚴禁使用逗號分隔字串**，必須使用陣列格式
 
@@ -842,7 +863,20 @@ ${request.text}
 - narrative **保留完整**：將用戶提供的描述、結論、細節、背景完整複製到 narrative，不得省略或壓縮；如果用戶提供大量細節，全部放入 narrative（≤ 500 字元）
 - reasoning 範例：「提到專案名稱，判斷為工作相關」`,
         })
-        result = object
+        logAgentLlmCall({
+          event: "agent_llm_call",
+          feature: "brain_dump_generate_structure",
+          userId: request.userId,
+          latencyMs: Date.now() - attemptStartedAt,
+          usage: normalizeAiSdkUsage(usage),
+          model: process.env.OPENROUTER_MODEL ?? "gemini-2.5-flash-lite",
+          metadata: {
+            attempt: attempt + 1,
+            action: object.action,
+            textLen: request.text.length,
+          },
+        })
+        result = validateBrainDumpStructureResult(object)
         aiUsage = usage
         break
       } catch (err) {
@@ -853,12 +887,20 @@ ${request.text}
           err.message.includes('ECONNRESET') ||
           err.message.includes('timeout')
         )
+        const isRetryableSemanticValidation = err instanceof ValidationException && (
+          err.field === "sub_items" ||
+          err.field === "target_task_ids" ||
+          err.field === "items"
+        )
         console.error(`❌ [brain-dump] AI call attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : String(err))
-        if (!isTransient || attempt === 2) {
+        if ((!isTransient && !isRetryableSemanticValidation) || attempt === 2) {
           console.error(`❌ [brain-dump] All 3 AI attempts failed. Final error:`, lastError instanceof Error ? lastError.message : String(lastError))
           throw err
         }
-        console.warn(`⚠️ [brain-dump] AI call attempt ${attempt + 1} failed (transient), retrying...`, err)
+        console.warn(
+          `⚠️ [brain-dump] AI call attempt ${attempt + 1} failed (${isRetryableSemanticValidation ? "semantic" : "transient"}), retrying...`,
+          err,
+        )
         await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
       }
     }
@@ -879,6 +921,76 @@ ${request.text}
           `AI 選擇的追加目標（${invalidIds.join(', ')}）不在當前任務清單中，請重新送出輸入`,
           'target_task_ids'
         )
+      }
+
+      if (taskIds.length > 1) {
+        const candidateTasks = existingAreas
+          .flatMap((area) => area.products)
+          .flatMap((product) => product.tasks)
+          .filter((task) => taskIds.includes(task.id))
+          .map((task) => ({ id: task.id, title: task.content }))
+
+        const resolutionStartedAt = Date.now()
+        const { object: targetResolution, usage: targetResolutionUsage } = await resilientGenerateObject({
+          model: process.env.OPENROUTER_MODEL
+            ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
+            : google("gemini-2.5-flash-lite"),
+          schema: AppendTargetResolutionSchema,
+          prompt: `你是 mutation decision validator。你的唯一任務是判斷：這段使用者輸入，是否明確要求把同一批 sub-items 追加到多個既有任務。
+
+規則：
+1. 只有在使用者**明確提到多個目標**時，outcome 才能是 \`multiple\`
+2. 如果使用者只是在記錄單一事項，或雖然相關但未明確指向多個任務，outcome 必須是 \`single\` 或 \`ambiguous\`
+3. 不可因為多個任務語意相關，就自動判成 multiple
+4. 若 outcome = single，\`resolved_target_task_ids\` 必須只保留最合理的 1 個 task id
+5. 若 outcome = multiple，\`resolved_target_task_ids\` 必須只保留真正被使用者明確提到的多個 task ids
+6. 若無法安全判定，回 \`ambiguous\`
+
+用戶輸入：
+${request.text}
+
+候選任務：
+${candidateTasks.map((task) => `- [${task.id}] ${task.title}`).join('\n')}
+
+目前 structure agent 選到的 target_task_ids：
+${taskIds.join(', ')}
+
+請只根據使用者輸入是否明確指向單一或多個目標來判斷。`,
+        })
+        logAgentLlmCall({
+          event: "agent_llm_call",
+          feature: "brain_dump_append_target_resolution",
+          userId: request.userId,
+          latencyMs: Date.now() - resolutionStartedAt,
+          usage: normalizeAiSdkUsage(targetResolutionUsage),
+          model: process.env.OPENROUTER_MODEL ?? "gemini-2.5-flash-lite",
+          metadata: {
+            candidateCount: candidateTasks.length,
+            outcome: targetResolution.outcome,
+          },
+        })
+
+        aiUsage = mergeAiUsage(aiUsage, targetResolutionUsage)
+
+        if (targetResolution.outcome === "ambiguous" || !targetResolution.resolved_target_task_ids) {
+          throw new ValidationException(
+            `追加目標仍不夠明確（${targetResolution.reasoning}），請重新判斷是單一任務還是需要先澄清`,
+            "target_task_ids",
+          )
+        }
+
+        const outOfScopeIds = targetResolution.resolved_target_task_ids.filter((id) => !taskIds.includes(id))
+        if (outOfScopeIds.length > 0) {
+          throw new ValidationException(
+            `追加目標解析器回傳了不在候選集內的 task id（${outOfScopeIds.join(", ")}）`,
+            "target_task_ids",
+          )
+        }
+
+        result = {
+          ...result,
+          target_task_ids: targetResolution.resolved_target_task_ids,
+        }
       }
     }
 

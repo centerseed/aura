@@ -23,7 +23,7 @@ export interface GetLibraryRequest {
 export interface TaskData {
   id: string
   title: string
-  product_id: string
+  product_id: string | null
   narrative: string | null
   drawer: string
   lifecycle: string
@@ -93,6 +93,11 @@ export interface GetLibraryResponse {
   areas: AreaData[]
 }
 
+const VIRTUAL_INBOX_AREA_ID = '__virtual_inbox_area__'
+const VIRTUAL_INBOX_PRODUCT_ID = '__virtual_inbox_product__'
+const VIRTUAL_INBOX_AREA_NAME = '收件匣'
+const VIRTUAL_INBOX_PRODUCT_NAME = '待整理'
+
 // ============================================================================
 // Use Case
 // ============================================================================
@@ -114,6 +119,22 @@ interface RawLibraryRow {
   task_id: string | null
   task_content: string | null
   task_status: string | null
+  task_ai_analysis: unknown
+  task_references: unknown
+  task_start_date: Date | null
+  task_due_date: Date | null
+  task_time_confidence: number | null
+  task_inferred_from_milestone: string | null
+  task_date_source: string | null
+  task_created_at: Date | null
+  task_recurring_task_id: string | null
+  topic_name: string | null
+}
+
+interface RawUnassignedTaskRow {
+  task_id: string
+  task_content: string
+  task_status: string
   task_ai_analysis: unknown
   task_references: unknown
   task_start_date: Date | null
@@ -168,8 +189,35 @@ export class GetLibraryUseCase {
       ORDER BY a.name, p.display_order, p.name, t.created_at DESC
     `
 
+    const unassignedRows = await prisma.$queryRaw<RawUnassignedTaskRow[]>`
+      SELECT
+        t.id::text as task_id,
+        t.content as task_content,
+        t.status::text as task_status,
+        t.ai_analysis as task_ai_analysis,
+        t.references as task_references,
+        t.start_date as task_start_date,
+        t.due_date as task_due_date,
+        t.time_confidence as task_time_confidence,
+        t.inferred_from_milestone as task_inferred_from_milestone,
+        t.date_source as task_date_source,
+        t.created_at as task_created_at,
+        t.recurring_task_id::text as task_recurring_task_id,
+        top.name as topic_name
+      FROM tasks t
+      LEFT JOIN topics top ON top.id = t.topic_id
+      WHERE t.user_id = ${request.userId}::uuid
+        AND t.deleted_at IS NULL
+        AND t.product_id IS NULL
+        ${request.includeArchived ? Prisma.empty : Prisma.sql`AND t.status != 'ARCHIVE'::"statusenum"`}
+      ORDER BY t.created_at DESC
+    `
+
     // 3. 批次查詢 sub_tasks（從 sub_tasks 表讀取，不再依賴 JSON）
-    const taskIds = rawRows.map(r => r.task_id).filter((id): id is string => id !== null)
+    const taskIds = [
+      ...rawRows.map(r => r.task_id).filter((id): id is string => id !== null),
+      ...unassignedRows.map(r => r.task_id),
+    ]
     const uniqueTaskIds = [...new Set(taskIds)]
     let subTasksByTaskId = new Map<string, Array<{ id: string; content: string; completed: boolean; created_at: Date; completed_at: Date | null; order: number; start_date: Date | null; due_date: Date | null }>>()
 
@@ -187,7 +235,7 @@ export class GetLibraryUseCase {
     }
 
     // 4. 將扁平結果轉換為巢狀結構
-    const formattedAreas = this.transformToNestedStructure(rawRows, subTasksByTaskId)
+    const formattedAreas = this.transformToNestedStructure(rawRows, unassignedRows, subTasksByTaskId)
 
     // 5. 查詢所有 topics 並掛到對應 product
     const allProductIds = formattedAreas.flatMap(a => a.products.map(p => p.id))
@@ -223,7 +271,11 @@ export class GetLibraryUseCase {
   /**
    * 將扁平的 SQL 結果轉換為巢狀的 Area → Product → Task 結構
    */
-  private transformToNestedStructure(rows: RawLibraryRow[], subTasksByTaskId: Map<string, Array<{ id: string; content: string; completed: boolean; created_at: Date; completed_at: Date | null; order: number; start_date: Date | null; due_date: Date | null }>>): AreaData[] {
+  private transformToNestedStructure(
+    rows: RawLibraryRow[],
+    unassignedRows: RawUnassignedTaskRow[],
+    subTasksByTaskId: Map<string, Array<{ id: string; content: string; completed: boolean; created_at: Date; completed_at: Date | null; order: number; start_date: Date | null; due_date: Date | null }>>,
+  ): AreaData[] {
     const areasMap = new Map<string, AreaData>()
     const productsMap = new Map<string, ProductData>()
     const taskIdsAdded = new Set<string>()
@@ -269,6 +321,63 @@ export class GetLibraryUseCase {
         // 累加 task references 到 product 的 referenceCount
         product.referenceCount += taskData.references.length
       }
+    }
+
+    if (unassignedRows.length > 0) {
+      const inboxArea: AreaData = {
+        id: VIRTUAL_INBOX_AREA_ID,
+        name: VIRTUAL_INBOX_AREA_NAME,
+        description: null,
+        scope: null,
+        products: [{
+          id: VIRTUAL_INBOX_PRODUCT_ID,
+          name: VIRTUAL_INBOX_PRODUCT_NAME,
+          description: null,
+          status: 'INBOX',
+          lifecycle: 'FINITE',
+          priority: null,
+          referenceCount: 0,
+          tasks: [],
+          topics: [],
+        }],
+      }
+
+      for (const row of unassignedRows) {
+        const taskData = this.transformTask(
+          {
+            area_id: VIRTUAL_INBOX_AREA_ID,
+            area_name: VIRTUAL_INBOX_AREA_NAME,
+            area_description: null,
+            area_scope: null,
+            product_id: null,
+            product_name: VIRTUAL_INBOX_PRODUCT_NAME,
+            product_description: null,
+            product_status: null,
+            product_lifecycle: null,
+            product_priority: null,
+            product_references: [],
+            product_display_order: null,
+            task_id: row.task_id,
+            task_content: row.task_content,
+            task_status: row.task_status,
+            task_ai_analysis: row.task_ai_analysis,
+            task_references: row.task_references,
+            task_start_date: row.task_start_date,
+            task_due_date: row.task_due_date,
+            task_time_confidence: row.task_time_confidence,
+            task_inferred_from_milestone: row.task_inferred_from_milestone,
+            task_date_source: row.task_date_source,
+            task_created_at: row.task_created_at,
+            task_recurring_task_id: row.task_recurring_task_id,
+            topic_name: row.topic_name,
+          },
+          subTasksByTaskId.get(row.task_id) || [],
+        )
+        inboxArea.products[0].tasks.push(taskData)
+        inboxArea.products[0].referenceCount += taskData.references.length
+      }
+
+      return [inboxArea, ...Array.from(areasMap.values())]
     }
 
     return Array.from(areasMap.values())
@@ -317,13 +426,13 @@ export class GetLibraryUseCase {
     return {
       id: row.task_id!,
       title: row.task_content!,
-      product_id: row.product_id!,
+      product_id: row.product_id,
       narrative: (analysis?.narrative as string) || null,
       drawer: row.task_status!,
       lifecycle: (analysis?.lifecycle as string) || 'embryo',
       tag: {
         area: row.area_name,
-        product: row.product_name!,
+        product: row.product_name || VIRTUAL_INBOX_PRODUCT_NAME,
         topic: row.topic_name || '未分類',
       },
       strategy_used: (analysis?.strategy_used as string) || null,
