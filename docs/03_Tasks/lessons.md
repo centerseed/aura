@@ -56,3 +56,5 @@
 - Rule: 在 LINE 上，只要下一步已收斂成少數明確選項，就必須改成 button-first 互動；`記錄：...`、序號、`確認` 等文字輸入只能保留為 fallback，不得是主要 UX。
 - Pattern: live agent regression script 若沿用舊版固定多輪流程（例如硬要求下一輪 `確認`）或共用上一個 section 的殘留資料，會把已經正確的單輪完成誤判成異常，甚至讓 exit code 失真。
 - Rule: 所有 live multi-turn 驗證腳本都必須依當前回合實際 UI / pending state 做 conditional expectation，並在每個 section 前重置 session 與測試資料；只要收集到任何 failure（含 FACTS 洩漏），process exit code 必須為非 0。
+- Pattern: brain_dump 若只依賴 LLM 自行保留「短 inline list」的細項，遇到像「要買宣紙、毛筆作品簿」這種無主題純列表輸入時，模型可能把內容抽象成總結標題，卻沒有把原文落到 content、narrative 或 sub-items。
+- Rule: 對單一 `create_new_tasks` 結果，只要原始輸入可 deterministic 判定為短 inline list，persist 前就必須補上 user-visible 原文細項（至少 sub-items，必要時回填 title/narrative），不能只把 raw_input 藏在 ai_analysis。

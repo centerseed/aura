@@ -283,6 +283,84 @@ describe('ExecuteBrainDumpUseCase', () => {
   })
 
   describe('🔴 迴歸測試：Brain Dump 自動建立 Product 必須呼叫 ensureProductEmbedding', () => {
+    it('短 inline list 被摘要成總結標題時，仍應把原始細項落成 sub-items 與可見 title', async () => {
+      await useCase.execute({
+        userId: TEST_UUIDS.USER_1,
+        text: '要買宣紙、毛筆作品簿',
+        inputType: 'text',
+        result: {
+          action: 'create_new_tasks',
+          items: [
+            buildItem({
+              title: '採購文具',
+              narrative: '採購文具',
+            }),
+          ],
+        },
+        milestones: [],
+        existingAreas: AREA_WITHOUT_PRODUCTS,
+        imageUnderstandingResult: null,
+      })
+
+      expect(mockTx.task.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          content: '要買宣紙、毛筆作品簿',
+          ai_analysis: expect.objectContaining({
+            narrative: expect.stringContaining('要買宣紙、毛筆作品簿'),
+          }),
+        }),
+      }))
+      expect(mockTx.subTask.create).toHaveBeenCalledTimes(2)
+      expect(mockTx.subTask.create).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        data: expect.objectContaining({
+          content: '要買宣紙',
+        }),
+      }))
+      expect(mockTx.subTask.create).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        data: expect.objectContaining({
+          content: '毛筆作品簿',
+        }),
+      }))
+    })
+
+    it('已有明確 sub-items 的 create_new_tasks 不應被 inline list 保底改寫', async () => {
+      await useCase.execute({
+        userId: TEST_UUIDS.USER_1,
+        text: '購物清單：宣紙、毛筆作品簿',
+        inputType: 'text',
+        result: {
+          action: 'create_new_tasks',
+          items: [
+            buildItem({
+              title: '購物清單',
+              narrative: '購物清單：宣紙、毛筆作品簿',
+              sub_items: [{ content: '宣紙' }, { content: '毛筆作品簿' }],
+            }),
+          ],
+        },
+        milestones: [],
+        existingAreas: AREA_WITHOUT_PRODUCTS,
+        imageUnderstandingResult: null,
+      })
+
+      expect(mockTx.task.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          content: '購物清單',
+        }),
+      }))
+      expect(mockTx.subTask.create).toHaveBeenCalledTimes(2)
+      expect(mockTx.subTask.create).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        data: expect.objectContaining({
+          content: '宣紙',
+        }),
+      }))
+      expect(mockTx.subTask.create).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        data: expect.objectContaining({
+          content: '毛筆作品簿',
+        }),
+      }))
+    })
+
     it('建立新 Product 時必須呼叫 ensureProductEmbedding', async () => {
       await useCase.execute({
         userId: TEST_UUIDS.USER_1,

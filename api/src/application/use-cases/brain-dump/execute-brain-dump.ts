@@ -236,6 +236,99 @@ function resolveAppendTargetTasks<
   )
 }
 
+function stripCapturePrefix(text: string): string {
+  return text
+    .trim()
+    .replace(/^(記錄|記下|記一下|幫我記(?:一下)?|幫我加(?:一下)?|新增|待辦|todo)\s*[:：]?\s*/i, "")
+    .trim()
+}
+
+function extractInlineListSubItems(text: string): string[] {
+  const normalized = stripCapturePrefix(text)
+    .replace(/^[「『"\s]+|[」』"\s]+$/g, "")
+    .trim()
+
+  if (!normalized || !/[、，,；;\n]/.test(normalized)) {
+    return []
+  }
+
+  const hasSubjectPrefix = /[^:：]{1,30}[:：]/.test(normalized)
+  const listPortion = hasSubjectPrefix
+    ? normalized.replace(/^[^:：]{1,30}[:：]\s*/, "").trim()
+    : normalized
+
+  if (!listPortion || listPortion.length > 80) {
+    return []
+  }
+
+  const rawParts = listPortion
+    .split(/[、，,；;\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (rawParts.length < 2 || rawParts.length > 8) {
+    return []
+  }
+
+  const parts = rawParts.filter((part) => !/^(和|跟|以及|還有|與|及)$/.test(part))
+  if (parts.length < 2 || parts.some((part) => part.length > 100)) {
+    return []
+  }
+
+  const looksLikeSentence = /[。！？!?]/.test(listPortion)
+  const allShort = parts.every((part) => part.length <= 20)
+  if (looksLikeSentence || !allShort) {
+    return []
+  }
+
+  return parts
+}
+
+function ensureNarrativeContainsRawInput(narrative: string, text: string): string {
+  const normalized = stripCapturePrefix(text)
+  if (!normalized) return narrative
+  if (narrative.includes(normalized)) return narrative
+
+  const suffix = narrative.trim() ? `\n原始記錄：${normalized}` : normalized
+  const combined = `${narrative}${suffix}`.trim()
+  return combined.length <= 500 ? combined : narrative
+}
+
+function backfillInlineListDetails(result: StructureResult, text: string): StructureResult {
+  if (result.action !== "create_new_tasks" || !result.items || result.items.length !== 1) {
+    return result
+  }
+
+  const [item] = result.items
+  if (item.sub_items && item.sub_items.length > 0) {
+    return result
+  }
+
+  const inferredSubItems = extractInlineListSubItems(text)
+  if (inferredSubItems.length < 2) {
+    return result
+  }
+
+  const normalizedText = stripCapturePrefix(text)
+  const shouldUseRawTitle =
+    normalizedText.length > 0 &&
+    normalizedText.length <= 50 &&
+    !/[:：]/.test(normalizedText) &&
+    appendTargetScore(normalizedText, item.title) < 45
+
+  return {
+    ...result,
+    items: [
+      {
+        ...item,
+        title: shouldUseRawTitle ? normalizedText : item.title,
+        narrative: ensureNarrativeContainsRawInput(item.narrative, text),
+        sub_items: inferredSubItems.map((content) => ({ content })),
+      },
+    ],
+  }
+}
+
 // ============================================================================
 // DTOs
 // ============================================================================
@@ -389,7 +482,7 @@ export class ExecuteBrainDumpUseCase {
     }
 
     // 情況 2: 創建新任務
-    const result = request.result
+    const result = backfillInlineListDetails(request.result, request.text)
     const areaCache = new Map<string, { id: string }>()
     const productCache = new Map<string, { id: string }>()
     const topicCache = new Map<string, { id: string }>()

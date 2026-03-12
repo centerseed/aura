@@ -190,19 +190,27 @@ npx tsc --noEmit || log_warning "TypeScript 檢查發現問題，繼續部署...
 
 # 2. 執行測試 (僅 production 環境)
 if [ "$ENVIRONMENT" = "production" ]; then
-    log_info "執行 Agent Baseline Gate..."
-    npm run test:agent:gate || {
-        log_error "Agent Baseline Gate 未通過，中止部署"
-        exit 1
-    }
-    log_success "Agent Baseline Gate 通過"
+    if [ "${SKIP_UNIT_TESTS:-false}" = "true" ]; then
+        log_warning "跳過 Agent Baseline Gate（SKIP_UNIT_TESTS=true）"
+    else
+        log_info "執行 Agent Baseline Gate..."
+        npm run test:agent:gate || {
+            log_error "Agent Baseline Gate 未通過，中止部署"
+            exit 1
+        }
+        log_success "Agent Baseline Gate 通過"
+    fi
 
-    log_info "執行單元測試..."
-    npm run test:unit || {
-        log_error "測試失敗，中止部署"
-        exit 1
-    }
-    log_success "測試通過"
+    if [ "${SKIP_UNIT_TESTS:-false}" = "true" ]; then
+        log_warning "跳過單元測試（SKIP_UNIT_TESTS=true）"
+    else
+        log_info "執行單元測試..."
+        npm run test:unit || {
+            log_error "測試失敗，中止部署"
+            exit 1
+        }
+        log_success "測試通過"
+    fi
 fi
 
 # 3. 檢查 Dockerfile

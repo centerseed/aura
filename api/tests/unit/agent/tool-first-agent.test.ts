@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ToolFirstAgent } from "@/application/use-cases/agent/tool-first-agent"
 import { normalizeCompletionQuery } from "@/application/use-cases/agent/completion-query-normalizer"
+import * as completionQueryNormalizer from "@/application/use-cases/agent/completion-query-normalizer"
 import { classifyConfirmationDisposition } from "@/lib/line-confirmation"
 
 const {
@@ -601,6 +602,9 @@ describe("ToolFirstAgent", () => {
   })
 
   it("routes multi-clause completion phrasing through the normalized query", async () => {
+    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
+      .mockResolvedValueOnce("api 文件整理")
+
     const delegate = {
       chat: vi.fn(),
     }

@@ -62,6 +62,7 @@
 
 下列情況記錄為 `ERROR`：
 
+1. lifecycle `beforeMessage` throw error
 1. delegate chat throw error
 2. execution verifier 擋下回覆
 3. lifecycle `afterMessage` throw error
@@ -71,6 +72,15 @@
 1. 原始 `request_text`
 2. 已知的 `response_text`（若有）
 3. `error_message`
+4. 已知的 `intent` / `usage` / `timings` / `trace`（若 agent result 已經產生）
+
+### 4.3 Best-Effort Enrichment
+
+若 delegate result 缺少標準欄位，logging wrapper 仍必須做 best-effort 補全，避免 turn 落成「只有 request / response，沒有 routing context」：
+
+1. 若 `result.intent` 缺失，先嘗試從 `trace.resolvedIntent` 回填
+2. 若仍缺失，允許依照 confirmation / cancel 類已知語句模式寫入 synthetic intent
+3. `metadata` 必須標記 enrichment 來源與 error stage，讓後續 review 能區分原始欄位與推導欄位
 
 ## 5. Data Model
 
@@ -127,7 +137,11 @@
       "usage": { "inputTokens": 12, "outputTokens": 30, "totalTokens": 42 },
       "timings": { "intent_resolve_ms": 12, "total_ms": 520 },
       "trace": { "resolver": "deterministic", "selectedTool": "query_today_tasks" },
-      "metadata": { "verified": true },
+      "metadata": {
+        "verified": true,
+        "errorStage": null,
+        "intentSource": "result.intent"
+      },
       "created_at": "2026-03-12T00:00:00.000Z"
     }
   ]

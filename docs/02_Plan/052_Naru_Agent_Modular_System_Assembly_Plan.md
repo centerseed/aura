@@ -42,6 +42,8 @@ Zentropy 現有 agent 能力不是單一 `naru_agent` 實例帶出來的，而�
 3. 將 prompt、tool、memory、routing、policy 轉成可配置 contract
 4. 保留 truth-boundary layers 為 deterministic service
 5. 讓新產品能以最少程式碼組裝出可用的 agent system
+6. 讓 Python 與 JS/TS 共享同一套 assembly contract，而不是各自長出相似但不相容的 runtime
+7. 把 Zentropy 已驗證過的 deterministic orchestration 經驗沉澱成 reusable adapter pattern，而不是只存在於單一專案內
 
 ## 4. Non-Goals
 
@@ -87,11 +89,92 @@ Zentropy 現有 agent 能力不是單一 `naru_agent` 實例帶出來的，而�
 
 模組化的核心不是 prompt，而是每層輸入輸出 contract。
 
-## 6. Proposed Module Architecture
+### 5.5 Polyglot parity over feature cloning
 
-目標架構分成三層：
+Python 與 JS 不需要逐行對齊實作，但必須共享：
 
-### 6.1 Layer A: `naru-agent-core`
+- 相同的 config semantics
+- 相同的 protocol schema
+- 相同的 deterministic boundary vocabulary
+- 相同的 contract test expectations
+
+也就是說，跨語言要追求的是 parity，不是 copy-paste。
+
+## 6. Current State Assessment
+
+先釐清現況，避免抽象方向失焦。
+
+### 6.1 `naru_agent` 已經具備的基礎
+
+`naru_agent` 與 `naru-agent-js` 其實都已經有 reusable runtime 雛形：
+
+- `NaruAgent` runtime
+- tools / skills registry
+- memory manager
+- session store
+- context compression / summary store
+- guardrails
+- structured classifier / decision helper
+- tracing / event bus
+
+這代表「單 agent runtime」不是主要缺口。
+
+### 6.2 真正綁死在 Zentropy 專案內的能力
+
+Zentropy 真正有價值、但目前尚未 productize 的，是這些 deterministic system layer：
+
+- `agent-context-assembler.ts`
+- `agent-intent-resolver.ts`
+- `tool-first-agent.ts`
+- `agent-execution-verifier.ts`
+- `lifecycle-aware-agent.ts`
+- session-based confirmation / contextual reference / tool result protocol
+
+換句話說，現在缺的不是再做一個更大的 `NaruAgent`，而是把這些系統邊界抽成可組裝框架。
+
+### 6.3 目前 Python / JS 的落差
+
+現況不是「Python 先進、JS 落後」，而是兩邊都只做到 runtime layer，system layer 仍未正式抽象。
+
+主要落差如下：
+
+1. JS 版已較明確支援 `StructuredClassifier` / `DecisionAgentResult` 與 tool planning
+2. Python 版仍混有 legacy `Agent` 與 Agno-based `NaruAgent` 雙路徑
+3. 兩邊都沒有 versioned shared protocol package
+4. Zentropy 的 deterministic orchestration 目前只存在於 Naruvia app code，尚未回流成通用套件
+
+## 7. Proposed Module Architecture
+
+目標架構應從三層擴成四層：
+
+### 7.1 Layer 0: `naru-agent-contracts`
+
+責任：
+
+- cross-language canonical schemas
+- config schema
+- protocol schema
+- trace / verifier / tool result schema
+- contract versioning
+- JSON Schema / Zod / Pydantic generation source
+
+這一層不執行 agent，只負責定義跨語言共同語義。
+
+建議內容：
+
+```ts
+contracts/
+  agent-system-config.schema.json
+  decision-context.schema.json
+  canonical-intent.schema.json
+  tool-execution-result.schema.json
+  conversation-state.schema.json
+  reply-verification.schema.json
+```
+
+Python 與 JS 都從這一層產生型別或驗證器，而不是各自手寫一份近似介面。
+
+### 7.2 Layer A: `naru-agent-core`
 
 責任：
 
@@ -105,7 +188,7 @@ Zentropy 現有 agent 能力不是單一 `naru_agent` 實例帶出來的，而�
 
 這一層不理解產品 intent，也不決定工具 truth。
 
-### 6.2 Layer B: `naru-agent-system`
+### 7.3 Layer B: `naru-agent-system`
 
 責任：
 
@@ -123,7 +206,7 @@ Zentropy 現有 agent 能力不是單一 `naru_agent` 實例帶出來的，而�
 
 這一層是 reusable system assembly framework。
 
-### 6.3 Layer C: product package
+### 7.4 Layer C: product package
 
 責任：
 
@@ -136,9 +219,74 @@ Zentropy 現有 agent 能力不是單一 `naru_agent` 實例帶出來的，而�
 
 Zentropy 應落在這一層。
 
-## 7. Target Runtime Layers
+### 7.5 Layer D: channel package
 
-### 7.1 Deterministic layers
+責任：
+
+- LINE / Web / API / CLI channel wording
+- confirmation UX adapter
+- session key policy
+- channel-specific formatting constraints
+
+這層應與 product package 分開，避免把 LINE 特性誤抽象成產品規則。
+
+## 8. Polyglot Expansion Strategy
+
+若要讓 Python 和 JS 都能應用在 Zentropy 的經驗，建議不是做「JS 版複製 Python 架構」或反過來，而是採用下列拆法。
+
+### 8.1 共享 contract，不共享 implementation
+
+共享：
+
+- `AgentSystemConfig`
+- `DecisionContext`
+- `CanonicalIntent`
+- `ToolExecutionResult`
+- `ConversationState`
+- `VerificationResult`
+- tracing event names / shape
+
+不強迫共享：
+
+- underlying LLM SDK
+- storage implementation
+- web framework / transport
+- async model
+
+### 8.2 Core API 維持語言原生
+
+Python：
+
+- 保留 `NaruAgent(...)`
+- 補上 `NaruRoleRuntime` 或 `RoleAgentFactory`
+- 用 Pydantic 驗證 config / protocol
+
+JS/TS：
+
+- 保留 `new NaruAgent({...})`
+- 補上 `createRoleRuntime(config, deps)`
+- 用 Zod 或 JSON Schema 驗證 config / protocol
+
+### 8.3 System API 對齊
+
+兩個語言的 system assembly API 應對齊到同一層級：
+
+```ts
+interface AgentSystemFactory {
+  create(config: AgentSystemConfig, deps: RuntimeDeps): AgentSystem
+}
+```
+
+```py
+class AgentSystemFactory(Protocol):
+    def create(self, config: AgentSystemConfig, deps: RuntimeDeps) -> AgentSystem: ...
+```
+
+目標是「概念對齊、型別對齊、測試對齊」，不是語法完全一致。
+
+## 9. Target Runtime Layers
+
+### 9.1 Deterministic layers
 
 必須由 system assembly 明確保留以下抽象介面：
 
@@ -149,7 +297,12 @@ Zentropy 應落在這一層。
 5. `Executor`
 6. `PostExecutionVerifier`
 
-### 7.2 Agent layers
+此外建議補上兩個明確介面：
+
+7. `ConversationStateStore`
+8. `ConfirmationPolicy`
+
+### 9.2 Agent layers
 
 可由 `naru_agent` 實裝以下角色：
 
@@ -157,13 +310,13 @@ Zentropy 應落在這一層。
 2. `ResponseAgent`
 3. `MemoryAwareAssistant`
 
-### 7.3 Optional role
+### 9.3 Optional role
 
 `LowRiskOrchestrator` 可存在，但只能處理低風險 query / clarification，不得直接跨過 deterministic truth boundary。
 
-## 8. Core Contracts
+## 10. Core Contracts
 
-### 8.1 Agent system config
+### 10.1 Agent system config
 
 ```ts
 type AgentSystemConfig = {
@@ -204,7 +357,7 @@ type AgentSystemConfig = {
 }
 ```
 
-### 8.2 Role config
+### 10.2 Role config
 
 ```ts
 type RoleConfig = {
@@ -219,7 +372,7 @@ type RoleConfig = {
 }
 ```
 
-### 8.3 Decision context
+### 10.3 Decision context
 
 `DecisionContext` 必須是 deterministic assembled object，不得由 LLM 自行推測。
 
@@ -237,7 +390,7 @@ type DecisionContext = {
 }
 ```
 
-### 8.4 Tool result protocol
+### 10.4 Tool result protocol
 
 所有工具執行後，都必須輸出 canonical result：
 
@@ -258,9 +411,44 @@ type ToolExecutionResult = {
 
 `ResponseAgent` 只能根據 `humanSummary + facts + proof` 組織語言，不得脫離 canonical result 自由發揮。
 
-## 9. Assembly Flow
+### 10.5 Product adapter contract
 
-### 9.1 System boot sequence
+這是目前文件尚缺、但對跨專案重用最重要的一層。
+
+```ts
+type ProductAgentAdapter = {
+  productName: string
+  intents: CanonicalIntentDefinition[]
+  tools: ToolRegistration[]
+  policies: ProductPolicySet
+  createSafetyKernel(deps: ProductDeps): SafetyKernel
+  createContextAssembler(deps: ProductDeps): ContextAssembler
+  createIntentResolver(deps: ProductDeps): IntentResolver
+  createTargetResolver(deps: ProductDeps): TargetResolver
+  createExecutor(deps: ProductDeps): Executor
+  createVerifier(deps: ProductDeps): PostExecutionVerifier
+}
+```
+
+這樣 `naru-agent-system` 就只知道如何組裝，不需要理解 Zentropy 的 task / calendar / confirmation 細節。
+
+### 10.6 Channel adapter contract
+
+```ts
+type ChannelAdapter = {
+  channelName: "line" | "web" | "api" | "cli"
+  sessionKeyOf(input: ChatInput): string
+  formatReply(reply: VerifiedReply): ChannelReply
+  buildConfirmationPrompt(input: ConfirmationPromptInput): string
+  parseChannelMetadata(input: ChatInput): ChannelContext
+}
+```
+
+這可以把目前 `LINE` 專屬的語氣、 confirmation key、回覆格式，從產品邏輯中拆出去。
+
+## 11. Assembly Flow
+
+### 11.1 System boot sequence
 
 1. load `AgentSystemConfig`
 2. initialize shared runtime dependencies
@@ -269,7 +457,7 @@ type ToolExecutionResult = {
 5. build orchestrator pipeline
 6. expose product-facing `chat()` entry
 
-### 9.2 Message handling pipeline
+### 11.2 Message handling pipeline
 
 1. `SafetyKernel.inspect(rawMessage, sessionState)`
 2. 若可 direct route，直接進 deterministic path
@@ -281,7 +469,7 @@ type ToolExecutionResult = {
 8. `PostExecutionVerifier.verify(reply, result, trace)`
 9. persist state, trace, turn log
 
-### 9.3 Fallback rules
+### 11.3 Fallback rules
 
 LLM fallback 只能出現在以下位置：
 
@@ -295,9 +483,9 @@ LLM fallback 只能出現在以下位置：
 2. target ambiguity 是否可猜測
 3. 是否真的執行成功
 
-## 10. Factory Design
+## 12. Factory Design
 
-### 10.1 Core factory
+### 12.1 Core factory
 
 提供一個 assembly-level factory：
 
@@ -307,7 +495,7 @@ interface AgentSystemFactory {
 }
 ```
 
-### 10.2 Internal factories
+### 12.2 Internal factories
 
 ```ts
 interface RoleAgentFactory {
@@ -326,7 +514,7 @@ interface DeterministicServiceFactory {
 }
 ```
 
-### 10.3 Product assembly output
+### 12.3 Product assembly output
 
 ```ts
 type AgentSystem = {
@@ -335,7 +523,42 @@ type AgentSystem = {
 }
 ```
 
-## 11. What Should Be Configurable
+## 13. What Zentropy Teaches That Should Become Framework Rules
+
+Zentropy 目前已經驗證了幾個值得上提成 framework 規則的經驗，這些不是單一產品偶然需求。
+
+### 13.1 Query / mutation / preview / clarification 要有明確結果型別
+
+這已經在 `tool-result-protocol.ts` 出現雛形。應正式上提為 framework rule，而不是留在單一產品自行約定。
+
+### 13.2 Cross-turn reference resolution 必須是 deterministic facility
+
+像「上一個」「第二個」「剛才那個」這些能力，在任務、檔案、CRM、ticket 系統都會重複出現。
+
+建議抽成 reusable resolver primitives：
+
+- ordinal reference resolver
+- contextual last-mentioned resolver
+- pending confirmation resolver
+- presented entity registry
+
+### 13.3 Execution claim verification 必須是標配
+
+目前 `agent-execution-verifier.ts` 是 Zentropy 很有價值的 safety pattern，應變成 system default，而不是產品自行決定要不要做。
+
+### 13.4 Lifecycle hooks 與 turn logging 應是 assembly 內建能力
+
+`LifecycleAwareAgent` 不只是 wrapper，而是產品級 agent system 的標準配備：
+
+- before message
+- after message
+- idle flush
+- turn logging
+- verification failure logging
+
+這些應進 `naru-agent-system`，不是留在 app project 四散存在。
+
+## 14. What Should Be Configurable
 
 以下應可用設定檔控制：
 
@@ -348,7 +571,7 @@ type AgentSystem = {
 7. logging / tracing level
 8. reply formatting style
 
-## 12. What Must Remain Code
+## 15. What Must Remain Code
 
 以下必須保留程式實作：
 
@@ -359,7 +582,9 @@ type AgentSystem = {
 5. high-risk confirmation state machine
 6. cross-turn reference resolution
 
-## 13. Zentropy Mapping
+補充：雖然 cross-turn reference resolution 可以有 reusable primitives，但產品如何判斷可接受的 target ambiguity，仍應保留程式實作。
+
+## 16. Zentropy Mapping
 
 Zentropy 現有結構可映射如下：
 
@@ -372,7 +597,21 @@ Zentropy 現有結構可映射如下：
 
 換句話說，Zentropy 不是從零開始，而是已經有一個 product-specific implementation。下一步是把這些接口上提，讓 Zentropy 改為 `naru-agent-system` 的一個組裝實例。
 
-## 14. Example Product Config
+## 17. Recommended Package Layout
+
+為了讓其他專案更容易採用，建議最終 package layout 不要只是一個 repo 裡放 Python 和 JS，而是明確分成：
+
+1. `naru-agent-contracts`
+2. `naru-agent-core-py`
+3. `naru-agent-core-js`
+4. `naru-agent-system-py`
+5. `naru-agent-system-js`
+6. `naru-agent-adapter-zentropy`
+7. 其他產品 adapter，例如 `naru-agent-adapter-supportdesk`
+
+若維持 monorepo，也應至少在目錄與發版邏輯上呈現這個分層。
+
+## 18. Example Product Config
 
 ```ts
 const zentropyConfig: AgentSystemConfig = {
@@ -429,44 +668,63 @@ const zentropyConfig: AgentSystemConfig = {
 }
 ```
 
-## 15. Migration Plan
+## 19. Migration Plan
 
-### Phase 1: Normalize interfaces
+### Phase 1: Extract contracts first
 
-1. 將現有 `DecisionContext`、`AgentIntent`、tool result、verification result 收斂成明確 contract
+1. 將 `DecisionContext`、`AgentIntent`、tool result、verification result 定義到 shared schema
+2. 為 Python / JS 生成型別與 validator
+3. 加入 contract version，例如 `v1alpha1`
+
+### Phase 2: Normalize Zentropy adapters
+
+1. 把 `agent-context-assembler.ts`、`agent-intent-resolver.ts`、`agent-execution-verifier.ts` 收斂成 adapter interfaces
 2. 移除目前 product code 內隱含的 message parsing 協議
+3. 把 LINE-specific session/confirmation policy 從 product logic 拆到 channel adapter
 
-### Phase 2: Extract reusable system package
+### Phase 3: Extract reusable system package
 
 1. 抽出 shared orchestration interfaces
 2. 抽出 shared role factory interfaces
 3. 抽出 lifecycle/logging hooks
 
-### Phase 3: Move Zentropy to product config + adapters
+### Phase 4: Align Python / JS system API
+
+1. JS 先實作 `AgentSystemFactory`
+2. Python 補上對應 factory 與 contracts validator
+3. 讓兩邊通過同一份 contract test fixtures
+
+### Phase 5: Move Zentropy to product config + adapters
 
 1. 讓 Zentropy 只保留 product-specific deterministic services
 2. 用 config 裝配 response/decision/memory roles
+3. 確認 `tool-first-agent` 大部分邏輯回流到 system package
 
-### Phase 4: Contract tests
+### Phase 6: Contract tests
 
 1. 為每層介面建立 contract tests
 2. 驗證不同產品 config 下，不會破壞 truth boundary
+3. 使用同一批 fixtures 驗證 Python / JS parity
 
-## 16. Risks
+## 20. Risks
 
-### 16.1 False abstraction
+### 20.1 False abstraction
 
 若過早把 product-specific logic 全部抽成 generic config，最後會得到難維護的巨大 YAML/JSON，而不是可重用系統。
 
-### 16.2 Prompt-centric illusion
+### 20.2 Prompt-centric illusion
 
 若把 orchestration 問題誤判成 prompt 問題，會讓可用性退化成 demo-level agent。
 
-### 16.3 Protocol drift
+### 20.3 Protocol drift
 
 若 `DecisionContext`、tool result、reply verifier 沒有 versioned contract，不同產品會產生隱性耦合。
 
-## 17. Success Criteria
+### 20.4 Cross-language skew
+
+若 Python 與 JS 沒有共享 schema 與 fixtures，很快就會長成兩套名字相似但語義不同的系統。
+
+## 21. Success Criteria
 
 以下條件成立，才算模組化成功：
 
@@ -475,16 +733,19 @@ const zentropyConfig: AgentSystemConfig = {
 3. mutation claim 仍必須經過 verifier
 4. system contract tests 可以攔截 role misconfiguration
 5. Zentropy 可作為第一個 product implementation 遷移上去
+6. Python / JS 可用同一份 contract fixtures 驗證相同行為語義
+7. channel 切換（LINE -> API/Web）不需要重寫 product deterministic services
 
-## 18. Decision
+## 22. Decision
 
 結論不是「把現在的 agent 做成一份 prompt config」。
 
 結論是：
 
-1. `naru_agent` 應上提為 bounded-role runtime core
-2. 另建 `naru-agent-system` 作為 multi-layer assembly framework
-3. 產品只提供 config + deterministic adapters
-4. truth-boundary layers 嚴禁退化為 prompt-only
+1. `naru_agent` / `naru-agent-js` 應各自保留為 bounded-role runtime core
+2. 先建立 `naru-agent-contracts`，再建立 `naru-agent-system`
+3. Zentropy 的經驗應沉澱為 reusable deterministic adapters 與 framework defaults
+4. 產品只提供 config + deterministic adapters + channel adapters
+5. truth-boundary layers 嚴禁退化為 prompt-only
 
 這樣才有可能快速重現「現在這樣有實用價值的 agent 能力」，而不是重現一個只有表面對話能力的 agent。

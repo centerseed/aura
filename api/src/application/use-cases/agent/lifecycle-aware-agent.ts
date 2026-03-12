@@ -8,6 +8,150 @@ export interface AgentChatDelegate {
   chat(message: string, options?: ChatOptions): Promise<any>
 }
 
+type AgentTurnStage =
+  | "before_message"
+  | "delegate_chat"
+  | "verify_result"
+  | "after_message"
+  | "log_success"
+
+interface NormalizedTurnLogPayload {
+  responseText: string | null
+  toolCalls: string[]
+  intent: unknown
+  usage: unknown
+  timings: unknown
+  trace: unknown
+  intentSource: string | null
+}
+
+function normalizeToolCalls(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : []
+}
+
+function hasIntentObject(value: unknown): value is { object: string } {
+  if (!value || typeof value !== "object") return false
+  const objectValue = (value as { object?: unknown }).object
+  return typeof objectValue === "string" && objectValue.trim().length > 0
+}
+
+function extractResponseText(result: unknown): string | null {
+  if (!result || typeof result !== "object") return null
+  const content = (result as { content?: unknown }).content
+  return typeof content === "string" ? content : null
+}
+
+function extractTrace(result: unknown): unknown {
+  if (!result || typeof result !== "object") return null
+  return (result as { trace?: unknown }).trace ?? null
+}
+
+function extractUsage(result: unknown): unknown {
+  if (!result || typeof result !== "object") return null
+  return (result as { usage?: unknown }).usage ?? null
+}
+
+function extractTimings(result: unknown): unknown {
+  if (!result || typeof result !== "object") return null
+  return (result as { timings?: unknown }).timings ?? null
+}
+
+function buildSyntheticIntent(
+  requestText: string,
+  responseText: string | null,
+): { intent: Record<string, unknown>; source: string } | null {
+  const trimmedRequest = requestText.trim()
+  const trimmedResponse = responseText?.trim() ?? ""
+
+  if (/^你想要我幫你記下/u.test(trimmedResponse)) {
+    return {
+      intent: {
+        object: "pending_confirmation",
+        requiresConfirmation: true,
+        confidence: 0.6,
+      },
+      source: "response.pending_confirmation_prompt",
+    }
+  }
+
+  if (/^好的，(?:已取消|沒事)/u.test(trimmedResponse)) {
+    return {
+      intent: {
+        object: "confirmation_reject",
+        requiresConfirmation: false,
+        confidence: 0.6,
+      },
+      source: "response.confirmation_reject",
+    }
+  }
+
+  if (/^(?:確認|是的|好|好的|ok|okay)$/iu.test(trimmedRequest)) {
+    return {
+      intent: {
+        object: "confirmation_reply",
+        requiresConfirmation: false,
+        confidence: 0.5,
+      },
+      source: "request.confirmation_reply",
+    }
+  }
+
+  return null
+}
+
+function normalizeTurnLogPayload(
+  requestText: string,
+  result: unknown,
+): NormalizedTurnLogPayload {
+  const responseText = extractResponseText(result)
+  const trace = extractTrace(result)
+  const rawIntent = result && typeof result === "object"
+    ? (result as { intent?: unknown }).intent
+    : null
+  if (hasIntentObject(rawIntent)) {
+    return {
+      responseText,
+      toolCalls: normalizeToolCalls((result as { toolCalls?: unknown }).toolCalls),
+      intent: rawIntent,
+      usage: extractUsage(result),
+      timings: extractTimings(result),
+      trace,
+      intentSource: "result.intent",
+    }
+  }
+
+  const resolvedIntent = trace && typeof trace === "object"
+    ? (trace as { resolvedIntent?: unknown }).resolvedIntent
+    : null
+  if (hasIntentObject(resolvedIntent)) {
+    return {
+      responseText,
+      toolCalls: normalizeToolCalls((result as { toolCalls?: unknown }).toolCalls),
+      intent: resolvedIntent,
+      usage: extractUsage(result),
+      timings: extractTimings(result),
+      trace,
+      intentSource: "trace.resolvedIntent",
+    }
+  }
+
+  const synthetic = buildSyntheticIntent(requestText, responseText)
+
+  return {
+    responseText,
+    toolCalls: normalizeToolCalls(result && typeof result === "object"
+      ? (result as { toolCalls?: unknown }).toolCalls
+      : null),
+    intent: synthetic?.intent ?? rawIntent ?? null,
+    usage: extractUsage(result),
+    timings: extractTimings(result),
+    trace,
+    intentSource: synthetic?.source ?? null,
+  }
+}
+
 export class LifecycleAwareAgent {
   private readonly channel: AgentChatTurnChannel
   private readonly turnLogger: Pick<AgentChatTurnLogger, "log"> | null
@@ -42,44 +186,49 @@ export class LifecycleAwareAgent {
   async chat(message: string, options: ChatOptions = {}): Promise<any> {
     const sessionId = options.sessionId ?? "default"
     const userId = options.userId ?? this.defaultUserId
-    let responseText: string | null = null
+    let stage: AgentTurnStage = "before_message"
+    let delegateResult: any = null
     let verifiedResult: any = null
 
-    await this.lifecycleService.beforeMessage({
-      sessionId,
-      userId,
-      now: this.now(),
-    })
-
     try {
-      const result = await this.delegate.chat(message, {
+      await this.lifecycleService.beforeMessage({
+        sessionId,
+        userId,
+        now: this.now(),
+      })
+
+      stage = "delegate_chat"
+      delegateResult = await this.delegate.chat(message, {
         ...options,
         sessionId,
         userId,
       })
 
-      verifiedResult = verifyAgentExecutionResult(result)
-      responseText = typeof verifiedResult?.content === "string"
-        ? verifiedResult.content
-        : null
+      stage = "verify_result"
+      verifiedResult = verifyAgentExecutionResult(delegateResult)
+      const normalized = normalizeTurnLogPayload(message, verifiedResult)
 
+      stage = "after_message"
       await this.lifecycleService.afterMessage({
         sessionId,
         now: this.now(),
       })
 
+      stage = "log_success"
       await this.logTurnSafely({
         userId,
         sessionId,
         requestText: message,
-        responseText,
-        toolCalls: Array.isArray(verifiedResult?.toolCalls) ? verifiedResult.toolCalls : [],
-        intent: verifiedResult?.intent,
-        usage: verifiedResult?.usage,
-        timings: verifiedResult?.timings,
-        trace: verifiedResult?.trace,
+        responseText: normalized.responseText,
+        toolCalls: normalized.toolCalls,
+        intent: normalized.intent,
+        usage: normalized.usage,
+        timings: normalized.timings,
+        trace: normalized.trace,
         metadata: {
           verified: true,
+          errorStage: null,
+          intentSource: normalized.intentSource,
         },
         status: "SUCCESS",
       })
@@ -87,18 +236,21 @@ export class LifecycleAwareAgent {
       return verifiedResult
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
+      const normalized = normalizeTurnLogPayload(message, verifiedResult ?? delegateResult)
       await this.logTurnSafely({
         userId,
         sessionId,
         requestText: message,
-        responseText,
-        toolCalls: Array.isArray(verifiedResult?.toolCalls) ? verifiedResult.toolCalls : [],
-        intent: verifiedResult?.intent,
-        usage: verifiedResult?.usage,
-        timings: verifiedResult?.timings,
-        trace: verifiedResult?.trace,
+        responseText: normalized.responseText,
+        toolCalls: normalized.toolCalls,
+        intent: normalized.intent,
+        usage: normalized.usage,
+        timings: normalized.timings,
+        trace: normalized.trace,
         metadata: {
           verified: false,
+          errorStage: stage,
+          intentSource: normalized.intentSource,
           errorName: error instanceof Error ? error.name : "UnknownError",
         },
         status: "ERROR",
