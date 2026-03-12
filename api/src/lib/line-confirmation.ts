@@ -41,6 +41,9 @@ const REJECTION_PHRASES = new Set([
 ])
 
 const BRAIN_DUMP_CONFIRMATION_PATTERNS = [
+  /你想要我記錄[「『"]([^」』"\n]+)[」』"]嗎/u,
+  /你想要我幫你記下[「『"]([^」』"\n]+)[」』"](?:這件事)?嗎/u,
+  /要幫你記下[「『"]([^」』"\n]+)[」』"]嗎/u,
   /你想要我記錄[「『"]([^」』"\n]+)[」』"]嗎？請確認是否要建立新的任務/u,
   /你想要我記錄[「『"]([^」』"\n]+)[」』"]嗎？請說[「『"]?記錄[:：]/u,
 ] as const
@@ -68,5 +71,37 @@ export function extractBrainDumpConfirmationTarget(text: string): string | null 
     const candidate = match?.[1]?.trim()
     if (candidate) return candidate
   }
+  return null
+}
+
+export function parseOrdinalSelection(text: string, candidateCount: number): number | null {
+  const normalized = text.trim()
+  if (!normalized || candidateCount <= 0) return null
+
+  if (/^最後一個$/u.test(normalized)) {
+    return candidateCount
+  }
+
+  const numericMatch = normalized.match(/^(?:選)?\s*(\d+)\s*$/u)
+    ?? normalized.match(/^第\s*(\d+)\s*個$/u)
+  if (numericMatch) {
+    const position = Number(numericMatch[1])
+    return position >= 1 && position <= candidateCount ? position : null
+  }
+
+  const chineseOrdinalPatterns = [
+    { pattern: /^第一個$/u, position: 1 },
+    { pattern: /^第二個$/u, position: 2 },
+    { pattern: /^第三個$/u, position: 3 },
+    { pattern: /^第四個$/u, position: 4 },
+    { pattern: /^第五個$/u, position: 5 },
+  ]
+
+  for (const candidate of chineseOrdinalPatterns) {
+    if (candidate.pattern.test(normalized) && candidate.position <= candidateCount) {
+      return candidate.position
+    }
+  }
+
   return null
 }

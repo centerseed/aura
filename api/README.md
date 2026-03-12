@@ -75,6 +75,7 @@ npm start
 - `POST /api/suggest-product` - AI 推薦專案名稱
 - `GET /api/evaluation/logs` - 獲取評估日誌
 - `PUT /api/evaluation/logs` - 更新評估日誌
+- `GET /api/agent/chat-turns` - 取得 agent 聊天 turn logs（支援 channel/status/session_id/from/to/limit/offset）
 
 ### Complex AI APIs (3 endpoints - 技術債)
 - `POST /api/brain-dump` - AI 任務解析

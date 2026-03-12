@@ -20,6 +20,7 @@ model User {
   auth_provider_id     String?
   settings             Json?
   areas                Area[]
+  agent_chat_turns     AgentChatTurn[]
   governance_proposals GovernanceProposal[]
   milestones           Milestone[]
   products             Product[]
@@ -147,4 +148,24 @@ model SystemEvaluationLog {
   metadata       Json?
   created_at     DateTime @default(now())
   user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model AgentChatTurn {
+  id            String   @id @default(uuid())
+  user_id       String
+  channel       String
+  session_id    String
+  request_text  String
+  response_text String?
+  tool_calls    Json
+  intent        Json?
+  usage         Json?
+  timings       Json?
+  trace         Json?
+  metadata      Json?
+  status        String
+  error_message String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }

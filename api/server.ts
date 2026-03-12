@@ -35,6 +35,7 @@ try {
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { createMcpServer } from "./src/mcp/server";
+import { extractMcpAccessToken } from "./src/mcp/security/http-token";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -52,16 +53,13 @@ const port = parseInt(process.env.PORT || "3002", 10);
  * so the MCP SDK passes it to tool handlers via extra.authInfo.
  */
 function attachAuthInfo(req: import("node:http").IncomingMessage & { auth?: AuthInfo }) {
-  const authHeader = req.headers.authorization;
-  if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.slice("Bearer ".length);
-    if (token) {
-      req.auth = {
-        token,
-        clientId: "claude-code",
-        scopes: [],
-      };
-    }
+  const token = extractMcpAccessToken(req);
+  if (token) {
+    req.auth = {
+      token,
+      clientId: "mcp-client",
+      scopes: [],
+    };
   }
 }
 

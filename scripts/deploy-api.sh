@@ -179,6 +179,7 @@ sync_secret "ZENTROPY_MCP_JWT_SECRET" "ZENTROPY_MCP_JWT_SECRET"
 sync_secret "line-channel-access-token" "LINE_CHANNEL_ACCESS_TOKEN"
 sync_secret "line-channel-secret" "LINE_CHANNEL_SECRET"
 sync_secret "groq-api-key" "GROQ_API_KEY"
+sync_secret "cron-secret" "CRON_SECRET"
 
 log_success "Secrets 同步完成"
 echo ""
@@ -281,6 +282,7 @@ DEPLOY_ARGS=(
     --update-secrets LINE_CHANNEL_ACCESS_TOKEN=line-channel-access-token:latest
     --update-secrets LINE_CHANNEL_SECRET=line-channel-secret:latest
     --update-secrets GROQ_API_KEY=groq-api-key:latest
+    --update-secrets CRON_SECRET=cron-secret:latest
 )
 
 if [ "$ENVIRONMENT" = "staging" ]; then

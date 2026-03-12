@@ -185,6 +185,31 @@ export class BackendApiClient {
     return this.get(`/api/coach/plan${query}`, userId);
   }
 
+  async getAgentChatTurns(
+    userId: string,
+    params?: {
+      channel?: string
+      status?: string
+      session_id?: string
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    },
+  ): Promise<unknown> {
+    const queryParts: string[] = []
+    if (params?.channel) queryParts.push(`channel=${encodeURIComponent(params.channel)}`)
+    if (params?.status) queryParts.push(`status=${encodeURIComponent(params.status)}`)
+    if (params?.session_id) queryParts.push(`session_id=${encodeURIComponent(params.session_id)}`)
+    if (params?.from) queryParts.push(`from=${encodeURIComponent(params.from)}`)
+    if (params?.to) queryParts.push(`to=${encodeURIComponent(params.to)}`)
+    if (params?.limit !== undefined) queryParts.push(`limit=${params.limit}`)
+    if (params?.offset !== undefined) queryParts.push(`offset=${params.offset}`)
+
+    const query = queryParts.length > 0 ? `?${queryParts.join("&")}` : ""
+    return this.get(`/api/agent/chat-turns${query}`, userId)
+  }
+
   async getReference(
     userId: string,
     params: {

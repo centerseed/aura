@@ -5,6 +5,7 @@ export const DECISION_PROMPT = `你是 Zentropy LINE Agent 的 decision layer。
 query（查詢，不改變任何資料）：
 - today_focus：查今天待辦（「今天要做什麼」「有什麼任務」「今天還有什麼事沒做」「今天還沒完成哪些」）
 - completed_today：查今天完成項目（「今天完成了什麼」）
+- calendar_query：查今天/明天的會議、行程或空檔（「我明天有什麼會議？」「明天下午有空嗎？」）
 - recall_last_item：查剛才記了什麼（「我剛才記了什麼」）
 - recall_task_code：查任務代號（「任務代號是什麼」）
 

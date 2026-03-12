@@ -4,6 +4,7 @@ import type { AgentDecisionTrace, AgentIntent } from "./agent-intent"
 import { AgentIntentSchema } from "./agent-intent"
 import { hasExplicitCaptureFrame } from "./explicit-capture-frame"
 import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
+import { hasCompletionCueZhTw } from "./completion-query-normalizer/locale-zh-tw"
 // ── Deterministic Fast-Path Patterns ─────────────────────────────────────────
 // 只保留語意 100% 明確、不可能碰撞的 pattern。
 // 其餘全部交給 LLM structured classifier。
@@ -16,6 +17,7 @@ const SHORT_UNDERSPECIFIED_PATTERN = /^(記|好|嗯|喔|哦|欸|？|\?)$/
 // — 制式回應引導的 fast-path（用戶照著提示說的話，必須穩定接住）—
 const TODAY_FOCUS_PATTERN = /^今天(要做什麼|有什麼|有哪些|還有什麼(?:事)?沒做|還沒完成哪些)|(?:今天|明天).*(待辦|代辦|任務|要做|待辦事項|代辦事項)|(?:今天|還有|還沒).*(沒做|沒做完|還沒做|未完成)/i
 const COMPLETED_TODAY_PATTERN = /今天.*(?:完成了什麼|做了什麼|完成哪些|做了哪些|已完成(?:什麼|哪些)?)|(?:完成了什麼|做了什麼|已完成哪些)/i
+const CALENDAR_QUERY_PATTERN = /(?:今天|明天)?(?:上午|早上|下午|晚上)?(?:有什麼|有哪些)?(?:會議|行程)|(?:今天|明天)?(?:上午|早上|下午|晚上)?.*(?:有空嗎|有沒有空|空檔|空嗎)/i
 const COMPLETE_TASK_PATTERN = /完成|做完|跑完|弄完|處理完|搞定|done|完成了|已完成|做好了|結束了|標記(?:成|為)?完成|勾掉/i
 const CONTEXTUAL_COMPLETE_PATTERN_INTENT = /這件事|這個|那個|剛剛那個|剛才那個|上一個|上個/i
 const MUTATION_REQUEST_PATTERN = /幫我|請|把|將|麻煩|標記|勾掉|設成|改成/i
@@ -211,7 +213,19 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       }, message)
     }
 
-    if (COMPLETE_TASK_PATTERN.test(message)) {
+    if (CALENDAR_QUERY_PATTERN.test(message)) {
+      return buildResult({
+        object: "calendar_query",
+        requiresConfirmation: false,
+        confidence: 0.97,
+        speechAct: "query",
+        targetReferenceMode: "none",
+        temporalScope: resolveTemporalScope(message),
+        reasonCodes: ["fast_path_calendar_query"],
+      }, message)
+    }
+
+    if (COMPLETE_TASK_PATTERN.test(message) || hasCompletionCueZhTw(message)) {
       const contextualReference = CONTEXTUAL_COMPLETE_PATTERN_INTENT.test(message)
       const mutationRequest = MUTATION_REQUEST_PATTERN.test(message)
       const queryWord = QUERY_WORD_PATTERN.test(message)

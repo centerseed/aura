@@ -22,6 +22,8 @@ import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./c
 import { createRunPlannerTool } from "./planner-skill"
 import { resolveCompletionQuery } from "./completion-query-normalizer"
 import { normalizeAgentUsage } from "./llm-logging"
+import { createQueryCalendarTool } from "./query-calendar-skill"
+import { toCalendarUnavailableMessage } from "./agent-calendar-query-service"
 
 interface AgentChatResult {
   blocked: boolean
@@ -83,6 +85,7 @@ const SHORT_RECORD_PATTERN = /^記$/
 // 序號引用模式：第一個、第二個、第三個...
 const ORDINAL_REFERENCE_PATTERN = /第([一二三四五六七八九十\d]+)個/
 const BARE_ORDINAL_PATTERN = /^([一二三四五六七八九十\d]+)$/
+const LAST_ORDINAL_PATTERN = /最後一個|最後那個/
 const ORDINAL_MAP: Record<string, number> = {
   "一": 0, "二": 1, "三": 2, "四": 3, "五": 4,
   "六": 5, "七": 6, "八": 7, "九": 8, "十": 9,
@@ -93,7 +96,9 @@ const CONTEXTUAL_REFERENCE_PATTERN = /(?:剛才|剛剛|上一個|上次|之前)(
 const CONTEXTUAL_ADJUST_REFERENCE_PATTERN = /(?:這個任務|那個任務|這件事|這個|那個|剛剛那個|剛才那個|上一個|上個)/
 const LIST_CONTEXTUAL_REFERENCE_PATTERN = /(?:第[一二三四五六七八九十\d]+個|最後一個|最後那個|那個|這個|剛剛那個|剛才那個|上一個|上個)/
 const BARE_COMPLETION_REFERENCE_PATTERN = /^(?:完成了?|做完了?|搞定了?|done|好了?|處理完了?|結束了?)$/i
-function resolveOrdinalIndex(message: string): number | null {
+function resolveOrdinalIndex(message: string): number | "last" | null {
+  if (LAST_ORDINAL_PATTERN.test(message)) return "last"
+
   const match = message.match(ORDINAL_REFERENCE_PATTERN)
   const bareMatch = message.trim().match(BARE_ORDINAL_PATTERN)
   const ordinalToken = match?.[1] ?? bareMatch?.[1]
@@ -120,6 +125,9 @@ function resolveContextualQuery(
     const mentions = sessionState.lastPresentedEntities.length > 0
       ? sessionState.lastPresentedEntities.map((entity) => entity.title)
       : extractTaskMentions(history)
+    if (ordinalIndex === "last") {
+      return mentions.at(-1) ?? null
+    }
     if (ordinalIndex >= 0 && ordinalIndex < mentions.length) {
       return mentions[ordinalIndex] ?? null
     }
@@ -257,6 +265,9 @@ function resolveContextualEntity(
     const presentedEntities = sessionState.lastPresentedEntities.length > 0
       ? sessionState.lastPresentedEntities
       : extractLatestPresentedEntities(history)
+    if (ordinalIndex === "last") {
+      return presentedEntities.at(-1) ?? null
+    }
     if (ordinalIndex >= 0 && ordinalIndex < presentedEntities.length) {
       return presentedEntities[ordinalIndex] ?? null
     }
@@ -649,7 +660,7 @@ export class ToolFirstAgent {
       return this.buildDirectResult({
         sessionId,
         message: trimmedMessage,
-        content: "我是 Naru，也是 Zentropy 的任務助理。目前可以幫你記錄任務、查詢待辦、標記完成、規劃目標、整理結構與調整分類。",
+        content: "我是 Naru，也是 Zentropy 的助理。目前可以幫你記錄任務、查詢待辦、查今天或明天的會議空檔、標記完成、規劃目標、整理結構與調整分類。",
         intent,
         trace,
       })
@@ -666,6 +677,24 @@ export class ToolFirstAgent {
         dayOffset: resolveQueryDayOffset(trimmedMessage, trace),
       }).execute({})
       toolOutput = parseToolResult(toolHistoryContent).summary
+    } else if (intent.object === "calendar_query") {
+      try {
+        toolName = "query_calendar"
+        toolHistoryContent = await createQueryCalendarTool(userId ?? "", trimmedMessage).execute({})
+        toolOutput = parseToolResult(toolHistoryContent).summary
+      } catch (error) {
+        const unavailableMessage = toCalendarUnavailableMessage(error)
+        if (unavailableMessage) {
+          return this.buildDirectResult({
+            sessionId,
+            message: trimmedMessage,
+            content: unavailableMessage,
+            intent,
+            trace,
+          })
+        }
+        throw error
+      }
     } else if (intent.object === "task_capture" && intent.confidence >= 0.95) {
       toolName = "brain_dump"
       toolOutput = await createBrainDumpTool(userId ?? "", trimmedMessage).execute({})

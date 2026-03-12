@@ -8,6 +8,8 @@ const {
   mockQueryTodayExecute,
   mockQueryCompletedTodayExecute,
   mockCreateQueryTodayTasksTool,
+  mockQueryCalendarExecute,
+  mockCreateQueryCalendarTool,
   mockCompleteTaskSearchExecute,
   mockCreateCompleteTaskSearchTool,
   mockAdjustTagsExecute,
@@ -22,6 +24,8 @@ const {
   mockQueryTodayExecute: vi.fn(),
   mockQueryCompletedTodayExecute: vi.fn(),
   mockCreateQueryTodayTasksTool: vi.fn(),
+  mockQueryCalendarExecute: vi.fn(),
+  mockCreateQueryCalendarTool: vi.fn(),
   mockCompleteTaskSearchExecute: vi.fn(),
   mockCreateCompleteTaskSearchTool: vi.fn(),
   mockAdjustTagsExecute: vi.fn(),
@@ -44,6 +48,10 @@ vi.mock("@/application/use-cases/agent/query-tasks-skill", () => ({
   createQueryCompletedTodayTasksTool: vi.fn(() => ({
     execute: mockQueryCompletedTodayExecute,
   })),
+}))
+
+vi.mock("@/application/use-cases/agent/query-calendar-skill", () => ({
+  createQueryCalendarTool: mockCreateQueryCalendarTool,
 }))
 
 vi.mock("@/application/use-cases/agent/complete-task-skill", () => ({
@@ -100,6 +108,10 @@ describe("ToolFirstAgent", () => {
       execute: mockQueryTodayExecute,
     })
     mockQueryCompletedTodayExecute.mockResolvedValue("[FACTS]\n{}\n[/FACTS]\n\n✅ 今天已完成 1 項任務：")
+    mockQueryCalendarExecute.mockResolvedValue("[FACTS]\n{}\n[/FACTS]\n\n📅 明天共有 2 個行程：")
+    mockCreateQueryCalendarTool.mockReturnValue({
+      execute: mockQueryCalendarExecute,
+    })
     mockCompleteTaskSearchExecute.mockResolvedValue("[FACTS]\n{}\n[/FACTS]\n\n是否完成「整理競品投影片」？")
     mockAdjustTagsExecute.mockResolvedValue("📋 調整預覽：\n\n將「買牛奶」\n從 一般 / 家務\n移到 一般 / 個人\n\n回覆「確認」執行，或無視此訊息取消。")
     mockRunPlannerExecute.mockResolvedValue("✅ 規劃完成！共建立 3 個任務")
@@ -127,6 +139,7 @@ describe("ToolFirstAgent", () => {
     expect(normalizeCompletionQuery("幫我把買牛奶標記完成")).toBe("買牛奶")
     expect(normalizeCompletionQuery("健身房做完了")).toBe("健身房")
     expect(normalizeCompletionQuery("我今天已經跑完步了，幫我標記完成")).toBe("跑步")
+    expect(normalizeCompletionQuery("信已經發出去給客戶了")).toBe("信發給客戶")
   })
 
   it("routes today's todo query through query_today_tasks", async () => {
@@ -247,6 +260,43 @@ describe("ToolFirstAgent", () => {
       strictToday: false,
       dayOffset: 1,
     })
+  })
+
+  it("routes calendar queries through query_calendar", async () => {
+    const delegate = {
+      chat: vi.fn().mockResolvedValue({
+        blocked: false,
+        content: "delegate fallback",
+        usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        intent: null,
+        toolCalls: [],
+        timings: {},
+        sessionId: "line-user-1",
+        traceId: null,
+        trace: null,
+      }),
+    }
+
+    const sessionStore = {
+      get: vi.fn().mockResolvedValue([]),
+      save: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const agent = new ToolFirstAgent({
+      delegate,
+      sessionStore,
+      memoryManager: null,
+    })
+
+    const result = await agent.chat("我明天有什麼會議？", {
+      userId: "user-1",
+      sessionId: "line-user-1",
+    })
+
+    expect(mockCreateQueryCalendarTool).toHaveBeenCalledWith("user-1", "我明天有什麼會議？")
+    expect(delegate.chat).not.toHaveBeenCalled()
+    expect(result.toolCalls).toEqual(["query_calendar"])
+    expect(result.content).toContain("明天共有 2 個行程")
   })
 
   it("routes capture requests through brain_dump via intent resolver", async () => {
@@ -618,6 +668,36 @@ describe("ToolFirstAgent", () => {
     )
   })
 
+  it("routes passive/resultative completion phrasing through direct completion flow", async () => {
+    const delegate = {
+      chat: vi.fn(),
+    }
+
+    const sessionStore = {
+      get: vi.fn().mockResolvedValue([]),
+      save: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const agent = new ToolFirstAgent({
+      delegate,
+      sessionStore,
+      memoryManager: null,
+      lineUserId: "line-user-1",
+    })
+
+    await agent.chat("信已經發出去給客戶了", {
+      userId: "user-1",
+      sessionId: "line-user-1",
+    })
+
+    expect(delegate.chat).not.toHaveBeenCalled()
+    expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
+      "user-1",
+      "信發給客戶",
+      "line-user-1",
+    )
+  })
+
   it("resolves '把第一個標記完成' deterministically using history mentions", async () => {
     mockCompleteTaskSearchExecute.mockResolvedValue(
       "[FACTS]\n{}\n[/FACTS]\n\n是否完成「跑步」？\n\n回覆「確認」執行，或無視此訊息取消。",
@@ -821,7 +901,7 @@ describe("ToolFirstAgent", () => {
     expect(result.content).toContain("買牛奶")
   })
 
-  it("asks for list clarification when '最後一個' cannot be safely resolved from the latest list", async () => {
+  it("resolves '最後一個做完了' to the tail item in the latest canonical list", async () => {
     const sessionStore = {
       get: vi.fn().mockResolvedValue([
         {
@@ -844,11 +924,16 @@ describe("ToolFirstAgent", () => {
       sessionId: "line-user-1",
     })
 
-    expect(mockSaveLineSession).not.toHaveBeenCalled()
+    expect(mockExecuteCompleteTaskPayload).toHaveBeenCalledWith("user-1", {
+      sourceType: "task",
+      taskTitle: "寫報告",
+      taskId: "task-3",
+      subTaskId: undefined,
+      planItemId: undefined,
+    })
     expect(mockCompleteTaskSearchExecute).not.toHaveBeenCalled()
-    expect(result.toolCalls).toEqual([])
-    expect(result.content).toContain("你是指清單中的哪一個")
-    expect(result.content).toContain("序號或完整名稱")
+    expect(result.toolCalls).toEqual(["complete_task_search"])
+    expect(result.content).toContain("寫報告")
   })
 
   it("keeps ordinal resolution bound to the last actual list, not latest preview facts", async () => {

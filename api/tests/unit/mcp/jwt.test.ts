@@ -38,6 +38,24 @@ describe("MCP JWT Utility", () => {
       expect(payload.iss).toBe("zentropy-mcp");
     });
 
+    it("should support custom token TTLs for personal access tokens", async () => {
+      const { issueAccessToken, verifyAccessToken } = await import(
+        "@/mcp/oauth/jwt"
+      );
+
+      const result = issueAccessToken({
+        userId: "user-123",
+        clientId: "codex",
+        scope: "read:tasks",
+        issuer: "zentropy-mcp-personal-token",
+        expiresInSeconds: 90 * 24 * 3600,
+      });
+
+      expect(result.expiresIn).toBe(90 * 24 * 3600);
+      const payload = verifyAccessToken(result.token);
+      expect(payload.iss).toBe("zentropy-mcp-personal-token");
+    });
+
     it("should reject a tampered token", async () => {
       const { issueAccessToken, verifyAccessToken } = await import(
         "@/mcp/oauth/jwt"

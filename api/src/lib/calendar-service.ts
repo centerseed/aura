@@ -34,6 +34,13 @@ export interface BusySlot extends TimeSlot {
   summary?: string
 }
 
+export interface CalendarEventSummary extends TimeSlot {
+  eventId: string
+  summary: string
+  eventLink?: string
+  meetLink?: string
+}
+
 /**
  * Free/Busy 查詢結果
  */
@@ -42,6 +49,13 @@ export interface FreeBusyResult {
   busySlots: BusySlot[]
   timeMin: string
   timeMax: string
+}
+
+export interface QueryEventsResult {
+  events: CalendarEventSummary[]
+  timeMin: string
+  timeMax: string
+  timezone: string
 }
 
 /**
@@ -163,6 +177,67 @@ export class CalendarService {
       busySlots,
       timeMin,
       timeMax,
+    }
+  }
+
+  /**
+   * 查詢指定時間範圍內的 Calendar Events
+   */
+  async queryEvents(
+    userId: string,
+    timeMin: string,
+    timeMax: string,
+  ): Promise<QueryEventsResult> {
+    const accessToken = await this.getAccessToken(userId)
+    const timezone = await this.getUserTimezone(userId)
+
+    const url = new URL(`${CALENDAR_API_BASE}/calendars/primary/events`)
+    url.searchParams.set('timeMin', timeMin)
+    url.searchParams.set('timeMax', timeMax)
+    url.searchParams.set('singleEvents', 'true')
+    url.searchParams.set('orderBy', 'startTime')
+    url.searchParams.set('maxResults', '50')
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to list events: ${error}`)
+    }
+
+    const data = await response.json() as {
+      items?: Array<{
+        id: string
+        summary?: string
+        htmlLink?: string
+        hangoutLink?: string
+        conferenceData?: { entryPoints?: Array<{ uri?: string }> }
+        start?: { dateTime?: string; date?: string }
+        end?: { dateTime?: string; date?: string }
+      }>
+    }
+
+    const events = (data.items || [])
+      .filter((item) => item.start?.dateTime && item.end?.dateTime)
+      .map((item) => ({
+        eventId: item.id,
+        summary: item.summary || '未命名行程',
+        start: item.start!.dateTime!,
+        end: item.end!.dateTime!,
+        eventLink: item.htmlLink,
+        meetLink: item.hangoutLink || item.conferenceData?.entryPoints?.[0]?.uri,
+      }))
+
+    return {
+      events,
+      timeMin,
+      timeMax,
+      timezone,
     }
   }
 

@@ -16,6 +16,7 @@ describe("completion-query-normalizer hybrid path", () => {
     ["剛才把報告送出了", "報告送出"],
     ["我剛把 API 文件整理好了", "api 文件整理"],
     ["我今天已經把客戶名單更新完了", "客戶名單更新"],
+    ["信已經發出去給客戶了", "信發給客戶"],
     ["幫我把買牛奶標記完成", "買牛奶"],
     ["這個 done 了", ""],
   ])("covers additional zh-TW completion phrasings: %s -> %s", (input, expected) => {

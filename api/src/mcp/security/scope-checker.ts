@@ -39,6 +39,7 @@ const TOOL_SCOPE_MAP: Record<string, OAuthScope[]> = {
   update_sub_item: ["write:inbox"],
   list_products: ["read:tasks"],
   get_plan: ["read:tasks"],
+  list_agent_chat_turns: ["read:tasks"],
 };
 
 /** Mapping of resource URI patterns to required scopes */

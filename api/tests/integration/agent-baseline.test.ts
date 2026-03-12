@@ -203,7 +203,11 @@ const SCENARIOS: Scenario[] = [
     message: '下週要去台北出差，記得訂機票和飯店',
     expectedSkill: null,                // 可能不觸發 skill（無關鍵字）
     expectedToolCalls: [],
-    responseContains: ['台北', '出差', '機票'],
+    responseContains: ['記錄', '記下', '台北', '機票', '嗎'],
+    responseNotMatch: [
+      /✅\s*已記錄/u,
+      /已記錄.+台北出差/u,
+    ],
   },
 
   // ── Multi-turn session context ───────────────────────────────────────────

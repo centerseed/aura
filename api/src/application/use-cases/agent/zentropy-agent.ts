@@ -12,12 +12,14 @@ import { createBrainDumpSkill } from "./brain-dump-skill"
 import { createReorganizeSkill } from "./reorganize-skill"
 import { createPlannerSkill } from "./planner-skill"
 import { createQueryTasksSkill } from "./query-tasks-skill"
+import { createQueryCalendarSkill } from "./query-calendar-skill"
 import { createAdjustTagsSkill } from "./adjust-tags-skill"
 import { createCompleteTaskSkill } from "./complete-task-skill"
 import { StructuredFallbackAgentIntentResolver } from "./agent-intent-resolver"
 import { getAgentRuntime } from "./agent-runtime"
 import { LifecycleAwareAgent } from "./lifecycle-aware-agent"
 import { ToolFirstAgent } from "./tool-first-agent"
+import { AgentChatTurnLogger } from "./agent-chat-turn-logger"
 import { GroqPromptGuardrail } from "@/application/services/groq-prompt-guardrail"
 import { getAgentChatModel, getAgentRoutingMode, getAgentSummaryModel } from "@/lib/agent-model"
 import { createDecisionFallbackAgent, createResponseAgent, type AgentRuntimeParts } from "./agent-factories"
@@ -70,6 +72,7 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     createReorganizeSkill(userId),
     createPlannerSkill(userId),
     createQueryTasksSkill(userId),
+    createQueryCalendarSkill(userId),
     createCompleteTaskSkill(userId, confirmationKey),
     createAdjustTagsSkill(userId, confirmationKey),
   ]
@@ -100,5 +103,11 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
       })
     : baseAgent
 
-  return new LifecycleAwareAgent(agent, rawRuntime.lifecycleService, userId)
+  return new LifecycleAwareAgent(
+    agent,
+    rawRuntime.lifecycleService,
+    userId,
+    lineUserId ? "LINE" : "API",
+    new AgentChatTurnLogger(),
+  )
 }

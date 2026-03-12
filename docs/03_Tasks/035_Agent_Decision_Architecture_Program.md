@@ -82,6 +82,7 @@
 - [ ] intent resolver 產出 `task_capture`
 - [ ] `ToolFirstAgent` capture route 改由 intent 驅動
 - [ ] webhook 對話 regression 覆蓋 contextual completion
+- [x] `待辦` 單字不再直接觸發 capture，heading + payload 變體補齊 regression tests
 
 ### T035-7: 接上 structured decision fallback
 - [ ] 升級 `naru-agent-js` 到 `0.1.2`

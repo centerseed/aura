@@ -122,3 +122,120 @@ export function formatMorningBriefingPush(
   const result = lines.join("\n")
   return result.length > 4900 ? result.slice(0, 4900) + "…" : result
 }
+
+export type LinePostbackPayload =
+  | { action: "confirm_pending" }
+  | { action: "reject_pending" }
+  | { action: "select_completion_candidate"; position: number }
+
+interface QuickReplyPostbackOption {
+  label: string
+  displayText: string
+  payload: LinePostbackPayload
+}
+
+interface CompletionCandidateOption {
+  position: number
+  label: string
+}
+
+export function encodeLinePostbackPayload(payload: LinePostbackPayload): string {
+  if (payload.action === "select_completion_candidate") {
+    return `a=select_completion_candidate&p=${payload.position}`
+  }
+
+  return `a=${payload.action}`
+}
+
+export function decodeLinePostbackPayload(data: string): LinePostbackPayload | null {
+  const params = new URLSearchParams(data)
+  const action = params.get("a")
+
+  if (action === "confirm_pending") {
+    return { action: "confirm_pending" }
+  }
+
+  if (action === "reject_pending") {
+    return { action: "reject_pending" }
+  }
+
+  if (action === "select_completion_candidate") {
+    const rawPosition = params.get("p")
+    const position = rawPosition ? Number(rawPosition) : NaN
+    if (Number.isInteger(position) && position >= 1) {
+      return { action: "select_completion_candidate", position }
+    }
+  }
+
+  return null
+}
+
+export function buildQuickReplyTextMessage(
+  text: string,
+  options: QuickReplyPostbackOption[],
+): messagingApi.TextMessage {
+  return {
+    type: "text",
+    text,
+    quickReply: {
+      items: options.map((option) => ({
+        type: "action",
+        action: {
+          type: "postback",
+          label: truncateQuickReplyLabel(option.label),
+          displayText: option.displayText,
+          data: encodeLinePostbackPayload(option.payload),
+        },
+      })),
+    },
+  }
+}
+
+export function buildPendingConfirmationMessage(
+  text: string,
+  confirmLabel = "確認",
+  rejectLabel = "取消",
+): messagingApi.TextMessage {
+  return buildQuickReplyTextMessage(text, [
+    {
+      label: confirmLabel,
+      displayText: confirmLabel,
+      payload: { action: "confirm_pending" },
+    },
+    {
+      label: rejectLabel,
+      displayText: rejectLabel,
+      payload: { action: "reject_pending" },
+    },
+  ])
+}
+
+export function buildCompletionCandidateMessage(
+  text: string,
+  candidates: CompletionCandidateOption[],
+): messagingApi.TextMessage {
+  return buildQuickReplyTextMessage(text, [
+    ...candidates.map((candidate) => ({
+      label: candidate.label,
+      displayText: candidate.label,
+      payload: { action: "select_completion_candidate", position: candidate.position } as const,
+    })),
+    {
+      label: "取消",
+      displayText: "取消",
+      payload: { action: "reject_pending" } as const,
+    },
+  ])
+}
+
+export function ensureLineMessages(
+  message: messagingApi.Message | messagingApi.Message[],
+): messagingApi.Message[] {
+  return Array.isArray(message) ? message : [message]
+}
+
+function truncateQuickReplyLabel(label: string): string {
+  const trimmed = label.trim()
+  if (trimmed.length <= 20) return trimmed
+  return `${trimmed.slice(0, 19)}…`
+}

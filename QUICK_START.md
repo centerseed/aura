@@ -41,7 +41,41 @@ claude mcp add \
 
 ---
 
-## 🔐 啟用 OAuth 認證（選用）
+## Codex 設定（不走 OAuth）
+
+Codex 目前可直接在 `~/.codex/config.toml` 設定 remote MCP URL，但不適合直接使用 Zentropy 的 OAuth browser flow。
+
+### 1. 先用已登入的 Zentropy session 換一顆 Personal Access Token
+
+```bash
+curl -s \
+  -X POST https://api.zentropy.cc/api/mcp/personal-token \
+  -H "Authorization: Bearer <你的 Firebase ID token>" \
+  -H "Content-Type: application/json" \
+  -d '{"client_name":"codex","expires_in_days":90}' | jq '.'
+```
+
+回應會包含：
+
+* `access_token`
+* `expires_at`
+* `mcp_url`
+
+### 2. 加到 Codex 設定
+
+編輯 `~/.codex/config.toml`：
+
+```toml
+[mcp_servers.zentropy]
+enabled = true
+url = "https://api.zentropy.cc/mcp?access_token=<你的 PAT>"
+```
+
+### 3. 重啟 Codex
+
+Codex 重新啟動後就能直接使用 Zentropy MCP。
+
+## 🔐 啟用 OAuth 認證（選用，適用 Claude Code 等支援 OAuth 的 Client）
 
 如果你想啟用完整的 OAuth 2.1 認證：
 

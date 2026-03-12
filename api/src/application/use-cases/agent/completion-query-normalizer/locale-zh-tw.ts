@@ -1,6 +1,7 @@
 import { normalizeCompletionInputText } from "./core"
 
 const COMPLETION_QUERY_REGEX = /^(.*?)(做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|完|done)\s*(了|啦|囉|喔|哦|欸)?$/i
+const RESULTATIVE_COMPLETION_PATTERN = /^(.{1,8}?)(?:已經|剛|剛剛|剛才)(.+?)(出去|出來|出)(給.+?)?(?:了|啦|囉|喔|哦|欸)?$/u
 const COMPLETION_FRAME_PATTERNS = [
   /(?:幫我|請|麻煩)/gu,
   /(?:把|將)/gu,
@@ -9,6 +10,7 @@ const COMPLETION_FRAME_PATTERNS = [
 const LEADING_FILLERS = ["我今天已經", "我已經", "今天已經", "我剛剛", "我剛才", "我剛", "剛剛", "剛才", "剛", "我把", "我要把", "想把", "幫我把", "幫我", "請把", "請幫我把", "請幫我", "把", "將", "這個", "那個", "這項", "那項"]
 const TRAILING_FILLERS = ["這個", "那個", "這項", "那項", "我"]
 const COMPLETION_TRAILING_PARTICLES = /(?:吧|呢|喔|哦|啊|呀)$/u
+const STRUCTURAL_COMPLETION_CUE_PATTERN = /(?:做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|done)|(?:(?:已經|剛|剛剛|剛才).+?(?:出去|出來|出)(?:給.+?)?(?:了|啦|囉|喔|哦|欸)?$)/iu
 
 function stripLeadingFillers(text: string): string {
   let value = text.trim()
@@ -53,6 +55,23 @@ function trimRepeatedLeadingStem(text: string): string {
   return chars.slice(0, -1).join("").trim()
 }
 
+function stripResultativeCompletionClause(text: string): string {
+  const match = text.match(RESULTATIVE_COMPLETION_PATTERN)
+  if (!match) return text
+
+  const [, subject, predicate, , recipient] = match
+  const normalizedSubject = subject?.trim() ?? ""
+  const normalizedPredicate = predicate?.trim() ?? ""
+  const normalizedRecipient = recipient?.trim() ?? ""
+  if (!normalizedSubject || !normalizedPredicate) return text
+
+  return `${normalizedSubject}${normalizedPredicate}${normalizedRecipient}`.trim()
+}
+
+export function hasCompletionCueZhTw(text: string): boolean {
+  return STRUCTURAL_COMPLETION_CUE_PATTERN.test(normalizeCompletionInputText(text))
+}
+
 export function normalizeCompletionQueryZhTw(text: string): string {
   let normalized = normalizeCompletionInputText(text)
   if (!normalized) return ""
@@ -75,6 +94,8 @@ export function normalizeCompletionQueryZhTw(text: string): string {
     if (completionMatch) {
       normalized = completionMatch[1]?.trim() ?? ""
     }
+
+    normalized = stripResultativeCompletionClause(normalized)
 
     const objectCompletionMatch = normalized.match(/^(.{1,4})完(.{1,20})了?$/u)
     if (objectCompletionMatch?.[1] && objectCompletionMatch?.[2]) {

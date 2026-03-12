@@ -144,6 +144,7 @@ deterministic 檢查：
 
 - `brain_dump` 改由 shared capture matcher + intent resolver 判斷
 - `ToolFirstAgent` 不再混用 resolver 與獨立 capture regex
+- 收窄 `待辦` explicit capture frame，要求標頭後必須帶有效 payload（冒號、空白內容或 multiline 清單）
 - webhook regression 補上「列清單 → contextual completion → confirm」對話流
 - `naru-agent-js@0.1.2` 的 `LLMStructuredClassifier` 僅作 deterministic resolver 的 fallback decision runtime
 

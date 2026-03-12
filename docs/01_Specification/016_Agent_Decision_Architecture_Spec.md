@@ -1,7 +1,7 @@
 # Agent Decision Architecture Specification
 
 **版本**: v1.0  
-**更新日期**: 2026-03-10  
+**更新日期**: 2026-03-12  
 **定位**: 將 Zentropy LINE Agent 從 regex / keyword 主導的 tool-first bot，重構為顯式 decision layer 主導的 agent。
 
 ## 1. 問題定義
@@ -109,8 +109,14 @@ regex / keyword 只能作為：
 - `我今天已經跑完步了，幫我標記完成`
 - `這件事今天做完了`
 - `我今天完成了跑步，幫我勾掉`
+- `信已經發出去給客戶了`
 
 都必須先走 intent resolver。
+
+補充規則：
+
+- `已經 … 了`、`剛 … 了` 這類完成敘述若 shared completion normalizer 可萃出穩定 task query，必須視為 `task_completion`
+- 這類完成敘述的 coverage 必須收斂在 shared completion normalizer / structural parser，不得在 intent resolver、skill、prompt 各自補 phrasing 白名單
 
 ### FR-3 Confirm / Clarify 是一級意圖
 
@@ -138,11 +144,22 @@ regex / keyword 只能作為：
 - 只要語意是在問剩餘 / 未完成 / 還沒做的項目，就必須路由到 `today_focus`
 - `completed_today` 只接受明確詢問已完成內容的 phrasing，不得靠模糊的 `今天.*做了什麼` 類比去吞掉 negative pending query
 
+### FR-7 `待辦` capture frame 必須要求有效 payload
+
+`待辦` / `todo` 只能在「明確記錄框架」下觸發 `task_capture`，不得因為單獨一個標頭或模糊詞就建立任務。
+
+規則：
+
+- `待辦：買牛奶`、`待辦 買牛奶`、`待辦\n10:00 銀行繳稅` 應視為 explicit capture frame
+- 單獨 `待辦`、`todo` 不得視為 capture，應交給後續 resolver / clarifier
+- `今天待辦`、`今天 待辦`、`有哪些待辦` 這類 query phrasing 必須優先保留為 `today_focus`
+
 像 `第一個`、`第三個`、`最後一個`、`剛剛那個` 這類完成語句，若明確承接最近一次 canonical list，Target Resolver 必須優先用該 list 做解析。
 
 規則：
 
 - 可安全解析時，直接綁定該 list item
+- `最後一個` / `最後那個` 屬於 canonical list tail reference；只要最近 canonical list 存在且未歧義，必須直接解析為末位 item
 - 無法安全解析時，必須明說「你是指清單中的哪一個」並要求回覆序號或完整名稱
 - 不得把 `最後一個` 原句直接丟進 semantic search 後再回 `請確認名稱`
 

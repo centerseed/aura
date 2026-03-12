@@ -45,6 +45,7 @@ import { handleCreateTask } from "./tools/create-task";
 import { handleUpdateTask } from "./tools/update-task";
 import { handleListProducts } from "./tools/list-products";
 import { handleGetPlan } from "./tools/get-plan";
+import { handleListAgentChatTurns } from "./tools/list-agent-chat-turns";
 import { handleGetReference } from "./tools/get-reference";
 import { handleAddReference } from "./tools/add-reference";
 import { handleAddSubItem } from "./tools/add-sub-item";
@@ -663,6 +664,30 @@ export function createMcpServer(configOverride?: Partial<McpConfig>): McpServer 
         input as Record<string, unknown>,
         ["read:tasks"],
         handleGetPlan,
+        extra.authInfo,
+      );
+    },
+  );
+
+  server.tool(
+    "list_agent_chat_turns",
+    "讀取 agent 聊天 turn logs，供分析 routing、tool 使用、失敗案例與回覆品質。\n\n" +
+      "回傳格式: { total, limit, offset, items: [{ id, channel, session_id, request_text, response_text, tool_calls, status, error_message, intent_object, usage, timings, created_at }] }",
+    {
+      channel: z.enum(["API", "LINE"]).optional().describe("Filter by channel"),
+      status: z.enum(["SUCCESS", "ERROR"]).optional().describe("Filter by turn status"),
+      session_id: z.string().optional().describe("Filter by session ID"),
+      from: z.string().optional().describe("Inclusive start datetime in ISO-8601"),
+      to: z.string().optional().describe("Inclusive end datetime in ISO-8601"),
+      limit: z.number().int().min(1).max(100).optional().describe("Max rows to return (default 20)"),
+      offset: z.number().int().min(0).optional().describe("Pagination offset"),
+    },
+    async (input, extra) => {
+      return executeToolPipeline(
+        "list_agent_chat_turns",
+        input as Record<string, unknown>,
+        ["read:tasks"],
+        handleListAgentChatTurns,
         extra.authInfo,
       );
     },

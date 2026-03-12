@@ -41,6 +41,19 @@ describe("DeterministicAgentIntentResolver", () => {
       expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
     })
 
+    it("keeps standalone '待辦' as unknown instead of capture", () => {
+      const result = resolver.resolve({ message: "待辦" })
+      expect(result.intent.object).toBe("unknown")
+    })
+
+    it("classifies heading + multiline items as task capture", () => {
+      const result = resolver.resolve({
+        message: "待辦\n10:00銀行繳稅\n12:00拿信件",
+      })
+      expect(result.intent.object).toBe("task_capture")
+      expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
+    })
+
     it("keeps explicit capture framing over completion wording in mixed inputs", () => {
       const result = resolver.resolve({
         message: "待辦：準備 Q2 OKR 報告初稿，這週五前完成",
@@ -95,6 +108,11 @@ describe("DeterministicAgentIntentResolver", () => {
       expect(result.intent.object).toBe("today_focus")
     })
 
+    it("routes '今天 待辦' to today_focus", () => {
+      const result = resolver.resolve({ message: "今天 待辦" })
+      expect(result.intent.object).toBe("today_focus")
+    })
+
     it("routes '明天有什麼待辦' to today_focus", () => {
       const result = resolver.resolve({ message: "明天有什麼待辦" })
       expect(result.intent.object).toBe("today_focus")
@@ -127,6 +145,24 @@ describe("DeterministicAgentIntentResolver", () => {
     it("routes '今天做了什麼' to completed_today", () => {
       const result = resolver.resolve({ message: "今天做了什麼" })
       expect(result.intent.object).toBe("completed_today")
+    })
+  })
+
+  describe("calendar_query fast-path", () => {
+    it("routes '我明天有什麼會議？' to calendar_query", () => {
+      const result = resolver.resolve({ message: "我明天有什麼會議？" })
+      expect(result.intent).toMatchObject({
+        object: "calendar_query",
+        confidence: 0.97,
+      })
+      expect(result.trace.metadata?.temporalScope).toBe("future")
+      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_calendar_query")
+    })
+
+    it("routes '明天下午有空嗎？' to calendar_query", () => {
+      const result = resolver.resolve({ message: "明天下午有空嗎？" })
+      expect(result.intent.object).toBe("calendar_query")
+      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_calendar_query")
     })
   })
 
@@ -176,6 +212,12 @@ describe("DeterministicAgentIntentResolver", () => {
     it("'把這件事標記完成' → task_completion (deterministic fast-path)", () => {
       const result = resolver.resolve({ message: "把這件事標記完成" })
       expect(result.intent.object).toBe("task_completion")
+    })
+
+    it("'信已經發出去給客戶了' → task_completion (shared normalizer cue)", () => {
+      const result = resolver.resolve({ message: "信已經發出去給客戶了" })
+      expect(result.intent.object).toBe("task_completion")
+      expect(result.trace.metadata?.reasonCodes).toContain("completion_statement")
     })
 
     it("'把這個任務移到工作' → unknown (LLM handles classification)", () => {

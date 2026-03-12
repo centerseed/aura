@@ -6,6 +6,7 @@ describe("LifecycleAwareAgent", () => {
   it("blocks unverified effect claims before returning to callers", async () => {
     const beforeMessage = vi.fn().mockResolvedValue(undefined)
     const afterMessage = vi.fn().mockResolvedValue(undefined)
+    const turnLogger = { log: vi.fn().mockResolvedValue(undefined) }
     const delegate = {
       chat: vi.fn().mockResolvedValue({
         content: "✅ 已記錄 1 個項目：整理簡報",
@@ -17,6 +18,8 @@ describe("LifecycleAwareAgent", () => {
       delegate,
       { beforeMessage, afterMessage } as never,
       "user-1",
+      "API",
+      turnLogger,
     )
 
     await expect(agent.chat("幫我記一下整理簡報", {
@@ -26,11 +29,18 @@ describe("LifecycleAwareAgent", () => {
 
     expect(beforeMessage).toHaveBeenCalled()
     expect(afterMessage).not.toHaveBeenCalled()
+    expect(turnLogger.log).toHaveBeenCalledWith(expect.objectContaining({
+      status: "ERROR",
+      channel: "API",
+      userId: "user-1",
+      sessionId: "line-user-1",
+    }))
   })
 
   it("passes through verified tool results", async () => {
     const beforeMessage = vi.fn().mockResolvedValue(undefined)
     const afterMessage = vi.fn().mockResolvedValue(undefined)
+    const turnLogger = { log: vi.fn().mockResolvedValue(undefined) }
     const delegateResult = {
       content: "✅ 已記錄 1 個項目：整理簡報",
       toolCalls: ["brain_dump"],
@@ -43,6 +53,8 @@ describe("LifecycleAwareAgent", () => {
       delegate,
       { beforeMessage, afterMessage } as never,
       "user-1",
+      "LINE",
+      turnLogger,
     )
 
     await expect(agent.chat("幫我記一下整理簡報", {
@@ -52,5 +64,11 @@ describe("LifecycleAwareAgent", () => {
 
     expect(beforeMessage).toHaveBeenCalled()
     expect(afterMessage).toHaveBeenCalled()
+    expect(turnLogger.log).toHaveBeenCalledWith(expect.objectContaining({
+      status: "SUCCESS",
+      channel: "LINE",
+      responseText: "✅ 已記錄 1 個項目：整理簡報",
+      toolCalls: ["brain_dump"],
+    }))
   })
 })

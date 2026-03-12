@@ -23,6 +23,8 @@ export class AuthenticationError extends Error {
  * Development: Falls back to dev context if JWT secret is not configured.
  */
 export async function authenticateMcpRequest(authHeader?: string): Promise<AuthContext> {
+  const token = extractRawToken(authHeader);
+
   // If no JWT secret configured...
   if (!process.env.ZENTROPY_MCP_JWT_SECRET) {
     // In production, refuse to start without a secret — silent dev bypass is dangerous
@@ -33,8 +35,8 @@ export async function authenticateMcpRequest(authHeader?: string): Promise<AuthC
       );
     }
     // Dev only: decode token without verification, then resolve Firebase UID → DB UUID
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const ctx = decodeTokenUnsafe(authHeader.slice("Bearer ".length));
+    if (token) {
+      const ctx = decodeTokenUnsafe(token);
       ctx.userId = await resolveUserId(ctx.userId);
       return ctx;
     }
@@ -42,15 +44,10 @@ export async function authenticateMcpRequest(authHeader?: string): Promise<AuthC
   }
 
   // Production: require and verify Bearer token
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new AuthenticationError(
-      "Missing or invalid Authorization header. Expected: Bearer <token>",
-    );
-  }
-
-  const token = authHeader.slice("Bearer ".length);
   if (!token) {
-    throw new AuthenticationError("Empty access token.");
+    throw new AuthenticationError(
+      "Missing MCP access token.",
+    );
   }
 
   try {
@@ -62,6 +59,16 @@ export async function authenticateMcpRequest(authHeader?: string): Promise<AuthC
     const message = error instanceof Error ? error.message : "Invalid token";
     throw new AuthenticationError(message);
   }
+}
+
+function extractRawToken(authValue?: string): string | undefined {
+  if (!authValue) return undefined;
+  if (authValue.startsWith("Bearer ")) {
+    const token = authValue.slice("Bearer ".length).trim();
+    return token || undefined;
+  }
+  const token = authValue.trim();
+  return token || undefined;
 }
 
 const ACCESS_TOKEN_TTL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days

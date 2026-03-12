@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMorningBriefingPush } from '@/lib/line-client'
+import { buildCompletionCandidateMessage, buildPendingConfirmationMessage, decodeLinePostbackPayload, encodeLinePostbackPayload, formatMorningBriefingPush } from '@/lib/line-client'
 import type { CoachBriefingData } from '@/domain/interfaces/coach-briefing-repository'
 import type { DailyPlanData } from '@/domain/interfaces/daily-plan-repository'
 
@@ -123,5 +123,42 @@ describe('formatMorningBriefingPush', () => {
 
     expect(result.length).toBeLessThanOrEqual(4901)
     expect(result.endsWith('…')).toBe(true)
+  })
+})
+
+describe('LINE interactive helpers', () => {
+  it('encodes and decodes postback payloads', () => {
+    const encoded = encodeLinePostbackPayload({ action: 'select_completion_candidate', position: 2 })
+
+    expect(encoded).toBe('a=select_completion_candidate&p=2')
+    expect(decodeLinePostbackPayload(encoded)).toEqual({ action: 'select_completion_candidate', position: 2 })
+    expect(decodeLinePostbackPayload('a=confirm_pending')).toEqual({ action: 'confirm_pending' })
+  })
+
+  it('builds a pending confirmation quick reply message', () => {
+    const result = buildPendingConfirmationMessage('要幫你記下「買牛奶」嗎？', '記錄', '取消')
+
+    expect(result.quickReply?.items).toHaveLength(2)
+    expect(result.quickReply?.items[0].action).toEqual({
+      type: 'postback',
+      label: '記錄',
+      displayText: '記錄',
+      data: 'a=confirm_pending',
+    })
+  })
+
+  it('builds completion candidate quick reply buttons plus cancel', () => {
+    const result = buildCompletionCandidateMessage('請選擇要完成的任務', [
+      { position: 1, label: '1. 晨跑' },
+      { position: 2, label: '2. 晚間回顧' },
+    ])
+
+    expect(result.quickReply?.items).toHaveLength(3)
+    expect(result.quickReply?.items[1].action).toEqual({
+      type: 'postback',
+      label: '2. 晚間回顧',
+      displayText: '2. 晚間回顧',
+      data: 'a=select_completion_candidate&p=2',
+    })
   })
 })

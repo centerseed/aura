@@ -8,7 +8,11 @@ import { prisma } from "@/lib/db"
 import { randomUUID } from "crypto"
 import { Prisma } from "@prisma/client"
 
-export type LineSessionType = "adjust_tags_preview" | "complete_task_confirm" | "brain_dump_pending"
+export type LineSessionType =
+  | "adjust_tags_preview"
+  | "complete_task_confirm"
+  | "complete_task_disambiguation"
+  | "brain_dump_pending"
 
 export interface BrainDumpPendingPayload {
   originalText: string
@@ -38,7 +42,15 @@ export interface CompleteTaskPayload {
   planItemId?: string
 }
 
-export type LineSessionPayload = AdjustTagsPayload | CompleteTaskPayload | BrainDumpPendingPayload
+export interface CompleteTaskDisambiguationPayload {
+  candidates: Array<CompleteTaskPayload & { position: number }>
+}
+
+export type LineSessionPayload =
+  | AdjustTagsPayload
+  | CompleteTaskPayload
+  | CompleteTaskDisambiguationPayload
+  | BrainDumpPendingPayload
 
 function isMissingLinePendingStateTable(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError
@@ -100,7 +112,12 @@ export async function getLineSession(
     return null
   }
   // Validate session type before returning
-  const validSessionTypes: LineSessionType[] = ["adjust_tags_preview", "complete_task_confirm", "brain_dump_pending"]
+  const validSessionTypes: LineSessionType[] = [
+    "adjust_tags_preview",
+    "complete_task_confirm",
+    "complete_task_disambiguation",
+    "brain_dump_pending",
+  ]
   if (!validSessionTypes.includes(state.type as LineSessionType)) {
     await clearLineSession(lineUserId).catch(() => {})
     return null

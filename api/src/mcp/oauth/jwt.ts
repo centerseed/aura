@@ -12,6 +12,7 @@ import { createHmac, createHash, randomBytes, timingSafeEqual } from "node:crypt
 
 const ALG = "HS256";
 const ACCESS_TOKEN_TTL = 3 * 24 * 3600; // 3 days = 259200 seconds
+export const PERSONAL_ACCESS_TOKEN_TTL = 90 * 24 * 3600; // 90 days
 const REFRESH_TOKEN_TTL = 30 * 24 * 3600; // 30 days
 
 export interface McpTokenPayload {
@@ -73,24 +74,26 @@ export function issueAccessToken(params: {
   clientId: string;
   scope: string;
   issuer?: string;
+  expiresInSeconds?: number;
 }): { token: string; expiresIn: number; expiresAt: Date } {
   const secret = getSecret();
   const now = Math.floor(Date.now() / 1000);
+  const expiresIn = params.expiresInSeconds ?? ACCESS_TOKEN_TTL;
 
   const payload: McpTokenPayload = {
     sub: params.userId,
     azp: params.clientId,
     scope: params.scope,
     iat: now,
-    exp: now + ACCESS_TOKEN_TTL,
+    exp: now + expiresIn,
     iss: params.issuer || "zentropy-mcp",
   };
 
   const token = sign(JSON.stringify(payload), secret);
   return {
     token,
-    expiresIn: ACCESS_TOKEN_TTL,
-    expiresAt: new Date((now + ACCESS_TOKEN_TTL) * 1000),
+    expiresIn,
+    expiresAt: new Date((now + expiresIn) * 1000),
   };
 }
 

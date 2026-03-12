@@ -102,7 +102,41 @@ Zentropy MCP Server **強制要求**所有連線必須經過 OAuth 2.1 認證，
 | Refresh Token | 支援，單次使用後失效 (Rotation) | 偵測 token 竊取 |
 | Metadata Discovery | `/.well-known/oauth-authorization-server-metadata` | 符合 MCP 規範要求 |
 
-#### 2.2.2 Stdio 模式認證 (Local Mode)
+#### 2.2.2 Remote Personal Access Token 模式（Codex 相容）
+
+部分 MCP Client（目前確認包含 Codex）僅提供最精簡的 remote MCP 設定，通常只有：
+
+*   `url = "https://.../mcp"`
+
+這類 Client 目前**不可靠地支援** OAuth browser flow / discovery metadata，因此 Zentropy MCP Server 必須提供一種不依賴 OAuth redirect 的替代模式。
+
+**方案**: Personal Access Token (PAT)
+
+*   取得方式：使用者先在已登入的 Zentropy Web / API session 中呼叫受保護的 token mint API
+*   傳遞方式：
+    *   `Authorization: Bearer <token>`（若 client 支援自訂 header）
+    *   或 `https://.../mcp?access_token=<token>`（供僅支援 `url` 欄位的 client，如 Codex）
+*   Token 類型：仍使用 Zentropy 自簽 JWT，但標記為 personal access 用途
+*   預設有效期：90 天
+*   預設 scopes：`read:tasks read:knowledge read:profile write:inbox write:knowledge`
+
+**限制與要求**:
+
+| 項目 | 要求 | 原因 |
+| :--- | :--- | :--- |
+| 發行入口 | 必須要求既有登入態（Firebase ID token） | 防止匿名鑄造 token |
+| 傳遞方式 | 若 client 不支援 header，允許 query param `access_token` | 相容 Codex 現行設定模型 |
+| 有效期 | 最長 90 天 | 在可用性與外洩風險之間取平衡 |
+| 儲存 | 僅顯示一次，由使用者自行保存 | 降低伺服器端洩漏面 |
+| 權限 | 不得超過一般 MCP OAuth token 可授予的 scopes | 維持統一 ACL 模型 |
+
+**安全註記**:
+
+*   Query-string token 的安全性低於 Authorization header，僅作為 Codex 相容 fallback。
+*   任何記錄 URL 的 access log / analytics 都必須避免持久化完整 query string。
+*   當 Codex 後續原生支援 OAuth 時，優先切回 OAuth 2.1 + PKCE。
+
+#### 2.2.3 Stdio 模式認證 (Local Mode)
 
 當 MCP Client 以 `stdio` 方式啟動 Zentropy MCP Server 時（如 Claude Code 本地模式）：
 
@@ -110,7 +144,7 @@ Zentropy MCP Server **強制要求**所有連線必須經過 OAuth 2.1 認證，
 *   **Token 取得**: 用戶透過 `zentropy auth login` CLI 指令完成 OAuth 流程，token 安全存放於 OS Keychain（macOS Keychain / Linux Secret Service）
 *   **禁止**: 將 token 存放於明文檔案或 `.env`（僅開發環境例外）
 
-#### 2.2.3 Dynamic Client Registration (可選)
+#### 2.2.4 Dynamic Client Registration (可選)
 
 *   支援 RFC 7591 Dynamic Client Registration
 *   允許新的 MCP Client（如新的 IDE 外掛）自動註冊

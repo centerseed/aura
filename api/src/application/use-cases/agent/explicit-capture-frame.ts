@@ -9,7 +9,8 @@ const NON_CAPTURE_PATTERNS: RegExp[] = [
 ]
 
 const EXPLICIT_CAPTURE_PATTERNS: RegExp[] = [
-  /(記錄|記下|記一下|幫我記|幫我加|新增任務|待辦|todo)/i,
+  /(記錄|記下|記一下|幫我記|幫我加|新增任務)/i,
+  /^(?:待辦|代辦|todo)(?:\s*[:：-]\s*|\s+\S+|\s*\n\s*\S+)/i,
   /(再加一個|再加|補一個|另外一個)/i,
 ]
 

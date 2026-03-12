@@ -43,6 +43,14 @@ describe("hasExplicitBrainDumpFrame", () => {
     expect(hasExplicitBrainDumpFrame("待辦：買牛奶")).toBe(true)
   })
 
+  it("returns false for standalone 待辦 heading without content", () => {
+    expect(hasExplicitBrainDumpFrame("待辦")).toBe(false)
+  })
+
+  it("returns true for multiline 待辦 heading with content", () => {
+    expect(hasExplicitBrainDumpFrame("待辦\n10:00銀行繳稅")).toBe(true)
+  })
+
   it("returns true for explicit capture request", () => {
     expect(hasExplicitBrainDumpFrame("幫我記一下明天開會")).toBe(true)
   })

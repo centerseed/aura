@@ -5,6 +5,7 @@ export const AGENT_INTENT_OBJECT_VALUES = [
   "task_completion",
   "today_focus",
   "completed_today",
+  "calendar_query",
   "classification",
   "planning",
   "reorganize",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isLineSessionConfirmation, classifyConfirmationDisposition } from "@/lib/line-confirmation"
+import { isLineSessionConfirmation, classifyConfirmationDisposition, extractBrainDumpConfirmationTarget, parseOrdinalSelection } from "@/lib/line-confirmation"
 
 describe("isLineSessionConfirmation", () => {
   it("accepts exact confirmation phrases and common affirmative replies", () => {
@@ -50,5 +50,27 @@ describe("classifyConfirmationDisposition", () => {
   it("returns 'override' for unrecognized phrases", () => {
     expect(classifyConfirmationDisposition("隨便")).toBe("override")
     expect(classifyConfirmationDisposition("其實我想")).toBe("override")
+  })
+})
+
+describe("extractBrainDumpConfirmationTarget", () => {
+  it("extracts pending capture target from plain confirmation prompts", () => {
+    expect(extractBrainDumpConfirmationTarget("你想要我記錄「修復 webhook 問題」嗎？")).toBe("修復 webhook 問題")
+    expect(extractBrainDumpConfirmationTarget("要幫你記下「買牛奶」嗎？")).toBe("買牛奶")
+  })
+})
+
+describe("parseOrdinalSelection", () => {
+  it("parses numeric and ordinal selections", () => {
+    expect(parseOrdinalSelection("1", 3)).toBe(1)
+    expect(parseOrdinalSelection("第 2 個", 3)).toBe(2)
+    expect(parseOrdinalSelection("第二個", 3)).toBe(2)
+    expect(parseOrdinalSelection("最後一個", 3)).toBe(3)
+  })
+
+  it("returns null for invalid selections", () => {
+    expect(parseOrdinalSelection("確認", 3)).toBeNull()
+    expect(parseOrdinalSelection("第五個", 3)).toBeNull()
+    expect(parseOrdinalSelection("4", 3)).toBeNull()
   })
 })

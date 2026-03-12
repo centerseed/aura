@@ -30,10 +30,14 @@ async function flushAsyncWork(rounds = 5): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-vi.mock("@/lib/line-client", () => ({
-  verifyLineSignature: mockVerifyLineSignature,
-  getLineClient: vi.fn(() => mockLineClient),
-}))
+vi.mock("@/lib/line-client", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/line-client")>("@/lib/line-client")
+  return {
+    ...actual,
+    verifyLineSignature: mockVerifyLineSignature,
+    getLineClient: vi.fn(() => mockLineClient),
+  }
+})
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -95,6 +99,13 @@ const { ToolFirstAgent } = await import("@/application/use-cases/agent/tool-firs
 const { POST } = await import("@/app/api/line/webhook/route")
 
 function buildRequest(text: string, lineUserId = "line-user-1"): NextRequest {
+  return buildMessageRequest({ type: "text", text }, lineUserId)
+}
+
+function buildMessageRequest(
+  message: Record<string, unknown>,
+  lineUserId = "line-user-1",
+): NextRequest {
   return new NextRequest("http://localhost/api/line/webhook", {
     method: "POST",
     headers: {
@@ -106,7 +117,29 @@ function buildRequest(text: string, lineUserId = "line-user-1"): NextRequest {
         {
           type: "message",
           source: { userId: lineUserId },
-          message: { type: "text", text },
+          message,
+        },
+      ],
+    }),
+  })
+}
+
+function buildPostbackRequest(
+  data: string,
+  lineUserId = "line-user-1",
+): NextRequest {
+  return new NextRequest("http://localhost/api/line/webhook", {
+    method: "POST",
+    headers: {
+      "x-line-signature": "valid-signature",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      events: [
+        {
+          type: "postback",
+          source: { userId: lineUserId },
+          postback: { data },
         },
       ],
     }),
@@ -238,6 +271,59 @@ describe("POST /api/line/webhook", () => {
     expect(mockCreateZentropyAgent).not.toHaveBeenCalled()
   })
 
+  it("replies to sticker messages instead of silently ignoring them", async () => {
+    const request = buildMessageRequest({
+      type: "sticker",
+      packageId: "1",
+      stickerId: "1",
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    await flushAsyncWork()
+
+    expect(mockCreateZentropyAgent).not.toHaveBeenCalled()
+    expect(mockPushMessage).toHaveBeenCalledWith({
+      to: "line-user-1",
+        messages: [{
+          type: "text",
+          text: "我先收到你的貼圖了，但我目前還只能讀文字訊息。\n\n你可以直接打字告訴我想做什麼，例如「今天要做什麼」或「幫我記買牛奶」。",
+        }],
+      })
+  })
+
+  it("asks for text confirmation when a sticker arrives during pending session", async () => {
+    pendingLineSessions.set("line-user-1", {
+      type: "complete_task_confirm",
+      payload: {
+        sourceType: "task",
+        taskId: "task-1",
+        taskTitle: "整理競品投影片",
+      },
+    })
+
+    const request = buildMessageRequest({
+      type: "sticker",
+      packageId: "1",
+      stickerId: "2",
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    await flushAsyncWork()
+
+    expect(mockCompleteTaskExecute).not.toHaveBeenCalled()
+    expect(mockPushMessage).toHaveBeenCalledWith({
+      to: "line-user-1",
+        messages: [{
+          type: "text",
+          text: "我先收到你的貼圖了，但我目前還只能讀文字訊息。\n\n如果你是在回覆上一個操作，請直接點下方按鈕；若按鈕沒出現，再輸入「確認」或「取消」。",
+        }],
+      })
+  })
+
   it("routes subtask confirmation through UpdateSubItemUseCase", async () => {
     pendingLineSessions.set("line-user-1", {
       type: "complete_task_confirm",
@@ -303,7 +389,7 @@ describe("POST /api/line/webhook", () => {
           subTaskId: "sub-1",
           taskTitle: "晨跑",
         })
-        return "[FACTS]\n{}\n[/FACTS]\n\n是否完成「晨跑」？\n\n回覆「確認」執行，或無視此訊息取消。"
+        return "[FACTS]\n{}\n[/FACTS]\n\n是否完成「晨跑」？"
       }),
     }))
 
@@ -540,7 +626,7 @@ describe("POST /api/line/webhook", () => {
           planItemId: "plan-1",
           taskTitle: "晨間回顧",
         })
-        return "[FACTS]\n{}\n[/FACTS]\n\n是否完成「晨間回顧」？\n\n回覆「確認」執行，或無視此訊息取消。"
+        return "[FACTS]\n{}\n[/FACTS]\n\n是否完成「晨間回顧」？"
       }),
     }))
 
@@ -603,6 +689,134 @@ describe("POST /api/line/webhook", () => {
         messages: [{ type: "text", text: "✅ 已記錄 1 個項目：修復embedded問題" }],
       }),
     )
+  })
+
+  it("renders brain-dump confirmation as quick reply buttons", async () => {
+    mockAgentChat.mockResolvedValue({
+      blocked: false,
+      content: "你想要我記錄「修復embedded問題」嗎？",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: [],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    await POST(buildRequest("修復embedded問題"))
+    await flushAsyncWork()
+
+    expect(mockSaveLineSession).toHaveBeenCalledWith("line-user-1", "brain_dump_pending", {
+      originalText: "修復embedded問題",
+      taskTitle: "修復embedded問題",
+    })
+    expect(mockPushMessage).toHaveBeenLastCalledWith(expect.objectContaining({
+      messages: [expect.objectContaining({
+        type: "text",
+        text: "你想要我記錄「修復embedded問題」嗎？",
+        quickReply: {
+          items: [
+            {
+              type: "action",
+              action: {
+                type: "postback",
+                label: "記錄",
+                displayText: "記錄",
+                data: "a=confirm_pending",
+              },
+            },
+            {
+              type: "action",
+              action: {
+                type: "postback",
+                label: "取消",
+                displayText: "取消",
+                data: "a=reject_pending",
+              },
+            },
+          ],
+        },
+      })],
+    }))
+  })
+
+  it("completes pending brain-dump confirmation via postback", async () => {
+    pendingLineSessions.set("line-user-1", {
+      type: "brain_dump_pending",
+      payload: {
+        originalText: "修復embedded問題",
+        taskTitle: "修復embedded問題",
+      },
+    })
+
+    await POST(buildPostbackRequest("a=confirm_pending"))
+    await flushAsyncWork()
+
+    expect(mockBrainDumpExecute).toHaveBeenCalledWith({})
+    expect(mockClearLineSession).toHaveBeenCalledWith("line-user-1")
+    expect(mockPushMessage).toHaveBeenLastCalledWith(expect.objectContaining({
+      messages: [{ type: "text", text: "✅ 已記錄 1 個項目：修復embedded問題" }],
+    }))
+  })
+
+  it("shows completion candidates as quick replies and completes the selected task via postback", async () => {
+    mockAgentChat.mockResolvedValue({
+      blocked: false,
+      content: [
+        "[FACTS]",
+        "{\"decision\":\"needs_disambiguation\",\"presentedEntities\":[{\"position\":1,\"title\":\"晨跑\",\"entityType\":\"task\",\"taskId\":\"task-1\"},{\"position\":2,\"title\":\"晚間回顧\",\"entityType\":\"daily_plan_item\",\"planItemId\":\"plan-1\"}]}",
+        "[/FACTS]",
+        "",
+        "我找到多個可能的任務，請直接選一個。",
+      ].join("\n"),
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: ["complete_task_search"],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    await POST(buildRequest("這個完成了"))
+    await flushAsyncWork()
+
+    expect(mockSaveLineSession).toHaveBeenCalledWith("line-user-1", "complete_task_disambiguation", {
+      candidates: [
+        { position: 1, sourceType: "task", taskTitle: "晨跑", taskId: "task-1", subTaskId: undefined, planItemId: undefined },
+        { position: 2, sourceType: "daily_plan_item", taskTitle: "晚間回顧", taskId: undefined, subTaskId: undefined, planItemId: "plan-1" },
+      ],
+    })
+    expect(mockPushMessage).toHaveBeenLastCalledWith(expect.objectContaining({
+      messages: [expect.objectContaining({
+        quickReply: {
+          items: [
+            expect.objectContaining({
+              action: expect.objectContaining({ data: "a=select_completion_candidate&p=1" }),
+            }),
+            expect.objectContaining({
+              action: expect.objectContaining({ data: "a=select_completion_candidate&p=2" }),
+            }),
+            expect.objectContaining({
+              action: expect.objectContaining({ data: "a=reject_pending" }),
+            }),
+          ],
+        },
+      })],
+    }))
+
+    await POST(buildPostbackRequest("a=select_completion_candidate&p=2"))
+    await flushAsyncWork()
+
+    expect(mockUpdatePlanItemExecute).toHaveBeenCalledWith({
+      itemId: "plan-1",
+      userId: "user-1",
+      completed: true,
+    })
+    expect(mockPushMessage).toHaveBeenLastCalledWith(expect.objectContaining({
+      messages: [{ type: "text", text: "✅ 已完成「晚間回顧」" }],
+    }))
   })
 
   it("rejects pending brain-dump confirmation and clears the session", async () => {

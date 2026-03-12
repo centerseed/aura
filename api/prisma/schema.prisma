@@ -37,6 +37,7 @@ model User {
   daily_ai_usage       DailyAiUsage[]
   daily_plans          DailyPlan[]
   governance_proposals GovernanceProposal[]
+  agent_chat_turns     AgentChatTurn[]
   line_message_deliveries LineMessageDelivery[]
   mcp_access_tokens    McpAccessToken[]
   mcp_refresh_tokens   McpRefreshToken[]
@@ -480,6 +481,32 @@ model LineMessageDelivery {
   @@map("line_message_deliveries")
 }
 
+model AgentChatTurn {
+  id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String               @db.Uuid
+  channel       AgentChatTurnChannel
+  session_id    String               @db.VarChar(255)
+  request_text  String               @db.Text
+  response_text String?              @db.Text
+  tool_calls    Json                 @default("[]") @db.Json
+  intent        Json?                @db.Json
+  usage         Json?                @db.Json
+  timings       Json?                @db.Json
+  trace         Json?                @db.Json
+  metadata      Json?                @db.Json
+  status        AgentChatTurnStatus
+  error_message String?              @db.Text
+  created_at    DateTime             @default(now()) @db.Timestamp(6)
+  updated_at    DateTime             @updatedAt @db.Timestamp(6)
+  user          User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([channel, created_at])
+  @@index([session_id, created_at])
+  @@index([status, created_at])
+  @@map("agent_chat_turns")
+}
+
 model AiTokenLog {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id       String   @db.Uuid
@@ -677,6 +704,20 @@ enum EvaluationUserAction {
   EDITED
 
   @@map("evaluationuseractionenum")
+}
+
+enum AgentChatTurnChannel {
+  API
+  LINE
+
+  @@map("agentchatturnchannelenum")
+}
+
+enum AgentChatTurnStatus {
+  SUCCESS
+  ERROR
+
+  @@map("agentchatturnstatusenum")
 }
 
 enum ReminderType {

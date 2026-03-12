@@ -49,3 +49,10 @@
 - Rule: 對 latency / timeout 類回報，必須先補 structured phase timing 並直接跑可重現測試；在拿到量測結果前，不能只靠推測把解法收斂到 fast-path 或 prompt 調整。
 - Pattern: 如果只在 LINE webhook 或 ToolFirstAgent 的彙總 log 記 token，而沒有覆蓋 agent 內每一個實際 LLM call site，最終仍無法區分是 intent classifier、delegate、normalizer，還是內層 generateObject 在吃 token 與延遲。
 - Rule: 對 agent latency / token 調查，instrumentation 必須覆蓋 agent 路徑內所有直接 LLM 呼叫點，並使用統一欄位輸出 `inputTokens / outputTokens / totalTokens / latency_ms`；只做入口彙總不算完成。
+
+## 2026-03-12
+
+- Pattern: LINE agent 若在語意不明的 capture / completion 場景仍要求使用者手打 `記錄：...`、任務名稱或確認文字，實際互動成本會高到讓本來已經接近完成的操作中斷。
+- Rule: 在 LINE 上，只要下一步已收斂成少數明確選項，就必須改成 button-first 互動；`記錄：...`、序號、`確認` 等文字輸入只能保留為 fallback，不得是主要 UX。
+- Pattern: live agent regression script 若沿用舊版固定多輪流程（例如硬要求下一輪 `確認`）或共用上一個 section 的殘留資料，會把已經正確的單輪完成誤判成異常，甚至讓 exit code 失真。
+- Rule: 所有 live multi-turn 驗證腳本都必須依當前回合實際 UI / pending state 做 conditional expectation，並在每個 section 前重置 session 與測試資料；只要收集到任何 failure（含 FACTS 洩漏），process exit code 必須為非 0。
