@@ -1,11 +1,14 @@
 import { normalizeCompletionInputText } from "./completion-query-normalizer/core"
-import { normalizeCompletionQueryZhTw } from "./completion-query-normalizer/locale-zh-tw"
+import { isCompletionStatusStatementZhTw, normalizeCompletionQueryZhTw } from "./completion-query-normalizer/locale-zh-tw"
 import type { StructuredCompletionQueryNormalizer } from "./completion-query-normalizer-agent"
 import { getCompletionQueryNormalizerAgent } from "./completion-query-normalizer-agent"
 
 export function normalizeCompletionQuery(text: string): string {
   return normalizeCompletionQueryZhTw(text)
 }
+
+const EMPTY_OR_DEICTIC_QUERY_PATTERN = /^(?:這件事|這個任務|這個|那個|剛剛那個|剛才那個|上一個|上個)?$/u
+const INTERROGATIVE_QUERY_PATTERN = /(?:什麼|哪個|哪一個|哪件|哪件事|何者|啥)$/u
 
 const SUSPICIOUS_QUERY_PATTERN = /^(?:剛|剛剛|剛才|我剛|我剛剛|我剛才|今天已經|我已經)|(?:完成|做完|done|搞定|處理完|整理完|跑完|完)$/u
 const DEICTIC_ONLY_PATTERN = /^(?:這個|那個|這件事|上一個|上個|剛剛那個|剛才那個)?$/u
@@ -26,6 +29,17 @@ export function shouldUseCompletionNormalizationFallback(originalText: string, n
 
 function sanitizeFallbackQuery(query: string): string {
   return normalizeCompletionQuery(query)
+}
+
+export function isStableCompletionQuery(query: string): boolean {
+  const trimmed = query.trim()
+  return Boolean(trimmed)
+    && !EMPTY_OR_DEICTIC_QUERY_PATTERN.test(trimmed)
+    && !INTERROGATIVE_QUERY_PATTERN.test(trimmed)
+}
+
+export function isCompletionStatusStatement(text: string): boolean {
+  return isCompletionStatusStatementZhTw(text)
 }
 
 export async function resolveCompletionQuery(

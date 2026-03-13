@@ -117,6 +117,8 @@ regex / keyword 只能作為：
 
 - `已經 … 了`、`剛 … 了` 這類完成敘述若 shared completion normalizer 可萃出穩定 task query，必須視為 `task_completion`
 - 這類完成敘述的 coverage 必須收斂在 shared completion normalizer / structural parser，不得在 intent resolver、skill、prompt 各自補 phrasing 白名單
+- 若 completion search 對這類完成敘述收斂到高信心單一候選，LINE UX 必須進入 completion confirmation quick reply，而不是 brain-dump confirmation
+- completion confirmation 的預設 quick reply 為 `確認完成 / 不是這個 / 取消`；`不是這個` 應清除 pending completion 並要求使用者提供更精確任務名稱或改選其他候選
 
 ### FR-3 Confirm / Clarify 是一級意圖
 

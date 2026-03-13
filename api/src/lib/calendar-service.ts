@@ -37,8 +37,10 @@ export interface BusySlot extends TimeSlot {
 export interface CalendarEventSummary extends TimeSlot {
   eventId: string
   summary: string
+  description?: string
   eventLink?: string
   meetLink?: string
+  attendees?: string[]
 }
 
 /**
@@ -214,9 +216,11 @@ export class CalendarService {
       items?: Array<{
         id: string
         summary?: string
+        description?: string
         htmlLink?: string
         hangoutLink?: string
         conferenceData?: { entryPoints?: Array<{ uri?: string }> }
+        attendees?: Array<{ email?: string }>
         start?: { dateTime?: string; date?: string }
         end?: { dateTime?: string; date?: string }
       }>
@@ -227,10 +231,16 @@ export class CalendarService {
       .map((item) => ({
         eventId: item.id,
         summary: item.summary || '未命名行程',
+        description: item.description || undefined,
         start: item.start!.dateTime!,
         end: item.end!.dateTime!,
         eventLink: item.htmlLink,
         meetLink: item.hangoutLink || item.conferenceData?.entryPoints?.[0]?.uri,
+        attendees: Array.isArray(item.attendees)
+          ? item.attendees
+            .map((attendee) => attendee.email?.trim())
+            .filter((email): email is string => Boolean(email))
+          : [],
       }))
 
     return {

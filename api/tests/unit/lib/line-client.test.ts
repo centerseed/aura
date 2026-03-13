@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCompletionCandidateMessage, buildPendingConfirmationMessage, decodeLinePostbackPayload, encodeLinePostbackPayload, formatMorningBriefingPush } from '@/lib/line-client'
+import { buildCompletionCandidateMessage, buildCompletionConfirmationMessage, buildPendingConfirmationMessage, decodeLinePostbackPayload, encodeLinePostbackPayload, formatMorningBriefingPush } from '@/lib/line-client'
 import type { CoachBriefingData } from '@/domain/interfaces/coach-briefing-repository'
 import type { DailyPlanData } from '@/domain/interfaces/daily-plan-repository'
 
@@ -133,6 +133,7 @@ describe('LINE interactive helpers', () => {
     expect(encoded).toBe('a=select_completion_candidate&p=2')
     expect(decodeLinePostbackPayload(encoded)).toEqual({ action: 'select_completion_candidate', position: 2 })
     expect(decodeLinePostbackPayload('a=confirm_pending')).toEqual({ action: 'confirm_pending' })
+    expect(decodeLinePostbackPayload('a=complete_not_this')).toEqual({ action: 'complete_not_this' })
   })
 
   it('builds a pending confirmation quick reply message', () => {
@@ -159,6 +160,30 @@ describe('LINE interactive helpers', () => {
       label: '2. 晚間回顧',
       displayText: '2. 晚間回顧',
       data: 'a=select_completion_candidate&p=2',
+    })
+  })
+
+  it('builds completion confirmation quick reply buttons', () => {
+    const result = buildCompletionConfirmationMessage('你是要把「寄信給客戶」標記為完成嗎？')
+
+    expect(result.quickReply?.items).toHaveLength(3)
+    expect(result.quickReply?.items[0].action).toEqual({
+      type: 'postback',
+      label: '確認完成',
+      displayText: '確認完成',
+      data: 'a=confirm_pending',
+    })
+    expect(result.quickReply?.items[1].action).toEqual({
+      type: 'postback',
+      label: '不是這個',
+      displayText: '不是這個',
+      data: 'a=complete_not_this',
+    })
+    expect(result.quickReply?.items[2].action).toEqual({
+      type: 'postback',
+      label: '取消',
+      displayText: '取消',
+      data: 'a=reject_pending',
     })
   })
 })

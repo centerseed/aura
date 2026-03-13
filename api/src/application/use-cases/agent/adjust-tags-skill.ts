@@ -83,7 +83,7 @@ export const createAdjustTagsSkill = (userId: string, lineUserId?: string) =>
   skill({
     name: "adjust_tags",
     description: "調整任務的分類或標籤",
-    triggers: ["移到", "改到", "改成", "分錯了", "應該在", "換到", "分類錯了", "移進", "歸到", "放在", "不是"],
+    triggers: [],
     priority: 9,
     run: async (_message, _context) =>
       makeSkillResult({

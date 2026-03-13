@@ -16,6 +16,12 @@ describe("QueryCalendarSkill scenarios", () => {
     vi.clearAllMocks()
   })
 
+  it("does not rely on keyword triggers", () => {
+    const skill = createQueryCalendarSkill("user-1") as unknown as { triggers?: string[] }
+
+    expect(skill.triggers ?? []).toEqual([])
+  })
+
   it("injects one shared calendar query tool for event/availability questions", async () => {
     const skill = createQueryCalendarSkill("user-1")
     const result = await skill.run("我明天有什麼會議？", {})

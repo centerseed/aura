@@ -126,6 +126,7 @@ export function formatMorningBriefingPush(
 export type LinePostbackPayload =
   | { action: "confirm_pending" }
   | { action: "reject_pending" }
+  | { action: "complete_not_this" }
   | { action: "select_completion_candidate"; position: number }
 
 interface QuickReplyPostbackOption {
@@ -157,6 +158,10 @@ export function decodeLinePostbackPayload(data: string): LinePostbackPayload | n
 
   if (action === "reject_pending") {
     return { action: "reject_pending" }
+  }
+
+  if (action === "complete_not_this") {
+    return { action: "complete_not_this" }
   }
 
   if (action === "select_completion_candidate") {
@@ -205,6 +210,26 @@ export function buildPendingConfirmationMessage(
     {
       label: rejectLabel,
       displayText: rejectLabel,
+      payload: { action: "reject_pending" },
+    },
+  ])
+}
+
+export function buildCompletionConfirmationMessage(text: string): messagingApi.TextMessage {
+  return buildQuickReplyTextMessage(text, [
+    {
+      label: "確認完成",
+      displayText: "確認完成",
+      payload: { action: "confirm_pending" },
+    },
+    {
+      label: "不是這個",
+      displayText: "不是這個",
+      payload: { action: "complete_not_this" },
+    },
+    {
+      label: "取消",
+      displayText: "取消",
       payload: { action: "reject_pending" },
     },
   ])

@@ -7,18 +7,16 @@ import {
 describe("DeterministicAgentIntentResolver", () => {
   const resolver = new DeterministicAgentIntentResolver()
 
-  describe("greeting fast-path", () => {
-    it("routes '你好' to greeting", () => {
+  describe("minimal deterministic fast-path", () => {
+    it("keeps '你好' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "你好" })
-      expect(result.intent).toMatchObject({
-        object: "greeting",
-        confidence: 0.99,
-      })
+      expect(result.intent.object).toBe("unknown")
+      expect(result.trace.metadata?.reasonCodes).toContain("no_direct_route_match")
     })
 
-    it("routes '你是誰' to greeting", () => {
+    it("keeps '你是誰' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "你是誰" })
-      expect(result.intent.object).toBe("greeting")
+      expect(result.intent.object).toBe("unknown")
     })
   })
 
@@ -74,95 +72,75 @@ describe("DeterministicAgentIntentResolver", () => {
     })
   })
 
-  describe("recall meta fast-path", () => {
-    it("routes '我剛才記了什麼' to recall_last_item", () => {
+  describe("non-capture intents defer to classifier", () => {
+    it("keeps '我剛才記了什麼' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "我剛才記了什麼" })
-      expect(result.intent.object).toBe("recall_last_item")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '你幫我記了什麼？' to recall_last_item instead of capture", () => {
+    it("keeps '你幫我記了什麼？' as unknown instead of fast-path capture", () => {
       const result = resolver.resolve({ message: "你幫我記了什麼？" })
-      expect(result.intent.object).toBe("recall_last_item")
-      expect(result.trace.metadata?.reasonCodes).toContain("meta_recall_last_item")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '任務代號是什麼' to recall_task_code", () => {
+    it("keeps '任務代號是什麼' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "任務代號是什麼" })
-      expect(result.intent.object).toBe("recall_task_code")
+      expect(result.intent.object).toBe("unknown")
     })
-  })
-
-  describe("today_focus fast-path", () => {
-    it("routes '今天要做什麼' to today_focus", () => {
+ 
+    it("keeps '今天要做什麼' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "今天要做什麼？" })
-      expect(result.intent).toMatchObject({
-        object: "today_focus",
-        confidence: 0.98,
-      })
-      expect(result.trace.metadata?.temporalScope).toBe("today")
-      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_today_focus")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '今天有哪些任務' to today_focus", () => {
+    it("keeps '今天有哪些任務' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "今天有哪些任務" })
-      expect(result.intent.object).toBe("today_focus")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '今天 待辦' to today_focus", () => {
+    it("keeps '今天 待辦' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "今天 待辦" })
-      expect(result.intent.object).toBe("today_focus")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '明天有什麼待辦' to today_focus", () => {
+    it("keeps '明天有什麼待辦' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "明天有什麼待辦" })
-      expect(result.intent.object).toBe("today_focus")
-      expect(result.trace.metadata?.temporalScope).toBe("future")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '今天還有什麼事沒做' to today_focus", () => {
+    it("keeps '今天還有什麼事沒做' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "今天還有什麼事沒做？" })
-      expect(result.intent.object).toBe("today_focus")
-      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_today_focus")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '今天還沒完成哪些' to today_focus", () => {
+    it("keeps '今天還沒完成哪些' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "今天還沒完成哪些" })
-      expect(result.intent.object).toBe("today_focus")
+      expect(result.intent.object).toBe("unknown")
     })
-  })
-
-  describe("completed_today fast-path", () => {
-    it("routes '今天完成了什麼' to completed_today", () => {
+ 
+    it("keeps '今天完成了什麼' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "今天完成了什麼？" })
-      expect(result.intent).toMatchObject({
-        object: "completed_today",
-        confidence: 0.98,
-      })
-      expect(result.trace.metadata?.temporalScope).toBe("today")
-      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_completed_today")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '今天做了什麼' to completed_today", () => {
+    it("keeps '今天做了什麼' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "今天做了什麼" })
-      expect(result.intent.object).toBe("completed_today")
+      expect(result.intent.object).toBe("unknown")
     })
-  })
-
-  describe("calendar_query fast-path", () => {
-    it("routes '我明天有什麼會議？' to calendar_query", () => {
+ 
+    it("keeps '我明天有什麼會議？' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "我明天有什麼會議？" })
-      expect(result.intent).toMatchObject({
-        object: "calendar_query",
-        confidence: 0.97,
-      })
-      expect(result.trace.metadata?.temporalScope).toBe("future")
-      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_calendar_query")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("routes '明天下午有空嗎？' to calendar_query", () => {
+    it("keeps '明天下午有空嗎？' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "明天下午有空嗎？" })
-      expect(result.intent.object).toBe("calendar_query")
-      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_calendar_query")
+      expect(result.intent.object).toBe("unknown")
+    })
+
+    it("keeps event statements like '今天晚上 8 點線上會議' as unknown", () => {
+      const result = resolver.resolve({ message: "今天晚上 8 點線上會議" })
+      expect(result.intent.object).toBe("unknown")
     })
   })
 
@@ -180,48 +158,84 @@ describe("DeterministicAgentIntentResolver", () => {
       const result = resolver.resolve({ message: "整理一下待辦" })
       expect(result.intent.object).toBe("reorganize")
     })
-  })
 
-  describe("planning fast-path", () => {
-    it("routes '幫我規劃減肥計畫' to planning", () => {
-      const result = resolver.resolve({ message: "幫我規劃減肥計畫" })
+    it("routes '把第 2 個加到任務' to calendar_task_link", () => {
+      const result = resolver.resolve({ message: "把第 2 個加到任務" })
       expect(result.intent).toMatchObject({
-        object: "planning",
+        object: "calendar_task_link",
+        requiresConfirmation: false,
         confidence: 0.97,
       })
-      expect(result.trace.metadata?.reasonCodes).toContain("fast_path_planning")
+      expect(result.trace.metadata?.reasonCodes).toContain("calendar_task_link_fast_path")
+      expect(result.trace.metadata?.targetReferenceMode).toBe("contextual")
     })
 
-    it("routes '幫我拆解這個專案' to planning", () => {
+    it("routes contextual classification correction away from completion", () => {
+      const result = resolver.resolve({ message: "把剛剛那個改到行銷產品線，不是產品開發" })
+      expect(result.intent).toMatchObject({
+        object: "classification",
+        requiresConfirmation: false,
+      })
+      expect(result.trace.metadata?.targetReferenceMode).toBe("contextual")
+      expect(result.trace.metadata?.reasonCodes).toContain("adjust_classification_fast_path")
+    })
+
+    it("routes contextual correction phrasing with '放在 ... 不是 ...' to classification", () => {
+      const result = resolver.resolve({ message: "剛才那個競品分析要放在行銷產品線，不是研發" })
+      expect(result.intent.object).toBe("classification")
+      expect(result.trace.metadata?.targetReferenceMode).toBe("contextual")
+      expect(result.trace.metadata?.reasonCodes).toContain("adjust_classification_fast_path")
+    })
+  })
+
+  describe("planning and completion defer to classifier", () => {
+    it("keeps '幫我規劃減肥計畫' as unknown for the classifier", () => {
+      const result = resolver.resolve({ message: "幫我規劃減肥計畫" })
+      expect(result.intent.object).toBe("unknown")
+    })
+
+    it("keeps '幫我拆解這個專案' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "幫我拆解這個專案" })
-      expect(result.intent.object).toBe("planning")
+      expect(result.intent.object).toBe("unknown")
     })
 
-    it("does NOT fast-path '規劃是什麼？' (question about planning)", () => {
+    it("keeps '規劃是什麼？' as unknown", () => {
       const result = resolver.resolve({ message: "規劃是什麼？" })
       expect(result.intent.object).toBe("unknown")
     })
-  })
 
-  describe("everything else → unknown (delegate to LLM)", () => {
+    it("keeps '把這件事標記完成' as unknown for the classifier", () => {
+      const result = resolver.resolve({ message: "把這件事標記完成" })
+      expect(result.intent.object).toBe("unknown")
+      expect(result.trace.metadata?.reasonCodes).toContain("completion_cue_requires_classifier")
+    })
+
+    it("keeps '信已經發出去給客戶了' as unknown for the classifier", () => {
+      const result = resolver.resolve({ message: "信已經發出去給客戶了" })
+      expect(result.intent).toMatchObject({
+        object: "task_completion",
+        requiresConfirmation: true,
+      })
+      expect(result.trace.metadata?.reasonCodes).toContain("completion_status_statement_fast_path")
+    })
+
+    it("routes '牛奶剛買回來了' to completion confirmation instead of capture", () => {
+      const result = resolver.resolve({ message: "牛奶剛買回來了" })
+      expect(result.intent).toMatchObject({
+        object: "task_completion",
+        requiresConfirmation: true,
+      })
+      expect(result.trace.metadata?.reasonCodes).toContain("completion_status_statement_fast_path")
+    })
+
+    it("'把這個任務移到工作' → classification", () => {
+      const result = resolver.resolve({ message: "把這個任務移到工作" })
+      expect(result.intent.object).toBe("classification")
+      expect(result.trace.metadata?.reasonCodes).toContain("adjust_classification_fast_path")
+    })
+
     it("'今天要去跑步' → unknown", () => {
       const result = resolver.resolve({ message: "今天要去跑步" })
-      expect(result.intent.object).toBe("unknown")
-    })
-
-    it("'把這件事標記完成' → task_completion (deterministic fast-path)", () => {
-      const result = resolver.resolve({ message: "把這件事標記完成" })
-      expect(result.intent.object).toBe("task_completion")
-    })
-
-    it("'信已經發出去給客戶了' → task_completion (shared normalizer cue)", () => {
-      const result = resolver.resolve({ message: "信已經發出去給客戶了" })
-      expect(result.intent.object).toBe("task_completion")
-      expect(result.trace.metadata?.reasonCodes).toContain("completion_statement")
-    })
-
-    it("'把這個任務移到工作' → unknown (LLM handles classification)", () => {
-      const result = resolver.resolve({ message: "把這個任務移到工作" })
       expect(result.intent.object).toBe("unknown")
     })
   })

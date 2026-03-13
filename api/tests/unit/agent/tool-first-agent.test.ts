@@ -20,6 +20,7 @@ const {
   mockClearLineSession,
   mockSaveLineSession,
   mockExecuteCompleteTaskPayload,
+  mockCreateTaskFromCalendarEvent,
 } = vi.hoisted(() => ({
   mockBrainDumpExecute: vi.fn(),
   mockQueryTodayExecute: vi.fn(),
@@ -36,6 +37,7 @@ const {
   mockClearLineSession: vi.fn(),
   mockSaveLineSession: vi.fn(),
   mockExecuteCompleteTaskPayload: vi.fn(),
+  mockCreateTaskFromCalendarEvent: vi.fn(),
 }))
 
 vi.mock("@/application/use-cases/agent/brain-dump-skill", () => ({
@@ -92,6 +94,52 @@ vi.mock("@/application/use-cases/agent/complete-task-executor", () => ({
   buildCompleteTaskSuccessMessage: vi.fn((taskTitle: string) => `✅ 已完成「${taskTitle}」`),
 }))
 
+vi.mock("@/application/use-cases/agent/create-task-from-calendar-event", () => ({
+  createTaskFromCalendarEvent: mockCreateTaskFromCalendarEvent,
+}))
+
+function createResolvedIntentResolver(
+  object: string,
+  options: {
+    confidence?: number
+    requiresConfirmation?: boolean
+    temporalScope?: "today" | "future" | "past" | "none"
+    targetReferenceMode?: "explicit" | "contextual" | "ambiguous" | "none"
+  } = {},
+) {
+  const confidence = options.confidence ?? 0.9
+  const requiresConfirmation = options.requiresConfirmation ?? false
+  const temporalScope = options.temporalScope ?? "none"
+  const targetReferenceMode = options.targetReferenceMode ?? "none"
+
+  return {
+    resolve: vi.fn().mockResolvedValue({
+      intent: {
+        object,
+        requiresConfirmation,
+        confidence,
+      },
+      trace: {
+        routeSource: "intent_resolver",
+        resolver: "test-resolver",
+        rawMessage: "",
+        resolvedIntent: {
+          object,
+          requiresConfirmation,
+          confidence,
+        },
+        metadata: {
+          temporalScope,
+          targetReferenceMode,
+          reasonCodes: ["test_override"],
+        },
+        selectedTool: null,
+        targetQuery: null,
+      },
+    }),
+  }
+}
+
 describe("ToolFirstAgent", () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>
 
@@ -103,6 +151,10 @@ describe("ToolFirstAgent", () => {
     mockClearLineSession.mockResolvedValue(undefined)
     mockSaveLineSession.mockResolvedValue(undefined)
     mockExecuteCompleteTaskPayload.mockResolvedValue(undefined)
+    mockCreateTaskFromCalendarEvent.mockResolvedValue({
+      taskId: "task-from-event-1",
+      taskTitle: "客戶會議",
+    })
     mockBrainDumpExecute.mockResolvedValue("✅ 已記錄 1 個項目：跟客戶開產品 review 會議")
     mockQueryTodayExecute.mockResolvedValue("[FACTS]\n{}\n[/FACTS]\n\n📋 目前查到 1 項待處理項目：")
     mockCreateQueryTodayTasksTool.mockReturnValue({
@@ -167,6 +219,7 @@ describe("ToolFirstAgent", () => {
       delegate,
       sessionStore,
       memoryManager: null,
+      intentResolver: createResolvedIntentResolver("today_focus", { temporalScope: "today" }),
     })
 
     const result = await agent.chat("今天的代辦事項為何？", {
@@ -213,6 +266,7 @@ describe("ToolFirstAgent", () => {
       delegate,
       sessionStore,
       memoryManager: null,
+      intentResolver: createResolvedIntentResolver("today_focus", { temporalScope: "today" }),
     })
 
     await agent.chat("我今天還有哪些沒做完的事情？", {
@@ -250,6 +304,7 @@ describe("ToolFirstAgent", () => {
       delegate,
       sessionStore,
       memoryManager: null,
+      intentResolver: createResolvedIntentResolver("today_focus", { temporalScope: "future" }),
     })
 
     await agent.chat("明天有哪些任務", {
@@ -287,6 +342,7 @@ describe("ToolFirstAgent", () => {
       delegate,
       sessionStore,
       memoryManager: null,
+      intentResolver: createResolvedIntentResolver("calendar_query", { temporalScope: "future" }),
     })
 
     const result = await agent.chat("我明天有什麼會議？", {
@@ -298,6 +354,86 @@ describe("ToolFirstAgent", () => {
     expect(delegate.chat).not.toHaveBeenCalled()
     expect(result.toolCalls).toEqual(["query_calendar"])
     expect(result.content).toContain("明天共有 2 個行程")
+  })
+
+  it("creates an inbox task from the selected calendar event", async () => {
+    const delegate = {
+      chat: vi.fn(),
+    }
+
+    const sessionStore = {
+      get: vi.fn().mockResolvedValue([
+        {
+          role: "assistant",
+          content: '[FACTS]\n{"presentedEntities":[{"position":1,"title":"客戶會議","entityId":"event-1","entityType":"calendar_event","start":"2026-03-13T01:00:00.000Z","end":"2026-03-13T02:00:00.000Z","description":"討論 Q2 合作","eventLink":"https://calendar.google.com/event?eid=1","meetLink":"https://meet.google.com/abc-defg-hij","attendees":["a@example.com"]}]}\n[/FACTS]\n\n📅 明天共有 1 個行程：',
+        },
+      ]),
+      save: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const agent = new ToolFirstAgent({
+      delegate,
+      sessionStore,
+      memoryManager: null,
+      intentResolver: createResolvedIntentResolver("calendar_task_link", { targetReferenceMode: "contextual" }),
+    })
+
+    const result = await agent.chat("把第 1 個加到任務", {
+      userId: "user-1",
+      sessionId: "line-user-1",
+    })
+
+    expect(mockCreateTaskFromCalendarEvent).toHaveBeenCalledWith({
+      userId: "user-1",
+      eventId: "event-1",
+      title: "客戶會議",
+      start: "2026-03-13T01:00:00.000Z",
+      end: "2026-03-13T02:00:00.000Z",
+      description: "討論 Q2 合作",
+      eventLink: "https://calendar.google.com/event?eid=1",
+      meetLink: "https://meet.google.com/abc-defg-hij",
+      attendees: ["a@example.com"],
+    })
+    expect(delegate.chat).not.toHaveBeenCalled()
+    expect(result.toolCalls).toEqual(["create_task_from_calendar_event"])
+    expect(result.content).toContain("已建立 INBOX 任務")
+  })
+
+  it("does not route plain event statements through query_calendar", async () => {
+    const delegate = {
+      chat: vi.fn().mockResolvedValue({
+        blocked: false,
+        content: "delegate fallback",
+        usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        intent: null,
+        toolCalls: [],
+        timings: {},
+        sessionId: "line-user-1",
+        traceId: null,
+        trace: null,
+      }),
+    }
+
+    const sessionStore = {
+      get: vi.fn().mockResolvedValue([]),
+      save: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const agent = new ToolFirstAgent({
+      delegate,
+      sessionStore,
+      memoryManager: null,
+    })
+
+    const result = await agent.chat("今天晚上 8 點線上會議", {
+      userId: "user-1",
+      sessionId: "line-user-1",
+    })
+
+    expect(mockCreateQueryCalendarTool).not.toHaveBeenCalled()
+    expect(delegate.chat).toHaveBeenCalled()
+    expect(result.toolCalls).toEqual([])
+    expect(result.content).toBe("delegate fallback")
   })
 
   it("routes capture requests through brain_dump via intent resolver", async () => {
@@ -514,6 +650,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "explicit",
+      }),
     })
 
     const result = await agent.chat("確認", {
@@ -554,6 +694,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("我今天已經跑完步了，幫我標記完成", {
@@ -567,6 +711,8 @@ describe("ToolFirstAgent", () => {
       "user-1",
       "跑步",
       "line-user-1",
+      undefined,
+      false,
     )
     expect(mockCompleteTaskSearchExecute).toHaveBeenCalledWith({})
     expect(result.toolCalls).toEqual(["complete_task_search"])
@@ -587,6 +733,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "explicit",
+      }),
     })
 
     await agent.chat("幫我把買牛奶標記完成", {
@@ -598,6 +748,8 @@ describe("ToolFirstAgent", () => {
       "user-1",
       "買牛奶",
       "line-user-1",
+      undefined,
+      false,
     )
   })
 
@@ -619,6 +771,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "explicit",
+      }),
     })
 
     await agent.chat("我今天已經把 API 文件整理好了，幫我標記完成", {
@@ -630,6 +786,8 @@ describe("ToolFirstAgent", () => {
       "user-1",
       "api 文件整理",
       "line-user-1",
+      undefined,
+      false,
     )
   })
 
@@ -658,6 +816,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "explicit",
+      }),
     })
 
     await agent.chat("剛剛把 email 寄給客戶 done 了", {
@@ -667,8 +829,10 @@ describe("ToolFirstAgent", () => {
 
     expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
       "user-1",
-      "email寄給客戶",
+      expect.stringMatching(/^email ?寄給客戶$/),
       "line-user-1",
+      undefined,
+      false,
     )
   })
 
@@ -687,6 +851,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "explicit",
+      }),
     })
 
     await agent.chat("信已經發出去給客戶了", {
@@ -699,6 +867,8 @@ describe("ToolFirstAgent", () => {
       "user-1",
       "信發給客戶",
       "line-user-1",
+      undefined,
+      true,
     )
   })
 
@@ -722,6 +892,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("把第一個標記完成", {
@@ -733,9 +907,8 @@ describe("ToolFirstAgent", () => {
       sourceType: "task",
       taskTitle: "跑步",
       taskId: "task-1",
-      subTaskId: undefined,
-      planItemId: undefined,
     })
+    expect(result.content).toContain("✅ 已完成「跑步」")
     expect(mockCompleteTaskSearchExecute).not.toHaveBeenCalled()
     expect(result.toolCalls).toEqual(["complete_task_search"])
     expect(result.content).toContain("跑步")
@@ -756,6 +929,7 @@ describe("ToolFirstAgent", () => {
       delegate,
       sessionStore,
       memoryManager: null,
+      intentResolver: createResolvedIntentResolver("planning"),
     })
 
     const result = await agent.chat("幫我規劃健身計畫", {
@@ -854,6 +1028,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("剛才記的那個完成了", {
@@ -886,6 +1064,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("第二個做完了", {
@@ -921,6 +1103,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("最後一個做完了", {
@@ -964,6 +1150,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("第二個做完了", {
@@ -1054,6 +1244,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("第二個也搞定了", {
@@ -1089,6 +1283,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("2", {
@@ -1123,6 +1321,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("幫我把剛才記的那個標記完成", {
@@ -1157,6 +1359,10 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: true,
+        targetReferenceMode: "contextual",
+      }),
     })
 
     const result = await agent.chat("搞定了", {
@@ -1195,6 +1401,7 @@ describe("ToolFirstAgent", () => {
       sessionStore,
       memoryManager: null,
       lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("recall_last_item"),
     })
 
     const result = await agent.chat("你幫我記了什麼？", {
@@ -1294,6 +1501,59 @@ describe("ToolFirstAgent", () => {
       expect.objectContaining({
         title: "買牛奶",
         taskId: "task-2",
+      }),
+    )
+    expect(mockAdjustTagsExecute).toHaveBeenCalledWith({})
+    expect(result.toolCalls).toEqual(["adjust_tags_preview"])
+  })
+
+  it("passes last recorded task context into adjust-tags for contextual references", async () => {
+    const delegate = {
+      chat: vi.fn(),
+    }
+
+    const sessionStore = {
+      get: vi.fn().mockResolvedValue([
+        {
+          role: "assistant",
+          content: '[FACTS]\n{"recordedItems":[{"title":"整理競品投影片","sourceType":"task","taskId":"task-9"}]}\n[/FACTS]\n\n✅ 已記錄 1 個項目：整理競品投影片',
+        },
+      ]),
+      save: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const agent = new ToolFirstAgent({
+      delegate,
+      sessionStore,
+      memoryManager: null,
+      lineUserId: "line-user-1",
+      intentResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          intent: { object: "classification", requiresConfirmation: false, confidence: 0.8 },
+          trace: {
+            routeSource: "intent_resolver",
+            resolver: "test",
+            rawMessage: "把剛剛那個改到行銷產品線，不是產品開發",
+            resolvedIntent: { object: "classification", requiresConfirmation: false, confidence: 0.8 },
+            selectedTool: null,
+            targetQuery: null,
+          },
+        }),
+      },
+    })
+
+    const result = await agent.chat("把剛剛那個改到行銷產品線，不是產品開發", {
+      userId: "user-1",
+      sessionId: "line-user-1",
+    })
+
+    expect(mockCreateAdjustTagsTool).toHaveBeenCalledWith(
+      "user-1",
+      "把剛剛那個改到行銷產品線，不是產品開發",
+      "line-user-1",
+      expect.objectContaining({
+        title: "整理競品投影片",
+        taskId: "task-9",
       }),
     )
     expect(mockAdjustTagsExecute).toHaveBeenCalledWith({})

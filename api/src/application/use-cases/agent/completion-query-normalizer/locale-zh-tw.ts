@@ -2,6 +2,7 @@ import { normalizeCompletionInputText } from "./core"
 
 const COMPLETION_QUERY_REGEX = /^(.*?)(做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|完|done)\s*(了|啦|囉|喔|哦|欸)?$/i
 const RESULTATIVE_COMPLETION_PATTERN = /^(.{1,8}?)(?:已經|剛|剛剛|剛才)(.+?)(出去|出來|出)(給.+?)?(?:了|啦|囉|喔|哦|欸)?$/u
+const RESULTATIVE_RETURN_PATTERN = /^(.{1,16}?)(?:已經|剛|剛剛|剛才)(買|拿|帶)(回來|回去)(?:了|啦|囉|喔|哦|欸)?$/u
 const COMPLETION_FRAME_PATTERNS = [
   /(?:幫我|請|麻煩)/gu,
   /(?:把|將)/gu,
@@ -10,7 +11,9 @@ const COMPLETION_FRAME_PATTERNS = [
 const LEADING_FILLERS = ["我今天已經", "我已經", "今天已經", "我剛剛", "我剛才", "我剛", "剛剛", "剛才", "剛", "我把", "我要把", "想把", "幫我把", "幫我", "請把", "請幫我把", "請幫我", "把", "將", "這個", "那個", "這項", "那項"]
 const TRAILING_FILLERS = ["這個", "那個", "這項", "那項", "我"]
 const COMPLETION_TRAILING_PARTICLES = /(?:吧|呢|喔|哦|啊|呀)$/u
-const STRUCTURAL_COMPLETION_CUE_PATTERN = /(?:做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|done)|(?:(?:已經|剛|剛剛|剛才).+?(?:出去|出來|出)(?:給.+?)?(?:了|啦|囉|喔|哦|欸)?$)/iu
+const STRUCTURAL_COMPLETION_CUE_PATTERN = /(?:做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|done)|(?:(?:.+)?(?:已經|剛|剛剛|剛才).+?(?:(?:出去|出來|出)(?:給.+?)?|(?:買|拿|帶)(?:回來|回去))(?:了|啦|囉|喔|哦|欸)?$)/iu
+const EXPLICIT_COMPLETION_COMMAND_PATTERN = /(?:幫我|請|麻煩).*(?:標記(?:成|為)?完成|設成完成|改成完成|勾掉|done)|(?:標記(?:成|為)?完成|設成完成|改成完成|勾掉|done)/iu
+const COMPLETION_STATUS_STATEMENT_PATTERN = /(?:(?:.+)?(?:已經|剛|剛剛|剛才).+?(?:了|啦|囉|喔|哦|欸)$)|(?:.+(?:做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|done)(?:了|啦|囉|喔|哦|欸)?$)/iu
 
 function stripLeadingFillers(text: string): string {
   let value = text.trim()
@@ -56,6 +59,16 @@ function trimRepeatedLeadingStem(text: string): string {
 }
 
 function stripResultativeCompletionClause(text: string): string {
+  const returnMatch = text.match(RESULTATIVE_RETURN_PATTERN)
+  if (returnMatch) {
+    const [, subject, verb] = returnMatch
+    const normalizedSubject = subject?.trim() ?? ""
+    const normalizedVerb = verb?.trim() ?? ""
+    if (normalizedSubject && normalizedVerb) {
+      return `${normalizedVerb}${normalizedSubject}`.trim()
+    }
+  }
+
   const match = text.match(RESULTATIVE_COMPLETION_PATTERN)
   if (!match) return text
 
@@ -70,6 +83,18 @@ function stripResultativeCompletionClause(text: string): string {
 
 export function hasCompletionCueZhTw(text: string): boolean {
   return STRUCTURAL_COMPLETION_CUE_PATTERN.test(normalizeCompletionInputText(text))
+}
+
+export function isCompletionStatusStatementZhTw(text: string): boolean {
+  const normalized = normalizeCompletionInputText(text)
+  if (!normalized) return false
+  if (EXPLICIT_COMPLETION_COMMAND_PATTERN.test(normalized)) return false
+  const normalizedQuery = normalizeCompletionQueryZhTw(normalized)
+  if (/(?:已經|剛|剛剛|剛才)/u.test(normalized) && normalizedQuery && normalizedQuery !== normalized) {
+    return true
+  }
+  if (!hasCompletionCueZhTw(normalized)) return false
+  return COMPLETION_STATUS_STATEMENT_PATTERN.test(normalized)
 }
 
 export function normalizeCompletionQueryZhTw(text: string): string {

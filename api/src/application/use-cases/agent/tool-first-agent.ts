@@ -12,7 +12,12 @@ import {
   type AgentIntentResolver,
 } from "./agent-intent-resolver"
 import { createCompleteTaskSearchTool } from "./complete-task-skill"
-import { extractPresentedEntities, parseToolResult, type PresentedEntity } from "./tool-result-protocol"
+import {
+  extractPresentedEntities,
+  parseToolResult,
+  serializeFactsSummary,
+  type PresentedEntity,
+} from "./tool-result-protocol"
 import { AgentSessionStateStore, type AgentSessionState } from "./agent-session-state"
 import { getLineSession, clearLineSession, saveLineSession } from "@/lib/line-session"
 import type { AdjustTagsPayload, BrainDumpPendingPayload, CompleteTaskPayload } from "@/lib/line-session"
@@ -20,10 +25,11 @@ import { classifyConfirmationDisposition, extractBrainDumpConfirmationTarget } f
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
 import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
 import { createRunPlannerTool } from "./planner-skill"
-import { resolveCompletionQuery } from "./completion-query-normalizer"
+import { isCompletionStatusStatement, resolveCompletionQuery } from "./completion-query-normalizer"
 import { normalizeAgentUsage } from "./llm-logging"
 import { createQueryCalendarTool } from "./query-calendar-skill"
 import { toCalendarUnavailableMessage } from "./agent-calendar-query-service"
+import { createTaskFromCalendarEvent } from "./create-task-from-calendar-event"
 
 interface AgentChatResult {
   blocked: boolean
@@ -83,8 +89,8 @@ interface ToolFirstAgentUsage {
 const SHORT_RECORD_PATTERN = /^記$/
 
 // 序號引用模式：第一個、第二個、第三個...
-const ORDINAL_REFERENCE_PATTERN = /第([一二三四五六七八九十\d]+)個/
-const BARE_ORDINAL_PATTERN = /^([一二三四五六七八九十\d]+)$/
+const ORDINAL_REFERENCE_PATTERN = /第\s*([一二三四五六七八九十\d]+)\s*個/
+const BARE_ORDINAL_PATTERN = /^\s*([一二三四五六七八九十\d]+)\s*$/
 const LAST_ORDINAL_PATTERN = /最後一個|最後那個/
 const ORDINAL_MAP: Record<string, number> = {
   "一": 0, "二": 1, "三": 2, "四": 3, "五": 4,
@@ -232,6 +238,10 @@ function isRecordedEntityReference(value: PresentedEntity | RecordedEntityRefere
   return "sourceType" in value
 }
 
+function isPresentedEntity(value: PresentedEntity | RecordedEntityReference): value is PresentedEntity {
+  return "entityType" in value
+}
+
 function toCompleteTaskPayload(entity: PresentedEntity | RecordedEntityReference): CompleteTaskPayload | null {
   const sourceType = isRecordedEntityReference(entity)
     ? entity.sourceType
@@ -336,7 +346,21 @@ function resolveQueryDayOffset(
 function toTaskPresentedEntity(
   entity: PresentedEntity | RecordedEntityReference | null,
 ): PresentedEntity | null {
-  if (!entity || isRecordedEntityReference(entity)) return null
+  if (!entity) return null
+
+  if (isRecordedEntityReference(entity)) {
+    if (entity.sourceType !== "task" || !entity.taskId) return null
+    return {
+      position: 1,
+      title: entity.title,
+      entityId: entity.taskId,
+      entityType: "task",
+      taskId: entity.taskId,
+      subTaskId: entity.subTaskId,
+      planItemId: entity.planItemId,
+    }
+  }
+
   if (entity.entityType !== "task" || !entity.taskId) return null
   return entity
 }
@@ -695,6 +719,56 @@ export class ToolFirstAgent {
         }
         throw error
       }
+    } else if (intent.object === "calendar_task_link") {
+      const contextualEntity = resolveContextualEntity(trimmedMessage, sessionState, history)
+      if (!contextualEntity || !isPresentedEntity(contextualEntity) || contextualEntity.entityType !== "calendar_event") {
+        return this.buildDirectResult({
+          sessionId,
+          message: trimmedMessage,
+          content: hasRecentPresentedList(sessionState, history)
+            ? "我知道你是在指剛剛那份清單，但目前只能把 calendar event 轉成任務。請直接回覆行程序號。"
+            : "我還不知道你指的是哪個行程。先叫我查行事曆，然後回覆像「把第 1 個加到任務」。",
+          intent,
+          trace,
+        })
+      }
+
+      if (!contextualEntity.entityId || !contextualEntity.start || !contextualEntity.end) {
+        return this.buildDirectResult({
+          sessionId,
+          message: trimmedMessage,
+          content: "我拿不到這個行程的完整資訊，請重新查一次行事曆後再試。",
+          intent,
+          trace,
+        })
+      }
+
+      toolName = "create_task_from_calendar_event"
+      const linkedTask = await createTaskFromCalendarEvent({
+        userId: userId ?? "",
+        eventId: contextualEntity.entityId,
+        title: contextualEntity.title,
+        start: contextualEntity.start,
+        end: contextualEntity.end,
+        description: contextualEntity.description,
+        eventLink: contextualEntity.eventLink,
+        meetLink: contextualEntity.meetLink,
+        attendees: contextualEntity.attendees,
+      })
+      toolOutput = serializeFactsSummary({
+        recordedItems: [{
+          position: 1,
+          title: linkedTask.taskTitle,
+          sourceType: "task",
+          taskId: linkedTask.taskId,
+        }],
+        linkedCalendarEvent: {
+          eventId: contextualEntity.entityId,
+          title: contextualEntity.title,
+          taskId: linkedTask.taskId,
+        },
+      }, `已建立 INBOX 任務「${linkedTask.taskTitle}」，並把這個 calendar event 關聯到該任務。`)
+      toolHistoryContent = toolOutput
     } else if (intent.object === "task_capture" && intent.confidence >= 0.95) {
       toolName = "brain_dump"
       toolOutput = await createBrainDumpTool(userId ?? "", trimmedMessage).execute({})
@@ -729,11 +803,21 @@ export class ToolFirstAgent {
     } else if (intent.object === "task_completion") {
       const contextualEntity = resolveContextualEntity(trimmedMessage, sessionState, history)
       const contextualPayload = contextualEntity ? toCompleteTaskPayload(contextualEntity) : null
+      const requireCompletionConfirmation = Boolean(
+        this.config.lineUserId
+        && !contextualEntity
+        && isCompletionStatusStatement(trimmedMessage),
+      )
 
       if (contextualPayload) {
-        await executeCompleteTaskPayload(userId ?? "", contextualPayload)
         toolName = "complete_task_search"
-        toolOutput = buildCompleteTaskSuccessMessage(contextualPayload.taskTitle)
+        if (requireCompletionConfirmation) {
+          await saveLineSession(this.config.lineUserId, "complete_task_confirm", contextualPayload)
+          toolOutput = `你是要把「${contextualPayload.taskTitle}」標記為完成嗎？`
+        } else {
+          await executeCompleteTaskPayload(userId ?? "", contextualPayload)
+          toolOutput = buildCompleteTaskSuccessMessage(contextualPayload.taskTitle)
+        }
         toolHistoryContent = toolOutput
       }
 
@@ -755,7 +839,7 @@ export class ToolFirstAgent {
         if (resolvedQuery) {
           toolName = "complete_task_search"
           toolOutput = await createCompleteTaskSearchTool(
-            userId ?? "", trimmedMessage, this.config.lineUserId, resolvedQuery,
+            userId ?? "", trimmedMessage, this.config.lineUserId, resolvedQuery, requireCompletionConfirmation,
           ).execute({})
           toolHistoryContent = toolOutput
         }
@@ -764,7 +848,7 @@ export class ToolFirstAgent {
           const normalizedQuery = await resolveCompletionQuery(trimmedMessage)
           toolName = "complete_task_search"
           toolOutput = await createCompleteTaskSearchTool(
-            userId ?? "", normalizedQuery || trimmedMessage, this.config.lineUserId,
+            userId ?? "", normalizedQuery || trimmedMessage, this.config.lineUserId, undefined, requireCompletionConfirmation,
           ).execute({})
           toolHistoryContent = toolOutput
         }

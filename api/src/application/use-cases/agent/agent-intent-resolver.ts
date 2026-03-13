@@ -5,25 +5,18 @@ import { AgentIntentSchema } from "./agent-intent"
 import { hasExplicitCaptureFrame } from "./explicit-capture-frame"
 import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
 import { hasCompletionCueZhTw } from "./completion-query-normalizer/locale-zh-tw"
+import { isCompletionStatusStatement, isStableCompletionQuery, normalizeCompletionQuery } from "./completion-query-normalizer"
 // ── Deterministic Fast-Path Patterns ─────────────────────────────────────────
 // 只保留語意 100% 明確、不可能碰撞的 pattern。
 // 其餘全部交給 LLM structured classifier。
 
-const GREETING_PATTERN = /^(?:你好|嗨|hi|hello|hey)$|你是誰|可以做什麼/i
-const RECALL_LAST_ITEM_PATTERN = /(?:((?:我|你)(?:剛才|剛剛)|剛才|剛剛).*(?:記了什麼|記的是什麼)|你幫我記了什麼)/i
-const RECALL_TASK_CODE_PATTERN = /任務代號是什麼|只回答代號/i
 const SHORT_UNDERSPECIFIED_PATTERN = /^(記|好|嗯|喔|哦|欸|？|\?)$/
 
-// — 制式回應引導的 fast-path（用戶照著提示說的話，必須穩定接住）—
-const TODAY_FOCUS_PATTERN = /^今天(要做什麼|有什麼|有哪些|還有什麼(?:事)?沒做|還沒完成哪些)|(?:今天|明天).*(待辦|代辦|任務|要做|待辦事項|代辦事項)|(?:今天|還有|還沒).*(沒做|沒做完|還沒做|未完成)/i
-const COMPLETED_TODAY_PATTERN = /今天.*(?:完成了什麼|做了什麼|完成哪些|做了哪些|已完成(?:什麼|哪些)?)|(?:完成了什麼|做了什麼|已完成哪些)/i
-const CALENDAR_QUERY_PATTERN = /(?:今天|明天)?(?:上午|早上|下午|晚上)?(?:有什麼|有哪些)?(?:會議|行程)|(?:今天|明天)?(?:上午|早上|下午|晚上)?.*(?:有空嗎|有沒有空|空檔|空嗎)/i
-const COMPLETE_TASK_PATTERN = /完成|做完|跑完|弄完|處理完|搞定|done|完成了|已完成|做好了|結束了|標記(?:成|為)?完成|勾掉/i
-const CONTEXTUAL_COMPLETE_PATTERN_INTENT = /這件事|這個|那個|剛剛那個|剛才那個|上一個|上個/i
-const MUTATION_REQUEST_PATTERN = /幫我|請|把|將|麻煩|標記|勾掉|設成|改成/i
-const QUERY_WORD_PATTERN = /嗎|？|\?|請問|查詢|列出|顯示|哪些|什麼|多少|還剩|剩下/i
 const REORGANIZE_PATTERN = /^幫我整理|^整理(一下)?(任務|待辦)/i
-const PLANNING_PATTERN = /^幫我(規劃|拆解)|^(規劃|拆解)(一下)?[^？?]*$/i
+const CALENDAR_TASK_LINK_PATTERN = /(?:把|將)?\s*(?:第\s*[一二三四五六七八九十\d]+\s*個|最後一個|最後那個|這個|那個)\s*(?:行程|會議|活動)?\s*(?:加到任務|加成任務|變成任務|建立任務|建成任務)/iu
+const ADJUST_CLASSIFICATION_PATTERN = /(?:移到|改到|換到|放到|放在|改放到|改放在|分到|應該在|分類錯|不是.+(?:產品線|分類|topic|product)|從.+移到.+)/iu
+const CONTEXTUAL_TASK_REFERENCE_PATTERN = /(?:這個任務|那個任務|這件事|這個|那個|剛剛那個|剛才那個|上一個|上個)/u
+const CONTEXTUAL_LIST_REFERENCE_PATTERN = /(?:第\s*[一二三四五六七八九十\d]+\s*個|最後一個|最後那個|這個|那個|剛剛那個|剛才那個|上一個|上個)/u
 
 type TraceSpeechAct = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["speechAct"]>
 type TraceTargetReferenceMode = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["targetReferenceMode"]>
@@ -117,42 +110,6 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
 
     // ── Fast-path: 只攔截語意 100% 明確的 pattern ──
 
-    if (GREETING_PATTERN.test(message)) {
-      return buildResult({
-        object: "greeting",
-        requiresConfirmation: false,
-        confidence: 0.99,
-        speechAct: "meta",
-        targetReferenceMode: "none",
-        temporalScope: "none",
-        reasonCodes: ["meta_greeting"],
-      }, message)
-    }
-
-    if (TODAY_FOCUS_PATTERN.test(message)) {
-      return buildResult({
-        object: "today_focus",
-        requiresConfirmation: false,
-        confidence: 0.98,
-        speechAct: "query",
-        targetReferenceMode: "none",
-        temporalScope: resolveTemporalScope(message),
-        reasonCodes: ["fast_path_today_focus"],
-      }, message)
-    }
-
-    if (COMPLETED_TODAY_PATTERN.test(message)) {
-      return buildResult({
-        object: "completed_today",
-        requiresConfirmation: false,
-        confidence: 0.98,
-        speechAct: "query",
-        targetReferenceMode: "none",
-        temporalScope: "today",
-        reasonCodes: ["fast_path_completed_today"],
-      }, message)
-    }
-
     if (REORGANIZE_PATTERN.test(message)) {
       return buildResult({
         object: "reorganize",
@@ -165,39 +122,15 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       }, message)
     }
 
-    if (PLANNING_PATTERN.test(message)) {
+    if (CALENDAR_TASK_LINK_PATTERN.test(message)) {
       return buildResult({
-        object: "planning",
+        object: "calendar_task_link",
         requiresConfirmation: false,
         confidence: 0.97,
         speechAct: "mutate",
-        targetReferenceMode: "contextual",
-        temporalScope: "none",
-        reasonCodes: ["fast_path_planning"],
-      }, message)
-    }
-
-    if (RECALL_TASK_CODE_PATTERN.test(message)) {
-      return buildResult({
-        object: "recall_task_code",
-        requiresConfirmation: false,
-        confidence: 0.99,
-        speechAct: "query",
-        targetReferenceMode: "none",
-        temporalScope: "none",
-        reasonCodes: ["meta_recall_task_code"],
-      }, message)
-    }
-
-    if (RECALL_LAST_ITEM_PATTERN.test(message)) {
-      return buildResult({
-        object: "recall_last_item",
-        requiresConfirmation: false,
-        confidence: 0.99,
-        speechAct: "query",
-        targetReferenceMode: "none",
-        temporalScope: "past",
-        reasonCodes: ["meta_recall_last_item"],
+        targetReferenceMode: CONTEXTUAL_LIST_REFERENCE_PATTERN.test(message) ? "contextual" : "explicit",
+        temporalScope: "future",
+        reasonCodes: ["calendar_task_link_fast_path"],
       }, message)
     }
 
@@ -213,37 +146,32 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       }, message)
     }
 
-    if (CALENDAR_QUERY_PATTERN.test(message)) {
+    const isContextualClassificationCorrection = CONTEXTUAL_TASK_REFERENCE_PATTERN.test(message)
+      && /(?:放在|放到|改到|移到|換到|改放到|改放在|應該在|不是)/u.test(message)
+
+    if (ADJUST_CLASSIFICATION_PATTERN.test(message) || isContextualClassificationCorrection) {
       return buildResult({
-        object: "calendar_query",
+        object: "classification",
         requiresConfirmation: false,
-        confidence: 0.97,
-        speechAct: "query",
-        targetReferenceMode: "none",
-        temporalScope: resolveTemporalScope(message),
-        reasonCodes: ["fast_path_calendar_query"],
+        confidence: 0.93,
+        speechAct: "mutate",
+        targetReferenceMode: CONTEXTUAL_TASK_REFERENCE_PATTERN.test(message) ? "contextual" : "explicit",
+        temporalScope: "none",
+        reasonCodes: ["adjust_classification_fast_path"],
       }, message)
     }
 
-    if (COMPLETE_TASK_PATTERN.test(message) || hasCompletionCueZhTw(message)) {
-      const contextualReference = CONTEXTUAL_COMPLETE_PATTERN_INTENT.test(message)
-      const mutationRequest = MUTATION_REQUEST_PATTERN.test(message)
-      const queryWord = QUERY_WORD_PATTERN.test(message)
-
-      if (contextualReference || mutationRequest || !queryWord) {
-        return buildResult({
-          object: "task_completion",
-          requiresConfirmation: true,
-          confidence: contextualReference || mutationRequest ? 0.94 : 0.82,
-          speechAct: "mutate",
-          targetReferenceMode: contextualReference ? "contextual" : "explicit",
-          temporalScope: /今天/.test(message) ? "today" : "none",
-          reasonCodes: [
-            contextualReference ? "contextual_completion_reference" : "explicit_completion_reference",
-            mutationRequest ? "completion_mutation_request" : "completion_statement",
-          ],
-        }, message)
-      }
+    const normalizedCompletionQuery = normalizeCompletionQuery(message)
+    if (isCompletionStatusStatement(message) && isStableCompletionQuery(normalizedCompletionQuery)) {
+      return buildResult({
+        object: "task_completion",
+        requiresConfirmation: true,
+        confidence: 0.9,
+        speechAct: "mutate",
+        targetReferenceMode: "explicit",
+        temporalScope: "none",
+        reasonCodes: ["completion_status_statement_fast_path"],
+      }, message)
     }
 
     // ── 其餘全部交給 LLM classifier ──
@@ -255,7 +183,11 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       speechAct: "meta",
       targetReferenceMode: "none",
       temporalScope: "none",
-      reasonCodes: ["no_direct_route_match"],
+      reasonCodes: [
+        hasCompletionCueZhTw(message)
+          ? "completion_cue_requires_classifier"
+          : "no_direct_route_match",
+      ],
     }, message)
   }
 }

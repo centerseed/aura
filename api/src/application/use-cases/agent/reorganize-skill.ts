@@ -42,7 +42,7 @@ export const createReorganizeSkill = (userId: string) =>
   skill({
     name: "reorganize",
     description: "重整任務結構",
-    triggers: ["整理", "重組", "歸類", "清理", "亂掉了", "太多任務", "整頓", "幫我整理"],
+    triggers: ["幫我整理", "整理任務", "整理待辦", "重組任務", "重整結構"],
     priority: 8,
     run: async (_message, _context) =>
       makeSkillResult({

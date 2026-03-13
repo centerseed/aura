@@ -1,5 +1,5 @@
 import type { LineSessionPayload, LineSessionType, CompleteTaskDisambiguationPayload } from "@/lib/line-session"
-import { buildCompletionCandidateMessage, buildPendingConfirmationMessage } from "@/lib/line-client"
+import { buildCompletionCandidateMessage, buildCompletionConfirmationMessage, buildPendingConfirmationMessage } from "@/lib/line-client"
 import { extractBrainDumpConfirmationTarget } from "@/lib/line-confirmation"
 import { extractPresentedEntities, parseToolResult } from "@/application/use-cases/agent/tool-result-protocol"
 
@@ -57,6 +57,12 @@ export function buildLineInteractiveReply(
     }
   }
 
+  if (looksLikeCompletionConfirmation(summary)) {
+    return {
+      message: buildCompletionConfirmationMessage(summary),
+    }
+  }
+
   if (looksLikePendingConfirmation(summary)) {
     return {
       message: buildPendingConfirmationMessage(summary),
@@ -109,4 +115,9 @@ function extractCompletionDisambiguationPayload(
 
 function looksLikePendingConfirmation(summary: string): boolean {
   return /回覆[「『"]?確認/u.test(summary) || /是否完成「.+」/u.test(summary)
+}
+
+function looksLikeCompletionConfirmation(summary: string): boolean {
+  return /你是要把「.+」標記為完成嗎/u.test(summary)
+    || /是否完成「.+」/u.test(summary)
 }

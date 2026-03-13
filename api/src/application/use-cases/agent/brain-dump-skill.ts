@@ -189,7 +189,7 @@ export const createBrainDumpSkill = (userId: string) =>
   skill({
     name: "brain_dump",
     description: "記錄任務與想法",
-    triggers: ["記下", "記一下", "待辦", "todo", "任務", "想法", "記得", "幫我記", "幫我加", "新增任務", "再加", "再加一個", "補一個"],
+    triggers: ["記錄", "幫我記", "記一下", "待辦", "todo"],
     priority: 10,
     run: async (message, _context) => {
       if (!shouldActivateBrainDump(message)) {

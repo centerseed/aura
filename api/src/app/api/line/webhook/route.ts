@@ -299,10 +299,13 @@ export async function POST(req: NextRequest) {
               const pushStartedAt = Date.now()
               await client.pushMessage({
                 to: lineUserId,
-                messages: [{
-                  type: "text",
-                  text: "請直接點選下面的候選任務，或回覆「第一個 / 第二個 / 最後一個」。",
-                }],
+                messages: [buildCompletionCandidateMessage(
+                  "請直接點選下面的候選任務，或回覆「第一個 / 第二個 / 最後一個」。",
+                  payload.candidates.map((candidate) => ({
+                    position: candidate.position,
+                    label: `${candidate.position}. ${candidate.taskTitle}`,
+                  })),
+                )],
               })
               timings.push_ms = Date.now() - pushStartedAt
               outcome = "awaiting_disambiguation_selection"
@@ -476,6 +479,14 @@ async function executeLineSessionAction({
 }): Promise<{ message: ReturnType<typeof ensureLineMessages>[number]; outcome: string }> {
   if (!postback) {
     throw new Error("Missing postback payload")
+  }
+
+  if (postback.action === "complete_not_this") {
+    await clearLineSession(lineUserId)
+    return {
+      message: { type: "text", text: "好，我先不標記完成。請告訴我更精確的任務名稱，或重新選其他候選。" },
+      outcome: "complete_task_not_this",
+    }
   }
 
   if (postback.action === "reject_pending") {

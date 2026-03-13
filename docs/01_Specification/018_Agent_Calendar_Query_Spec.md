@@ -1,7 +1,7 @@
 # Agent Calendar Query Specification
 
-**版本**: v1.0
-**更新日期**: 2026-03-11
+**版本**: v1.1
+**更新日期**: 2026-03-13
 **定位**: 擴充 LINE Agent，使其可回應日曆查詢需求，而不再把所有非任務需求都退回成能力外訊息。
 
 ## 1. 問題定義
@@ -24,7 +24,7 @@
 
 ## 3. 第一批支援範圍
 
-本輪只支援 query，不支援 mutation。
+本輪支援 query，並新增「從 calendar event 建立 Zentropy task 並關聯」的輕量 mutation flow。
 
 ### 3.1 支援句型
 
@@ -32,20 +32,26 @@
 - `我明天有什麼會議？`
 - `今天有什麼行程？`
 - `明天有什麼行程？`
+- `未來三天有什麼行程？`
+- `未來兩週有什麼會議？`
 - `今天有空嗎？`
 - `明天下午有空嗎？`
 - `今天上午有沒有空檔？`
+- `未來三天內呢？`（承接上一輪 calendar context）
 
 ### 3.2 支援能力
 
 - 查詢指定日期的 calendar events
+- 查詢未來 3 天 / 未來 2 週的 calendar events
 - 查詢指定日期 / 時段的 availability（free/busy）
+- 在 events query 中標示該 event 是否已連結 Zentropy task
+- 對未連結的 event，允許引導使用者用「把第 N 個加到任務」建立 task 並做關聯
 
 ### 3.3 非目標
 
 - 不在本輪支援建立 / 修改 / 刪除會議
-- 不在本輪支援跨週、多天複雜推理
 - 不在本輪支援日曆與任務的混合規劃回答
+- 不在本輪支援自動判斷應吸附到哪個既有 task；本輪只建立新 task 並關聯 event
 
 ## 4. Canonical Intent
 
@@ -71,9 +77,13 @@
 
 - 今天
 - 明天
+- 未來三天
+- 未來兩週
 - 上午 / 下午 / 晚上
 
 若未明說日期，預設為今天。
+
+若使用者使用承接語句（例如 `未來三天內呢？`），且最近一輪上下文明確是 calendar query，仍必須路由到 `calendar_query`。
 
 ### FR-3 回覆只能根據工具結果
 
@@ -90,6 +100,32 @@
 
 不得退回 generic unknown/fallback 文案。
 
+### FR-5 Events query 必須標示 task 關聯狀態
+
+對每個 event，系統必須判定：
+
+1. 已連結到 Zentropy task
+2. 尚未連結到 Zentropy task
+
+回覆至少要讓使用者知道哪些 event 還沒進到 Zentropy。
+
+### FR-6 對未連結 event 提供顯式建任務入口
+
+若查詢結果中有未連結 event，agent 可以提示：
+
+- `把第 1 個加到任務`
+- `把最後一個加到任務`
+
+這類命令必須只作用在最近一輪呈現過的 calendar event 清單。
+
+### FR-7 使用者同意後建立 task 並關聯 event
+
+當使用者對最近呈現的 calendar event 清單下達明確命令（例如 `把第 1 個加到任務`）時，系統必須：
+
+1. 以該 event title 建立新的 Zentropy task（可先落 INBOX）
+2. 將對應 `calendar_events.task_id` 關聯到新 task
+3. 回覆使用者已建立並關聯成功
+
 ## 6. Response 準則
 
 - 先講重點，再列清單
@@ -102,4 +138,6 @@
 
 1. intent resolver 能把典型會議 / 空檔問句路由到 `calendar_query`
 2. ToolFirstAgent 可 direct route 到 calendar query tool
-3. 既有 agent baseline / remote tests 無嚴重回歸
+3. `未來三天 / 未來兩週 / 承接式 calendar follow-up` 能穩定查到 events
+4. 對未連結 event，`把第 N 個加到任務` 會建立 task 並寫入 calendar relation
+5. 既有 agent baseline / remote tests 無嚴重回歸

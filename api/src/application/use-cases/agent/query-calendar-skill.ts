@@ -21,7 +21,7 @@ export const createQueryCalendarSkill = (userId: string) =>
   skill({
     name: "query_calendar",
     description: "查詢今天或明天的會議、行程或可用空檔",
-    triggers: ["會議", "行程", "有空", "空檔", "calendar"],
+    triggers: [],
     priority: 11,
     run: async (message, _context) =>
       makeSkillResult({

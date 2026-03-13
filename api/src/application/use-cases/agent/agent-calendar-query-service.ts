@@ -10,6 +10,12 @@ export interface AgentCalendarPresentedEntity {
   title: string
   entityId: string
   entityType: "calendar_event"
+  start: string
+  end: string
+  description?: string
+  eventLink?: string
+  meetLink?: string
+  attendees?: string[]
 }
 
 export interface AgentCalendarEventItem {
@@ -17,8 +23,13 @@ export interface AgentCalendarEventItem {
   title: string
   start: string
   end: string
+  description?: string
   eventLink?: string
   meetLink?: string
+  attendees?: string[]
+  linkedTaskId?: string
+  linkedTaskTitle?: string
+  isLinkedToTask: boolean
 }
 
 export interface AgentCalendarAvailabilityItem {
@@ -44,7 +55,8 @@ type CalendarQueryType = "events" | "availability"
 
 interface ParsedCalendarQuery {
   queryType: CalendarQueryType
-  dayOffset: 0 | 1
+  dayOffset?: 0 | 1
+  rollingDays?: number
   part: TimeScopePart
   scopeLabel: string
 }
@@ -53,12 +65,13 @@ export class AgentCalendarQueryService {
   constructor(
     private readonly calendarService: CalendarService = new CalendarService(prisma),
     private readonly timezoneResolver: typeof resolveTimezone = resolveTimezone,
+    private readonly calendarEventStore: Pick<typeof prisma.calendarEvent, "findMany"> = prisma.calendarEvent,
   ) {}
 
   async query(userId: string, rawMessage: string): Promise<AgentCalendarQueryResult> {
     const parsed = parseCalendarQuery(rawMessage)
     const timezone = await this.timezoneResolver(userId)
-    const { timeMin, timeMax } = resolveTimeRange(new Date(), timezone, parsed.dayOffset, parsed.part)
+    const { timeMin, timeMax } = resolveTimeRange(new Date(), timezone, parsed)
 
     if (parsed.queryType === "availability") {
       const freeBusy = await this.calendarService.queryFreeBusy(userId, timeMin, timeMax, resolveWorkingHours(parsed.part))
@@ -81,14 +94,44 @@ export class AgentCalendarQueryService {
     }
 
     const eventResult = await this.calendarService.queryEvents(userId, timeMin, timeMax)
-    const events = eventResult.events.slice(0, MAX_DISPLAY_ITEMS).map((event) => ({
-      eventId: event.eventId,
-      title: event.summary,
-      start: event.start,
-      end: event.end,
-      eventLink: event.eventLink,
-      meetLink: event.meetLink,
-    }))
+    const linkedEvents = await this.calendarEventStore.findMany({
+      where: {
+        user_id: userId,
+        deleted_at: null,
+        calendar_event_id: {
+          in: eventResult.events.map((event) => event.eventId),
+        },
+      },
+      select: {
+        calendar_event_id: true,
+        task_id: true,
+        task: {
+          select: {
+            content: true,
+          },
+        },
+      },
+    })
+    const linkedEventMap = new Map(
+      linkedEvents.map((event) => [event.calendar_event_id, event]),
+    )
+
+    const events = eventResult.events.slice(0, MAX_DISPLAY_ITEMS).map((event) => {
+      const linked = linkedEventMap.get(event.eventId)
+      return {
+        eventId: event.eventId,
+        title: event.summary,
+        start: event.start,
+        end: event.end,
+        description: event.description,
+        eventLink: event.eventLink,
+        meetLink: event.meetLink,
+        attendees: event.attendees ?? [],
+        linkedTaskId: linked?.task_id ?? undefined,
+        linkedTaskTitle: linked?.task?.content ?? undefined,
+        isLinkedToTask: Boolean(linked?.task_id),
+      }
+    })
 
     return {
       queryType: "events",
@@ -102,6 +145,12 @@ export class AgentCalendarQueryService {
         title: event.title,
         entityId: event.eventId,
         entityType: "calendar_event" as const,
+        start: event.start,
+        end: event.end,
+        description: event.description,
+        eventLink: event.eventLink,
+        meetLink: event.meetLink,
+        attendees: event.attendees,
       })),
       summary: formatEventsSummary(parsed.scopeLabel, timezone, events, eventResult.events.length),
     }
@@ -122,7 +171,12 @@ export function serializeCalendarQueryToolResult(result: AgentCalendarQueryResul
 }
 
 function parseCalendarQuery(message: string): ParsedCalendarQuery {
-  const dayOffset = /明天/.test(message) ? 1 : 0
+  const rollingDays = /未來\s*(?:三天|3天)/.test(message)
+    ? 3
+    : /未來\s*(?:兩週|2週|两周|兩周|14天)/.test(message)
+      ? 14
+      : undefined
+  const dayOffset = rollingDays ? undefined : (/明天/.test(message) ? 1 : 0)
   const part = /上午|早上/.test(message)
     ? "morning"
     : /下午/.test(message)
@@ -138,12 +192,15 @@ function parseCalendarQuery(message: string): ParsedCalendarQuery {
   return {
     queryType,
     dayOffset,
+    rollingDays,
     part,
-    scopeLabel: formatScopeLabel(dayOffset, part),
+    scopeLabel: formatScopeLabel(dayOffset, part, rollingDays),
   }
 }
 
-function formatScopeLabel(dayOffset: 0 | 1, part: TimeScopePart): string {
+function formatScopeLabel(dayOffset: 0 | 1 | undefined, part: TimeScopePart, rollingDays?: number): string {
+  if (rollingDays === 3) return "未來三天"
+  if (rollingDays === 14) return "未來兩週"
   const dayLabel = dayOffset === 1 ? "明天" : "今天"
   if (part === "full_day") return dayLabel
   if (part === "morning") return `${dayLabel}上午`
@@ -154,28 +211,34 @@ function formatScopeLabel(dayOffset: 0 | 1, part: TimeScopePart): string {
 function resolveTimeRange(
   now: Date,
   timezone: string,
-  dayOffset: 0 | 1,
-  part: TimeScopePart,
+  parsed: ParsedCalendarQuery,
 ): { timeMin: string; timeMax: string } {
   const todayStart = getStartOfDay(now, timezone)
-  const targetDayStart = new Date(todayStart.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+  if (parsed.rollingDays) {
+    return {
+      timeMin: todayStart.toISOString(),
+      timeMax: new Date(todayStart.getTime() + parsed.rollingDays * 24 * 60 * 60 * 1000).toISOString(),
+    }
+  }
+
+  const targetDayStart = new Date(todayStart.getTime() + (parsed.dayOffset ?? 0) * 24 * 60 * 60 * 1000)
   const targetDayEnd = new Date(getEndOfDay(targetDayStart, timezone))
 
-  if (part === "morning") {
+  if (parsed.part === "morning") {
     return {
       timeMin: new Date(targetDayStart.getTime() + 9 * 60 * 60 * 1000).toISOString(),
       timeMax: new Date(targetDayStart.getTime() + 12 * 60 * 60 * 1000).toISOString(),
     }
   }
 
-  if (part === "afternoon") {
+  if (parsed.part === "afternoon") {
     return {
       timeMin: new Date(targetDayStart.getTime() + 13 * 60 * 60 * 1000).toISOString(),
       timeMax: new Date(targetDayStart.getTime() + 18 * 60 * 60 * 1000).toISOString(),
     }
   }
 
-  if (part === "evening") {
+  if (parsed.part === "evening") {
     return {
       timeMin: new Date(targetDayStart.getTime() + 18 * 60 * 60 * 1000).toISOString(),
       timeMax: new Date(targetDayStart.getTime() + 22 * 60 * 60 * 1000).toISOString(),
@@ -210,10 +273,18 @@ function formatEventsSummary(
     : `📅 ${scopeLabel}共有 ${totalCount} 個行程：`
 
   const items = events.map((event, index) =>
-    `${index + 1}. ${formatTimeRange(event.start, event.end, timezone)} ${event.title}`,
+    `${index + 1}. ${formatEventTimeRange(scopeLabel, event.start, event.end, timezone)} ${event.title}${event.isLinkedToTask ? `｜已連結：${event.linkedTaskTitle}` : "｜未連結任務"}`,
   )
 
-  return [header, "", ...items].join("\n")
+  const unlinkedEvents = events.filter((event) => !event.isLinkedToTask)
+  const guidance = unlinkedEvents.length > 0
+    ? [
+        "",
+        `如果你要，我可以把未連結的行程轉成 Zentropy 任務。直接回覆「把第 ${unlinkedEvents[0] === events[0] ? 1 : events.findIndex((event) => !event.isLinkedToTask) + 1} 個加到任務」。`,
+      ]
+    : []
+
+  return [header, "", ...items, ...guidance].join("\n")
 }
 
 function formatAvailabilitySummary(
@@ -248,6 +319,27 @@ function formatTimeRange(start: string, end: string, timezone: string): string {
   return `${formatter.format(new Date(start))}-${formatter.format(new Date(end))}`
 }
 
+function formatEventTimeRange(
+  scopeLabel: string,
+  start: string,
+  end: string,
+  timezone: string,
+): string {
+  const timeRange = formatTimeRange(start, end, timezone)
+
+  if (!/未來三天|未來兩週/u.test(scopeLabel)) {
+    return timeRange
+  }
+
+  const dateFormatter = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: timezone,
+    month: "2-digit",
+    day: "2-digit",
+  })
+
+  return `${dateFormatter.format(new Date(start))} ${timeRange}`
+}
+
 export function isCalendarNotConnectedError(error: unknown): boolean {
   return error instanceof Error && /Google Calendar not connected/i.test(error.message)
 }
@@ -265,5 +357,7 @@ export function toEventItems(events: CalendarEventSummary[]): AgentCalendarEvent
     end: event.end,
     eventLink: event.eventLink,
     meetLink: event.meetLink,
+    attendees: event.attendees ?? [],
+    isLinkedToTask: false,
   }))
 }

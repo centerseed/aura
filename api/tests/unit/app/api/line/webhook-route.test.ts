@@ -148,6 +148,50 @@ function buildPostbackRequest(
 
 function installToolFirstAgentMock(lineUserId = "line-user-1"): void {
   const historyBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
+  const intentResolver = {
+    resolve: vi.fn(async ({ message }: { message: string }) => {
+      const normalized = message.trim()
+      const completionLike = /完成|做完|跑完|done|搞定|結束了|標記完成/i.test(normalized)
+      const todayFocusLike = /今天.*(要做什麼|待辦|代辦|任務)|有哪些代辦任務/i.test(normalized)
+      const captureLike = /幫我記|記一下|記錄|待辦[:：]/i.test(normalized)
+      const recallLike = /剛才記了什麼|你幫我記了什麼/i.test(normalized)
+
+      const object = captureLike
+        ? "task_capture"
+        : recallLike
+          ? "recall_last_item"
+          : completionLike
+            ? "task_completion"
+            : todayFocusLike
+              ? "today_focus"
+              : "unknown"
+
+      return {
+        intent: {
+          object,
+          requiresConfirmation: object === "task_completion",
+          confidence: object === "unknown" ? 0.1 : 0.9,
+        },
+        trace: {
+          routeSource: "intent_resolver",
+          resolver: "test-resolver",
+          rawMessage: normalized,
+          resolvedIntent: {
+            object,
+            requiresConfirmation: object === "task_completion",
+            confidence: object === "unknown" ? 0.1 : 0.9,
+          },
+          metadata: {
+            temporalScope: /明天/.test(normalized) ? "future" : /今天/.test(normalized) ? "today" : "none",
+            targetReferenceMode: /這件事|這個|那個|剛才/i.test(normalized) ? "contextual" : "explicit",
+            reasonCodes: ["test_override"],
+          },
+          selectedTool: null,
+          targetQuery: null,
+        },
+      }
+    }),
+  }
 
   mockCreateZentropyAgent.mockImplementation(() => new ToolFirstAgent({
     delegate: {
@@ -174,6 +218,7 @@ function installToolFirstAgentMock(lineUserId = "line-user-1"): void {
     },
     memoryManager: null,
     lineUserId,
+    intentResolver,
   }))
 }
 
@@ -757,6 +802,53 @@ describe("POST /api/line/webhook", () => {
     expect(mockClearLineSession).toHaveBeenCalledWith("line-user-1")
     expect(mockPushMessage).toHaveBeenLastCalledWith(expect.objectContaining({
       messages: [{ type: "text", text: "✅ 已記錄 1 個項目：修復embedded問題" }],
+    }))
+  })
+
+  it("renders completion confirmation as quick reply buttons", async () => {
+    pendingLineSessions.set("line-user-1", {
+      type: "complete_task_confirm",
+      payload: {
+        sourceType: "task",
+        taskId: "task-1",
+        taskTitle: "寄信給客戶",
+      },
+    })
+
+    mockAgentChat.mockResolvedValue({
+      blocked: false,
+      content: "你是要把「寄信給客戶」標記為完成嗎？",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      intent: null,
+      toolCalls: ["complete_task_search"],
+      timings: {},
+      sessionId: "line-user-1",
+      traceId: null,
+      trace: null,
+    })
+
+    pendingLineSessions.delete("line-user-1")
+    await POST(buildRequest("信已經發出去給客戶了"))
+    await flushAsyncWork()
+
+    expect(mockPushMessage).toHaveBeenLastCalledWith(expect.objectContaining({
+      messages: [expect.objectContaining({
+        type: "text",
+        text: "你是要把「寄信給客戶」標記為完成嗎？",
+        quickReply: {
+          items: [
+            expect.objectContaining({
+              action: expect.objectContaining({ data: "a=confirm_pending", label: "確認完成" }),
+            }),
+            expect.objectContaining({
+              action: expect.objectContaining({ data: "a=complete_not_this", label: "不是這個" }),
+            }),
+            expect.objectContaining({
+              action: expect.objectContaining({ data: "a=reject_pending", label: "取消" }),
+            }),
+          ],
+        },
+      })],
     }))
   })
 

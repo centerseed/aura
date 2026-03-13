@@ -6,6 +6,12 @@ export interface PresentedEntity {
   taskId?: string
   subTaskId?: string
   planItemId?: string
+  start?: string
+  end?: string
+  description?: string
+  eventLink?: string
+  meetLink?: string
+  attendees?: string[]
 }
 
 export interface ParsedToolResult {
@@ -71,6 +77,14 @@ export function extractPresentedEntities(
         taskId: typeof entity.taskId === "string" ? entity.taskId : undefined,
         subTaskId: typeof entity.subTaskId === "string" ? entity.subTaskId : undefined,
         planItemId: typeof entity.planItemId === "string" ? entity.planItemId : undefined,
+        start: typeof entity.start === "string" ? entity.start : undefined,
+        end: typeof entity.end === "string" ? entity.end : undefined,
+        description: typeof entity.description === "string" ? entity.description : undefined,
+        eventLink: typeof entity.eventLink === "string" ? entity.eventLink : undefined,
+        meetLink: typeof entity.meetLink === "string" ? entity.meetLink : undefined,
+        attendees: Array.isArray(entity.attendees)
+          ? entity.attendees.filter((item): item is string => typeof item === "string")
+          : undefined,
       }
     })
     .filter((item) => item !== null)

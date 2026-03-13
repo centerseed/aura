@@ -45,7 +45,7 @@ export const createQueryTasksSkill = (userId: string) =>
   skill({
     name: "query_tasks",
     description: "查詢今日任務清單或今日完成清單",
-    triggers: ["今天", "要做什麼", "有什麼事", "待辦", "任務清單", "今日", "有哪些任務", "完成了什麼", "今天完成"],
+    triggers: [],
     priority: 10,
     run: async (_message, _context) =>
       makeSkillResult({

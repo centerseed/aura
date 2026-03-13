@@ -569,7 +569,7 @@ export const createPlannerSkill = (userId: string) =>
   skill({
     name: "planner",
     description: "拆解大目標為任務清單",
-    triggers: ["規劃", "拆解", "計畫", "planner", "幫我規劃", "展開", "怎麼做", "怎麼拆", "任務計畫"],
+    triggers: [],
     priority: 6,
     run: async (_message, _context) =>
       makeSkillResult({

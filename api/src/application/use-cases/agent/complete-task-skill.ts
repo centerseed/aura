@@ -9,6 +9,7 @@ import { tool, skill, makeSkillResult } from "naru-agent-js"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 import type { CompleteTaskPayload } from "@/lib/line-session"
+import { saveLineSession } from "@/lib/line-session"
 import { serializeFactsSummary } from "./tool-result-protocol"
 import { normalizeCompletionQuery, resolveCompletionQuery } from "./completion-query-normalizer"
 import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
@@ -71,7 +72,8 @@ interface CompleteTaskSearchFacts {
 async function executeCompleteTaskSearch(
   userId: string,
   taskName: string,
-  _lineUserId?: string,
+  lineUserId?: string,
+  requireConfirmation = false,
 ): Promise<string> {
       const resolvedTaskName = await resolveCompletionQuery(taskName)
       const searchQuery = resolvedTaskName || taskName
@@ -193,6 +195,13 @@ async function executeCompleteTaskSearch(
 
       if (decision.type === "selected") {
         const payload = toCompleteTaskPayload(decision.task)
+        if (requireConfirmation) {
+          await persistCompletionConfirmation(lineUserId, payload)
+          return serializeCompleteTaskSearchResult(
+            buildSearchFacts(searchQuery, searchableTasks.length, top, "awaiting_confirmation", decision.task),
+            buildCompletionConfirmationPrompt(decision.task.content),
+          )
+        }
         await executeCompleteTaskPayload(userId, payload)
         return serializeCompleteTaskSearchResult(
           buildSearchFacts(searchQuery, searchableTasks.length, top, "completed", decision.task),
@@ -204,6 +213,13 @@ async function executeCompleteTaskSearch(
         const [candidate] = top
         if (candidate) {
           const payload = toCompleteTaskPayload(candidate)
+          if (requireConfirmation) {
+            await persistCompletionConfirmation(lineUserId, payload)
+            return serializeCompleteTaskSearchResult(
+              buildSearchFacts(searchQuery, searchableTasks.length, top, "awaiting_confirmation", candidate),
+              buildCompletionConfirmationPrompt(candidate.content),
+            )
+          }
           await executeCompleteTaskPayload(userId, payload)
 
           return serializeCompleteTaskSearchResult(
@@ -224,6 +240,7 @@ export const createCompleteTaskSearchTool = (
   originalMessage: string,
   lineUserId?: string,
   resolvedQuery?: string,
+  requireConfirmation = false,
 ) =>
   tool({
     name: "complete_task_search",
@@ -231,12 +248,13 @@ export const createCompleteTaskSearchTool = (
     // Groq function calling 會偶發把 schema 結構當成參數值回傳。
     // 這裡改成零參數工具，直接對使用者原句做任務搜尋，降低 provider 相容性風險。
     parameters: z.object({}),
-    execute: async () => executeCompleteTaskSearch(userId, resolvedQuery ?? originalMessage, lineUserId),
+    execute: async () => executeCompleteTaskSearch(userId, resolvedQuery ?? originalMessage, lineUserId, requireConfirmation),
   })
 
 export const createParameterizedCompleteTaskSearchTool = (
   userId: string,
   lineUserId?: string,
+  requireConfirmation = false,
 ) =>
   tool({
     name: "complete_task_search",
@@ -244,14 +262,14 @@ export const createParameterizedCompleteTaskSearchTool = (
     parameters: z.object({
       query: z.string().describe("要完成的任務名稱或關鍵字"),
     }),
-    execute: async ({ query }) => executeCompleteTaskSearch(userId, query, lineUserId),
+    execute: async ({ query }) => executeCompleteTaskSearch(userId, query, lineUserId, requireConfirmation),
   })
 
 export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
   skill({
     name: "complete_task",
     description: "標記任務為完成",
-    triggers: ["完成", "做完", "搞定", "done", "完成了", "已完成", "做好了", "結束了"],
+    triggers: [],
     priority: 9,
     run: async (_message, _context) =>
       makeSkillResult({
@@ -266,6 +284,18 @@ export const createCompleteTaskSkill = (userId: string, lineUserId?: string) =>
         skillName: "complete_task",
       }),
   })
+
+async function persistCompletionConfirmation(
+  lineUserId: string | undefined,
+  payload: CompleteTaskPayload,
+): Promise<void> {
+  if (!lineUserId) return
+  await saveLineSession(lineUserId, "complete_task_confirm", payload)
+}
+
+function buildCompletionConfirmationPrompt(taskTitle: string): string {
+  return `你是要把「${taskTitle}」標記為完成嗎？`
+}
 
 async function rankTaskMatches(taskName: string, tasks: SearchableTask[]): Promise<RankedTaskMatch[]> {
   const normalizedQuery = normalizeCompletionQuery(taskName)

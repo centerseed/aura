@@ -2,6 +2,7 @@ import { z } from "zod"
 
 export const AGENT_INTENT_OBJECT_VALUES = [
   "task_capture",
+  "calendar_task_link",
   "task_completion",
   "today_focus",
   "completed_today",

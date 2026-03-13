@@ -25,8 +25,9 @@ interface ChatSnapshot {
 }
 
 function requiresConfirmation(snapshot: ChatSnapshot): boolean {
+  const hasConfirmButton = snapshot.buttonLabels.some((label) => label === "確認" || label.startsWith("確認"))
   return snapshot.lineUiMode === "quickReply"
-    && snapshot.buttonLabels.includes("確認")
+    && hasConfirmButton
     && snapshot.buttonLabels.includes("取消")
 }
 
@@ -37,11 +38,12 @@ function requiresConfirmation(snapshot: ChatSnapshot): boolean {
 async function cleanTestUser() {
   const r2 = await prisma.$executeRawUnsafe(`DELETE FROM daily_plan_items WHERE task_id IN (SELECT id FROM tasks WHERE user_id = '${userId}')`)
   const r1 = await prisma.$executeRawUnsafe(`DELETE FROM sub_tasks WHERE task_id IN (SELECT id FROM tasks WHERE user_id = '${userId}')`)
+  const r0 = await prisma.$executeRawUnsafe(`UPDATE calendar_events SET task_id = NULL, deleted_at = NULL WHERE user_id = '${userId}'`)
   const r3 = await prisma.$executeRawUnsafe(`DELETE FROM tasks WHERE user_id = '${userId}'`)
   const r4 = await prisma.$executeRawUnsafe(`DELETE FROM topics WHERE product_id IN (SELECT id FROM products WHERE user_id = '${userId}')`)
   const r5 = await prisma.$executeRawUnsafe(`DELETE FROM products WHERE user_id = '${userId}'`)
   const r6 = await prisma.$executeRawUnsafe(`DELETE FROM areas WHERE user_id = '${userId}'`)
-  console.log(`🧹 [CLEANUP] daily_plan_items=${r2} sub_tasks=${r1} tasks=${r3} topics=${r4} products=${r5} areas=${r6}`)
+  console.log(`🧹 [CLEANUP] calendar_events_reset=${r0} daily_plan_items=${r2} sub_tasks=${r1} tasks=${r3} topics=${r4} products=${r5} areas=${r6}`)
 }
 
 async function verifyTasksInDB(label: string, expectedTitles: string[]) {
@@ -80,6 +82,56 @@ async function verifyTaskCompleted(label: string, expectedTitle: string) {
   if (!isArchived) {
     failures.push(`[${label}] 任務未完成封存: ${match.content} status=${match.status}`)
   }
+}
+
+async function hasCalendarConnection(): Promise<boolean> {
+  const token = await prisma.oAuthToken.findFirst({
+    where: { user_id: userId, provider: "GOOGLE_CALENDAR" },
+    select: { id: true },
+  })
+  return Boolean(token)
+}
+
+function extractCreatedTaskTitle(reply: string): string | null {
+  const quotedMatch = reply.match(/已建立 INBOX 任務[「「『"]([^」』"]+)[」』"]/u)
+  if (quotedMatch?.[1]) return quotedMatch[1].trim()
+
+  const plainMatch = reply.match(/已建立 INBOX 任務\s*([^，。\n]+)/u)
+  return plainMatch?.[1]?.trim() ?? null
+}
+
+async function verifyCalendarEventLinked(label: string, expectedTaskTitle?: string) {
+  const linkedEvent = await prisma.calendarEvent.findFirst({
+    where: {
+      user_id: userId,
+      deleted_at: null,
+      task_id: { not: null },
+      ...(expectedTaskTitle
+        ? {
+            task: {
+              content: {
+                contains: expectedTaskTitle,
+              },
+            },
+          }
+        : {}),
+    },
+    select: {
+      calendar_event_id: true,
+      summary: true,
+      task_id: true,
+      task: { select: { content: true, status: true } },
+    },
+    orderBy: { updated_at: "desc" },
+  })
+
+  if (!linkedEvent) {
+    console.log(`  🔍 [Calendar連結驗證 ${label}] ❌ 找不到已關聯到任務「${expectedTaskTitle}」的 calendar event`)
+    failures.push(`[${label}] 找不到已關聯 calendar event 的任務: ${expectedTaskTitle}`)
+    return
+  }
+
+  console.log(`  🔍 [Calendar連結驗證 ${label}] ✅ event=${linkedEvent.summary} → task=${linkedEvent.task?.content}`)
 }
 
 async function seedBaseTasks(extraTasks: string[] = []) {
@@ -276,6 +328,12 @@ async function main() {
     undefined,
     { mode: "quickReply", sessionType: "brain_dump_pending", buttonLabels: ["記錄", "取消"] },
   )
+  if (await hasCalendarConnection()) {
+    await singleTurn("A14: Calendar 查詢（未來三天）", "幫我看未來三天有什麼行程")
+  } else {
+    console.log("\n[單輪] A14: Calendar 查詢（未來三天）")
+    console.log("  ⏭️ Skip：測試 user 尚未連接 Google Calendar")
+  }
 
   await resetScenario("Section B")
 
@@ -364,6 +422,31 @@ async function main() {
     }
     await verifyTaskCompleted("F2: 整理書桌", "整理書桌")
   })
+
+  // ════════════════════════════════════════════════
+  // Section G：Calendar 查詢 → 第 N 個加到任務 → DB驗證
+  // ════════════════════════════════════════════════
+  console.log("\n════════════ G. Calendar：查詢 → 轉任務 ════════════")
+  if (await hasCalendarConnection()) {
+    await runSection("Section G", async () => {
+      const sid = "multi-g1-" + Date.now()
+      const g1 = await multiTurn(sid, "G1: 查未來三天行程", "幫我看未來三天有什麼行程")
+      if (!g1.content.includes("未連結任務") && !g1.content.includes("加到任務")) {
+        failures.push("[G1] Calendar 查詢結果沒有出現可轉任務提示")
+      }
+
+      const g2 = await multiTurn(sid, "G2: 把第 1 個加到任務", "把第 1 個加到任務")
+      const createdTaskTitle = extractCreatedTaskTitle(g2.content)
+      if (!createdTaskTitle) {
+        failures.push("[G2] 無法從回覆中解析出建立的任務標題")
+      } else {
+        await verifyTasksInDB("G3: Calendar event 建立任務", [createdTaskTitle])
+        await verifyCalendarEventLinked("G4: Calendar event 關聯 task_id", createdTaskTitle)
+      }
+    })
+  } else {
+    console.log("  ⏭️ Skip：測試 user 尚未連接 Google Calendar")
+  }
 
   if (failures.length > 0) {
     console.log("\n⚠️ 本次執行有失敗，但後續 section 已繼續執行：")
