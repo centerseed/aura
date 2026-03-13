@@ -57,8 +57,11 @@ interface SessionStoreLike {
   save(sessionId: string, history: ModelMessage[]): Promise<void>
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DelegateResult = Record<string, any> & { content: string }
+
 interface AgentChatDelegate {
-  chat(message: string, options?: ChatOptions): Promise<AgentChatResult>
+  chat(message: string, options?: ChatOptions): Promise<DelegateResult>
 }
 
 export interface PendingStateProvider {
@@ -306,7 +309,7 @@ export class AgentOrchestrator {
         }
       }
 
-      return finish({ ...delegateResult, pendingConfirmation }, "delegate")
+      return finish({ ...delegateResult, pendingConfirmation } as AgentChatResult, "delegate")
     } catch (error) {
       console.error(JSON.stringify({
         event: "agent_orchestrator_chat_error",
