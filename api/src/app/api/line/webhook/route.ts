@@ -7,14 +7,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { verifyLineSignature, getLineClient, buildCompletionCandidateMessage, buildPendingConfirmationMessage, decodeLinePostbackPayload, ensureLineMessages } from "@/lib/line-client"
+import { verifyLineSignature, getLineClient, buildCompletionCandidateMessage, decodeLinePostbackPayload, ensureLineMessages } from "@/lib/line-client"
 import { createZentropyAgent } from "@/application/use-cases/agent/zentropy-agent"
 import { prisma } from "@/lib/db"
 import { getLineSession, clearLineSession, saveLineSession } from "@/lib/line-session"
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
 import type { AdjustTagsPayload, BrainDumpPendingPayload, CompleteTaskDisambiguationPayload, CompleteTaskPayload, LineSessionPayload, LineSessionType } from "@/lib/line-session"
 import { generateLineMagicLink } from "@/lib/line-magic-link"
-import { classifyConfirmationDisposition, extractBrainDumpConfirmationTarget, parseOrdinalSelection } from "@/lib/line-confirmation"
+import { classifyConfirmationDisposition, parseOrdinalSelection } from "@/lib/line-confirmation"
 import { createBrainDumpTool } from "@/application/use-cases/agent/brain-dump-skill"
 import { parseToolResult } from "@/application/use-cases/agent/tool-result-protocol"
 import { normalizeAgentUsage } from "@/application/use-cases/agent/llm-logging"
