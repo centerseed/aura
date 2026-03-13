@@ -18,10 +18,11 @@ import { createCompleteTaskSkill } from "./complete-task-skill"
 import { StructuredFallbackAgentIntentResolver } from "./agent-intent-resolver"
 import { getAgentRuntime } from "./agent-runtime"
 import { LifecycleAwareAgent } from "./lifecycle-aware-agent"
-import { ToolFirstAgent } from "./tool-first-agent"
+import { AgentOrchestrator } from "./agent-orchestrator"
+import { LineAdapter } from "./line-adapter"
 import { AgentChatTurnLogger } from "./agent-chat-turn-logger"
 import { GroqPromptGuardrail } from "@/application/services/groq-prompt-guardrail"
-import { getAgentChatModel, getAgentRoutingMode, getAgentSummaryModel } from "@/lib/agent-model"
+import { getAgentChatModel, getAgentSummaryModel } from "@/lib/agent-model"
 import { createDecisionFallbackAgent, createResponseAgent, type AgentRuntimeParts } from "./agent-factories"
 import { DECISION_PROMPT } from "./decision-prompt"
 
@@ -92,16 +93,24 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     }),
   })
 
-  const agent = getAgentRoutingMode() === "tool_first"
-    ? new ToolFirstAgent({
-        delegate: baseAgent,
-        sessionStore: rawRuntime.sessionStore,
-        metaStore: rawRuntime.metaStore,
-        memoryManager: rawRuntime.longTermMemoryMode === "each_turn" ? rawRuntime.memoryManager : null,
-        lineUserId: confirmationKey,
-        intentResolver,
-      })
-    : baseAgent
+  // Build pending state provider for LINE (or API sessions with confirmationKey)
+  const lineAdapter = new LineAdapter()
+  const pendingStateProvider = {
+    load: (sessionId: string) => lineAdapter.loadPendingState(sessionId),
+    save: (sessionId: string, type: string, payload: unknown) =>
+      lineAdapter.savePendingState(sessionId, type, payload),
+    clear: (sessionId: string) => lineAdapter.clearPendingState(sessionId),
+  }
+
+  const agent = new AgentOrchestrator({
+    delegate: baseAgent,
+    sessionStore: rawRuntime.sessionStore,
+    metaStore: rawRuntime.metaStore,
+    memoryManager: rawRuntime.longTermMemoryMode === "each_turn" ? rawRuntime.memoryManager : null,
+    confirmationKey,
+    intentResolver,
+    pendingStateProvider,
+  })
 
   return new LifecycleAwareAgent(
     agent,

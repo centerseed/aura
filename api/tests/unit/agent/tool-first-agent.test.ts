@@ -792,6 +792,9 @@ describe("ToolFirstAgent", () => {
   })
 
   it("routes code-switching completion phrasing with explicit completion cue through the normalized query", async () => {
+    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
+      .mockResolvedValueOnce("email寄給客戶")
+
     const delegate = {
       chat: vi.fn().mockResolvedValue({
         blocked: false,
