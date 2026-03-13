@@ -201,4 +201,100 @@ describe('GenerateRecurringTaskInstancesUseCase', () => {
       taskId: 'created-task-99',
     })
   })
+
+  // AC3: DAILY task 每天只產生 1 張卡（lead_days=0 不超前建立）
+  it('AC3: lead_days=0 時只建立今天的 task，不建立明天的', async () => {
+    // nextOccurrenceAt = today，lead_days=0
+    mockRecurringRepo.findPendingForUser.mockResolvedValue([
+      makeTemplate({ leadDays: 0, nextOccurrenceAt: TODAY_UTC }),
+    ])
+
+    const result = await useCase.execute({ userId: VALID_USER_ID, localDate: LOCAL_DATE })
+
+    // 今天的 task 應被建立
+    expect(result.generated).toBe(1)
+    expect(mockTaskRepo.create).toHaveBeenCalledOnce()
+    expect(mockTaskRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ dueDate: TODAY_UTC })
+    )
+  })
+
+  it('AC3: lead_days=0 時，nextOccurrenceAt=tomorrow 不建立任何 task（沒有超前）', async () => {
+    // 當 pointer 已被推進到明天，今天呼叫 generate 不應建立明天的 task
+    const tomorrow = new Date(Date.UTC(2026, 2, 6)) // 2026-03-06
+    mockRecurringRepo.findPendingForUser.mockResolvedValue([
+      makeTemplate({ leadDays: 0, nextOccurrenceAt: tomorrow }),
+    ])
+
+    const result = await useCase.execute({ userId: VALID_USER_ID, localDate: LOCAL_DATE })
+
+    // tomorrow > today+0，超過 generateThreshold，靜默跳過
+    expect(result.generated).toBe(0)
+    expect(result.skipped).toBe(0)
+    expect(mockTaskRepo.create).not.toHaveBeenCalled()
+    expect(mockRecurringRepo.update).not.toHaveBeenCalled()
+  })
+
+  // AC4: lead_days=0 下 dedup 正常運作
+  it('AC4: lead_days=0 時重複呼叫不建立第二張 task', async () => {
+    mockRecurringRepo.findPendingForUser.mockResolvedValue([
+      makeTemplate({ leadDays: 0, nextOccurrenceAt: TODAY_UTC }),
+    ])
+    // 模擬今天的 task 已存在（dedup）
+    mockQueryRaw.mockResolvedValue([{ id: 'existing-today-task' }])
+
+    const result = await useCase.execute({ userId: VALID_USER_ID, localDate: LOCAL_DATE })
+
+    expect(result.generated).toBe(0)
+    expect(result.skipped).toBe(1)
+    expect(result.details[0].taskId).toBe('existing-today-task')
+    expect(mockTaskRepo.create).not.toHaveBeenCalled()
+    expect(mockRecurringRepo.update).toHaveBeenCalledOnce() // 仍要推進 pointer
+  })
+
+  // AC5: 隔天只產生新的一張卡
+  it('AC5: 隔天（nextOccurrenceAt=tomorrow）呼叫 generate 只建立 tomorrow 的 task', async () => {
+    const tomorrow = new Date(Date.UTC(2026, 2, 6)) // 2026-03-06
+    const tomorrowDate = '2026-03-06'
+    mockRecurringRepo.findPendingForUser.mockResolvedValue([
+      makeTemplate({ leadDays: 0, nextOccurrenceAt: tomorrow }),
+    ])
+
+    const result = await useCase.execute({ userId: VALID_USER_ID, localDate: tomorrowDate })
+
+    // tomorrow <= tomorrow+0，應建立一張
+    expect(result.generated).toBe(1)
+    expect(mockTaskRepo.create).toHaveBeenCalledOnce()
+    expect(mockTaskRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ dueDate: tomorrow })
+    )
+  })
+
+  // AC6: WEEKLY task 在匹配的週一仍正常建立
+  it('AC6: WEEKLY task（lead_days=0）在匹配的週一建立 task', async () => {
+    // 2026-03-09 是週一
+    const monday = new Date(Date.UTC(2026, 2, 9))
+    const mondayDate = '2026-03-09'
+    mockRecurringRepo.findPendingForUser.mockResolvedValue([
+      makeTemplate({
+        leadDays: 0,
+        nextOccurrenceAt: monday,
+        recurrenceRule: {
+          frequency: 'WEEKLY',
+          interval: 1,
+          timezone: 'Asia/Taipei',
+          startDate: '2026-01-05',
+          daysOfWeek: [1],
+        },
+      }),
+    ])
+
+    const result = await useCase.execute({ userId: VALID_USER_ID, localDate: mondayDate })
+
+    expect(result.generated).toBe(1)
+    expect(mockTaskRepo.create).toHaveBeenCalledOnce()
+    expect(mockTaskRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ dueDate: monday })
+    )
+  })
 })
