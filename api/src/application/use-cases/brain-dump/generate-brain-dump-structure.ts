@@ -17,6 +17,8 @@ import { ValidationException } from "@/lib/api-response"
 import type { AiTokenUsage } from "@/lib/ai-rate-limit"
 import { logAgentLlmCall, normalizeAiSdkUsage } from "@/application/use-cases/agent/llm-logging"
 
+export const DEFAULT_BRAIN_DUMP_MODEL = "gemini-2.5-flash-lite"
+
 // ============================================================================
 // Zod Schemas (moved from route)
 // ============================================================================
@@ -622,7 +624,7 @@ export class GenerateBrainDumpStructureUseCase {
         const { object, usage } = await resilientGenerateObject({
           model: process.env.OPENROUTER_MODEL
             ? createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY! })(process.env.OPENROUTER_MODEL)
-            : google("gemini-2.5-flash-lite"),
+            : google(DEFAULT_BRAIN_DUMP_MODEL),
           schema: StructureResultSchema,
           prompt: `你是任務記錄專家。將用戶輸入轉成結構化的 Task。
 

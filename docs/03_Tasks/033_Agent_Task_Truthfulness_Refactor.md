@@ -40,6 +40,90 @@
 - `complete_task_search` 仍以近似搜尋為主，缺少可驗證的候選/決策訊號
 - tool output 仍以文字摘要為主，尚未提供完整結構化 facts-first protocol
 - live 查詢延遲偏高，需要減少不必要的 sequential query 與重覆資料收集
+- tool-first query routing 對「代辦事項」等繁中同義句覆蓋不足，會漏回 provider delegate 並觸發通用 fallback
+
+### T033-12: 補齊 today-query 同義句 routing 回歸測試
+**預計時間**: 20 分鐘
+**目的**: 避免使用者改一個說法就掉出 tool-first 查詢路徑。
+
+**執行內容**:
+- 為 `ToolFirstAgent` 補測試，至少覆蓋「今天的代辦事項為何？」
+- 確認命中 `query_today_tasks`，而不是 fallback 到 delegate
+
+**交付物**:
+- [ ] tool-first routing regression test
+
+---
+
+### T033-13: 為 LINE webhook 補齊分段延遲追蹤
+**預計時間**: 30 分鐘
+**目的**: 讓正式環境可直接判斷 LINE 對話慢在 webhook、DB、agent 還是 LINE push。
+
+**執行內容**:
+- 在 `api/src/app/api/line/webhook/route.ts` 加入結構化 timing log
+- 至少記錄 `user_lookup_ms`、`session_lookup_ms`、`session_execute_ms`、`agent_ms`、`push_ms`、`total_ms`
+- 失敗路徑也要能輸出當前已累積的 timings，避免只看到錯誤訊息看不到慢點
+
+**交付物**:
+- [ ] LINE webhook structured latency logs
+
+---
+
+### T033-14: 對齊 brain_dump 生成模型設定
+**預計時間**: 20 分鐘
+**目的**: 避免使用者誤以為 agent 已全量切到 Groq，但 brain_dump 仍卡在舊的 Google 模型設定；brain dump 應優先使用穩定版 Gemini。
+
+**執行內容**:
+- 將 `GenerateBrainDumpStructureUseCase` 的預設生成模型切到穩定版 `gemini-2.5-flash-lite`
+- 明確記錄 chat agent 與 brain_dump pipeline 的 provider/model 不是同一條設定來源
+
+**交付物**:
+- [ ] brain_dump 預設生成模型更新
+
+---
+
+### T033-15: 擴充 LINE session 確認同義句
+**預計時間**: 20 分鐘
+**目的**: 避免使用者回覆「沒錯」「對」「好的」時，session confirm 沒被執行卻由 LLM 假裝完成。
+
+**執行內容**:
+- 抽出 LINE session confirmation helper
+- `complete_task_confirm` / `adjust_tags_preview` 攔截改用同一套確認詞判斷
+- 補回歸測試，至少覆蓋「沒錯」
+- 新增 webhook-level regression test，直接驗證 `complete_task_confirm` 有執行、session 會清掉、且不會落回一般 agent 對話
+
+**交付物**:
+- [ ] LINE confirm synonym handling
+- [ ] LINE webhook confirmation regression test
+
+### T033-16: 修正 LINE ToolFirst 完成路徑必經 confirm session
+**預計時間**: 20 分鐘
+**目的**: 避免 `ToolFirstAgent` 在 LINE 情境高信心命中完成任務時直接封存，繞過 webhook confirm session。
+
+**執行內容**:
+- 修改 `createZentropyAgent(userId, lineUserId)` 到 `ToolFirstAgent` 的參數傳遞
+- `ToolFirstAgent` 命中 `complete_task_search` 時把 `lineUserId` 傳進 `createCompleteTaskSearchTool(...)`
+- 補 regression test，直接驗證 LINE 情境下不會立即走完成，而是回傳 awaiting confirmation 訊息
+
+**交付物**:
+- [ ] LINE tool-first complete route passes `lineUserId`
+- [ ] tool-first complete confirmation regression test
+
+### T033-17: 補齊對話式完成與 SubTask / Daily Plan Item 完成路徑
+**預計時間**: 45 分鐘
+**目的**: 避免使用者用「跑完了」「把這件事標記完成」這種真實 LINE 對話時，agent 既抓不到完成意圖，也無法完成列表裡的 SubTask / Daily Plan Item。
+
+**執行內容**:
+- 擴充 tool-first completion trigger，涵蓋「跑完 / 弄完 / 處理完 / 標記完成」
+- 完成搜尋可利用 session history 解析「這件事 / 剛剛那個」等指代
+- `complete_task_search` 支援 `Task / SubTask / Daily Plan Item` 候選與 confirm payload
+- webhook confirm flow 依 payload source type 分流到 shared task / subtask / daily-plan completion path
+
+**交付物**:
+- [ ] conversational completion routing regression test
+- [ ] subtask / daily plan item completion confirm support
+
+---
 
 ## 3.2 失敗報告對應缺口 (2026-03-11)
 

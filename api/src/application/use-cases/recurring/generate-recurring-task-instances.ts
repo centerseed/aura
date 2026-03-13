@@ -55,7 +55,7 @@ export class GenerateRecurringTaskInstancesUseCase {
         continue
       }
 
-      // 生成條件：occurrence <= today + lead_days
+      // 生成條件：occurrence <= today + lead_days（包含邊界：lead_days=0 生成今天，lead_days=1 生成今明兩天）
       const generateThreshold = new Date(
         today.getTime() + template.leadDays * 24 * 60 * 60 * 1000
       )

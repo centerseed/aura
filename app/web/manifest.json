@@ -1,11 +1,11 @@
 {
-    "name": "Zentropy",
+    "name": "Zentropy AI任務助理",
     "short_name": "Zentropy",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#09090b",
     "theme_color": "#09090b",
-    "description": "Zentropy - Your personal Zen and Entropy balancer.",
+    "description": "Zentropy AI 任務助理，整理待辦、筆記、行程與每日計畫。",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

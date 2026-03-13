@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
-        android:label="Zentropy"
+        android:label="Zentropy AI任務助理"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

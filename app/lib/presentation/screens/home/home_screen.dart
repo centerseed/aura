@@ -15,7 +15,8 @@ import '../../providers/first_time_tutorial_provider.dart'
         showTutorialProvider,
         tutorialStepProvider,
         TutorialStep;
-import '../../../core/di/providers.dart' show recurringTaskRepositoryProvider;
+import '../../../core/di/providers.dart'
+    show recurringTaskRepositoryProvider, taskUnifiedRepositoryProvider;
 import '../../../core/utils/date_utils.dart' as app_date_utils;
 
 /// 主頁面 - 包含三個分頁
@@ -49,7 +50,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     try {
       final localDate = app_date_utils.DateUtils.formatDate(DateTime.now());
       final repo = ref.read(recurringTaskRepositoryProvider);
-      await repo.generateInstances(localDate);
+      final result = await repo.generateInstances(localDate);
+      // 若有新任務被生成，刷新快取以便 UI 顯示
+      final generated = result.fold(
+        (_) => 0,
+        (data) => (data['generated'] as int? ?? 0),
+      );
+      if (generated > 0) {
+        await ref.read(taskUnifiedRepositoryProvider).silentRefresh(force: true);
+      }
     } catch (_) {
       // 靜默失敗，不影響主流程
     }
