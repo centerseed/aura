@@ -368,13 +368,16 @@ export class AgentOrchestrator {
   }): Promise<AgentChatResult | null> {
     const { message, sessionId, userId } = input
     const provider = this.config.pendingStateProvider!
-    const pendingState = await provider.load(sessionId)
+    // Pending state is keyed by confirmationKey (LINE user ID or "api:{userId}"),
+    // NOT sessionId — these differ in non-LINE contexts (e.g. API, v2 test script)
+    const stateKey = this.config.confirmationKey ?? sessionId
+    const pendingState = await provider.load(stateKey)
     if (!pendingState) return null
 
     const disposition = classifyConfirmationDisposition(message)
 
     if (disposition === "reject") {
-      await provider.clear(sessionId)
+      await provider.clear(stateKey)
       return this.buildDirectResult({
         sessionId,
         message,
@@ -385,7 +388,7 @@ export class AgentOrchestrator {
     }
 
     if (disposition === "override") {
-      await provider.clear(sessionId)
+      await provider.clear(stateKey)
       return null // continue to normal agent flow
     }
 
@@ -403,7 +406,7 @@ export class AgentOrchestrator {
         taskMap: p.taskMap as Parameters<typeof executeUC.execute>[0]["taskMap"],
         logId: p.logId,
       })
-      await provider.clear(sessionId)
+      await provider.clear(stateKey)
       const summary = result.operationLog.join("\n")
       const content = `✅ 已完成分類調整：\n\n${summary}`
       return this.buildDirectResult({
@@ -422,7 +425,7 @@ export class AgentOrchestrator {
       try {
         await executeCompleteTaskPayload(userId ?? "", p)
       } catch {
-        await provider.clear(sessionId)
+        await provider.clear(stateKey)
         return this.buildDirectResult({
           sessionId,
           message,
@@ -431,7 +434,7 @@ export class AgentOrchestrator {
           trace: null,
         })
       }
-      await provider.clear(sessionId)
+      await provider.clear(stateKey)
       const successMessage = buildCompleteTaskSuccessMessage(p.taskTitle)
       return this.buildDirectResult({
         sessionId,
@@ -447,7 +450,7 @@ export class AgentOrchestrator {
     if (pendingState.type === "brain_dump_pending") {
       const p = pendingState.payload as BrainDumpPendingPayload
       const toolOutput = await createBrainDumpTool(userId ?? "", p.originalText).execute({})
-      await provider.clear(sessionId)
+      await provider.clear(stateKey)
       return this.buildDirectResult({
         sessionId,
         message,
@@ -460,7 +463,7 @@ export class AgentOrchestrator {
     }
 
     // Unknown pending type — clear and continue
-    await provider.clear(sessionId)
+    await provider.clear(stateKey)
     return null
   }
 
