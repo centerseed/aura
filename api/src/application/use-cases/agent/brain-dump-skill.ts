@@ -5,7 +5,7 @@
  * Tool 直接呼叫現有 Use Cases（同一 process，不走 HTTP）
  */
 
-import { tool, skill, makeSkillResult } from "naru-agent-js"
+import { tool, skill, makeSkillResult } from "@centerseedwu/naru-agent"
 import { z } from "zod"
 import { ParseBrainDumpInputUseCase } from "@/application/use-cases/brain-dump/parse-brain-dump-input"
 import { GenerateBrainDumpStructureUseCase } from "@/application/use-cases/brain-dump/generate-brain-dump-structure"

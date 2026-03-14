@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { prisma } from '@/lib/db'
 import { createZentropyAgent } from '@/application/use-cases/agent/zentropy-agent'
 import { getAgentChatModelName } from '@/lib/agent-model'
-import type { NaruResult } from 'naru-agent-js'
+import type { NaruResult } from '@centerseedwu/naru-agent'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 

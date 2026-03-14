@@ -1,6 +1,6 @@
 import type { ModelMessage } from "ai"
-import type { MemoryManager } from "naru-agent-js"
-import type { ChatOptions } from "naru-agent-js"
+import type { MemoryManager } from "@centerseedwu/naru-agent"
+import type { ChatOptions } from "@centerseedwu/naru-agent"
 import type { SessionMetaStore } from "@/application/services/agent-session-lifecycle-service"
 import { createBrainDumpTool } from "./brain-dump-skill"
 import { createAdjustTagsTool } from "./adjust-tags-skill"

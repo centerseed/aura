@@ -5,7 +5,7 @@
  * 呼叫 AnalyzeAdjustmentIntentUseCase → preview → 存 session → 等用戶確認
  */
 
-import { tool, skill, makeSkillResult } from "naru-agent-js"
+import { tool, skill, makeSkillResult } from "@centerseedwu/naru-agent"
 import { z } from "zod"
 import { AnalyzeAdjustmentIntentUseCase } from "@/application/use-cases/adjust-tags/analyze-adjustment-intent"
 import { saveLineSession } from "@/lib/line-session"

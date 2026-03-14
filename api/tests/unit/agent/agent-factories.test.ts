@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 const mockNaruAgent = vi.fn()
-vi.mock("naru-agent-js", () => ({
+vi.mock("@centerseedwu/naru-agent", () => ({
   NaruAgent: mockNaruAgent,
   LLMStructuredClassifier: vi.fn(),
 }))

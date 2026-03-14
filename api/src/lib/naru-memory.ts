@@ -1,7 +1,7 @@
 /**
  * NaruMemoryManager — Zentropy 的長期記憶層
  *
- * 使用原版 naru-agent-js 的 MemoryManager（mem0-equivalent pipeline）：
+ * 使用 @centerseedwu/naru-agent 的 MemoryManager（mem0-equivalent pipeline）：
  *   1. LLM 萃取對話中的用戶事實
  *   2. Embedding 搜尋現有記憶，找出相似條目進行調和
  *   3. ADD / UPDATE / DELETE / NONE
@@ -12,7 +12,7 @@
  * LLM：Gemini 2.0 Flash（事實萃取 + reconciliation）
  */
 
-import { MemoryManager, type MemoryStore, type MemoryItem } from "naru-agent-js"
+import { MemoryManager, type MemoryStore, type MemoryItem } from "@centerseedwu/naru-agent"
 import { google } from "@ai-sdk/google"
 import { prisma } from "@/lib/db"
 import { batchGetEmbeddings, getEmbedding } from "@/lib/embedding"
@@ -115,7 +115,7 @@ class PrismaVectorMemoryStore implements MemoryStore {
 }
 
 // ============================================================================
-// embedFn adapter — naru-agent-js EmbedFn 格式
+// embedFn adapter — @centerseedwu/naru-agent EmbedFn 格式
 // ============================================================================
 
 async function embedFn(texts: string[]): Promise<number[][]> {
@@ -127,7 +127,7 @@ async function embedFn(texts: string[]): Promise<number[][]> {
 }
 
 // ============================================================================
-// 匯出：使用原版 MemoryManager pipeline
+// 匯出：使用 @centerseedwu/naru-agent MemoryManager pipeline
 // ============================================================================
 
 export function createMemoryManager(): MemoryManager {

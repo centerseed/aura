@@ -1,4 +1,4 @@
-import type { ChatOptions } from "naru-agent-js"
+import type { ChatOptions } from "@centerseedwu/naru-agent"
 import { AgentSessionLifecycleService } from "@/application/services/agent-session-lifecycle-service"
 import { verifyAgentExecutionResult } from "./agent-execution-verifier"
 import type { AgentChatTurnChannel } from "./agent-chat-turn-logger"

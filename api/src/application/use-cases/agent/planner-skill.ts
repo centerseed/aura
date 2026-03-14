@@ -6,7 +6,7 @@
  *   2. execute_plan_creation()   → createTask × N + addSubItem × M
  */
 
-import { tool, skill, makeSkillResult } from "naru-agent-js"
+import { tool, skill, makeSkillResult } from "@centerseedwu/naru-agent"
 import { z } from "zod"
 import { google } from "@ai-sdk/google"
 import { resilientGenerateObject } from "@/lib/ai-resilient"

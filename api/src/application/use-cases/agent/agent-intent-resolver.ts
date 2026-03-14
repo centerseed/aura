@@ -1,6 +1,6 @@
 import type { LanguageModel, ModelMessage } from "ai"
-import { LLMStructuredClassifier, type DecisionAgentResult, type StructuredClassifier, type DecisionOptions } from "naru-agent-js"
-import type { AgentDecisionTrace, AgentIntent } from "./agent-intent"
+import { LLMStructuredClassifier, type DecisionAgentResult, type StructuredClassifier, type DecisionOptions, type BaseIntentResolver, type OrchestratorIntent, type IntentResolveInput } from "@centerseedwu/naru-agent"
+import type { AgentDecisionTrace, AgentIntent, AgentIntentObject } from "./agent-intent"
 import { AgentIntentSchema } from "./agent-intent"
 import { hasExplicitCaptureFrame } from "./explicit-capture-frame"
 import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
@@ -272,5 +272,39 @@ export class StructuredFallbackAgentIntentResolver implements AgentIntentResolve
         targetQuery: null,
       },
     }
+  }
+}
+
+/**
+ * IntentResolverAdapter — bridges AgentIntentResolver → BaseIntentResolver<AgentIntentObject>
+ *
+ * The new AgentOrchestrator expects a BaseIntentResolver that returns OrchestratorIntent.
+ * Our existing AgentIntentResolver returns { intent, trace } (ResolveAgentIntentResult).
+ *
+ * This adapter wraps AgentIntentResolver and:
+ * - Maps AgentIntent → OrchestratorIntent<AgentIntentObject>
+ * - Stores the full AgentDecisionTrace for later retrieval by DirectExecutorAdapter
+ */
+export class IntentResolverAdapter implements BaseIntentResolver<AgentIntentObject> {
+  private lastTrace: AgentDecisionTrace | null = null
+
+  constructor(private readonly inner: AgentIntentResolver) {}
+
+  async resolve(input: IntentResolveInput): Promise<OrchestratorIntent<AgentIntentObject>> {
+    const result = await this.inner.resolve({
+      message: input.message,
+      history: input.history as ModelMessage[] | undefined,
+    })
+    this.lastTrace = result.trace
+    return {
+      object: result.intent.object,
+      confidence: result.intent.confidence,
+      requiresConfirmation: result.intent.requiresConfirmation,
+    }
+  }
+
+  /** Returns the AgentDecisionTrace from the most recent resolve() call. */
+  getLastTrace(): AgentDecisionTrace | null {
+    return this.lastTrace
   }
 }

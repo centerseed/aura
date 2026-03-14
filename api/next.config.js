@@ -8,7 +8,7 @@ const nextConfig = {
   // output: 'standalone',
 
   // Optimize for API routes only
-  serverExternalPackages: ['@prisma/client', 'firebase-admin', 'naru-agent-js'],
+  serverExternalPackages: ['@prisma/client', 'firebase-admin', '@centerseedwu/naru-agent'],
 
   // No need for image optimization in API server
   images: {

@@ -1,4 +1,4 @@
-import type { BaseGuardrail, GuardrailResult } from "naru-agent-js/dist/guardrails/base.js"
+import type { BaseGuardrail, GuardrailResult } from "@centerseedwu/naru-agent"
 import { GroqPromptGuardClient } from "@/lib/groq-prompt-guard"
 
 interface GroqPromptGuardrailConfig {

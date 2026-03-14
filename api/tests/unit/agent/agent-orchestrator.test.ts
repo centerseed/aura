@@ -1,21 +1,20 @@
 /**
- * AC8 + AC15: AgentOrchestrator 單元測試
+ * AgentOrchestrator integration test (post-migration)
  *
- * Verifies:
- * - Correct module calling order: resolve intent → try direct → delegate
- * - Direct execution route works
- * - Delegate route works
- * - Brain dump pending session is saved after delegate
+ * Tests the new AgentOrchestrator from @centerseedwu/naru-agent combined with
+ * our adapters: IntentResolverAdapter, DirectExecutorAdapter, PendingConfirmationExecutor.
+ *
+ * Replaced the old test that tested the custom AgentOrchestrator (now deleted).
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
+import { describe, expect, it, vi, beforeEach } from "vitest"
 
 const mockBrainDumpExecute = vi.fn()
 const mockQueryTodayExecute = vi.fn()
 const mockCreateQueryTodayTasksTool = vi.fn()
 const mockExtractBrainDumpConfirmationTarget = vi.fn()
-const mockSaveLineSession = vi.fn()
 const mockGetLineSession = vi.fn()
+const mockSaveLineSession = vi.fn()
 const mockClearLineSession = vi.fn()
 
 vi.mock("@/application/use-cases/agent/brain-dump-skill", () => ({
@@ -67,7 +66,9 @@ vi.mock("@/lib/line-confirmation", () => ({
   classifyConfirmationDisposition: vi.fn(() => "override"),
 }))
 
-const { AgentOrchestrator } = await import("@/application/use-cases/agent/agent-orchestrator")
+const { AgentOrchestrator } = await import("@centerseedwu/naru-agent")
+const { DirectExecutorAdapter } = await import("@/application/use-cases/agent/direct-executor")
+const { IntentResolverAdapter } = await import("@/application/use-cases/agent/agent-intent-resolver")
 
 function makeDelegate(content = "delegate response") {
   return {
@@ -92,7 +93,7 @@ function makeSessionStore() {
   }
 }
 
-function makeIntentResolver(object: string, confidence = 0.9) {
+function makeInnerIntentResolver(object: string, confidence = 0.9) {
   return {
     resolve: vi.fn().mockResolvedValue({
       intent: { object, requiresConfirmation: false, confidence },
@@ -109,12 +110,9 @@ function makeIntentResolver(object: string, confidence = 0.9) {
   }
 }
 
-describe("AgentOrchestrator", () => {
-  let consoleLogSpy: ReturnType<typeof vi.spyOn>
-
+describe("AgentOrchestrator (new package) + DirectExecutorAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {})
     mockExtractBrainDumpConfirmationTarget.mockReturnValue(null)
     mockCreateQueryTodayTasksTool.mockReturnValue({ execute: mockQueryTodayExecute })
     mockQueryTodayExecute.mockResolvedValue("[FACTS]\n{}\n[/FACTS]\n\n📋 目前查到 2 項")
@@ -122,18 +120,23 @@ describe("AgentOrchestrator", () => {
     mockGetLineSession.mockResolvedValue(null)
   })
 
-  afterEach(() => {
-    consoleLogSpy.mockRestore()
-  })
-
-  describe("direct tool route", () => {
+  describe("direct tool route via DirectExecutorAdapter", () => {
     it("should route today_focus intent through query_today_tasks", async () => {
       const delegate = makeDelegate()
       const sessionStore = makeSessionStore()
-      const orchestrator = new AgentOrchestrator({
-        delegate,
+      const innerResolver = makeInnerIntentResolver("today_focus")
+      const intentResolverAdapter = new IntentResolverAdapter(innerResolver as never)
+      const directExecutorAdapter = new DirectExecutorAdapter(
+        { userId: "user-1", confirmationKey: "line-uid-1" },
         sessionStore,
-        intentResolver: makeIntentResolver("today_focus"),
+        undefined,
+        intentResolverAdapter,
+      )
+
+      const orchestrator = new AgentOrchestrator({
+        delegate: delegate as never,
+        intentResolver: intentResolverAdapter,
+        directExecutors: [directExecutorAdapter as never],
       })
 
       const result = await orchestrator.chat("今天的代辦", {
@@ -150,10 +153,19 @@ describe("AgentOrchestrator", () => {
     it("should route brain_dump via task_capture with high confidence", async () => {
       const delegate = makeDelegate()
       const sessionStore = makeSessionStore()
-      const orchestrator = new AgentOrchestrator({
-        delegate,
+      const innerResolver = makeInnerIntentResolver("task_capture", 0.95)
+      const intentResolverAdapter = new IntentResolverAdapter(innerResolver as never)
+      const directExecutorAdapter = new DirectExecutorAdapter(
+        { userId: "user-1", confirmationKey: "line-uid-1" },
         sessionStore,
-        intentResolver: makeIntentResolver("task_capture", 0.95),
+        undefined,
+        intentResolverAdapter,
+      )
+
+      const orchestrator = new AgentOrchestrator({
+        delegate: delegate as never,
+        intentResolver: intentResolverAdapter,
+        directExecutors: [directExecutorAdapter as never],
       })
 
       const result = await orchestrator.chat("幫我記明天要開會", {
@@ -169,10 +181,19 @@ describe("AgentOrchestrator", () => {
     it("should return greeting without tool call", async () => {
       const delegate = makeDelegate()
       const sessionStore = makeSessionStore()
-      const orchestrator = new AgentOrchestrator({
-        delegate,
+      const innerResolver = makeInnerIntentResolver("greeting")
+      const intentResolverAdapter = new IntentResolverAdapter(innerResolver as never)
+      const directExecutorAdapter = new DirectExecutorAdapter(
+        { userId: "user-1", confirmationKey: "line-uid-1" },
         sessionStore,
-        intentResolver: makeIntentResolver("greeting"),
+        undefined,
+        intentResolverAdapter,
+      )
+
+      const orchestrator = new AgentOrchestrator({
+        delegate: delegate as never,
+        intentResolver: intentResolverAdapter,
+        directExecutors: [directExecutorAdapter as never],
       })
 
       const result = await orchestrator.chat("你好", {
@@ -190,10 +211,19 @@ describe("AgentOrchestrator", () => {
     it("should delegate when intent is unknown", async () => {
       const delegate = makeDelegate("這是複雜回答")
       const sessionStore = makeSessionStore()
-      const orchestrator = new AgentOrchestrator({
-        delegate,
+      const innerResolver = makeInnerIntentResolver("unknown", 0.1)
+      const intentResolverAdapter = new IntentResolverAdapter(innerResolver as never)
+      const directExecutorAdapter = new DirectExecutorAdapter(
+        { userId: "user-1", confirmationKey: "line-uid-1" },
         sessionStore,
-        intentResolver: makeIntentResolver("unknown", 0.1),
+        undefined,
+        intentResolverAdapter,
+      )
+
+      const orchestrator = new AgentOrchestrator({
+        delegate: delegate as never,
+        intentResolver: intentResolverAdapter,
+        directExecutors: [directExecutorAdapter as never],
       })
 
       const result = await orchestrator.chat("複雜的問題", {
@@ -204,105 +234,35 @@ describe("AgentOrchestrator", () => {
       expect(delegate.chat).toHaveBeenCalled()
       expect(result.content).toBe("這是複雜回答")
     })
-
-    it("should save brain dump pending session when delegate asks for confirmation", async () => {
-      mockExtractBrainDumpConfirmationTarget.mockReturnValue("修復bug")
-      const delegate = makeDelegate("你想要我記錄「修復bug」嗎？")
-      const sessionStore = makeSessionStore()
-      const mockPendingSave = vi.fn().mockResolvedValue(undefined)
-
-      const orchestrator = new AgentOrchestrator({
-        delegate,
-        sessionStore,
-        intentResolver: makeIntentResolver("unknown", 0.1),
-        confirmationKey: "line-uid-1",
-        pendingStateProvider: {
-          load: vi.fn().mockResolvedValue(null),
-          save: mockPendingSave,
-          clear: vi.fn().mockResolvedValue(undefined),
-        },
-      })
-
-      const result = await orchestrator.chat("修復bug", {
-        userId: "user-1",
-        sessionId: "line-uid-1",
-      })
-
-      expect(mockPendingSave).toHaveBeenCalledWith("line-uid-1", "brain_dump_pending", {
-        originalText: "修復bug",
-        taskTitle: "修復bug",
-      })
-      expect(result.pendingConfirmation).toEqual({
-        type: "brain_dump_pending",
-        payload: { originalText: "修復bug", taskTitle: "修復bug" },
-      })
-    })
   })
 
-  describe("short-circuit route", () => {
-    it("should short-circuit single '記' character", async () => {
+  describe("OrchestrationResult fields", () => {
+    it("should include orchestration trace fields in result", async () => {
       const delegate = makeDelegate()
       const sessionStore = makeSessionStore()
-      const orchestrator = new AgentOrchestrator({
-        delegate,
+      const innerResolver = makeInnerIntentResolver("today_focus")
+      const intentResolverAdapter = new IntentResolverAdapter(innerResolver as never)
+      const directExecutorAdapter = new DirectExecutorAdapter(
+        { userId: "user-1", confirmationKey: "line-uid-1" },
         sessionStore,
-        intentResolver: makeIntentResolver("unknown"),
-      })
-
-      const result = await orchestrator.chat("記", {
-        userId: "user-1",
-        sessionId: "sess-1",
-      })
-
-      expect(delegate.chat).not.toHaveBeenCalled()
-      expect(result.content).toContain("請直接告訴我要記錄的內容")
-      expect(result.toolCalls).toHaveLength(0)
-    })
-  })
-
-  describe("session history persistence", () => {
-    it("should persist history after direct tool route", async () => {
-      const delegate = makeDelegate()
-      const sessionStore = makeSessionStore()
-      const orchestrator = new AgentOrchestrator({
-        delegate,
-        sessionStore,
-        intentResolver: makeIntentResolver("today_focus"),
-      })
-
-      await orchestrator.chat("今天的代辦", {
-        userId: "user-1",
-        sessionId: "sess-1",
-      })
-
-      expect(sessionStore.save).toHaveBeenCalledWith(
-        "sess-1",
-        expect.arrayContaining([
-          expect.objectContaining({ role: "user", content: "今天的代辦" }),
-          expect.objectContaining({ role: "assistant" }),
-        ]),
+        undefined,
+        intentResolverAdapter,
       )
-    })
-  })
 
-  describe("logging", () => {
-    it("should log agent_orchestrator_chat_complete event", async () => {
-      const delegate = makeDelegate()
-      const sessionStore = makeSessionStore()
       const orchestrator = new AgentOrchestrator({
-        delegate,
-        sessionStore,
-        intentResolver: makeIntentResolver("today_focus"),
+        delegate: delegate as never,
+        intentResolver: intentResolverAdapter,
+        directExecutors: [directExecutorAdapter as never],
       })
 
-      await orchestrator.chat("今天的代辦", {
+      const result = await orchestrator.chat("今天的代辦", {
         userId: "user-1",
         sessionId: "sess-1",
       })
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('"event":"agent_orchestrator_chat_complete"'),
-      )
+      expect(result.decisionTrace).toBeDefined()
+      expect(result.orchestrationIntent?.object).toBe("today_focus")
+      expect(result.pendingConfirmation).toBeNull()
     })
   })
 })

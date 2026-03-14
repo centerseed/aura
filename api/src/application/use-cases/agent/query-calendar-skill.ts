@@ -1,4 +1,4 @@
-import { makeSkillResult, skill, tool } from "naru-agent-js"
+import { makeSkillResult, skill, tool } from "@centerseedwu/naru-agent"
 import { z } from "zod"
 import {
   AgentCalendarQueryService,

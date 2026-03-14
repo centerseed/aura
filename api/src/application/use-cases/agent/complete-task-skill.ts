@@ -5,7 +5,7 @@
  * 正規化 + lexical matching 找候選 → deterministic 單輪完成或要求澄清
  */
 
-import { tool, skill, makeSkillResult } from "naru-agent-js"
+import { tool, skill, makeSkillResult } from "@centerseedwu/naru-agent"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 import type { CompleteTaskPayload } from "@/lib/line-session"

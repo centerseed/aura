@@ -8,17 +8,18 @@
  */
 
 import type { ModelMessage } from "ai"
+import type { BaseDirectExecutor, OrchestratorIntent, OrchestrationResult } from "@centerseedwu/naru-agent"
 import { createBrainDumpTool } from "./brain-dump-skill"
 import { createAdjustTagsTool } from "./adjust-tags-skill"
 import { createReorganizeTool } from "./reorganize-skill"
 import { createQueryCompletedTodayTasksTool, createQueryTodayTasksTool } from "./query-tasks-skill"
 import { shouldUseStrictTodayFocus } from "./today-focus-scope"
-import { serializeFactsSummary, parseToolResult } from "./tool-result-protocol"
+import { serializeFactsSummary, parseToolResult, extractPresentedEntities } from "./tool-result-protocol"
 import { createRunPlannerTool } from "./planner-skill"
 import { createQueryCalendarTool } from "./query-calendar-skill"
 import { toCalendarUnavailableMessage } from "./agent-calendar-query-service"
 import { createTaskFromCalendarEvent } from "./create-task-from-calendar-event"
-import type { AgentIntent, AgentDecisionTrace } from "./agent-intent"
+import type { AgentIntent, AgentDecisionTrace, AgentIntentObject } from "./agent-intent"
 import { handleTaskCompletion } from "./task-completion-handler"
 import type { AgentSessionState } from "./agent-session-state"
 import type { PresentedEntity } from "./tool-result-protocol"
@@ -274,6 +275,176 @@ export class DirectExecutor {
       toolHistoryContent: toolHistoryContent ?? toolOutput,
       intent,
       trace,
+    }
+  }
+}
+
+/**
+ * DirectExecutorAdapter — bridges DirectExecutor → BaseDirectExecutor<AgentIntentObject>
+ *
+ * The new AgentOrchestrator expects BaseDirectExecutor instances in its directExecutors array.
+ * This adapter wraps the existing DirectExecutor (which has rich context-fetching logic)
+ * and bridges its output to OrchestrationResult.
+ *
+ * Session history and state are fetched from the provided stores so that
+ * context-dependent intents (recall, contextual classification) work correctly.
+ */
+// Intent types that DirectExecutor can handle directly (excludes "unknown" which delegates to NaruAgent)
+const HIGH_CONFIDENCE_INTENTS: ReadonlySet<AgentIntentObject> = new Set<AgentIntentObject>([
+  "today_focus",
+  "completed_today",
+  "calendar_query",
+  "calendar_task_link",
+  "task_capture",
+  "classification",
+  "reorganize",
+  "task_completion",
+  "planning",
+  "greeting",
+  "recall_last_item",
+  "recall_task_code",
+])
+
+export class DirectExecutorAdapter implements BaseDirectExecutor<AgentIntentObject> {
+  readonly name = "zentropy_direct"
+
+  constructor(
+    private readonly config: DirectExecutorConfig,
+    private readonly sessionStore: {
+      get(sessionId: string): Promise<ModelMessage[] | null>
+      save(sessionId: string, history: ModelMessage[]): Promise<void>
+    },
+    private readonly sessionStateStore?: {
+      get(sessionId: string): Promise<AgentSessionState | null>
+      save(sessionId: string, updater: (current: AgentSessionState) => AgentSessionState): Promise<void>
+    },
+    private readonly intentResolverAdapter?: {
+      getLastTrace(): AgentDecisionTrace | null
+    },
+  ) {}
+
+  canHandle(intent: OrchestratorIntent<AgentIntentObject>): boolean {
+    return HIGH_CONFIDENCE_INTENTS.has(intent.object)
+  }
+
+  async execute(input: {
+    message: string
+    intent: OrchestratorIntent<AgentIntentObject>
+    options?: Record<string, unknown>
+  }): Promise<OrchestrationResult | null> {
+    const { message, intent: orchIntent, options } = input
+    const sessionId = typeof options?.sessionId === "string" ? options.sessionId : "default"
+
+    // Build the AgentIntent and AgentDecisionTrace from orchestration intent + adapter trace
+    const agentIntent: AgentIntent = {
+      object: orchIntent.object,
+      confidence: orchIntent.confidence,
+      requiresConfirmation: orchIntent.requiresConfirmation ?? false,
+    }
+    const trace: AgentDecisionTrace = this.intentResolverAdapter?.getLastTrace() ?? {
+      routeSource: "intent_resolver",
+      resolver: "direct_executor_adapter",
+      rawMessage: message,
+      resolvedIntent: agentIntent,
+      metadata: { reasonCodes: ["adapter_fallback"] },
+      selectedTool: null,
+      targetQuery: null,
+    }
+
+    // Fetch session context (history + state) for context-dependent intents
+    const [history, sessionState] = await Promise.all([
+      this.sessionStore.get(sessionId).then((h) => h ?? []),
+      this.sessionStateStore
+        ? this.sessionStateStore.get(sessionId).then((s) => s ?? { lastPresentedEntities: [], lastRecordedEntities: [] })
+        : Promise.resolve({ lastPresentedEntities: [], lastRecordedEntities: [] } as AgentSessionState),
+    ])
+
+    const directExecutor = new DirectExecutor(this.config)
+    const directResult = await directExecutor.tryExecute({
+      message,
+      intent: agentIntent,
+      trace,
+      history,
+      sessionState,
+    })
+
+    if (directResult === null) return null
+
+    const toolName = directResult.toolName
+    const toolOutput = directResult.toolOutput
+    // toolHistoryContent is the full tool output (includes [FACTS] block);
+    // toolOutput from DirectExecutor is already the summary extracted from it.
+    // Parse toolHistoryContent to access facts for session state updates.
+    const rawToolOutput = directResult.toolHistoryContent ?? toolOutput
+    const parsedResult = rawToolOutput ? parseToolResult(rawToolOutput) : null
+    const content = toolOutput
+      ? parseToolResult(toolOutput).summary
+      : directResult.content
+
+    // Carry our AgentDecisionTrace in result.trace via duck typing
+    // LifecycleAwareAgent reads trace.resolvedIntent for turn logging
+    const resultTrace = {
+      ...directResult.trace,
+      selectedTool: toolName ?? directResult.trace.selectedTool,
+    }
+
+    // BLOCK 2: Persist session history after direct execution
+    // The new AgentOrchestrator only writes history on the delegate route.
+    // For direct routes we must append user message + assistant response ourselves.
+    const updatedHistory: ModelMessage[] = [
+      ...history,
+      { role: "user", content: message },
+      { role: "assistant", content },
+    ]
+    await this.sessionStore.save(sessionId, updatedHistory)
+
+    // BLOCK 3: Persist AgentSessionState (lastPresentedEntities / lastRecordedEntities)
+    // after direct execution so that recall_last_item / recall_task_code see fresh data.
+    if (this.sessionStateStore && parsedResult?.facts) {
+      const { facts } = parsedResult
+
+      const newPresented = extractPresentedEntities(facts)
+      const rawRecorded = facts.recordedItems
+      const newRecorded: PresentedEntity[] = Array.isArray(rawRecorded)
+        ? (rawRecorded as Array<Record<string, unknown>>)
+            .map((item, index) => ({
+              position: typeof item.position === "number" ? item.position : index + 1,
+              title: typeof item.title === "string" ? item.title.trim() : "",
+              taskId: typeof item.taskId === "string" ? item.taskId : undefined,
+              entityType: typeof item.sourceType === "string" ? item.sourceType : undefined,
+            }))
+            .filter((item) => item.title !== "")
+        : []
+
+      if (newPresented.length > 0 || newRecorded.length > 0) {
+        await this.sessionStateStore.save(sessionId, (current) => ({
+          lastPresentedEntities: newPresented.length > 0 ? newPresented : current.lastPresentedEntities,
+          lastRecordedEntities: newRecorded.length > 0 ? newRecorded : current.lastRecordedEntities,
+        }))
+      }
+    }
+
+    return {
+      blocked: false,
+      content,
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      intent: null,
+      toolCalls: toolName ? [toolName] : [],
+      timings: {},
+      sessionId,
+      traceId: null,
+      // Store our AgentDecisionTrace here — LifecycleAwareAgent reads trace.resolvedIntent
+      trace: resultTrace as unknown as OrchestrationResult["trace"],
+      decisionTrace: {
+        traceId: "",
+        phaseReached: "direct_execution",
+        intentResolved: orchIntent,
+        timings: { total: 0 },
+        directExecutorUsed: this.name,
+        delegateUsed: null,
+      },
+      pendingConfirmation: null,
+      orchestrationIntent: orchIntent,
     }
   }
 }

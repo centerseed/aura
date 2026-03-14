@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { LLMStructuredClassifier, type StructuredClassifier } from "naru-agent-js"
+import { LLMStructuredClassifier, type StructuredClassifier } from "@centerseedwu/naru-agent"
 import type { LanguageModel } from "ai"
 import { getAgentRuntime } from "./agent-runtime"
 import { createDecisionFallbackAgent, type AgentRuntimeParts } from "./agent-factories"

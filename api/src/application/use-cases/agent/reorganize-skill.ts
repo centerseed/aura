@@ -5,7 +5,7 @@
  * Tool 直接呼叫 AnalyzeStructureUseCase（預覽模式）
  */
 
-import { tool, skill, makeSkillResult } from "naru-agent-js"
+import { tool, skill, makeSkillResult } from "@centerseedwu/naru-agent"
 import { z } from "zod"
 import { AnalyzeStructureUseCase } from "@/application/use-cases/reorganize/analyze-structure"
 

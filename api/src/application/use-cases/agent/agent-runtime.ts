@@ -3,7 +3,7 @@ import {
   InMemorySessionStore,
   InMemorySummaryStore,
   type MemoryManager,
-} from "naru-agent-js"
+} from "@centerseedwu/naru-agent"
 import {
   AgentSessionLifecycleService,
   type CompressedSessionSummary,

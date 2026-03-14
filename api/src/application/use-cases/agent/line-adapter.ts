@@ -12,6 +12,7 @@
 import type { ChannelAdapter, ChannelMessage, AgentReply } from "./channel-adapter"
 import { getLineSession, saveLineSession, clearLineSession } from "@/lib/line-session"
 import type { LineSessionType, LineSessionPayload } from "@/lib/line-session"
+import type { BasePendingStateManager, PendingState } from "@centerseedwu/naru-agent"
 
 const VALID_LINE_SESSION_TYPES: ReadonlySet<LineSessionType> = new Set([
   "adjust_tags_preview",
@@ -97,5 +98,42 @@ export class LineAdapter implements ChannelAdapter<LineRawInput, LineRawOutput> 
 
   async clearPendingState(sessionId: string): Promise<void> {
     await clearLineSession(sessionId)
+  }
+}
+
+/**
+ * LinePendingStateManager — adapts LineAdapter's pending state methods to
+ * the BasePendingStateManager interface required by the new AgentOrchestrator.
+ *
+ * Key design: always uses `confirmationKey` (LINE userId or api:{userId}) as
+ * the actual storage key, regardless of the `sessionId` argument passed by
+ * the orchestrator. This preserves the existing LINE pending session semantics.
+ */
+export class LinePendingStateManager implements BasePendingStateManager {
+  private readonly adapter: LineAdapter
+
+  constructor(
+    /** The actual storage key (LINE userId or api:{userId}) */
+    private readonly confirmationKey: string,
+  ) {
+    this.adapter = new LineAdapter()
+  }
+
+  async getPending(_sessionId: string): Promise<PendingState | null> {
+    const state = await this.adapter.loadPendingState(this.confirmationKey)
+    if (!state) return null
+    return {
+      type: state.type,
+      payload: state.payload as Record<string, unknown>,
+      createdAt: Date.now(),
+    }
+  }
+
+  async setPending(_sessionId: string, state: PendingState): Promise<void> {
+    await this.adapter.savePendingState(this.confirmationKey, state.type, state.payload)
+  }
+
+  async clearPending(_sessionId: string): Promise<void> {
+    await this.adapter.clearPendingState(this.confirmationKey)
   }
 }

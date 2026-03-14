@@ -2,7 +2,7 @@
  * QueryTasksSkill — 查詢今日任務 / 今日完成
  */
 
-import { tool, skill, makeSkillResult } from "naru-agent-js"
+import { tool, skill, makeSkillResult } from "@centerseedwu/naru-agent"
 import { z } from "zod"
 import { AgentTaskQueryService, serializeQueryToolResult } from "./agent-task-query-service"
 

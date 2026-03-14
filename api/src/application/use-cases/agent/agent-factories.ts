@@ -6,8 +6,8 @@
  * Memory-Aware Assistant：有 long-term memory，補充對話能力
  */
 
-import { NaruAgent } from "naru-agent-js"
-import type { BaseSkill, BaseGuardrail, MemoryManager } from "naru-agent-js"
+import { NaruAgent } from "@centerseedwu/naru-agent"
+import type { BaseSkill, BaseGuardrail, MemoryManager } from "@centerseedwu/naru-agent"
 import type { getAgentRuntime } from "./agent-runtime"
 import { DECISION_PROMPT } from "./decision-prompt"
 
