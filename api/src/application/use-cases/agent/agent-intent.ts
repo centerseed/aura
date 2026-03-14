@@ -1,6 +1,7 @@
 import { z } from "zod"
 
-export const AGENT_INTENT_OBJECT_VALUES = [
+/** Intent objects the LLM classifier may return — used for the Zod schema. */
+const LLM_AGENT_INTENT_OBJECT_VALUES = [
   "task_capture",
   "calendar_task_link",
   "task_completion",
@@ -16,6 +17,16 @@ export const AGENT_INTENT_OBJECT_VALUES = [
   "unknown",
 ] as const
 
+/**
+ * Full intent object union — includes LLM values plus synthetic adapter-level
+ * values that are never sent to the classifier.
+ */
+export const AGENT_INTENT_OBJECT_VALUES = [
+  ...LLM_AGENT_INTENT_OBJECT_VALUES,
+  "pending_confirmation",
+  "short_record",
+] as const
+
 export type AgentIntentObject = (typeof AGENT_INTENT_OBJECT_VALUES)[number]
 
 export interface AgentIntent {
@@ -24,8 +35,9 @@ export interface AgentIntent {
   confidence: number
 }
 
+/** Schema passed to LLM classifier — excludes synthetic adapter-only values. */
 export const AgentIntentSchema = z.object({
-  object: z.enum(AGENT_INTENT_OBJECT_VALUES),
+  object: z.enum(LLM_AGENT_INTENT_OBJECT_VALUES),
   requiresConfirmation: z.boolean(),
   confidence: z.number().min(0).max(1),
 })

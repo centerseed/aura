@@ -13,6 +13,7 @@
  */
 
 import type { BaseDirectExecutor, OrchestratorIntent, OrchestrationResult } from "@centerseedwu/naru-agent"
+import type { ModelMessage } from "ai"
 import type { LinePendingStateManager } from "./line-adapter"
 import { classifyConfirmationDisposition } from "@/lib/line-confirmation"
 import type { AdjustTagsPayload, BrainDumpPendingPayload, CompleteTaskPayload } from "@/lib/line-session"
@@ -21,6 +22,7 @@ import { executeCompleteTaskPayload, buildCompleteTaskSuccessMessage } from "./c
 import { createBrainDumpTool } from "./brain-dump-skill"
 import { parseToolResult } from "./tool-result-protocol"
 import type { AgentIntentObject } from "./agent-intent"
+import type { SessionHistoryStore } from "@/application/services/agent-session-lifecycle-service"
 
 type ZeroUsage = OrchestrationResult["usage"]
 
@@ -57,11 +59,34 @@ function buildPendingResult(
 export class PendingConfirmationExecutor implements BaseDirectExecutor<AgentIntentObject> {
   readonly name = "pending_confirmation"
 
-  constructor(private readonly pendingStateManager: LinePendingStateManager) {}
+  constructor(
+    private readonly pendingStateManager: LinePendingStateManager,
+    private readonly sessionStore?: Pick<SessionHistoryStore, "get" | "save">,
+  ) {}
 
   canHandle(_intent: OrchestratorIntent<AgentIntentObject>): boolean {
     // Always returns true — we check state in execute() and fall through if no pending
     return true
+  }
+
+  private async appendSessionHistory(
+    sessionId: string,
+    userMessage: string,
+    assistantContent: string,
+  ): Promise<void> {
+    if (!this.sessionStore) return
+    try {
+      const history = await this.sessionStore.get(sessionId) ?? []
+      const updated: ModelMessage[] = [
+        ...history,
+        { role: "user", content: userMessage },
+        { role: "assistant", content: assistantContent },
+      ]
+      await this.sessionStore.save(sessionId, updated)
+    } catch (err) {
+      // Non-fatal: session history write failure should not break the response
+      console.warn("[PendingConfirmationExecutor] Failed to write session history:", err)
+    }
   }
 
   async execute(input: {
@@ -71,6 +96,7 @@ export class PendingConfirmationExecutor implements BaseDirectExecutor<AgentInte
   }): Promise<OrchestrationResult | null> {
     const { message, options } = input
     const userId = typeof options?.userId === "string" ? options.userId : ""
+    const sessionId = typeof options?.sessionId === "string" ? options.sessionId : "default"
 
     const pendingState = await this.pendingStateManager.getPending("")
 
@@ -80,7 +106,9 @@ export class PendingConfirmationExecutor implements BaseDirectExecutor<AgentInte
 
     if (disposition === "reject") {
       await this.pendingStateManager.clearPending("")
-      return buildPendingResult("好的，已取消。")
+      const result = buildPendingResult("好的，已取消。")
+      await this.appendSessionHistory(sessionId, message, result.content)
+      return result
     }
 
     if (disposition === "override") {
@@ -92,7 +120,7 @@ export class PendingConfirmationExecutor implements BaseDirectExecutor<AgentInte
     if (pendingState.type === "adjust_tags_preview") {
       const p = pendingState.payload as unknown as AdjustTagsPayload
       const executeUC = new ExecuteAdjustmentUseCase()
-      const result = await executeUC.execute({
+      const execResult = await executeUC.execute({
         userId,
         intentType: p.intentType,
         taskMatches: p.taskMatches,
@@ -103,9 +131,11 @@ export class PendingConfirmationExecutor implements BaseDirectExecutor<AgentInte
         logId: p.logId,
       })
       await this.pendingStateManager.clearPending("")
-      const summary = result.operationLog.join("\n")
+      const summary = execResult.operationLog.join("\n")
       const content = `✅ 已完成分類調整：\n\n${summary}`
-      return buildPendingResult(content, "adjust_tags_preview", content)
+      const result = buildPendingResult(content, "adjust_tags_preview", content)
+      await this.appendSessionHistory(sessionId, message, result.content)
+      return result
     }
 
     if (pendingState.type === "complete_task_confirm") {
@@ -114,22 +144,28 @@ export class PendingConfirmationExecutor implements BaseDirectExecutor<AgentInte
         await executeCompleteTaskPayload(userId, p)
       } catch {
         await this.pendingStateManager.clearPending("")
-        return buildPendingResult("發生錯誤：無法識別要完成的任務。")
+        const errorResult = buildPendingResult("發生錯誤：無法識別要完成的任務。")
+        await this.appendSessionHistory(sessionId, message, errorResult.content)
+        return errorResult
       }
       await this.pendingStateManager.clearPending("")
       const successMessage = buildCompleteTaskSuccessMessage(p.taskTitle)
-      return buildPendingResult(successMessage, "complete_task_search", successMessage)
+      const result = buildPendingResult(successMessage, "complete_task_search", successMessage)
+      await this.appendSessionHistory(sessionId, message, result.content)
+      return result
     }
 
     if (pendingState.type === "brain_dump_pending") {
       const p = pendingState.payload as unknown as BrainDumpPendingPayload
       const toolOutput = await createBrainDumpTool(userId, p.originalText).execute({})
       await this.pendingStateManager.clearPending("")
-      return buildPendingResult(
+      const result = buildPendingResult(
         parseToolResult(toolOutput).summary,
         "brain_dump",
         toolOutput,
       )
+      await this.appendSessionHistory(sessionId, message, result.content)
+      return result
     }
 
     // Unknown pending type — clear and continue

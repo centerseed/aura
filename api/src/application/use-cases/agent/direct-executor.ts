@@ -80,6 +80,17 @@ export class DirectExecutor {
     const userId = this.config.userId
     const confirmationKey = this.config.confirmationKey
 
+    if (intent.object === "short_record") {
+      return {
+        content: "請直接告訴我要記錄的內容，例如任務名稱、待辦事項或想法。",
+        toolName: null,
+        toolOutput: null,
+        toolHistoryContent: null,
+        intent,
+        trace,
+      }
+    }
+
     if (intent.object === "recall_task_code") {
       const taskCode = extractLatestTaskCode(history)
       return {
@@ -303,6 +314,12 @@ const HIGH_CONFIDENCE_INTENTS: ReadonlySet<AgentIntentObject> = new Set<AgentInt
   "greeting",
   "recall_last_item",
   "recall_task_code",
+  // FIX-2: bare 記 short-circuit (user sent only 記, needs prompt to provide content)
+  "short_record",
+  // FIX-1: pending_confirmation is handled by PendingConfirmationExecutor (first in directExecutors),
+  // but we list it here so DirectExecutorAdapter.canHandle returns true and doesn't fall through to delegate.
+  // In practice, PendingConfirmationExecutor will consume it first.
+  "pending_confirmation",
 ])
 
 export class DirectExecutorAdapter implements BaseDirectExecutor<AgentIntentObject> {

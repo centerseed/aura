@@ -55,6 +55,13 @@ function makeOrchIntent(object = "unknown") {
   return { object: object as never, confidence: 0.5, requiresConfirmation: false }
 }
 
+function makeSessionStore() {
+  return {
+    get: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+  }
+}
+
 describe("PendingConfirmationExecutor", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -188,5 +195,95 @@ describe("PendingConfirmationExecutor", () => {
     expect(mockBrainDumpExecute).toHaveBeenCalledWith({})
     expect(result?.toolCalls).toContain("brain_dump")
     expect(mockClearLineSession).toHaveBeenCalledWith("line-uid-1")
+  })
+
+  describe("FIX-3: session history writing", () => {
+    it("should append session history after reject disposition", async () => {
+      mockGetLineSession.mockResolvedValue({
+        type: "adjust_tags_preview",
+        payload: { logId: "log-1" },
+      })
+      mockClassifyConfirmationDisposition.mockReturnValue("reject")
+      const manager = new LinePendingStateManager("line-uid-1")
+      const sessionStore = makeSessionStore()
+      const executor = new PendingConfirmationExecutor(manager, sessionStore)
+
+      const result = await executor.execute({
+        message: "不要了",
+        intent: makeOrchIntent(),
+        options: { userId: "user-1", sessionId: "sess-1" },
+      })
+
+      expect(result).not.toBeNull()
+      expect(sessionStore.save).toHaveBeenCalledOnce()
+      const savedHistory = sessionStore.save.mock.calls[0][1]
+      expect(savedHistory.at(-2)).toEqual({ role: "user", content: "不要了" })
+      expect(savedHistory.at(-1)).toEqual({ role: "assistant", content: "好的，已取消。" })
+    })
+
+    it("should append session history after confirm + complete_task_confirm", async () => {
+      mockGetLineSession.mockResolvedValue({
+        type: "complete_task_confirm",
+        payload: { taskId: "task-1", taskTitle: "買牛奶" },
+      })
+      mockClassifyConfirmationDisposition.mockReturnValue("confirm")
+      mockExecuteCompleteTaskPayload.mockResolvedValue(undefined)
+      const manager = new LinePendingStateManager("line-uid-1")
+      const sessionStore = makeSessionStore()
+      const executor = new PendingConfirmationExecutor(manager, sessionStore)
+
+      await executor.execute({
+        message: "確認",
+        intent: makeOrchIntent(),
+        options: { userId: "user-1", sessionId: "sess-1" },
+      })
+
+      expect(sessionStore.save).toHaveBeenCalledOnce()
+      const savedHistory = sessionStore.save.mock.calls[0][1]
+      expect(savedHistory.at(-2)).toEqual({ role: "user", content: "確認" })
+      // Assistant content is the success message
+      expect(typeof savedHistory.at(-1)?.content).toBe("string")
+    })
+
+    it("should NOT write session history when no sessionStore provided", async () => {
+      mockGetLineSession.mockResolvedValue({
+        type: "adjust_tags_preview",
+        payload: { logId: "log-1" },
+      })
+      mockClassifyConfirmationDisposition.mockReturnValue("reject")
+      const manager = new LinePendingStateManager("line-uid-1")
+      // No sessionStore provided
+      const executor = new PendingConfirmationExecutor(manager)
+
+      const result = await executor.execute({
+        message: "取消",
+        intent: makeOrchIntent(),
+        options: { userId: "user-1", sessionId: "sess-1" },
+      })
+
+      // Should still return result, just without writing history
+      expect(result).not.toBeNull()
+    })
+
+    it("should return null on override and NOT write session history", async () => {
+      mockGetLineSession.mockResolvedValue({
+        type: "adjust_tags_preview",
+        payload: { logId: "log-1" },
+      })
+      mockClassifyConfirmationDisposition.mockReturnValue("override")
+      const manager = new LinePendingStateManager("line-uid-1")
+      const sessionStore = makeSessionStore()
+      const executor = new PendingConfirmationExecutor(manager, sessionStore)
+
+      const result = await executor.execute({
+        message: "其實我要查今天待辦",
+        intent: makeOrchIntent(),
+        options: { userId: "user-1", sessionId: "sess-1" },
+      })
+
+      expect(result).toBeNull()
+      // Override continues to normal flow — no history write
+      expect(sessionStore.save).not.toHaveBeenCalled()
+    })
   })
 })

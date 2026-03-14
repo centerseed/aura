@@ -14,6 +14,8 @@
 import {
   AgentOrchestrator,
   LLMStructuredClassifier,
+  type BaseSessionStateStore,
+  type AgentSessionState as PackageAgentSessionState,
 } from "@centerseedwu/naru-agent"
 import type { OrchestrationResult } from "@centerseedwu/naru-agent"
 import { AgentIntentSchema, type AgentIntent } from "./agent-intent"
@@ -105,9 +107,6 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     }),
   })
 
-  // Adapter: bridges AgentIntentResolver → BaseIntentResolver for new orchestrator
-  const intentResolverAdapter = new IntentResolverAdapter(innerIntentResolver)
-
   // LinePendingStateManager: always uses confirmationKey, not sessionId
   const pendingStateManager = new LinePendingStateManager(confirmationKey)
 
@@ -115,6 +114,13 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
   const agentSessionStateStore = rawRuntime.metaStore
     ? new AgentSessionStateStore(rawRuntime.metaStore)
     : undefined
+
+  // Adapter: bridges AgentIntentResolver → BaseIntentResolver for new orchestrator
+  // FIX-1: pass pendingStateManager for pending state short-circuit
+  const intentResolverAdapter = new IntentResolverAdapter(
+    innerIntentResolver,
+    pendingStateManager,
+  )
 
   // DirectExecutorAdapter: bridges existing DirectExecutor → BaseDirectExecutor
   const directExecutorAdapter = new DirectExecutorAdapter(
@@ -139,7 +145,11 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
   )
 
   // PendingConfirmationExecutor: handles 3 pending types before DirectExecutor runs
-  const pendingConfirmationExecutor = new PendingConfirmationExecutor(pendingStateManager)
+  // FIX-3: pass sessionStore so that pending confirmation responses are written to session history
+  const pendingConfirmationExecutor = new PendingConfirmationExecutor(
+    pendingStateManager,
+    rawRuntime.sessionStore,
+  )
 
   // AfterMessage hook: detect brain_dump_pending confirmation prompt from delegate
   const afterMessageHook = async (result: OrchestrationResult): Promise<void> => {
@@ -160,10 +170,36 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     })
   }
 
+  // FIX-4: wrap agentSessionStateStore as BaseSessionStateStore so orchestrator passes
+  // sessionState to intentResolver.resolve(). We tunnel our domain AgentSessionState
+  // through the package's metadata field; IntentResolverAdapter reads it via isAgentSessionState.
+  const orchestratorSessionStateStore: BaseSessionStateStore | undefined = agentSessionStateStore
+    ? {
+        async get(sessionId: string): Promise<PackageAgentSessionState | null> {
+          const state = await agentSessionStateStore.get(sessionId)
+          // Tunnel our domain AgentSessionState through metadata so IntentResolverAdapter
+          // can type-narrow it via isAgentSessionState(metadata).
+          return {
+            sessionId,
+            lastPresentedEntities: state.lastPresentedEntities,
+            metadata: state as unknown as Record<string, unknown>,
+            updatedAt: Date.now(),
+          }
+        },
+        async save(): Promise<void> {
+          // DirectExecutorAdapter handles saves; this store is read-only for orchestrator
+        },
+        async clear(): Promise<void> {
+          // no-op: DirectExecutorAdapter manages state lifecycle
+        },
+      }
+    : undefined
+
   const agent = new AgentOrchestrator({
     delegate: baseAgent,
     intentResolver: intentResolverAdapter,
     directExecutors: [pendingConfirmationExecutor, directExecutorAdapter],
+    sessionStateStore: orchestratorSessionStateStore,
     lifecycleHooks: {
       afterMessage: afterMessageHook,
     },

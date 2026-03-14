@@ -6,11 +6,28 @@ import { hasExplicitCaptureFrame } from "./explicit-capture-frame"
 import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
 import { hasCompletionCueZhTw } from "./completion-query-normalizer/locale-zh-tw"
 import { isCompletionStatusStatement, isStableCompletionQuery, normalizeCompletionQuery } from "./completion-query-normalizer"
+import { resolveOrdinalIndex } from "./intent-router"
+import type { LinePendingStateManager } from "./line-adapter"
+import type { AgentSessionState } from "./agent-session-state"
+
+function isAgentSessionState(value: unknown): value is AgentSessionState {
+  return (
+    value !== null
+    && typeof value === "object"
+    && "lastPresentedEntities" in value
+    && Array.isArray((value as AgentSessionState).lastPresentedEntities)
+    && "lastRecordedEntities" in value
+    && Array.isArray((value as AgentSessionState).lastRecordedEntities)
+  )
+}
 // ── Deterministic Fast-Path Patterns ─────────────────────────────────────────
 // 只保留語意 100% 明確、不可能碰撞的 pattern。
 // 其餘全部交給 LLM structured classifier。
 
 const SHORT_UNDERSPECIFIED_PATTERN = /^(記|好|嗯|喔|哦|欸|？|\?)$/
+
+// Pattern for the bare 記 short-circuit (FIX-2)
+const SHORT_RECORD_PATTERN = /^記$/
 
 const REORGANIZE_PATTERN = /^幫我整理|^整理(一下)?(任務|待辦)/i
 const CALENDAR_TASK_LINK_PATTERN = /(?:把|將)?\s*(?:第\s*[一二三四五六七八九十\d]+\s*個|最後一個|最後那個|這個|那個)\s*(?:行程|會議|活動)?\s*(?:加到任務|加成任務|變成任務|建立任務|建成任務)/iu
@@ -284,17 +301,89 @@ export class StructuredFallbackAgentIntentResolver implements AgentIntentResolve
  * This adapter wraps AgentIntentResolver and:
  * - Maps AgentIntent → OrchestratorIntent<AgentIntentObject>
  * - Stores the full AgentDecisionTrace for later retrieval by DirectExecutorAdapter
+ * - FIX-1: Short-circuits to "pending_confirmation" when pending state exists (avoids LLM call)
+ * - FIX-2: Short-circuits to "short_record" for bare 記 messages
+ * - FIX-4: Applies ordinal override logic (unknown + ordinal + lastPresentedEntities → task_completion)
  */
 export class IntentResolverAdapter implements BaseIntentResolver<AgentIntentObject> {
   private lastTrace: AgentDecisionTrace | null = null
 
-  constructor(private readonly inner: AgentIntentResolver) {}
+  constructor(
+    private readonly inner: AgentIntentResolver,
+    private readonly pendingStateManager?: LinePendingStateManager,
+  ) {}
 
   async resolve(input: IntentResolveInput): Promise<OrchestratorIntent<AgentIntentObject>> {
+    const message = input.message.trim()
+
+    // FIX-1: If pending state exists, short-circuit before any LLM classifier call.
+    // PendingConfirmationExecutor (Phase 2) will handle the actual execution.
+    if (this.pendingStateManager) {
+      const pending = await this.pendingStateManager.getPending("")
+      if (pending) {
+        this.lastTrace = {
+          routeSource: "intent_resolver",
+          resolver: "pending-state-fast-path",
+          rawMessage: message,
+          resolvedIntent: { object: "pending_confirmation", requiresConfirmation: false, confidence: 1.0 },
+          metadata: { reasonCodes: ["pending_state_fast_path"] },
+          selectedTool: null,
+          targetQuery: null,
+        }
+        return { object: "pending_confirmation", confidence: 1.0, requiresConfirmation: false }
+      }
+    }
+
+    // FIX-2: 記 short-circuit — return "short_record" intent, handled by DirectExecutorAdapter
+    if (SHORT_RECORD_PATTERN.test(message)) {
+      this.lastTrace = {
+        routeSource: "intent_resolver",
+        resolver: "short-record-fast-path",
+        rawMessage: message,
+        resolvedIntent: { object: "short_record", requiresConfirmation: false, confidence: 1.0 },
+        metadata: { reasonCodes: ["short_record_fast_path"] },
+        selectedTool: null,
+        targetQuery: null,
+      }
+      return { object: "short_record", confidence: 1.0, requiresConfirmation: false }
+    }
+
     const result = await this.inner.resolve({
       message: input.message,
       history: input.history as ModelMessage[] | undefined,
     })
+
+    // FIX-4: Ordinal override — if intent is unknown but message has ordinal + session has
+    // lastPresentedEntities, override to task_completion (restores IntentRouter behaviour).
+    // Our domain AgentSessionState is tunnelled through sessionState.metadata by the orchestrator.
+    if (result.intent.object === "unknown") {
+      const rawMetadata = (input.sessionState as { metadata?: unknown } | null)?.metadata
+      const sessionState = isAgentSessionState(rawMetadata) ? rawMetadata : null
+      const hasOrdinal = resolveOrdinalIndex(message) !== null
+      const hasRecentList = (sessionState?.lastPresentedEntities.length ?? 0) > 0
+      if (hasOrdinal && hasRecentList) {
+        const overriddenIntent: AgentIntent = {
+          ...result.intent,
+          object: "task_completion" as const,
+          requiresConfirmation: true,
+          confidence: 0.9,
+        }
+        this.lastTrace = {
+          ...result.trace,
+          resolvedIntent: overriddenIntent,
+          metadata: {
+            ...result.trace.metadata,
+            reasonCodes: [...(result.trace.metadata?.reasonCodes ?? []), "ordinal_override_task_completion"],
+          },
+        }
+        return {
+          object: "task_completion",
+          confidence: 0.9,
+          requiresConfirmation: true,
+        }
+      }
+    }
+
     this.lastTrace = result.trace
     return {
       object: result.intent.object,
