@@ -54,14 +54,12 @@ describe("CompleteTaskSkill lexical candidate search", () => {
     expect(direct).toBeGreaterThan(weak)
   })
 
-  it("strips completion wording before lexical matching", () => {
-    expect(normalizeCompletionQuery("跑步跑完了")).toBe("跑步")
-    expect(normalizeCompletionQuery("週一跑步我做完了")).toBe("週一跑步")
-    expect(normalizeCompletionQuery("繳電費繳掉了")).toBe("繳電費")
-    expect(normalizeCompletionQuery("剛把書桌整理完了")).toBe("書桌整理")
-    expect(normalizeCompletionQuery("剛剛把書桌整理完了")).toBe("書桌整理")
-    expect(normalizeCompletionQuery("剛才把書桌整理完了")).toBe("書桌整理")
-    expect(normalizeCompletionQuery("這個 done 了")).toBe("")
+  it("normalizeCompletionQuery is pure text cleanup (no NLU stripping)", () => {
+    // normalizeCompletionQuery is now pure text cleanup (lowercase + whitespace collapse)
+    // Task name extraction from completion phrasing is done by resolveCompletionQuery (LLM-primary)
+    expect(normalizeCompletionQuery("跑步跑完了")).toBe("跑步跑完了")
+    expect(normalizeCompletionQuery("週一跑步我做完了")).toBe("週一跑步我做完了")
+    expect(normalizeCompletionQuery("DONE")).toBe("done")
   })
 
   it("uses normalized query for candidate selection", () => {

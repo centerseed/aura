@@ -2,10 +2,9 @@ import type { LanguageModel, ModelMessage } from "ai"
 import { LLMStructuredClassifier, type DecisionAgentResult, type StructuredClassifier, type DecisionOptions, type BaseIntentResolver, type OrchestratorIntent, type IntentResolveInput } from "@centerseedwu/naru-agent"
 import type { AgentDecisionTrace, AgentIntent, AgentIntentObject } from "./agent-intent"
 import { AgentIntentSchema } from "./agent-intent"
-import { hasExplicitCaptureFrame } from "./explicit-capture-frame"
 import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
 import { hasCompletionCueZhTw } from "./completion-query-normalizer/locale-zh-tw"
-import { isCompletionStatusStatement, isStableCompletionQuery, normalizeCompletionQuery } from "./completion-query-normalizer"
+import { isCompletionStatusStatement, isStableCompletionQuery, normalizeCompletionQueryText } from "./completion-query-normalizer"
 import { resolveOrdinalIndex } from "./intent-router"
 import type { LinePendingStateManager } from "./line-adapter"
 import type { AgentSessionState } from "./agent-session-state"
@@ -27,23 +26,13 @@ function isAgentSessionState(value: unknown): value is AgentSessionState {
 const SHORT_UNDERSPECIFIED_PATTERN = /^(記|好|嗯|喔|哦|欸|？|\?)$/
 
 // Pattern for the bare 記 short-circuit (FIX-2)
-const SHORT_RECORD_PATTERN = /^記$/
+export const SHORT_RECORD_PATTERN = /^記$/
 
 const REORGANIZE_PATTERN = /^幫我整理|^整理(一下)?(任務|待辦)/i
-const CALENDAR_TASK_LINK_PATTERN = /(?:把|將)?\s*(?:第\s*[一二三四五六七八九十\d]+\s*個|最後一個|最後那個|這個|那個)\s*(?:行程|會議|活動)?\s*(?:加到任務|加成任務|變成任務|建立任務|建成任務)/iu
-const ADJUST_CLASSIFICATION_PATTERN = /(?:移到|改到|換到|放到|放在|改放到|改放在|分到|應該在|分類錯|不是.+(?:產品線|分類|topic|product)|從.+移到.+)/iu
-const CONTEXTUAL_TASK_REFERENCE_PATTERN = /(?:這個任務|那個任務|這件事|這個|那個|剛剛那個|剛才那個|上一個|上個)/u
-const CONTEXTUAL_LIST_REFERENCE_PATTERN = /(?:第\s*[一二三四五六七八九十\d]+\s*個|最後一個|最後那個|這個|那個|剛剛那個|剛才那個|上一個|上個)/u
 
 type TraceSpeechAct = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["speechAct"]>
 type TraceTargetReferenceMode = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["targetReferenceMode"]>
 type TraceTemporalScope = NonNullable<NonNullable<AgentDecisionTrace["metadata"]>["temporalScope"]>
-
-function resolveTemporalScope(message: string): TraceTemporalScope {
-  if (/今天/.test(message)) return "today"
-  if (/明天|下週|下周|之後|稍後|週五前|周五前|月底前/.test(message)) return "future"
-  return "none"
-}
 
 export interface ResolveAgentIntentInput {
   message: string
@@ -113,6 +102,11 @@ const STRUCTURED_INTENT_SYSTEM_PROMPT = [
   "Use conversation summary and memory only as supporting context.",
   "Do not invent targets or actions that are not grounded in the message/context.",
   "If intent is unclear, return object='unknown', requiresConfirmation=false, confidence below 0.5.",
+  "Examples:",
+  "- '把第二個行程加到任務' -> calendar_task_link",
+  "- '移到產品A' -> classification",
+  "- '幫我把跑步標記完成' -> task_completion",
+  "- '幫我記了什麼' -> recall_last_item (NOT task_capture)",
 ].join("\n")
 
 function shouldBypassFallbackClassifier(message: string): boolean {
@@ -120,10 +114,25 @@ function shouldBypassFallbackClassifier(message: string): boolean {
   return SHORT_UNDERSPECIFIED_PATTERN.test(trimmed) || trimmed.length <= 1
 }
 
+// Fast-path keyword sets for task_capture
+const TASK_CAPTURE_PREFIXES = ["記錄", "幫我記", "新增任務"]
+const INTERROGATIVE_SUFFIX = /(?:什麼|哪個|哪一個|哪件|哪件事|了什麼|的是什麼|\?|？)$/u
+
+function isTaskCaptureFastPath(message: string): boolean {
+  if (INTERROGATIVE_SUFFIX.test(message)) return false
+  return TASK_CAPTURE_PREFIXES.some((prefix) => message.startsWith(prefix))
+}
+
+// Fast-path keywords for task_completion
+const TASK_COMPLETION_KEYWORDS = ["完成", "done", "做完"]
+
+function isTaskCompletionFastPath(message: string): boolean {
+  return TASK_COMPLETION_KEYWORDS.some((keyword) => message.includes(keyword))
+}
+
 export class DeterministicAgentIntentResolver implements AgentIntentResolver {
   resolve(input: ResolveAgentIntentInput): ResolveAgentIntentResult {
     const message = input.message.trim()
-    const explicitCaptureFrame = hasExplicitCaptureFrame(message)
 
     // ── Fast-path: 只攔截語意 100% 明確的 pattern ──
 
@@ -139,46 +148,20 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       }, message)
     }
 
-    if (CALENDAR_TASK_LINK_PATTERN.test(message)) {
-      return buildResult({
-        object: "calendar_task_link",
-        requiresConfirmation: false,
-        confidence: 0.97,
-        speechAct: "mutate",
-        targetReferenceMode: CONTEXTUAL_LIST_REFERENCE_PATTERN.test(message) ? "contextual" : "explicit",
-        temporalScope: "future",
-        reasonCodes: ["calendar_task_link_fast_path"],
-      }, message)
-    }
-
-    if (explicitCaptureFrame) {
+    // task_capture fast-path: 3 prefix keywords
+    if (isTaskCaptureFastPath(message)) {
       return buildResult({
         object: "task_capture",
         requiresConfirmation: false,
         confidence: 0.96,
         speechAct: "mutate",
         targetReferenceMode: "none",
-        temporalScope: resolveTemporalScope(message),
+        temporalScope: "none",
         reasonCodes: ["explicit_capture_frame_priority"],
       }, message)
     }
 
-    const isContextualClassificationCorrection = CONTEXTUAL_TASK_REFERENCE_PATTERN.test(message)
-      && /(?:放在|放到|改到|移到|換到|改放到|改放在|應該在|不是)/u.test(message)
-
-    if (ADJUST_CLASSIFICATION_PATTERN.test(message) || isContextualClassificationCorrection) {
-      return buildResult({
-        object: "classification",
-        requiresConfirmation: false,
-        confidence: 0.93,
-        speechAct: "mutate",
-        targetReferenceMode: CONTEXTUAL_TASK_REFERENCE_PATTERN.test(message) ? "contextual" : "explicit",
-        temporalScope: "none",
-        reasonCodes: ["adjust_classification_fast_path"],
-      }, message)
-    }
-
-    const normalizedCompletionQuery = normalizeCompletionQuery(message)
+    const normalizedCompletionQuery = normalizeCompletionQueryText(message)
     if (isCompletionStatusStatement(message) && isStableCompletionQuery(normalizedCompletionQuery)) {
       return buildResult({
         object: "task_completion",

@@ -3,15 +3,17 @@ import { DeterministicAgentIntentResolver } from "@/application/use-cases/agent/
 import { ToolFirstAgent } from "@/application/use-cases/agent/tool-first-agent"
 
 describe("Agent Safety Kernel", () => {
-  it("capture framing beats completion wording", () => {
+  it("'待辦：' capture framing is now handled by LLM classifier (not deterministic fast-path)", () => {
+    // With the new LLM-first design, '待辦:' prefix no longer has a deterministic fast-path.
+    // This message is correctly classified by the LLM classifier as task_capture.
+    // The deterministic resolver returns 'unknown' for the LLM to handle.
     const resolver = new DeterministicAgentIntentResolver()
 
     const result = resolver.resolve({
       message: "待辦：準備 Q2 OKR 報告初稿，這週五前完成",
     })
 
-    expect(result.intent.object).toBe("task_capture")
-    expect(result.trace.metadata?.reasonCodes).toContain("explicit_capture_frame_priority")
+    expect(result.intent.object).toBe("unknown")
   })
 
   it("identifier-heavy record payload does not leak into reorganize routing", () => {

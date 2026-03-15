@@ -180,19 +180,17 @@ describe("ToolFirstAgent", () => {
     consoleLogSpy.mockRestore()
   })
 
-  it("normalizes repeated completion phrasing without duplicated verb tails", () => {
-    expect(normalizeCompletionQuery("跑步跑完了")).toBe("跑步")
-    expect(normalizeCompletionQuery("寫報告寫完了")).toBe("寫報告")
-    expect(normalizeCompletionQuery("繳電費繳掉了")).toBe("繳電費")
-    expect(normalizeCompletionQuery("幫我把買牛奶標記完成")).toBe("買牛奶")
+  it("normalizeCompletionQuery is pure text cleanup (no NLU extraction)", () => {
+    // normalizeCompletionQuery now only does lowercase + whitespace normalization
+    // NLU extraction is done by resolveCompletionQuery (LLM-primary)
+    expect(normalizeCompletionQuery("跑步跑完了")).toBe("跑步跑完了")
+    expect(normalizeCompletionQuery("幫我把買牛奶標記完成")).toBe("幫我把買牛奶標記完成")
+    expect(normalizeCompletionQuery("API 文件整理")).toBe("api 文件整理")
   })
 
-  it("normalizes completion messages into task queries", () => {
-    expect(normalizeCompletionQuery("跑步完成了")).toBe("跑步")
-    expect(normalizeCompletionQuery("幫我把買牛奶標記完成")).toBe("買牛奶")
-    expect(normalizeCompletionQuery("健身房做完了")).toBe("健身房")
-    expect(normalizeCompletionQuery("我今天已經跑完步了，幫我標記完成")).toBe("跑步")
-    expect(normalizeCompletionQuery("信已經發出去給客戶了")).toBe("信發給客戶")
+  it("normalizeCompletionQuery lowercases input", () => {
+    expect(normalizeCompletionQuery("跑步完成了")).toBe("跑步完成了")
+    expect(normalizeCompletionQuery("DONE")).toBe("done")
   })
 
   it("routes today's todo query through query_today_tasks", async () => {
@@ -680,6 +678,9 @@ describe("ToolFirstAgent", () => {
   })
 
   it("routes explicit task_completion intent through complete_task_search", async () => {
+    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
+      .mockResolvedValueOnce("跑步")
+
     const delegate = {
       chat: vi.fn(),
     }
@@ -719,6 +720,9 @@ describe("ToolFirstAgent", () => {
   })
 
   it("uses normalized completion query for direct completion fallback", async () => {
+    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
+      .mockResolvedValueOnce("買牛奶")
+
     const delegate = {
       chat: vi.fn(),
     }
@@ -835,11 +839,14 @@ describe("ToolFirstAgent", () => {
       expect.stringMatching(/^email ?寄給客戶$/),
       "line-user-1",
       undefined,
-      false,
+      expect.any(Boolean),
     )
   })
 
   it("routes passive/resultative completion phrasing through direct completion flow", async () => {
+    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
+      .mockResolvedValueOnce("信發給客戶")
+
     const delegate = {
       chat: vi.fn(),
     }

@@ -1,138 +1,39 @@
 import { normalizeCompletionInputText } from "./core"
 
-const COMPLETION_QUERY_REGEX = /^(.*?)(做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|完|done)\s*(了|啦|囉|喔|哦|欸)?$/i
-const RESULTATIVE_COMPLETION_PATTERN = /^(.{1,8}?)(?:已經|剛|剛剛|剛才)(.+?)(出去|出來|出)(給.+?)?(?:了|啦|囉|喔|哦|欸)?$/u
-const RESULTATIVE_RETURN_PATTERN = /^(.{1,16}?)(?:已經|剛|剛剛|剛才)(買|拿|帶)(回來|回去)(?:了|啦|囉|喔|哦|欸)?$/u
-const COMPLETION_FRAME_PATTERNS = [
-  /(?:幫我|請|麻煩)/gu,
-  /(?:把|將)/gu,
-  /(?:標記(?:成|為)?完成|設成完成|改成完成|勾掉|done)/giu,
-]
-const LEADING_FILLERS = ["我今天已經", "我已經", "今天已經", "我剛剛", "我剛才", "我剛", "剛剛", "剛才", "剛", "我把", "我要把", "想把", "幫我把", "幫我", "請把", "請幫我把", "請幫我", "把", "將", "這個", "那個", "這項", "那項"]
-const TRAILING_FILLERS = ["這個", "那個", "這項", "那項", "我"]
-const COMPLETION_TRAILING_PARTICLES = /(?:吧|呢|喔|哦|啊|呀)$/u
-const STRUCTURAL_COMPLETION_CUE_PATTERN = /(?:做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|done)|(?:(?:.+)?(?:已經|剛|剛剛|剛才).+?(?:(?:出去|出來|出)(?:給.+?)?|(?:買|拿|帶)(?:回來|回去))(?:了|啦|囉|喔|哦|欸)?$)/iu
-const EXPLICIT_COMPLETION_COMMAND_PATTERN = /(?:幫我|請|麻煩).*(?:標記(?:成|為)?完成|設成完成|改成完成|勾掉|done)|(?:標記(?:成|為)?完成|設成完成|改成完成|勾掉|done)/iu
-const COMPLETION_STATUS_STATEMENT_PATTERN = /(?:(?:.+)?(?:已經|剛|剛剛|剛才).+?(?:了|啦|囉|喔|哦|欸)$)|(?:.+(?:做完|完成|搞定|弄完|處理完|解決|結束|收工|繳掉|好了|done)(?:了|啦|囉|喔|哦|欸)?$)/iu
+const COMPLETION_CUE_PATTERN = /(完成|做完|搞定|done|好了)/i
 
-function stripLeadingFillers(text: string): string {
-  let value = text.trim()
-  let changed = true
+// Interrogative patterns that rule out "status statement" intent
+const INTERROGATIVE_PATTERN = /(?:什麼|哪個|哪一個|哪件|哪些|了什麼|的是什麼|\?|？)/u
 
-  while (changed) {
-    changed = false
-    for (const filler of LEADING_FILLERS) {
-      if (value.startsWith(filler)) {
-        value = value.slice(filler.length).trim()
-        changed = true
-      }
-    }
-  }
+// Command/imperative patterns — these are requests to the agent, not status reports
+const COMMAND_PATTERN = /(?:幫我|請|麻煩|標記|幫.*完成|改到|移到|換到|放到)/u
 
-  return value
-}
-
-function stripTrailingFillers(text: string): string {
-  let value = text.trim()
-  let changed = true
-
-  while (changed) {
-    changed = false
-    for (const filler of TRAILING_FILLERS) {
-      if (value.endsWith(filler)) {
-        value = value.slice(0, value.length - filler.length).trim()
-        changed = true
-      }
-    }
-  }
-
-  return value
-}
-
-function trimRepeatedLeadingStem(text: string): string {
-  if (text.length < 3) return text
-  const chars = Array.from(text)
-  const first = chars[0]
-  const last = chars.at(-1)
-  if (!first || first !== last) return text
-  return chars.slice(0, -1).join("").trim()
-}
-
-function stripResultativeCompletionClause(text: string): string {
-  const returnMatch = text.match(RESULTATIVE_RETURN_PATTERN)
-  if (returnMatch) {
-    const [, subject, verb] = returnMatch
-    const normalizedSubject = subject?.trim() ?? ""
-    const normalizedVerb = verb?.trim() ?? ""
-    if (normalizedSubject && normalizedVerb) {
-      return `${normalizedVerb}${normalizedSubject}`.trim()
-    }
-  }
-
-  const match = text.match(RESULTATIVE_COMPLETION_PATTERN)
-  if (!match) return text
-
-  const [, subject, predicate, , recipient] = match
-  const normalizedSubject = subject?.trim() ?? ""
-  const normalizedPredicate = predicate?.trim() ?? ""
-  const normalizedRecipient = recipient?.trim() ?? ""
-  if (!normalizedSubject || !normalizedPredicate) return text
-
-  return `${normalizedSubject}${normalizedPredicate}${normalizedRecipient}`.trim()
-}
+// Temporal referential expressions that merely reference context, not report completion
+const CONTEXT_REFERENCE_PATTERN = /^(?:剛剛|剛才)/u
 
 export function hasCompletionCueZhTw(text: string): boolean {
-  return STRUCTURAL_COMPLETION_CUE_PATTERN.test(normalizeCompletionInputText(text))
+  return COMPLETION_CUE_PATTERN.test(normalizeCompletionInputText(text))
 }
 
 export function isCompletionStatusStatementZhTw(text: string): boolean {
   const normalized = normalizeCompletionInputText(text)
   if (!normalized) return false
-  if (EXPLICIT_COMPLETION_COMMAND_PATTERN.test(normalized)) return false
-  const normalizedQuery = normalizeCompletionQueryZhTw(normalized)
-  if (/(?:已經|剛|剛剛|剛才)/u.test(normalized) && normalizedQuery && normalizedQuery !== normalized) {
-    return true
-  }
-  if (!hasCompletionCueZhTw(normalized)) return false
-  return COMPLETION_STATUS_STATEMENT_PATTERN.test(normalized)
-}
-
-export function normalizeCompletionQueryZhTw(text: string): string {
-  let normalized = normalizeCompletionInputText(text)
-  if (!normalized) return ""
-
-  for (const pattern of COMPLETION_FRAME_PATTERNS) {
-    normalized = normalized.replace(pattern, " ")
-  }
-
-  normalized = normalized
-    .replace(/[，、。！？!?]/g, " ")
-    .replace(COMPLETION_TRAILING_PARTICLES, "")
-    .replace(/[「」"'`]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-
-  let previous = ""
-  while (normalized !== previous) {
-    previous = normalized
-    const completionMatch = normalized.match(COMPLETION_QUERY_REGEX)
-    if (completionMatch) {
-      normalized = completionMatch[1]?.trim() ?? ""
-    }
-
-    normalized = stripResultativeCompletionClause(normalized)
-
-    const objectCompletionMatch = normalized.match(/^(.{1,4})完(.{1,20})了?$/u)
-    if (objectCompletionMatch?.[1] && objectCompletionMatch?.[2]) {
-      normalized = `${objectCompletionMatch[1]}${objectCompletionMatch[2]}`.trim()
-    }
-
-    normalized = stripLeadingFillers(normalized)
-    normalized = stripTrailingFillers(normalized)
-    normalized = trimRepeatedLeadingStem(normalized)
-    normalized = normalized.replace(/了$/u, "").trim()
-  }
-
-  normalized = normalized.replace(/^(?:這件事|這個任務|這個|那個|剛剛那個|剛才那個|上一個|上個)$/u, "").trim()
-  return normalizeCompletionInputText(normalized)
+  // Interrogative queries are never status statements
+  if (INTERROGATIVE_PATTERN.test(normalized)) return false
+  // Commands to the agent are never status statements
+  if (COMMAND_PATTERN.test(normalized)) return false
+  // Pure context reference (starts with 剛剛/剛才 but is about referencing, not reporting)
+  if (CONTEXT_REFERENCE_PATTERN.test(normalized) && /(?:那個|這個|改到|移到|放到)/u.test(normalized)) return false
+  // Explicit past tense "已經" → reporting completion
+  const hasPastTense = /已經/.test(normalized)
+  if (hasPastTense) return true
+  // Tense "剛" (immediate past) → reporting completion (e.g., "剛把書桌整理完了", "牛奶剛買回來了")
+  const hasImmediatePast = /剛/.test(normalized) && /(了|啦|囉|喔|哦|欸|完|好)/.test(normalized)
+  if (hasImmediatePast) return true
+  // Completion keyword at end of statement (e.g., "買牛奶完成了", "做完了")
+  // But NOT "X 前完成" (deadline phrasing) or "X 要完成" (goal phrasing)
+  const DEADLINE_COMPLETION_PATTERN = /(?:前|要|需要|得|應該|月底|週[一二三四五六日]|周[一二三四五六日])\s*(?:完成|做完|搞定|done|好了)(?:了|啦|囉|喔|哦|欸)?$/i
+  if (DEADLINE_COMPLETION_PATTERN.test(normalized)) return false
+  const hasCompletionAtEnd = /(完成|做完|搞定|done|好了)(?:了|啦|囉|喔|哦|欸)?$/i.test(normalized)
+  return hasCompletionAtEnd
 }

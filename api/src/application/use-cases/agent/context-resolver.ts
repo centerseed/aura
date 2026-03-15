@@ -27,7 +27,7 @@ export {
 export { extractLatestTaskCode } from "./history-extractor"
 
 // ── 上下文引用模式 ─────────────────────────────────────────────────────────
-const CONTEXTUAL_REFERENCE_PATTERN = /(?:剛才|剛剛|上一個|上次|之前)(?:記的|那個|的)?|那個|這個/
+export const CONTEXTUAL_REFERENCE_PATTERN = /(?:剛才|剛剛|上一個|上次|之前)(?:記的|那個|的)?|那個|這個/
 export const CONTEXTUAL_ADJUST_REFERENCE_PATTERN = /(?:這個任務|那個任務|這件事|這個|那個|剛剛那個|剛才那個|上一個|上個)/
 export const LIST_CONTEXTUAL_REFERENCE_PATTERN = /(?:第[一二三四五六七八九十\d]+個|最後一個|最後那個|那個|這個|剛剛那個|剛才那個|上一個|上個)/
 export const BARE_COMPLETION_REFERENCE_PATTERN = /^(?:完成了?|做完了?|搞定了?|done|好了?|處理完了?|結束了?)$/i

@@ -10,6 +10,7 @@ import { shouldUseStrictTodayFocus } from "./today-focus-scope"
 import {
   DeterministicAgentIntentResolver,
   type AgentIntentResolver,
+  SHORT_RECORD_PATTERN,
 } from "./agent-intent-resolver"
 import { createCompleteTaskSearchTool } from "./complete-task-skill"
 import {
@@ -22,6 +23,13 @@ import { AgentSessionStateStore, type AgentSessionState } from "./agent-session-
 import { getLineSession, clearLineSession, saveLineSession } from "@/lib/line-session"
 import type { AdjustTagsPayload, BrainDumpPendingPayload, CompleteTaskPayload } from "@/lib/line-session"
 import { classifyConfirmationDisposition, extractBrainDumpConfirmationTarget } from "@/lib/line-confirmation"
+import {
+  CONTEXTUAL_REFERENCE_PATTERN,
+  CONTEXTUAL_ADJUST_REFERENCE_PATTERN,
+  LIST_CONTEXTUAL_REFERENCE_PATTERN,
+  BARE_COMPLETION_REFERENCE_PATTERN,
+} from "./context-resolver"
+import { resolveOrdinalIndex } from "./intent-router"
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
 import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
 import { createRunPlannerTool } from "./planner-skill"
@@ -84,40 +92,6 @@ interface ToolFirstAgentUsage {
   classifierInputTokens?: number
   classifierOutputTokens?: number
   classifierTotalTokens?: number
-}
-
-const SHORT_RECORD_PATTERN = /^記$/
-
-// 序號引用模式：第一個、第二個、第三個...
-const ORDINAL_REFERENCE_PATTERN = /第\s*([一二三四五六七八九十\d]+)\s*個/
-const BARE_ORDINAL_PATTERN = /^\s*([一二三四五六七八九十\d]+)\s*$/
-const LAST_ORDINAL_PATTERN = /最後一個|最後那個/
-const ORDINAL_MAP: Record<string, number> = {
-  "一": 0, "二": 1, "三": 2, "四": 3, "五": 4,
-  "六": 5, "七": 6, "八": 7, "九": 8, "十": 9,
-}
-
-// 上下文引用模式：剛才記的、那個、這個
-const CONTEXTUAL_REFERENCE_PATTERN = /(?:剛才|剛剛|上一個|上次|之前)(?:記的|那個|的)?|那個|這個/
-const CONTEXTUAL_ADJUST_REFERENCE_PATTERN = /(?:這個任務|那個任務|這件事|這個|那個|剛剛那個|剛才那個|上一個|上個)/
-const LIST_CONTEXTUAL_REFERENCE_PATTERN = /(?:第[一二三四五六七八九十\d]+個|最後一個|最後那個|那個|這個|剛剛那個|剛才那個|上一個|上個)/
-const BARE_COMPLETION_REFERENCE_PATTERN = /^(?:完成了?|做完了?|搞定了?|done|好了?|處理完了?|結束了?)$/i
-function resolveOrdinalIndex(message: string): number | "last" | null {
-  if (LAST_ORDINAL_PATTERN.test(message)) return "last"
-
-  const match = message.match(ORDINAL_REFERENCE_PATTERN)
-  const bareMatch = message.trim().match(BARE_ORDINAL_PATTERN)
-  const ordinalToken = match?.[1] ?? bareMatch?.[1]
-  if (!ordinalToken) return null
-
-  const ordinal = ordinalToken
-  // 數字
-  const num = Number(ordinal)
-  if (!Number.isNaN(num)) return num - 1
-
-  // 中文
-  const mapped = ORDINAL_MAP[ordinal]
-  return mapped ?? null
 }
 
 function resolveContextualQuery(

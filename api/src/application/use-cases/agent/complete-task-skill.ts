@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db"
 import type { CompleteTaskPayload } from "@/lib/line-session"
 import { saveLineSession } from "@/lib/line-session"
 import { serializeFactsSummary } from "./tool-result-protocol"
-import { normalizeCompletionQuery, resolveCompletionQuery } from "./completion-query-normalizer"
+import { normalizeCompletionQueryText, resolveCompletionQuery } from "./completion-query-normalizer"
 import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
 
 const MAX_TASK_SEARCH_POOL = 150
@@ -298,7 +298,7 @@ function buildCompletionConfirmationPrompt(taskTitle: string): string {
 }
 
 async function rankTaskMatches(taskName: string, tasks: SearchableTask[]): Promise<RankedTaskMatch[]> {
-  const normalizedQuery = normalizeCompletionQuery(taskName)
+  const normalizedQuery = normalizeCompletionQueryText(taskName)
   const candidates = pickSearchCandidates(normalizedQuery, tasks)
   if (candidates.length === 0) return []
 
@@ -436,7 +436,7 @@ export function decideTaskMatch(
 }
 
 export function pickSearchCandidates(taskName: string, tasks: SearchableTask[]): SearchableTask[] {
-  const normalizedQuery = normalizeCompletionQuery(taskName)
+  const normalizedQuery = normalizeCompletionQueryText(taskName)
   const dedupedTasks = dedupeSearchableTasks(tasks)
   const ranked = dedupedTasks
     .map((task, index) => ({
@@ -458,8 +458,8 @@ export function pickSearchCandidates(taskName: string, tasks: SearchableTask[]):
 }
 
 export function lexicalMatchScore(taskName: string, content: string): number {
-  const query = normalizeCompletionQuery(taskName)
-  const target = normalizeText(content)
+  const query = normalizeCompletionQueryText(taskName)
+  const target = normalizeCompletionQueryText(content)
   const compactQuery = compactNormalizeText(query)
   const compactTarget = compactNormalizeText(content)
   if (!query || !target) return 0
@@ -481,10 +481,6 @@ export function lexicalMatchScore(taskName: string, content: string): number {
 
   const boostedScore = Math.max(weightedScore, unorderedTokenScore * 100)
   return Math.round(boostedScore * 1000) / 1000
-}
-
-function normalizeText(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, " ").trim()
 }
 
 function compactNormalizeText(text: string): string {

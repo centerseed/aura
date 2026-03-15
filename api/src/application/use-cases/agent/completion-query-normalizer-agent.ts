@@ -16,6 +16,10 @@ const COMPLETION_QUERY_NORMALIZER_PROMPT = [
   "- '剛把書桌整理完了' -> '書桌整理'",
   "- '我今天已經跑完步了，幫我標記完成' -> '跑步'",
   "- '這個 done 了' -> ''",
+  "- '實作 Planner Phase 1 第一優先 -> 已經完成' -> '實作 Planner Phase 1'",
+  "- '信已經發出去給客戶了' -> '寄信給客戶'",
+  "- '作 Planner Phase 1 已完成' -> 'Planner Phase 1'",
+  "- '寫週報已完成' -> '寫週報'",
 ].join("\n")
 
 const CompletionQueryNormalizationSchema = z.object({
