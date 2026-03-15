@@ -3,8 +3,6 @@ import { LLMStructuredClassifier, type DecisionAgentResult, type StructuredClass
 import type { AgentDecisionTrace, AgentIntent, AgentIntentObject } from "./agent-intent"
 import { AgentIntentSchema } from "./agent-intent"
 import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
-import { hasCompletionCueZhTw } from "./completion-query-normalizer/locale-zh-tw"
-import { isCompletionStatusStatement, isStableCompletionQuery, normalizeCompletionQueryText } from "./completion-query-normalizer"
 import { resolveOrdinalIndex } from "./intent-router"
 import type { LinePendingStateManager } from "./line-adapter"
 import type { AgentSessionState } from "./agent-session-state"
@@ -123,13 +121,6 @@ function isTaskCaptureFastPath(message: string): boolean {
   return TASK_CAPTURE_PREFIXES.some((prefix) => message.startsWith(prefix))
 }
 
-// Fast-path keywords for task_completion
-const TASK_COMPLETION_KEYWORDS = ["完成", "done", "做完"]
-
-function isTaskCompletionFastPath(message: string): boolean {
-  return TASK_COMPLETION_KEYWORDS.some((keyword) => message.includes(keyword))
-}
-
 export class DeterministicAgentIntentResolver implements AgentIntentResolver {
   resolve(input: ResolveAgentIntentInput): ResolveAgentIntentResult {
     const message = input.message.trim()
@@ -161,19 +152,6 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       }, message)
     }
 
-    const normalizedCompletionQuery = normalizeCompletionQueryText(message)
-    if (isCompletionStatusStatement(message) && isStableCompletionQuery(normalizedCompletionQuery)) {
-      return buildResult({
-        object: "task_completion",
-        requiresConfirmation: true,
-        confidence: 0.9,
-        speechAct: "mutate",
-        targetReferenceMode: "explicit",
-        temporalScope: "none",
-        reasonCodes: ["completion_status_statement_fast_path"],
-      }, message)
-    }
-
     // ── 其餘全部交給 LLM classifier ──
 
     return buildResult({
@@ -183,11 +161,7 @@ export class DeterministicAgentIntentResolver implements AgentIntentResolver {
       speechAct: "meta",
       targetReferenceMode: "none",
       temporalScope: "none",
-      reasonCodes: [
-        hasCompletionCueZhTw(message)
-          ? "completion_cue_requires_classifier"
-          : "no_direct_route_match",
-      ],
+      reasonCodes: ["no_direct_route_match"],
     }, message)
   }
 }

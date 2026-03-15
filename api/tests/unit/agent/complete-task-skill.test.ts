@@ -5,7 +5,7 @@ import {
   lexicalMatchScore,
   pickSearchCandidates,
 } from "@/application/use-cases/agent/complete-task-skill"
-import { normalizeCompletionQuery } from "@/application/use-cases/agent/completion-query-normalizer"
+import { normalizeCompletionQueryText } from "@/application/use-cases/agent/completion-query-normalizer"
 
 describe("CompleteTaskSkill lexical candidate search", () => {
   it("prefers lexical matches over unrelated tasks", () => {
@@ -54,12 +54,12 @@ describe("CompleteTaskSkill lexical candidate search", () => {
     expect(direct).toBeGreaterThan(weak)
   })
 
-  it("normalizeCompletionQuery is pure text cleanup (no NLU stripping)", () => {
-    // normalizeCompletionQuery is now pure text cleanup (lowercase + whitespace collapse)
-    // Task name extraction from completion phrasing is done by resolveCompletionQuery (LLM-primary)
-    expect(normalizeCompletionQuery("跑步跑完了")).toBe("跑步跑完了")
-    expect(normalizeCompletionQuery("週一跑步我做完了")).toBe("週一跑步我做完了")
-    expect(normalizeCompletionQuery("DONE")).toBe("done")
+  it("normalizeCompletionQueryText is pure text cleanup (no NLU stripping)", () => {
+    // normalizeCompletionQueryText: lowercase + whitespace collapse only
+    // Raw messages are passed directly to lexical matching — no NLU extraction layer
+    expect(normalizeCompletionQueryText("跑步跑完了")).toBe("跑步跑完了")
+    expect(normalizeCompletionQueryText("週一跑步我做完了")).toBe("週一跑步我做完了")
+    expect(normalizeCompletionQueryText("DONE")).toBe("done")
   })
 
   it("uses normalized query for candidate selection", () => {

@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ToolFirstAgent } from "@/application/use-cases/agent/tool-first-agent"
-import { normalizeCompletionQuery } from "@/application/use-cases/agent/completion-query-normalizer"
-import * as completionQueryNormalizer from "@/application/use-cases/agent/completion-query-normalizer"
 import { classifyConfirmationDisposition } from "@/lib/line-confirmation"
 
 const {
@@ -180,17 +178,38 @@ describe("ToolFirstAgent", () => {
     consoleLogSpy.mockRestore()
   })
 
-  it("normalizeCompletionQuery is pure text cleanup (no NLU extraction)", () => {
-    // normalizeCompletionQuery now only does lowercase + whitespace normalization
-    // NLU extraction is done by resolveCompletionQuery (LLM-primary)
-    expect(normalizeCompletionQuery("跑步跑完了")).toBe("跑步跑完了")
-    expect(normalizeCompletionQuery("幫我把買牛奶標記完成")).toBe("幫我把買牛奶標記完成")
-    expect(normalizeCompletionQuery("API 文件整理")).toBe("api 文件整理")
-  })
+  it("@ac2 raw message is passed directly to complete_task_search (no NLU extraction layer)", async () => {
+    // After nlp-cleanup: task matching uses the raw trimmed message directly.
+    // No resolveCompletionQuery or NLU extraction step occurs before matching.
+    const delegate = { chat: vi.fn() }
+    const sessionStore = {
+      get: vi.fn().mockResolvedValue([]),
+      save: vi.fn().mockResolvedValue(undefined),
+    }
 
-  it("normalizeCompletionQuery lowercases input", () => {
-    expect(normalizeCompletionQuery("跑步完成了")).toBe("跑步完成了")
-    expect(normalizeCompletionQuery("DONE")).toBe("done")
+    const agent = new ToolFirstAgent({
+      delegate,
+      sessionStore,
+      memoryManager: null,
+      lineUserId: "line-user-1",
+      intentResolver: createResolvedIntentResolver("task_completion", {
+        requiresConfirmation: false,
+        targetReferenceMode: "explicit",
+      }),
+    })
+
+    await agent.chat("作 Planner Phase 1 已完成", {
+      userId: "user-1",
+      sessionId: "line-user-1",
+    })
+
+    expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
+      "user-1",
+      "作 Planner Phase 1 已完成",
+      "line-user-1",
+      undefined,
+      true,
+    )
   })
 
   it("routes today's todo query through query_today_tasks", async () => {
@@ -678,9 +697,6 @@ describe("ToolFirstAgent", () => {
   })
 
   it("routes explicit task_completion intent through complete_task_search", async () => {
-    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
-      .mockResolvedValueOnce("跑步")
-
     const delegate = {
       chat: vi.fn(),
     }
@@ -708,21 +724,19 @@ describe("ToolFirstAgent", () => {
 
     expect(mockQueryCompletedTodayExecute).not.toHaveBeenCalled()
     expect(delegate.chat).not.toHaveBeenCalled()
+    // @ac2: raw message passed directly — no NLU extraction layer
     expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
       "user-1",
-      "跑步",
+      "我今天已經跑完步了，幫我標記完成",
       "line-user-1",
       undefined,
-      false,
+      true,
     )
     expect(mockCompleteTaskSearchExecute).toHaveBeenCalledWith({})
     expect(result.toolCalls).toEqual(["complete_task_search"])
   })
 
-  it("uses normalized completion query for direct completion fallback", async () => {
-    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
-      .mockResolvedValueOnce("買牛奶")
-
+  it("passes raw message directly to complete_task_search (no NLU extraction)", async () => {
     const delegate = {
       chat: vi.fn(),
     }
@@ -748,19 +762,17 @@ describe("ToolFirstAgent", () => {
       sessionId: "line-user-1",
     })
 
+    // @ac2: raw trimmed message, not an NLU-extracted query
     expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
       "user-1",
-      "買牛奶",
+      "幫我把買牛奶標記完成",
       "line-user-1",
       undefined,
-      false,
+      true,
     )
   })
 
-  it("routes multi-clause completion phrasing through the normalized query", async () => {
-    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
-      .mockResolvedValueOnce("api 文件整理")
-
+  it("routes multi-clause completion phrasing through direct completion flow", async () => {
     const delegate = {
       chat: vi.fn(),
     }
@@ -786,31 +798,19 @@ describe("ToolFirstAgent", () => {
       sessionId: "line-user-1",
     })
 
+    // @ac2: raw message passed directly — lexical similarity handles matching
     expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
       "user-1",
-      "api 文件整理",
+      "我今天已經把 API 文件整理好了，幫我標記完成",
       "line-user-1",
       undefined,
-      false,
+      true,
     )
   })
 
-  it("routes code-switching completion phrasing with explicit completion cue through the normalized query", async () => {
-    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
-      .mockResolvedValueOnce("email寄給客戶")
-
+  it("routes code-switching completion phrasing through direct completion flow", async () => {
     const delegate = {
-      chat: vi.fn().mockResolvedValue({
-        blocked: false,
-        content: "delegate response",
-        usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
-        intent: null,
-        toolCalls: [],
-        timings: {},
-        sessionId: "line-user-1",
-        traceId: null,
-        trace: null,
-      }),
+      chat: vi.fn(),
     }
 
     const sessionStore = {
@@ -834,9 +834,10 @@ describe("ToolFirstAgent", () => {
       sessionId: "line-user-1",
     })
 
+    // @ac2: raw message, no NLU extraction layer
     expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
       "user-1",
-      expect.stringMatching(/^email ?寄給客戶$/),
+      "剛剛把 email 寄給客戶 done 了",
       "line-user-1",
       undefined,
       expect.any(Boolean),
@@ -844,9 +845,6 @@ describe("ToolFirstAgent", () => {
   })
 
   it("routes passive/resultative completion phrasing through direct completion flow", async () => {
-    vi.spyOn(completionQueryNormalizer, "resolveCompletionQuery")
-      .mockResolvedValueOnce("信發給客戶")
-
     const delegate = {
       chat: vi.fn(),
     }
@@ -873,9 +871,10 @@ describe("ToolFirstAgent", () => {
     })
 
     expect(delegate.chat).not.toHaveBeenCalled()
+    // @ac2: raw message passed directly — no NLU extraction
     expect(mockCreateCompleteTaskSearchTool).toHaveBeenCalledWith(
       "user-1",
-      "信發給客戶",
+      "信已經發出去給客戶了",
       "line-user-1",
       undefined,
       true,

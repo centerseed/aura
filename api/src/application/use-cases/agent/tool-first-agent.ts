@@ -33,7 +33,6 @@ import { resolveOrdinalIndex } from "./intent-router"
 import { ExecuteAdjustmentUseCase } from "@/application/use-cases/adjust-tags/execute-adjustment"
 import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
 import { createRunPlannerTool } from "./planner-skill"
-import { isCompletionStatusStatement, resolveCompletionQuery } from "./completion-query-normalizer"
 import { normalizeAgentUsage } from "./llm-logging"
 import { createQueryCalendarTool } from "./query-calendar-skill"
 import { toCalendarUnavailableMessage } from "./agent-calendar-query-service"
@@ -780,7 +779,7 @@ export class ToolFirstAgent {
       const requireCompletionConfirmation = Boolean(
         this.config.lineUserId
         && !contextualEntity
-        && isCompletionStatusStatement(trimmedMessage),
+        && intent.object === "task_completion",
       )
 
       if (contextualPayload) {
@@ -819,10 +818,9 @@ export class ToolFirstAgent {
         }
 
         if (!toolOutput) {
-          const normalizedQuery = await resolveCompletionQuery(trimmedMessage)
           toolName = "complete_task_search"
           toolOutput = await createCompleteTaskSearchTool(
-            userId ?? "", normalizedQuery || trimmedMessage, this.config.lineUserId, undefined, requireCompletionConfirmation,
+            userId ?? "", trimmedMessage, this.config.lineUserId, undefined, requireCompletionConfirmation,
           ).execute({})
           toolHistoryContent = toolOutput
         }

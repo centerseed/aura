@@ -1,8 +1,7 @@
 /**
  * CompleteTaskSkill — 完成任務 check-off
  *
- * 觸發詞：完成、做完、搞定、done、完成了、已完成
- * 正規化 + lexical matching 找候選 → deterministic 單輪完成或要求澄清
+ * Raw message → lexical matching 找候選 → deterministic 單輪完成或要求澄清
  */
 
 import { tool, skill, makeSkillResult } from "@centerseedwu/naru-agent"
@@ -11,7 +10,7 @@ import { prisma } from "@/lib/db"
 import type { CompleteTaskPayload } from "@/lib/line-session"
 import { saveLineSession } from "@/lib/line-session"
 import { serializeFactsSummary } from "./tool-result-protocol"
-import { normalizeCompletionQueryText, resolveCompletionQuery } from "./completion-query-normalizer"
+import { normalizeCompletionQueryText } from "./completion-query-normalizer"
 import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
 
 const MAX_TASK_SEARCH_POOL = 150
@@ -75,8 +74,7 @@ async function executeCompleteTaskSearch(
   lineUserId?: string,
   requireConfirmation = false,
 ): Promise<string> {
-      const resolvedTaskName = await resolveCompletionQuery(taskName)
-      const searchQuery = resolvedTaskName || taskName
+      const searchQuery = taskName
       const [tasks, subTasks, dailyPlanItems] = await Promise.all([
         prisma.task.findMany({
           where: { user_id: userId, status: "ACTIVE", deleted_at: null },

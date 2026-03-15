@@ -7,7 +7,6 @@
 import type { ModelMessage } from "ai"
 import { createCompleteTaskSearchTool } from "./complete-task-skill"
 import { parseToolResult } from "./tool-result-protocol"
-import { isCompletionStatusStatement, resolveCompletionQuery } from "./completion-query-normalizer"
 import { buildCompleteTaskSuccessMessage, executeCompleteTaskPayload } from "./complete-task-executor"
 import {
   toCompleteTaskPayload,
@@ -44,7 +43,7 @@ export async function handleTaskCompletion(
   const requireCompletionConfirmation = Boolean(
     confirmationKey
     && !contextualEntity
-    && isCompletionStatusStatement(message),
+    && intent.object === "task_completion",
   )
 
   let toolName: string | null = null
@@ -88,10 +87,9 @@ export async function handleTaskCompletion(
     }
 
     if (!toolOutput) {
-      const normalizedQuery = await resolveCompletionQuery(message)
       toolName = "complete_task_search"
       toolOutput = await createCompleteTaskSearchTool(
-        userId, normalizedQuery || message, confirmationKey, undefined, requireCompletionConfirmation,
+        userId, message, confirmationKey, undefined, requireCompletionConfirmation,
       ).execute({})
       toolHistoryContent = toolOutput
     }

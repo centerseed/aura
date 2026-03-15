@@ -194,25 +194,20 @@ describe("DeterministicAgentIntentResolver", () => {
     it("keeps '把這件事標記完成' as unknown for the classifier", () => {
       const result = resolver.resolve({ message: "把這件事標記完成" })
       expect(result.intent.object).toBe("unknown")
-      expect(result.trace.metadata?.reasonCodes).toContain("completion_cue_requires_classifier")
+      expect(result.trace.metadata?.reasonCodes).toContain("no_direct_route_match")
     })
 
-    it("routes '信已經發出去給客戶了' to task_completion via status statement", () => {
+    // @ac1: completion intent now goes to LLM classifier (no deterministic fast-path)
+    it("@ac1 keeps '信已經發出去給客戶了' as unknown (delegated to LLM classifier)", () => {
       const result = resolver.resolve({ message: "信已經發出去給客戶了" })
-      expect(result.intent).toMatchObject({
-        object: "task_completion",
-        requiresConfirmation: true,
-      })
-      expect(result.trace.metadata?.reasonCodes).toContain("completion_status_statement_fast_path")
+      expect(result.intent.object).toBe("unknown")
+      expect(result.trace.metadata?.reasonCodes).toContain("no_direct_route_match")
     })
 
-    it("routes '牛奶剛買回來了' to completion confirmation", () => {
+    it("@ac1 keeps '牛奶剛買回來了' as unknown (delegated to LLM classifier)", () => {
       const result = resolver.resolve({ message: "牛奶剛買回來了" })
-      expect(result.intent).toMatchObject({
-        object: "task_completion",
-        requiresConfirmation: true,
-      })
-      expect(result.trace.metadata?.reasonCodes).toContain("completion_status_statement_fast_path")
+      expect(result.intent.object).toBe("unknown")
+      expect(result.trace.metadata?.reasonCodes).toContain("no_direct_route_match")
     })
 
     // @ac6: '把這個任務移到工作' now goes to LLM classifier
