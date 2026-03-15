@@ -3,6 +3,7 @@ dotenv.config()
 
 import { createZentropyAgent } from "@/application/use-cases/agent/zentropy-agent"
 import { prisma } from "@/lib/db"
+import { clearLineSession } from "@/lib/line-session"
 import { buildLineInteractiveReply } from "@/lib/line-interactive-reply"
 
 const userId = "d8493e56-db97-4cfa-b18d-8c843b8574f3"
@@ -153,6 +154,7 @@ async function seedBaseTasks(extraTasks: string[] = []) {
 async function resetScenario(label: string, extraTasks: string[] = []) {
   console.log(`\n🔄 ${label} 前重置資料...`)
   sessionAgents.clear()
+  await clearLineSession(`api:${userId}`).catch(() => {})
   await cleanTestUser()
   await seedBaseTasks(extraTasks)
 }

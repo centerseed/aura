@@ -316,10 +316,6 @@ const HIGH_CONFIDENCE_INTENTS: ReadonlySet<AgentIntentObject> = new Set<AgentInt
   "recall_task_code",
   // FIX-2: bare 記 short-circuit (user sent only 記, needs prompt to provide content)
   "short_record",
-  // FIX-1: pending_confirmation is handled by PendingConfirmationExecutor (first in directExecutors),
-  // but we list it here so DirectExecutorAdapter.canHandle returns true and doesn't fall through to delegate.
-  // In practice, PendingConfirmationExecutor will consume it first.
-  "pending_confirmation",
 ])
 
 export class DirectExecutorAdapter implements BaseDirectExecutor<AgentIntentObject> {
@@ -441,7 +437,7 @@ export class DirectExecutorAdapter implements BaseDirectExecutor<AgentIntentObje
       }
     }
 
-    return {
+    const result: OrchestrationResult = {
       blocked: false,
       content,
       usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
@@ -463,5 +459,9 @@ export class DirectExecutorAdapter implements BaseDirectExecutor<AgentIntentObje
       pendingConfirmation: null,
       orchestrationIntent: orchIntent,
     }
+    // Attach toolOutputs for LINE interactive reply (disambiguation, confirmation)
+    // Duck-typed: OrchestrationResult doesn't declare this field, but LifecycleAwareAgent passes it through
+    ;(result as unknown as Record<string, unknown>).toolOutputs = rawToolOutput ? [rawToolOutput] : []
+    return result
   }
 }

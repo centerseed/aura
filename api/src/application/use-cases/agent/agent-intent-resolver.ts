@@ -4,7 +4,6 @@ import type { AgentDecisionTrace, AgentIntent, AgentIntentObject } from "./agent
 import { AgentIntentSchema } from "./agent-intent"
 import { logAgentLlmCall, normalizeAgentUsage } from "./llm-logging"
 import { resolveOrdinalIndex } from "./intent-router"
-import type { LinePendingStateManager } from "./line-adapter"
 import type { AgentSessionState } from "./agent-session-state"
 
 function isAgentSessionState(value: unknown): value is AgentSessionState {
@@ -258,7 +257,6 @@ export class StructuredFallbackAgentIntentResolver implements AgentIntentResolve
  * This adapter wraps AgentIntentResolver and:
  * - Maps AgentIntent → OrchestratorIntent<AgentIntentObject>
  * - Stores the full AgentDecisionTrace for later retrieval by DirectExecutorAdapter
- * - FIX-1: Short-circuits to "pending_confirmation" when pending state exists (avoids LLM call)
  * - FIX-2: Short-circuits to "short_record" for bare 記 messages
  * - FIX-4: Applies ordinal override logic (unknown + ordinal + lastPresentedEntities → task_completion)
  */
@@ -267,29 +265,10 @@ export class IntentResolverAdapter implements BaseIntentResolver<AgentIntentObje
 
   constructor(
     private readonly inner: AgentIntentResolver,
-    private readonly pendingStateManager?: LinePendingStateManager,
   ) {}
 
   async resolve(input: IntentResolveInput): Promise<OrchestratorIntent<AgentIntentObject>> {
     const message = input.message.trim()
-
-    // FIX-1: If pending state exists, short-circuit before any LLM classifier call.
-    // PendingConfirmationExecutor (Phase 2) will handle the actual execution.
-    if (this.pendingStateManager) {
-      const pending = await this.pendingStateManager.getPending("")
-      if (pending) {
-        this.lastTrace = {
-          routeSource: "intent_resolver",
-          resolver: "pending-state-fast-path",
-          rawMessage: message,
-          resolvedIntent: { object: "pending_confirmation", requiresConfirmation: false, confidence: 1.0 },
-          metadata: { reasonCodes: ["pending_state_fast_path"] },
-          selectedTool: null,
-          targetQuery: null,
-        }
-        return { object: "pending_confirmation", confidence: 1.0, requiresConfirmation: false }
-      }
-    }
 
     // FIX-2: 記 short-circuit — return "short_record" intent, handled by DirectExecutorAdapter
     if (SHORT_RECORD_PATTERN.test(message)) {

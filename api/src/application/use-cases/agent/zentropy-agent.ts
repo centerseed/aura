@@ -116,10 +116,8 @@ export function createZentropyAgent(userId: string, lineUserId?: string): Lifecy
     : undefined
 
   // Adapter: bridges AgentIntentResolver → BaseIntentResolver for new orchestrator
-  // FIX-1: pass pendingStateManager for pending state short-circuit
   const intentResolverAdapter = new IntentResolverAdapter(
     innerIntentResolver,
-    pendingStateManager,
   )
 
   // DirectExecutorAdapter: bridges existing DirectExecutor → BaseDirectExecutor

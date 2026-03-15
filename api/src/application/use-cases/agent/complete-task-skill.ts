@@ -325,7 +325,6 @@ async function rankTaskMatches(taskName: string, tasks: SearchableTask[]): Promi
     }))
 
   return ranked
-    .filter((task) => task.combinedScore >= 0.45)
     .sort((lhs, rhs) => rhs.combinedScore - lhs.combinedScore)
 }
 

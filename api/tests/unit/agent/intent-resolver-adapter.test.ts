@@ -6,7 +6,6 @@
  * - Maps AgentIntent → OrchestratorIntent<AgentIntentObject>
  * - Preserves AgentDecisionTrace via getLastTrace()
  * - Result shape satisfies OrchestratorIntent contract
- * - FIX-1: Short-circuits to pending_confirmation when pending state exists
  * - FIX-2: Short-circuits to short_record for bare 記 messages
  * - FIX-4: Applies ordinal override when intent=unknown + ordinal + lastPresentedEntities
  */
@@ -21,7 +20,6 @@ vi.mock("@/lib/line-session", () => ({
 }))
 
 const { IntentResolverAdapter } = await import("@/application/use-cases/agent/agent-intent-resolver")
-const { LinePendingStateManager } = await import("@/application/use-cases/agent/line-adapter")
 
 function makeInnerResolver(object: string, confidence = 0.9, requiresConfirmation = false) {
   const trace = {
@@ -94,53 +92,6 @@ describe("IntentResolverAdapter", () => {
     expect(typeof result.confidence).toBe("number")
     expect(result.confidence).toBeGreaterThanOrEqual(0)
     expect(result.confidence).toBeLessThanOrEqual(1)
-  })
-
-  describe("FIX-1: pending state short-circuit", () => {
-    it("should return pending_confirmation when pending state exists (skips LLM classifier)", async () => {
-      mockGetLineSession.mockResolvedValue({
-        type: "adjust_tags_preview",
-        payload: { logId: "log-1" },
-      })
-      const inner = makeInnerResolver("unknown", 0.1)
-      const manager = new LinePendingStateManager("line-uid-1")
-      const adapter = new IntentResolverAdapter(inner as never, manager)
-
-      const result = await adapter.resolve({ message: "確認" })
-
-      expect(result.object).toBe("pending_confirmation")
-      expect(result.confidence).toBe(1.0)
-      // Inner resolver must NOT be called (skips LLM)
-      expect(inner.resolve).not.toHaveBeenCalled()
-    })
-
-    it("should set lastTrace to pending-state-fast-path resolver", async () => {
-      mockGetLineSession.mockResolvedValue({
-        type: "complete_task_confirm",
-        payload: { taskId: "t1", taskTitle: "買牛奶" },
-      })
-      const inner = makeInnerResolver("unknown", 0.1)
-      const manager = new LinePendingStateManager("line-uid-1")
-      const adapter = new IntentResolverAdapter(inner as never, manager)
-
-      await adapter.resolve({ message: "好的" })
-
-      const trace = adapter.getLastTrace()
-      expect(trace?.resolver).toBe("pending-state-fast-path")
-      expect(trace?.resolvedIntent.object).toBe("pending_confirmation")
-    })
-
-    it("should proceed normally when no pending state exists", async () => {
-      mockGetLineSession.mockResolvedValue(null)
-      const inner = makeInnerResolver("today_focus", 0.95)
-      const manager = new LinePendingStateManager("line-uid-1")
-      const adapter = new IntentResolverAdapter(inner as never, manager)
-
-      const result = await adapter.resolve({ message: "今天要做什麼" })
-
-      expect(result.object).toBe("today_focus")
-      expect(inner.resolve).toHaveBeenCalledOnce()
-    })
   })
 
   describe("FIX-2: 記 short-circuit", () => {
