@@ -35,6 +35,9 @@ class Task extends Equatable {
   // Recurring task link
   final String? recurringTaskId;     // 若非 null，此任務由週期任務模板生成
 
+  // Date-locked (event-type task, only shown on due_date day)
+  final bool dateLocked;
+
   const Task({
     required this.id,
     required this.content,
@@ -57,6 +60,7 @@ class Task extends Equatable {
     this.reminderTimezone,
     this.notificationId,
     this.recurringTaskId,
+    this.dateLocked = false,
   });
 
   /// 是否逾期 (截止日 < 今天)
@@ -104,6 +108,7 @@ class Task extends Equatable {
     reminderTimezone,
     notificationId,
     recurringTaskId,
+    dateLocked,
   ];
 
   Task copyWith({
@@ -124,6 +129,7 @@ class Task extends Equatable {
     String? reminderTimezone,
     int? notificationId,
     String? recurringTaskId,
+    bool? dateLocked,
   }) {
     return Task(
       id: this.id,
@@ -147,6 +153,7 @@ class Task extends Equatable {
       reminderTimezone: reminderTimezone ?? this.reminderTimezone,
       notificationId: notificationId ?? this.notificationId,
       recurringTaskId: recurringTaskId ?? this.recurringTaskId,
+      dateLocked: dateLocked ?? this.dateLocked,
     );
   }
 }

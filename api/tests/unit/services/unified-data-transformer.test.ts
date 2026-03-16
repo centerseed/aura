@@ -29,6 +29,7 @@ function makeTask(overrides: Partial<UnifiedRawData['allTasks'][0]> = {}): Unifi
     product_priority: null,
     inferred_from_milestone: null,
     date_source: null,
+    date_locked: false,
     ...overrides,
   }
 }
@@ -263,6 +264,50 @@ describe('UnifiedDataTransformer', () => {
         })
         const result = transformer.toPlanCollectedData(raw, TODAY, 'Asia/Taipei')
         expect(result.unscheduledTasks[0].productPriority).toBe('P2')
+      })
+    })
+
+    describe('date_locked 行為（透過 start_date=due_date 驅動）', () => {
+      const MARCH_18 = new Date('2026-03-18T00:00:00Z')
+      const MARCH_20 = new Date('2026-03-20T00:00:00Z')
+      const MARCH_22 = new Date('2026-03-22T00:00:00Z')
+
+      it('@ac1: date_locked task (start_date=due_date=3/20) NOT shown before start_date (today=3/18)', () => {
+        // date_locked 任務會在建立/更新時同步 start_date = due_date
+        // 因此 start_date 在未來 → Rule 2 的 start_date 檢查擋住
+        const raw = makeRawData({
+          allTasks: [makeTask({ id: 't-locked', start_date: MARCH_20, due_date: MARCH_20 })],
+        })
+        const result = transformer.toPlanCollectedData(raw, MARCH_18, 'Asia/Taipei')
+        expect(result.candidates).toHaveLength(0)
+      })
+
+      it('@ac2: date_locked task (start_date=due_date=3/20) IS shown on due_date (today=3/20)', () => {
+        const raw = makeRawData({
+          allTasks: [makeTask({ id: 't-locked', start_date: MARCH_20, due_date: MARCH_20 })],
+        })
+        const result = transformer.toPlanCollectedData(raw, MARCH_20, 'Asia/Taipei')
+        expect(result.candidates).toHaveLength(1)
+        expect(result.candidates[0].taskId).toBe('t-locked')
+      })
+
+      it('@ac5: non-date_locked task with due_date within 15 days still appears (default behavior)', () => {
+        const raw = makeRawData({
+          allTasks: [makeTask({ id: 't-normal', due_date: MARCH_22 })],
+        })
+        const result = transformer.toPlanCollectedData(raw, MARCH_18, 'Asia/Taipei')
+        expect(result.candidates).toHaveLength(1)
+        expect(result.candidates[0].taskId).toBe('t-normal')
+      })
+
+      it('overdue date_locked task (start_date=due_date=3/18, today=3/20) IS shown (Rule 1 逾期)', () => {
+        // 行為改變：逾期的 date_locked 任務現在會出現（比原本「消失」更合理）
+        const raw = makeRawData({
+          allTasks: [makeTask({ id: 't-locked-overdue', start_date: MARCH_18, due_date: MARCH_18 })],
+        })
+        const result = transformer.toPlanCollectedData(raw, MARCH_20, 'Asia/Taipei')
+        expect(result.candidates).toHaveLength(1)
+        expect(result.candidates[0].taskId).toBe('t-locked-overdue')
       })
     })
 

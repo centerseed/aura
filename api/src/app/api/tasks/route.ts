@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
       date_source: task.dateSource || null,
+      date_locked: task.dateLocked || false,
       updated_at: safeToISOStringRequired(task.updatedAt),
       created_at: safeToISOStringRequired(task.createdAt),
       references: task.references.map((r) => ({
@@ -217,6 +218,7 @@ export async function PATCH(request: NextRequest) {
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
       date_source: task.dateSource || null,
+      date_locked: task.dateLocked || false,
       updated_at: safeToISOStringRequired(task.updatedAt),
       created_at: safeToISOStringRequired(task.createdAt),
       references: task.references.map((r) => ({
@@ -344,6 +346,7 @@ export async function POST(request: NextRequest) {
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
       date_source: task.dateSource || null,
+      date_locked: task.dateLocked || false,
       updated_at: safeToISOStringRequired(task.updatedAt),
       created_at: safeToISOStringRequired(task.createdAt),
       references: task.references.map((r) => ({

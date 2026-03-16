@@ -82,6 +82,7 @@ export async function GET(
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
       date_source: task.dateSource || null,
+      date_locked: task.dateLocked || false,
       remind_at: safeToISOString(task.remindAt),
       reminder_enabled: task.reminderEnabled || false,
       reminder_timezone: task.reminderTimezone || null,
@@ -138,6 +139,7 @@ export async function PATCH(
       reminder_timezone,
       notification_id,
       recurring_task_id,
+      date_locked,
     } = body
 
     // 4. 執行 Use Case
@@ -159,6 +161,7 @@ export async function PATCH(
       reminderTimezone: reminder_timezone,
       notificationId: notification_id,
       recurringTaskId: recurring_task_id,
+      dateLocked: date_locked,
     })
 
     // 5. 格式化任務資料
@@ -200,6 +203,7 @@ export async function PATCH(
       time_confidence: task.timeConfidence || null,
       inferred_from_milestone: task.inferredFromMilestone || null,
       date_source: task.dateSource || null,
+      date_locked: task.dateLocked || false,
       remind_at: safeToISOString(task.remindAt),
       reminder_enabled: task.reminderEnabled || false,
       reminder_timezone: task.reminderTimezone || null,

@@ -154,6 +154,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
     String? topicId,
     double? timeConfidence,
     List<String>? tags,
+    bool? dateLocked,
   }) async {
     try {
       final requestBody = TaskRequestBuilder.buildUpdateRequestBody(
@@ -165,6 +166,7 @@ class TaskUnifiedRepository extends CachedRepository<Task, String>
         topicId: topicId,
         timeConfidence: timeConfidence,
         tags: tags,
+        dateLocked: dateLocked,
       );
 
       final model = await _apiClient.updateTask(taskId, requestBody);

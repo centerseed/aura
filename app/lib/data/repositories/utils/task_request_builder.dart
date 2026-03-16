@@ -33,6 +33,7 @@ class TaskRequestBuilder {
     bool? reminderEnabled,
     String? reminderTimezone,
     int? notificationId,
+    bool? dateLocked,
   }) {
     final body = <String, dynamic>{};
 
@@ -71,6 +72,9 @@ class TaskRequestBuilder {
     }
     if (notificationId != null) {
       body['notification_id'] = notificationId;
+    }
+    if (dateLocked != null) {
+      body['date_locked'] = dateLocked;
     }
 
     return body;

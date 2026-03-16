@@ -673,6 +673,8 @@ export class ExecuteBrainDumpUseCase {
             content: item.title,
             status: item.drawer as any,
             due_date: dueDate,
+            start_date: (item.date_locked && dueDate) ? dueDate : undefined,
+            date_locked: item.date_locked || false,
             inferred_from_milestone: inferredFromMilestone,
             time_confidence: timeConfidence,
             sub_items: [] as any,

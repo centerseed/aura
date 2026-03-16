@@ -36,6 +36,7 @@ interface RawTaskRow {
   remind_at: Date | null
   reminder_enabled: boolean
   date_source: string | null
+  date_locked: boolean
   reminder_timezone: string | null
   notification_id: number | null
   estimated_duration_hours: number | null
@@ -75,6 +76,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.time_confidence,
         t.inferred_from_milestone,
         t.date_source,
+        t.date_locked,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -125,6 +127,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.time_confidence,
         t.inferred_from_milestone,
         t.date_source,
+        t.date_locked,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -172,6 +175,7 @@ export class PrismaTaskRepository implements ITaskRepository {
         t.time_confidence,
         t.inferred_from_milestone,
         t.date_source,
+        t.date_locked,
         t.remind_at,
         t.reminder_enabled,
         t.reminder_timezone,
@@ -312,6 +316,9 @@ export class PrismaTaskRepository implements ITaskRepository {
         ...(data.dateSource !== undefined && {
           date_source: data.dateSource,
         }),
+        ...(data.dateLocked !== undefined && {
+          date_locked: data.dateLocked,
+        }),
         ...(data.actualDurationHours !== undefined && {
           actual_duration_hours: data.actualDurationHours,
         }),
@@ -430,6 +437,7 @@ export class PrismaTaskRepository implements ITaskRepository {
       timeConfidence: row.time_confidence,
       inferredFromMilestone: row.inferred_from_milestone,
       dateSource: row.date_source,
+      dateLocked: row.date_locked || false,
       remindAt: row.remind_at,
       reminderEnabled: row.reminder_enabled || false,
       reminderTimezone: row.reminder_timezone,

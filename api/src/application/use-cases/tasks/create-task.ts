@@ -73,6 +73,7 @@ export class CreateTaskUseCase {
       reminderTimezone: null,
       notificationId: null,
       dateSource: null,
+      dateLocked: false,
       estimatedDurationHours: null,
       actualDurationHours: null,
       recurringTaskId: null,

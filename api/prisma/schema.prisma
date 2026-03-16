@@ -187,6 +187,7 @@ model Task {
   reminder_timezone       String?                @db.VarChar(50)
   notification_id         Int?
   date_source             String?                @db.VarChar(10)
+  date_locked             Boolean                @default(false)
   completed_at            DateTime?              @db.Timestamp(6)
   estimated_duration_hours Float?
   actual_duration_hours    Float?

@@ -259,6 +259,7 @@ export function ReorganizeModal({
                 <span className="text-sm text-indigo-600 dark:text-indigo-300/70">
                   {currentTopicCount} → {newTopicCount} 個主題
                   {changedCount > 0 && `，${changedCount} 個任務移動`}
+                  {unchangedCount > 0 && `，${unchangedCount} 個不動`}
                 </span>
               </label>
 
@@ -321,7 +322,11 @@ export function ReorganizeModal({
                       };
                     });
                     const isNew = !proposal.current_topics.includes(cluster.topic_name);
-                    const movedTasks = tasksInCluster.filter(t => t.isMoved);
+                    // 只顯示移動的任務（未分類 → 新 Topic 也算移動）
+                    const visibleTasks = tasksInCluster.filter(t => t.isMoved && (!t.isFromUncategorized || isNew));
+
+                    // 沒有可見任務的 cluster 不渲染
+                    if (visibleTasks.length === 0) return null;
 
                     return (
                       <div key={idx} className="rounded-lg border border-slate-100 dark:border-white/5 overflow-hidden">
@@ -334,19 +339,19 @@ export function ReorganizeModal({
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">新</span>
                           )}
                           <span className="text-xs text-slate-400 dark:text-white/40 ml-auto">
-                            {cluster.task_ids.length} 個任務
+                            {visibleTasks.length} 個任務移動
                           </span>
                         </div>
-                        {/* Task list */}
+                        {/* Task list — 只顯示移動的任務 */}
                         <div className="px-3 py-2 space-y-1">
-                          {tasksInCluster.map(task => (
+                          {visibleTasks.map(task => (
                             <div key={task.id} className="flex items-start gap-2 text-xs py-0.5">
-                              <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${task.isMoved && !task.isFromUncategorized ? 'bg-amber-500' : 'bg-slate-300 dark:bg-white/30'}`} />
+                              <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 bg-amber-500" />
                               <div className="min-w-0 flex-1">
-                                <span className={`${task.isMoved && !task.isFromUncategorized ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-white/70'}`}>
+                                <span className="text-amber-700 dark:text-amber-300">
                                   {task.title}
                                 </span>
-                                {task.isMoved && !task.isFromUncategorized && (
+                                {!task.isFromUncategorized && (
                                   <span className="ml-2 text-slate-400 dark:text-white/30">
                                     從「{task.fromTopic}」移入
                                   </span>

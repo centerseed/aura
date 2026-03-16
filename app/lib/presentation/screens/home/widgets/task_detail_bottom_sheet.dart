@@ -48,6 +48,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   late DateTime? _selectedDueDate;
   late DateTime? _selectedRemindAt;
   late bool _reminderEnabled;
+  late bool _dateLocked;
   late String? _selectedProductId;
   late String? _selectedTopicId;
   String? _selectedAreaId;
@@ -78,6 +79,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
     _selectedDueDate = widget.task.dueDate;
     _selectedRemindAt = widget.task.remindAt;
     _reminderEnabled = widget.task.reminderEnabled;
+    _dateLocked = widget.task.dateLocked;
     _selectedProductId = widget.task.productId;
     _selectedTopicId = widget.task.topicId;
     _selectedStatus = widget.task.status;
@@ -209,6 +211,7 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
       dueDate: _selectedDueDate,
       productId: _selectedProductId,
       topicId: _selectedTopicId,
+      dateLocked: _dateLocked,
     ));
 
     await result.fold(
@@ -1172,6 +1175,10 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
                         _buildStatusRow(),
                         _buildDivider(),
                         _buildDatesRow(),
+                        if (_selectedDueDate != null) ...[
+                          _buildDivider(),
+                          _buildDateLockedRow(),
+                        ],
                         _buildDivider(),
                         _buildReminderRow(),
                         _buildDivider(),
@@ -1481,6 +1488,48 @@ class _TaskDetailBottomSheetState extends ConsumerState<TaskDetailBottomSheet> {
   }
 
   /// 提醒行
+  Widget _buildDateLockedRow() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            Icons.event,
+            size: 18,
+            color: _dateLocked ? AppColors.statusActive : colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('當日限定', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
+                Text(
+                  '僅在到期日當天列入代辦',
+                  style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 32,
+            child: FittedBox(
+              child: Switch(
+                value: _dateLocked,
+                onChanged: _isLoading ? null : (value) {
+                  setState(() => _dateLocked = value);
+                },
+                activeTrackColor: AppColors.statusActive,
+                activeThumbColor: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReminderRow() {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(

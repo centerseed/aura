@@ -25,6 +25,7 @@ abstract class TaskRepository {
     String? topicId,
     double? timeConfidence,
     List<String>? tags,
+    bool? dateLocked,
   });
 
   Future<Either<Failure, void>> deleteTask(String taskId);

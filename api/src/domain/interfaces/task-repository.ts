@@ -47,6 +47,7 @@ export interface TaskData {
   timeConfidence: number | null
   inferredFromMilestone: string | null
   dateSource: string | null
+  dateLocked: boolean
   remindAt: Date | null
   reminderEnabled: boolean
   reminderTimezone: string | null
@@ -109,6 +110,7 @@ export interface TaskUpdateData {
   reminderTimezone?: string | null
   notificationId?: number | null
   dateSource?: string | null
+  dateLocked?: boolean
   actualDurationHours?: number | null
   recurringTaskId?: string | null
 }

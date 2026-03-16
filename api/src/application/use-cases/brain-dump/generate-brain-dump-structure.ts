@@ -58,6 +58,9 @@ const StructuredItemSchema = z.object({
   estimated_days_needed: z.number().min(0.25).max(365).optional().describe("AI 估算完成此任務需要的天數（包含等待時間），最小值為 0.25（即 2 小時）"),
   depends_on_task: z.string().max(50).optional().describe("如果此任務依賴同批次的其他任務，填入該任務的 title"),
   time_confidence: z.number().min(0).max(1).optional().describe("Confidence score for time inference (0-1)"),
+  date_locked: z.boolean().default(false).describe(
+    "true = 事件型任務（去看展/參加婚禮/赴約），due_date 是發生點，只在當天列入代辦；false = 截止型任務（寫報告/準備提案），可提前完成"
+  ),
   sub_items: z.array(SubItemSchema).max(20).optional().describe("【清單模式強制填寫】當輸入格式為「主題：A、B、C」或「主題：1. A 2. B」時，必須將列表中的每個項目填入 sub_items，禁止將它們合併到 narrative。每個 sub-item 使用用戶的原話。最多 20 個，超過時只取前 20 個最重要的。"),
 })
 
@@ -824,6 +827,22 @@ due_date 格式：ISO 8601，如 2026-02-07T00:00:00+08:00
 - booking：需預約
 - preparation：需準備
 - execution：可立即執行
+
+## 4.5 當日限定判斷（date_locked）
+
+當任務有 due_date 時，判斷是事件型（date_locked: true）還是截止型（date_locked: false）：
+
+**date_locked = true（事件型，只在當天列入代辦）：**
+- 動詞暗示「出席/前往/到場」：去、參加、出席、看、觀看、體驗、赴約、接送
+- 受詞是外部固定事件：展覽、婚禮、活動、演出、會議（行事曆型）、比賽、儀式、面試
+- 用戶不能提前執行該任務——事件在那天才存在
+
+**date_locked = false（截止型，預設，可提前完成）：**
+- 動詞暗示「產出/完成」：寫、做、準備、完成、整理、提交
+- 受詞是用戶自己產出的東西
+- 可以提前完成
+
+**沒有 due_date 時不需要設定 date_locked（保持預設 false）**
 
 ## 5. Drawer 狀態
 

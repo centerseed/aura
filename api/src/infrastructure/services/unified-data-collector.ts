@@ -34,6 +34,7 @@ interface RawTask {
   product_priority: string | null
   inferred_from_milestone: string | null
   date_source: string | null
+  date_locked: boolean
 }
 
 interface RawSubTask {
@@ -169,6 +170,7 @@ export class UnifiedDataCollector implements IDataCollector {
       task_completed_at: Date | null
       task_milestone: string | null
       task_date_source: string | null
+      task_date_locked: boolean
       area_name: string
       product_id: string
       product_name: string
@@ -190,6 +192,7 @@ export class UnifiedDataCollector implements IDataCollector {
           t.completed_at as task_completed_at,
           t.inferred_from_milestone::text as task_milestone,
           t.date_source as task_date_source,
+          t.date_locked as task_date_locked,
           a.name as area_name,
           p.id::text as product_id,
           p.name as product_name,
@@ -245,6 +248,7 @@ export class UnifiedDataCollector implements IDataCollector {
       completed_at: row.task_completed_at,
       inferred_from_milestone: row.task_milestone,
       date_source: row.task_date_source,
+      date_locked: row.task_date_locked || false,
       area_name: row.area_name,
       product_id: row.product_id,
       product_name: row.product_name,

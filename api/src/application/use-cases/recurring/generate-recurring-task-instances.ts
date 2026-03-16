@@ -118,6 +118,7 @@ export class GenerateRecurringTaskInstancesUseCase {
           reminderTimezone: null,
           notificationId: null,
           dateSource: 'recurring',
+          dateLocked: false,
           estimatedDurationHours: template.estimatedDurationHours,
           actualDurationHours: null,
           recurringTaskId: template.id,

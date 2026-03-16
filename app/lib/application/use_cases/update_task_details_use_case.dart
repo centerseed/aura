@@ -15,6 +15,7 @@ class UpdateTaskDetailsParams {
   final String? topicId;
   final double? timeConfidence;
   final List<String>? tags;
+  final bool? dateLocked;
 
   const UpdateTaskDetailsParams({
     required this.taskId,
@@ -26,6 +27,7 @@ class UpdateTaskDetailsParams {
     this.topicId,
     this.timeConfidence,
     this.tags,
+    this.dateLocked,
   });
 }
 
@@ -47,6 +49,7 @@ class UpdateTaskDetailsUseCase extends UseCase<Task, UpdateTaskDetailsParams> {
       topicId: params.topicId,
       timeConfidence: params.timeConfidence,
       tags: params.tags,
+      dateLocked: params.dateLocked,
     );
   }
 }

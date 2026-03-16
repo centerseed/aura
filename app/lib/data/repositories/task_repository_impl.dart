@@ -77,6 +77,7 @@ class TaskRepositoryImpl implements TaskRepository {
     bool? reminderEnabled,
     String? reminderTimezone,
     int? notificationId,
+    bool? dateLocked,
   }) async {
     try {
       final requestBody = TaskRequestBuilder.buildUpdateRequestBody(
@@ -92,6 +93,7 @@ class TaskRepositoryImpl implements TaskRepository {
         reminderEnabled: reminderEnabled,
         reminderTimezone: reminderTimezone,
         notificationId: notificationId,
+        dateLocked: dateLocked,
       );
 
       final model = await _apiClient.updateTask(taskId, requestBody);

@@ -43,6 +43,7 @@ export interface UpdateTaskRequest {
   reminderTimezone?: string | null
   notificationId?: number | null
   recurringTaskId?: string | null
+  dateLocked?: boolean
 }
 
 export interface UpdateTaskResponse {
@@ -192,6 +193,38 @@ export class UpdateTaskUseCase {
     }
     if (request.recurringTaskId !== undefined) {
       updateData.recurringTaskId = request.recurringTaskId
+    }
+    if (request.dateLocked !== undefined) {
+      updateData.dateLocked = request.dateLocked
+    }
+
+    // date_locked ↔ start_date 連動邏輯
+    const effectiveDateLocked = request.dateLocked !== undefined
+      ? request.dateLocked
+      : existingTaskData.dateLocked
+    const effectiveDueDate = request.dueDate !== undefined
+      ? (request.dueDate ? new Date(request.dueDate) : null)
+      : existingTaskData.dueDate
+
+    if (request.dateLocked !== undefined) {
+      if (request.dateLocked && effectiveDueDate) {
+        // dateLocked 變為 true → start_date = due_date
+        task.setStartDate(effectiveDueDate)
+        updateData.startDate = effectiveDueDate
+      } else if (!request.dateLocked) {
+        // dateLocked 變為 false → 清除 start_date
+        task.setStartDate(null)
+        updateData.startDate = null
+      }
+    }
+
+    if (request.dueDate !== undefined && effectiveDateLocked) {
+      // due_date 變更且 dateLocked == true → 同步 start_date
+      const newDueDate = request.dueDate ? new Date(request.dueDate) : null
+      if (newDueDate) {
+        task.setStartDate(newDueDate)
+        updateData.startDate = newDueDate
+      }
     }
 
     // 5.6 用戶將 due_date 延後超過 3 天 → 清除 coach 設的 start_date
@@ -449,7 +482,8 @@ export class UpdateTaskUseCase {
       request.reminderEnabled !== undefined ||
       request.reminderTimezone !== undefined ||
       request.notificationId !== undefined ||
-      request.recurringTaskId !== undefined
+      request.recurringTaskId !== undefined ||
+      request.dateLocked !== undefined
 
     if (!hasUpdate) {
       throw new ValidationException('No update data provided', 'data')

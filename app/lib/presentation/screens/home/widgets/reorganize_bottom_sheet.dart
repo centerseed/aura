@@ -73,6 +73,10 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
         .expand((c) => c.tasks)
         .where((t) => t.isMoved && !t.isFromUncategorized)
         .length;
+    final unchangedCount = topicChanges
+        .expand((c) => c.tasks)
+        .where((t) => !t.isMoved)
+        .length;
     final hasTopicOps = visibleTopicOps.isNotEmpty;
     final hasChanges = changedCount > 0 || hasTopicOps || topicChanges.any((c) => c.isNew);
     final nothingSelected = !_applyTopicOps && !_applyConsolidations;
@@ -133,7 +137,8 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                       icon: Icons.auto_awesome,
                       title: '主題重組',
                       subtitle: '$currentTopicCount → $newTopicCount 個主題'
-                          '${changedCount > 0 ? '，$changedCount 個任務移動' : ''}',
+                          '${changedCount > 0 ? '，$changedCount 個任務移動' : ''}'
+                          '${unchangedCount > 0 ? '，$unchangedCount 個不動' : ''}',
                       checked: _applyTopicOps,
                       onChecked: (v) => setState(() => _applyTopicOps = v),
                       dimmed: !_applyTopicOps,
@@ -173,8 +178,10 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                             ),
                           ],
 
-                          // Cluster 分配
-                          ...topicChanges.map((change) => Padding(
+                          // Cluster 分配（只顯示有移動任務的 cluster）
+                          ...topicChanges.where((change) =>
+                            change.tasks.any((t) => t.isMoved && (!t.isFromUncategorized || change.isNew))
+                          ).map((change) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: _buildClusterCard(change),
                           )),
@@ -520,8 +527,13 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
     );
   }
 
-  // ─── Cluster card ───
+  // ─── Cluster card（只顯示移動的任務） ───
   Widget _buildClusterCard(_TopicChange change) {
+    // 只顯示有移動的任務（未分類 → 新 Topic 也算移動）
+    final visibleTasks = change.tasks
+        .where((t) => t.isMoved && (!t.isFromUncategorized || change.isNew))
+        .toList();
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainer,
@@ -580,7 +592,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                     ),
                   ),
                 Text(
-                  '${change.totalTasks} 個任務',
+                  '${visibleTasks.length} 個任務移動',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 12,
@@ -589,12 +601,12 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
               ],
             ),
           ),
-          // 任務列表
+          // 任務列表（只顯示移動的）
           Padding(
             padding: const EdgeInsets.all(10),
             child: Column(
-              children: change.tasks.map((task) {
-                final showMovement = task.isMoved && !task.isFromUncategorized;
+              children: visibleTasks.map((task) {
+                final showFromLabel = !task.isFromUncategorized;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 5),
                   child: Row(
@@ -606,9 +618,7 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                           width: 5,
                           height: 5,
                           decoration: BoxDecoration(
-                            color: showMovement
-                                ? AppColors.statusInbox
-                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                            color: AppColors.statusInbox,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -621,13 +631,11 @@ class _ReorganizeBottomSheetState extends State<ReorganizeBottomSheet> {
                             Text(
                               task.title,
                               style: TextStyle(
-                                color: showMovement
-                                    ? AppColors.statusInbox
-                                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                                color: AppColors.statusInbox,
                                 fontSize: 13,
                               ),
                             ),
-                            if (showMovement)
+                            if (showFromLabel)
                               Padding(
                                 padding: const EdgeInsets.only(top: 2),
                                 child: Text(

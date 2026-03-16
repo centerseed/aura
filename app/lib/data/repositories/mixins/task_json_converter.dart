@@ -24,6 +24,7 @@ mixin TaskJsonConverter {
         'topic': item.topicName,
       },
       'tags': item.tags,
+      'date_locked': item.dateLocked,
       'created_at': item.createdAt?.toIso8601String(),
       'updated_at': item.updatedAt?.toIso8601String(),
       'deleted_at': item.deletedAt?.toIso8601String(),

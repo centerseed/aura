@@ -21,6 +21,7 @@ export interface UnifiedRawData {
     product_priority: string | null
     inferred_from_milestone: string | null
     date_source: string | null
+    date_locked: boolean
   }>
   allSubTasks: Array<{
     id: string
